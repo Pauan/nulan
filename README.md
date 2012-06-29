@@ -26,7 +26,7 @@ For a quick taste of how it looks, here's some standard list utilities:
 
 If you've used a Lisp before, you might have noticed something: there's very few parens in the above code!
 
-This is because Nulan uses significant whitespace (like Python and Haskell) and two special syntax operators: `:` and `;`.
+This is because Nulan uses significant whitespace (like Python and Haskell) and two special syntax operators: `:` and `;`
 
 This lets you write Lisp code in a style that has very few parens, but has a very simple translation to S-expressions, which means it works predictably with macros and fexprs.
 

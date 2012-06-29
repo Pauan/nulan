@@ -61,7 +61,7 @@ $def! map: type list? fn?
 
 $set! $defvau! ; $vau Env [Name | Fns]
   $let: Args: uniq
-    eval Env [$set! Name: $vau ($quote &Env) Args: case Args | Fns]
+    eval Env [$set! Name: $vau ($quote %Env) Args: case Args | Fns]
 
 ##############################################################################
 #  $use
@@ -94,7 +94,7 @@ $defvau! $and
   [X]     -> eval X
   [X | R] -> $if (eval X): eval [$and | R]
 
-$def! not:  X -> $if X &f &t
+$def! not:  X -> $if X %f %t
 $set! all:  [X | R] F -> $and (F X) (all R F)
 $set! none: [X | R] F -> $and (not: F X) (none R F)
 

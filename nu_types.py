@@ -62,16 +62,18 @@ def nu_lambda(name):
 #  Types
 ##############################################################################
 class W_Stream:
-  def __init__(self, iterable):
-    self._iter      = iter(iterable)
+  def __init__(self, next, name=""):
+    self._next      = next #iter(iterable)
     self._empty     = False
     self._at_start  = True
+    self.filename   = name
     self.old_indent = 0
     self.indent     = 0
     self.line       = 1
     self.column     = 0
+    self.seen       = ""
     try:
-      self._peeked = self._iter.next()
+      self._peeked = self._next()
     except StopIteration:
       self._empty = True
 
@@ -92,6 +94,7 @@ class W_Stream:
         self.indent     = 0
         self.line      += 1
         self.column     = 0
+        self.seen       = ""
       else:
         if old in " \t":
           if self._at_start:
@@ -99,8 +102,9 @@ class W_Stream:
         else:
           self._at_start = False
         self.column += 1
+        self.seen += old
       try:
-        self._peeked = self._iter.next()
+        self._peeked = self._next()
       except StopIteration:
         self._empty = True
       return old

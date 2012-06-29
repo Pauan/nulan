@@ -10,14 +10,27 @@ from nu_types import *
 #    raise SyntaxError("{} is not valid hexadecimal".format(x))
 
 def from_hex(args):
-  for x in args:
-    if not x in "0123456789ABCDEF":
-      raise SyntaxError("{} is not valid hexadecimal".format(x))
   return int("".join(args), 16)
   #return sum(from_hex1(x) * (16 ** i) for i, x in enumerate(reversed(args)))
 
 def to_hex(x):
   return "{:0=4X}".format(x)
+
+
+class W_SyntaxError(SyntaxError):
+  def __init__(self, message, s):
+    SyntaxError.__init__(self, message,
+      (s.filename, s.line, s.column, None if s.seen.isspace() else s.seen))
+  def __str__(self):
+    x = "{}: {!s} (line {}, column {})".format(type(self).__name__,
+                                               self.msg,
+                                               self.lineno,
+                                               self.offset)
+    if self.text:
+      x += ":\n  {}\n {}{}".format(self.text, " " * self.offset, "^")
+    return x
+
+W_SyntaxError.__name__ = "SyntaxError"
 
 
 char_white  = " \n"
@@ -74,7 +87,7 @@ def parse_inside_parens(chars, fn, s):
           #  result.append(fn(y, line, column))
           #result = list_to_cons(result)
         else:
-          raise SyntaxError("illegal use of |")
+          raise W_SyntaxError("illegal use of |", s)
       ## TODO: proper line and column
       #return result #fn(result, line, column)
     elif c == "-":
@@ -106,7 +119,7 @@ def parse_recursive_until(sym):
         #if x:
         #  return fn(x, line, column)
       except StopIteration:
-        raise SyntaxError("missing ending {} brackets".format(sym))
+        raise W_SyntaxError("missing ending {} brackets".format(sym), s)
       #return fn(list_to_cons(result), line, column)
     return wrapped
   return decorator
@@ -138,7 +151,7 @@ def parse_string(sym):
           fn(result, s, info)
         s.read()
       except StopIteration:
-        raise SyntaxError("missing ending {} quote".format(q))
+        raise W_SyntaxError("missing ending {} quote".format(q), s)
       x = W_Cons(sym, list_to_cons(result))
       x.line   = info["line"]
       x.column = info["column"]
@@ -279,7 +292,7 @@ def read_inside_top(unwrap, chars, indent, fn, s):
               except StopIteration:
                 pass
             else:
-              raise SyntaxError("illegal use of |")
+              raise W_SyntaxError("illegal use of |", s)
         except StopIteration:
           return W_Cons(w_apply, result) #list_to_cons(result).join(x)
       elif c == "-":
@@ -363,11 +376,19 @@ def parse_single_string(result, s, info):
         c.tostring = "\\t"
       elif c == "u":
         s.read()
-        h = s.read() + s.read() + s.read() + s.read()
+        h = []
+        for i in range(4):
+          x = s.read()
+          h.append(x)
+          if not x in "0123456789ABCDEF":
+            raise W_SyntaxError("{} is not valid hexadecimal".format(x), s)
+        h = "".join(h)
         c = W_Char(unichr(from_hex(h)))
         c.tostring = "\\u{}".format(h)
       else:
-        raise SyntaxError("unknown escape sequence {}".format(c))
+        s.read()
+        #result = "'{}\\{} ...'".format("".join(x.value for x in result), c)
+        raise W_SyntaxError("unknown escape sequence {}".format(c), s) #result
     else:
       c = W_Char(c)
     c.line   = s.line
@@ -420,7 +441,7 @@ def parse_comment(s):
           break
       s.read()
     except StopIteration:
-      raise SyntaxError("missing ending |# block")
+      raise W_SyntaxError("missing ending |# block", s)
   else:
     try:
       while s.read() != "\n":
@@ -500,12 +521,15 @@ def read1(s):
   elif c in char_sym:
     return parse_num_or_symbol(s)
   else:
-    raise SyntaxError("invalid character {}".format(c))
+    s.read()
+    raise W_SyntaxError("invalid character {}".format(c), s)
 
 def read(s, eof):
-  s = W_Stream(s)
   try:
     #return read1(s)
     return read_top(s)
   except StopIteration:
     return eof
+
+def readstring(s, eof):
+  return read(W_Stream(iter(s).next), eof)
