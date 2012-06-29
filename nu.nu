@@ -8,11 +8,6 @@ $set! $fn; $vau Env [Args | Body]
   wrap: eval Env [$vau ~ Args | Body]
   #eval Env [| Args -> | Body]
 
-# TODO: cons isn't actually used, it's only included here because it is conceptually attached to car/cdr
-$set! cons: X R -> [X | R]
-$set! car: [X | R] -> X
-$set! cdr: [X | R] -> R
-
 # ($let X)         => X
 # ($let (X Y) ...) => ((X -> ($let ...)) Y)
 $set! $let; $vau Env [X | R]
@@ -82,21 +77,25 @@ $def! make-base-env
 $defvau! $use
   | Args -> each Args; X ->
               $let: New: make-base-env
-                $hook New $env-get-if-unbound
+                $hook New %env-get-if-unbound
                   K -> eval K New
-                load-file New X
+                load-file-in New: find-file X
+                eval %Env [$set! (strip-extension:basename X) New]
 
 ##############################################################################
 #  Other utilities
 ##############################################################################
 
-# 9 vau
 $defvau! $and
   [X]     -> eval X
   [X | R] -> $if (eval X): eval [$and | R]
 
-$set! all:  [X | R] F -> $and (F X) (all R F)
-$set! none: [X | R] F -> $and (not: F X) (none R F)
+$def! all:  [X | R] F -> $and (F X):      all  R F
+$def! none: [X | R] F -> $and (not: F X): none R F
+
+$def! cons: X R -> [X | R]
+$def! car: [X | R] -> X
+$def! cdr: [X | R] -> R
 
 $def! fold: type list? fn?
   [X Y | R] F -> fold [(F X Y) | R] F
@@ -118,28 +117,15 @@ $def! rem: type list? fn?
                  rem R F
   X       ~ -> X
 
+# (zip [a 1] [b 2] [c 3]) => [[a b c] [1 2 3]]
+           # TODO: type needs to work with varargs
 $def! zip: type | list?
-#  []       ~        -> []
-#  ~        []       -> []
-#  [X | R1] [Y | R2] -> [[X Y] | (zip R1 R2)]
   | Args -> $if: some Args null?
               []
               [(map Args car) | (zip | (map Args cdr))]
 
 $def! id:   X -> X
 $def! copy: X -> map X id
-
-#|
-# TODO: copy needs to type check when applied to a dotted list
-$def! copy: type list?
-  [X | R] -> [X | (copy R)]
-  X       -> X
-|#
-
-$def! pair: type list?
-  [X Y | R] I -> [[X Y] | (pair R I)]
-  [X]       I -> [[X I]]
-  X           -> pair X []
 
 $def! join: type list? ~
   [X | R] Y -> [X | (join R Y)]
@@ -150,9 +136,10 @@ $def! ref: type list? ~
   [~ ~ | R] K -> ref R K
 
 #|
-$defvau! $lets
-  [X]         -> eval X
-  [[X Y] | R] -> eval [$let X Y [$lets | R]]
+$def! pair: type list?
+  [X Y | R] I -> [[X Y] | (pair R I)]
+  [X]       I -> [[X I]]
+  X           -> pair X []
 |#
 
 $defvau! $def-if! ; Name Test | Fns ->

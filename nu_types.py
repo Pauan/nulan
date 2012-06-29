@@ -123,7 +123,7 @@ class w_VariableError(w_BaseError):
 ##############################################################################
 #  Types
 ##############################################################################
-class w_Stream:
+class w_Stream(object):
   def __init__(self, next, name=""):
     self._next      = next #iter(iterable)
     self._empty     = False
@@ -179,7 +179,7 @@ class w_Stream:
     return self
 
 ## Generic stuff for chars, symbols, numbers, etc.
-class w_Base:
+class w_Base(object):
   def __init__(self, value):
     self.value = value
   def __str__(self):
@@ -234,7 +234,7 @@ class w_Symbol(w_Base):
   def __repr__(self):
     return "(&symbol {})".format(self.value)
 
-class w_Uniq:
+class w_Uniq(object):
   counter = 1
   def __init__(self):
     self.counter = w_Uniq.counter
@@ -242,7 +242,7 @@ class w_Uniq:
   def __repr__(self):
     return "(&uniq {})".format(self.counter)
 
-class w_Nil:
+class w_Nil(object):
   def __repr__(self):
     return "[]"
   def join(self, y):
@@ -371,7 +371,7 @@ class w_Cons(w_Nil):
         raise TypeError("cannot convert {} to a string".format(repr(self)))
     return "".join(result)
 
-class w_Env:
+class w_Env(object):
   def __init__(self, parent):
     self.variables = {}
     self.parent = parent
@@ -392,7 +392,7 @@ class w_GlobalEnv(w_Env):
     except KeyError:
       raise w_VariableError(name)
 
-class w_Vau:
+class w_Vau(object):
   def __init__(self, closure, env, args, body):
     self.closure = closure
     self.args    = args
@@ -431,7 +431,7 @@ class w_Builtin(w_Vau):
   def __call__(self, env, args):
     return self.value(env, args)
 
-class w_Wrapped:
+class w_Wrapped(object):
   def __init__(self, f):
     self.value = f
   def __repr__(self):
