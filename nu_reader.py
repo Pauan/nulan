@@ -17,22 +17,6 @@ def to_hex(x):
   return "{:0=4X}".format(x)
 
 
-class W_SyntaxError(SyntaxError):
-  def __init__(self, message, s):
-    SyntaxError.__init__(self, message,
-      (s.filename, s.line, s.column, None if s.seen.isspace() else s.seen))
-  def __str__(self):
-    x = "{}: {!s} (line {}, column {})".format(type(self).__name__,
-                                               self.msg,
-                                               self.lineno,
-                                               self.offset)
-    if self.text:
-      x += ":\n  {}\n {}{}".format(self.text, " " * self.offset, "^")
-    return x
-
-W_SyntaxError.__name__ = "SyntaxError"
-
-
 char_white  = " \n"
 char_num    = "0123456789"
 char_lower  = "abcdefghijklmnopqrstuvwxyz"
@@ -70,7 +54,7 @@ def parse_inside_parens(chars, fn, s):
         s.read()
       c = s.peek()
       if c in chars:
-        return W_Cons(w_apply, fn(result, line, column)) #.join(x)
+        return w_Cons(w_apply, fn(result, line, column)) #.join(x)
       else:
         #c = s.read()
         #print c
@@ -78,7 +62,7 @@ def parse_inside_parens(chars, fn, s):
         s.read()
         if c == "-" and s.peek() == ">":
           s.read()
-          result = [w_arrow, W_Cons(w_apply, W_Cons(w_list, result))]
+          result = [w_arrow, w_Cons(w_apply, w_Cons(w_list, result))]
           #list_to_cons(result).join(x)
           #y = parse_inside_parens(chars, fn, s)
           #if y.cdr == w_nil:
@@ -87,14 +71,14 @@ def parse_inside_parens(chars, fn, s):
           #  result.append(fn(y, line, column))
           #result = list_to_cons(result)
         else:
-          raise W_SyntaxError("illegal use of |", s)
+          raise w_SyntaxError("illegal use of |", s)
       ## TODO: proper line and column
       #return result #fn(result, line, column)
     elif c == "-":
       s.read()
       if s.peek() == ">":
         s.read()
-        result = [w_arrow, W_Cons(w_list, list_to_cons(result))]
+        result = [w_arrow, w_Cons(w_list, list_to_cons(result))]
       else:
         # TODO: not sure how this will interact with infix math -
         result.append(parse_symbol([c], line, column, s))
@@ -119,7 +103,7 @@ def parse_recursive_until(sym):
         #if x:
         #  return fn(x, line, column)
       except StopIteration:
-        raise W_SyntaxError("missing ending {} brackets".format(sym), s)
+        raise w_SyntaxError("missing ending {} brackets".format(sym), s)
       #return fn(list_to_cons(result), line, column)
     return wrapped
   return decorator
@@ -127,12 +111,12 @@ def parse_recursive_until(sym):
 #def parse_column(sym, wrap):
 #  def wrapped(c, s):
 #    x = read_top(s.column, s.read(), s)
-#    if isinstance(x, W_Cons):
-#      x.car = W_Symbol(sym)
+#    if isinstance(x, w_Cons):
+#      x.car = w_Symbol(sym)
 #      if wrap:
-#        x.cdr = W_Cons(W_Cons(W_Symbol("&round-brackets"), x.cdr), w_nil)
+#        x.cdr = w_Cons(w_Cons(w_Symbol("&round-brackets"), x.cdr), w_nil)
 #    else:
-#      x = W_Cons(W_Symbol(sym), W_Cons(x, w_nil))
+#      x = w_Cons(w_Symbol(sym), w_Cons(x, w_nil))
 #    return x
 #  return wrapped
 
@@ -151,8 +135,8 @@ def parse_string(sym):
           fn(result, s, info)
         s.read()
       except StopIteration:
-        raise W_SyntaxError("missing ending {} quote".format(q), s)
-      x = W_Cons(sym, list_to_cons(result))
+        raise w_SyntaxError("missing ending {} quote".format(q), s)
+      x = w_Cons(sym, list_to_cons(result))
       x.line   = info["line"]
       x.column = info["column"]
       return x
@@ -183,7 +167,7 @@ def parse_string(sym):
 #            body.append(x)
 #          ## TODO: ugly hack
 #          except Infixer as e:
-#            infix = W_Symbol(e.name)
+#            infix = w_Symbol(e.name)
 #            left  = list_to_cons(body)
 #            body  = []
 #            #column = s.column
@@ -224,10 +208,10 @@ def parse_string(sym):
 #        body = list_to_cons(body)
 #        if infix:
 #          #print repr(body.cdr)
-#          #body = W_Cons(W_Cons(W_Symbol("&round-brackets"), body), w_nil)
-#          return W_Cons(infix, W_Cons(left, body))
+#          #body = w_Cons(w_Cons(w_Symbol("&round-brackets"), body), w_nil)
+#          return w_Cons(infix, w_Cons(left, body))
 #        else:
-#          return W_Cons(W_Symbol(sym), body)
+#          return w_Cons(w_Symbol(sym), body)
 #    return wrapped
 #  return decorator
 
@@ -245,7 +229,7 @@ def parse_string(sym):
 #def parse_backslash(c, s):
 #  #s.read()
 #  x = read_top(s.indent, s.peek(), s)
-#  x.car = W_Symbol("&backslash")
+#  x.car = w_Symbol("&backslash")
 #  return x
 #  #try:
 #  #  x = read_top(s.indent, c, s)
@@ -285,21 +269,21 @@ def read_inside_top(unwrap, chars, indent, fn, s):
             s.read()
             if c == "-" and s.peek() == ">":
               s.read()
-              result = [w_arrow, W_Cons(w_apply, W_Cons(w_list, result))]
+              result = [w_arrow, w_Cons(w_apply, w_Cons(w_list, result))]
               # list_to_cons(result).join(x)
               try:
                 result.append(read_inside_top(True, chars, indent, lambda: False, s))
               except StopIteration:
                 pass
             else:
-              raise W_SyntaxError("illegal use of |", s)
+              raise w_SyntaxError("illegal use of |", s)
         except StopIteration:
-          return W_Cons(w_apply, result) #list_to_cons(result).join(x)
+          return w_Cons(w_apply, result) #list_to_cons(result).join(x)
       elif c == "-":
         s.read()
         if s.peek() == ">":
           s.read()
-          result = [w_arrow, W_Cons(w_list, list_to_cons(result))]
+          result = [w_arrow, w_Cons(w_list, list_to_cons(result))]
           try:
             result.append(read_inside_top(True, chars, indent, lambda: False, s))
           except StopIteration:
@@ -343,14 +327,14 @@ def parse_round_bracket(x, line, column):
 
 @parse_recursive_until("]")
 def parse_square_bracket(result, line, column):
-  x = W_Cons(w_list, result)
+  x = w_Cons(w_list, result)
   x.line   = line
   x.column = column
   return x
 
 #def parse_bar(s):
 #  #s.read()
-#  return W_Cons(W_Symbol("&bar"), W_Cons(read1(s), w_nil))
+#  return w_Cons(w_Symbol("&bar"), w_Cons(read1(s), w_nil))
 
 @parse_string(w_string)
 def parse_single_string(result, s, info):
@@ -365,14 +349,14 @@ def parse_single_string(result, s, info):
       c = s.peek()
       if c == info["start_quote"] or c in "\\@":
         c = s.read()
-        c = W_Char(c)
+        c = w_Char(c)
       elif c == "n":
         s.read()
-        c = W_Char("\n")
+        c = w_Char("\n")
         c.tostring = "\\n"
       elif c == "t":
         s.read()
-        c = W_Char("\t")
+        c = w_Char("\t")
         c.tostring = "\\t"
       elif c == "u":
         s.read()
@@ -381,23 +365,23 @@ def parse_single_string(result, s, info):
           x = s.read()
           h.append(x)
           if not x in "0123456789ABCDEF":
-            raise W_SyntaxError("{} is not valid hexadecimal".format(x), s)
+            raise w_SyntaxError("{} is not valid hexadecimal".format(x), s)
         h = "".join(h)
-        c = W_Char(unichr(from_hex(h)))
+        c = w_Char(unichr(from_hex(h)))
         c.tostring = "\\u{}".format(h)
       else:
         s.read()
         #result = "'{}\\{} ...'".format("".join(x.value for x in result), c)
-        raise W_SyntaxError("unknown escape sequence {}".format(c), s) #result
+        raise w_SyntaxError("unknown escape sequence {}".format(c), s) #result
     else:
-      c = W_Char(c)
+      c = w_Char(c)
     c.line   = s.line
     c.column = s.column
     result.append(c)
 
 @parse_string(w_string)
 def parse_raw_string(result, s, info):
-  c = W_Char(s.read())
+  c = w_Char(s.read())
   c.line   = s.line
   c.column = s.column
   result.append(c)
@@ -441,7 +425,7 @@ def parse_comment(s):
           break
       s.read()
     except StopIteration:
-      raise W_SyntaxError("missing ending |# block", s)
+      raise w_SyntaxError("missing ending |# block", s)
   else:
     try:
       while s.read() != "\n":
@@ -457,7 +441,7 @@ def parse_symbol(result, line, column, s):
       result.append(s.read())
   except StopIteration:
     pass
-  x = W_Symbol("".join(result))
+  x = w_Symbol("".join(result))
   x.line   = line
   x.column = column
   return x
@@ -482,7 +466,7 @@ def parse_num_or_symbol(s):
         break
   except StopIteration:
     pass
-  return W_Number("".join(result))
+  return w_Number("".join(result))
 
 def read1(s):
   c = s.peek()
@@ -522,7 +506,7 @@ def read1(s):
     return parse_num_or_symbol(s)
   else:
     s.read()
-    raise W_SyntaxError("invalid character {}".format(c), s)
+    raise w_SyntaxError("invalid character {}".format(c), s)
 
 def read(s, eof):
   try:
@@ -532,4 +516,4 @@ def read(s, eof):
     return eof
 
 def readstring(s, eof):
-  return read(W_Stream(iter(s).next), eof)
+  return read(w_Stream(iter(s).next), eof)

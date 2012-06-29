@@ -9,10 +9,10 @@
 >>> def error(f, x):
 ...   try:
 ...     return f(x)
-...   except W_SyntaxError as e:
+...   except w_SyntaxError, w_BaseError as e:
 ...     print e
-...   except Exception as e:
-...     print "{}: {}".format(type(e).__name__, e.message)
+#...   except Exception as e:
+#...     print "{}: {}".format(type(e).__name__, e.message)
 
 ##############################################################################
 #  Strings

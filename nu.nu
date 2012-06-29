@@ -18,16 +18,15 @@ $set! cdr: [X | R] -> R
 $set! $let; $vau Env [X | R]
   eval Env: $if: null? R
               X
-              [[(car X) -> : $let | R] (car:cdr X)]
-
-
               :[X Y] -> [[X -> : $let | R] Y]
                X
 
-              :[X Y] -> [[$fn [X]: $let | R] Y]
-               X
+              #[[(car X) -> : $let | R] (car:cdr X)]
 
-              [[$fn [(car X)]: $let | R] (car:cdr X)]
+              #:[X Y] -> [[$fn [X]: $let | R] Y]
+              # X
+
+              #[[$fn [(car X)]: $let | R] (car:cdr X)]
 
 # ($let (X 5) X)       => 5
 # ($let (X 5)
@@ -45,6 +44,8 @@ $set! case: X | Fns -> any Fns: F -> F | X
 $set! $def! ; $vau Env [Name | Fns]
   $let: Args: uniq
     eval Env [$set! Name: $fn Args: case Args | Fns]
+
+$def! not: X -> $if X %f %t
 
 $def! type; $fn Fns
   $fn Args
@@ -94,7 +95,6 @@ $defvau! $and
   [X]     -> eval X
   [X | R] -> $if (eval X): eval [$and | R]
 
-$def! not:  X -> $if X %f %t
 $set! all:  [X | R] F -> $and (F X) (all R F)
 $set! none: [X | R] F -> $and (not: F X) (none R F)
 
