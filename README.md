@@ -10,9 +10,9 @@ For a quick taste of how it looks, here's some standard list utilities:
       X       ~ -> X
 
     $def! each: type list? fn?
-      [X | R] F -> (F X): each R F
+      [X | R] F -> F X; each R F
 
-    $def! fold: type list? fn?
+    $def! fold:  type list? fn?
       [X Y | R] F -> fold [(F X Y) | R] F
       X         ~ -> X
 

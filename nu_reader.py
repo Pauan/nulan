@@ -24,7 +24,7 @@ def parse_inside_parens(chars, fn, s):
       result.append(parse_inside_parens(chars + ";", fn, s))
     elif c == ";":
       s.read()
-      result.append(parse_inside_parens(chars, fn, s))
+      result.append(parse_inside_parens(chars + ";", fn, s))
     elif c == "|":
       s.read()
       result.append(read1(s))
@@ -109,7 +109,7 @@ def read_inside_top(unwrap, chars, indent, fn, s):
       elif c == ";":
         s.read()
         column = s.column
-        result.append(read_inside_top(False, chars, indent, lambda: s.indent < column, s))
+        result.append(read_inside_top(True, chars + ";", indent, lambda: s.indent < column, s))
       elif c == "|":
         s.read()
         result.append(read1(s))
@@ -126,7 +126,7 @@ def read_inside_top(unwrap, chars, indent, fn, s):
               s.read()
               result = [w_arrow, w_Cons(w_apply, w_Cons(w_list, result))]
               try:
-                result.append(read_inside_top(True, chars, indent, lambda: False, s))
+                result.append(read_inside_top(True, chars + ";", indent, lambda: False, s))
               except StopIteration:
                 pass
             else:
@@ -139,7 +139,7 @@ def read_inside_top(unwrap, chars, indent, fn, s):
           s.read()
           result = [w_arrow, w_Cons(w_list, list_to_cons(result))]
           try:
-            result.append(read_inside_top(True, chars, indent, lambda: False, s))
+            result.append(read_inside_top(True, chars + ";", indent, lambda: False, s))
           except StopIteration:
             pass
         else:

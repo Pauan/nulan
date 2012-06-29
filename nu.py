@@ -3,7 +3,7 @@ import readline
 
 sys.dont_write_bytecode = True
 
-from nu_reader import *
+#from nu_reader import *
 
 eof = {}
 
@@ -23,6 +23,6 @@ def repl():
 
 
 if __name__ == "__main__":
-  #import doctest
-  #doctest.testfile("tests/nu_reader.py")
-  repl()
+  import doctest
+  doctest.testfile("tests/nu_reader.py")
+  #repl()

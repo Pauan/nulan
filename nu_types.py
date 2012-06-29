@@ -96,12 +96,9 @@ class w_BaseError(Exception):
   def __str__(self):
     return "error: {}".format(self.message)
 
-class w_TypeError(w_BaseError):
-  pass
-
 class w_SyntaxError(w_BaseError, SyntaxError):
   def __init__(self, message, s, line=None, column=None, text=None, filename=None):
-    self.message  = message
+    self.msg      = message
     self.lineno   = line     or s.line
     self.offset   = column   or s.column
     self.text     = text     or (None if s.seen.isspace() else s.seen)
@@ -515,10 +512,12 @@ def w_error(env, args):
 
 @nu_lambda("eval")
 def w_eval(env, args):
-  if args.cdr.cdr != w_nil:
-    return w_false
+  if args.cdr == w_nil:
+    return eval_(eval_(env, w_Symbol("%Env")), args.car)
+  elif args.cdr.cdr == w_nil:
+    return eval_(eval_(env, args.car), args.cdr.car)
   else:
-    return eval_(env, args.cdr.car)
+    return w_false
 
 @nu_lambda("fn?")
 def w_fnq(env, args):
@@ -530,14 +529,11 @@ def w_fnq(env, args):
     else:
       return w_false
 
-@nu_lambda("null?")
-def w_nullq(env, args):
-  if args.cdr != w_nil:
-    return w_false
-  elif args.car == w_nil:
-    return args.car
-  else:
-    return w_false
+@nu_lambda("is")
+def w_is(env, args):
+  while args.car == args.cdr.car:
+    args = args.cdr
+  return w_false
 
 @nu_lambda("uniq")
 def w_uniq(env, args):
@@ -583,7 +579,7 @@ glob = w_GlobalEnv({
   "error"  : w_error,
   "eval"   : w_eval,
   "fn?"    : w_fnq,
-  "null?"  : w_nullq,
+  "is"     : w_is,
   "uniq"   : w_uniq,
   "unwrap" : w_unwrap,
   "vau?"   : w_vauq,
