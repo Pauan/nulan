@@ -178,35 +178,13 @@ class w_Stream:
   def __iter__(self):
     return self
 
-#class w_Char:
-#  interned = {}
-#  def __init__(self, value):
-#    self.value = value
-#  def __repr__(self):
-#    if self.value in "\"\\@":
-#      return "\\{}".format(self.value)
-#    elif self.value == "\n":
-#      return "\\n"
-#    elif self.value == "\t":
-#      return "\\t"
-#    else:
-#      return repr(self.value)
-#
-#def char(x):
-#  if not x in w_Char.interned:
-#    w_Char.interned[x] = w_Char(x)
-#  return w_Char.interned[x]
-
-## Generic stuff for symbols and chars
+## Generic stuff for chars, symbols, numbers, etc.
 class w_Base:
   def __init__(self, value):
     self.value = value
   def __str__(self):
     return str(self.value)
   def __repr__(self):
-    #self.line = None
-    #self.column = None
-    #return "{} at {}x{}".format(self.value, self.line, self.column)
     return repr(self.value)
   def __eq__(self, x):
     return self.value == x
@@ -237,11 +215,6 @@ class w_Char(w_Base):
         return "\\{}".format(self.value)
       else:
         return self.value
-      #x = ord(self.value)
-      #if 31 < x < 127:
-      #  return self.value
-      #else:
-      #  return "\\u{}".format(to_hex(x))
   def __repr__(self):
     if self.value == "\n":
       x = "\\n"
@@ -268,16 +241,6 @@ class w_Uniq:
     w_Uniq.counter += 1
   def __repr__(self):
     return "(&uniq {})".format(self.counter)
-
-#class w_Keyword:
-#  interned = {}
-#  def __init__(self, value):
-#    self.value = value
-#
-#def keyword(x):
-#  if not x in w_Keyword.interned:
-#    w_Keyword.interned[x] = w_Keyword(x)
-#  return w_Keyword.interned[x]
 
 class w_Nil:
   def __repr__(self):
@@ -460,25 +423,6 @@ class w_Vau:
       last = eval_(inner, x.car)
       x = x.cdr
     return last
-
-#  def pattern_match(closure, pattern, args):
-#    seen = {}
-#    s = w_Symbol("&square-brackets")
-#    x = pattern
-#    while isinstance(x, w_Cons):
-#      if x.car == s
-#        c = x.cdr.car
-#        r = x.cdr.cdr.car
-#        if isinstance(c, w_Cons) and c.car == s:
-#          self.pattern_match(closure, x.car, args.car)
-#        elif isinstance(c, w_Symbol) and c.value not in seen:
-#          closure[c] = args.car
-#        elif c != args.car:
-#          return w_false
-#        args = args.cdr
-#      else
-#        raise Exception("non-cons in pattern: {}".format(x))
-#      x = x.cdr
 
 class w_Builtin(w_Vau):
   def __init__(self, f):
