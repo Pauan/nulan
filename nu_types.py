@@ -1,3 +1,66 @@
+##############################################################################
+#  Helpers
+##############################################################################
+def eval_(env, x):
+  if isinstance(x, W_Symbol):
+    return env[x]
+  elif isinstance(x, W_Cons):
+    return eval_(env, x.car)(env, x.cdr)
+  else:
+    return x
+
+def list_to_cons(x):
+  result = w_nil
+  for x in reversed(x):
+    result = W_Cons(x, result)
+  return result
+
+def pattern_match(closure, pattern, args):
+  seen = {}
+  def rec(env, p, a):
+    if isinstance(p, W_Cons):
+      if p.car == w_list:
+        p = p.cdr
+        while isinstance(p, W_Cons):
+          if not isinstance(a, W_Cons):
+            return w_false
+          r = rec(env, p.car, a.car)
+          if r == w_false:
+            return r
+          p = p.cdr
+          a = a.cdr
+        return rec(env, p, a)
+      else:
+        return w_false
+    elif isinstance(p, W_Symbol):
+      if p in seen:
+        if env[p] != a:
+          return w_false
+      else:
+        seen[p] = True
+        env[p] = a
+    elif p == w_tilde:
+      return
+    else:
+      if p != a:
+        return w_false
+  return rec(closure, pattern, args)
+
+def nu_vau(name):
+  def decorator(fn):
+    fn.__name__ = name
+    return W_Builtin(fn)
+  return decorator
+
+def nu_lambda(name):
+  def decorator(fn):
+    fn.__name__ = name
+    return W_WrappedBuiltin(W_Builtin(fn))
+  return decorator
+
+##############################################################################
+#  Types
+##############################################################################
 class W_Stream:
   def __init__(self, iterable):
     self._iter      = iter(iterable)
@@ -85,12 +148,18 @@ class W_Base:
     return not self == x
   def __hash__(self):
     return hash(self.value)
+  def __radd__(self, x):
+    return self.__add__(x)
 
 class W_Number(W_Base):
   def __init__(self, value):
     self.value = float(value)
+  def __str__(self):
+    return "{:g}".format(self.value)
   def __repr__(self):
-    return "(&number {:g})".format(self.value)
+    return "(&number {})".format(str(self))
+  def __add__(self, x):
+    return self.value + x
 
 class W_Char(W_Base):
   def __str__(self):
@@ -115,14 +184,16 @@ class W_Char(W_Base):
     else:
       x = str(self)
     return "(&char {})".format(x)
+  #def __eq__(self, x):
+  #         # self.value == x
+  #  return (W_Base.__eq__(self, x) or
+  #          (isinstance(x, W_Cons) and
+  #           x.cdr == w_nil and
+  #           x.car == self))
 
 class W_Symbol(W_Base):
   def __repr__(self):
     return "(&symbol {})".format(self.value)
-
-w_true  = W_Symbol("%t")
-w_false = W_Symbol("%f")
-
 
 #class W_Keyword:
 #  interned = {}
@@ -134,11 +205,9 @@ w_false = W_Symbol("%f")
 #    W_Keyword.interned[x] = W_Keyword(x)
 #  return W_Keyword.interned[x]
 
-
 class W_Nil:
   def __repr__(self):
     return "[]"
-
   def join(self, y):
     return y
 
@@ -149,15 +218,16 @@ class W_Cons:
     self.car = car
     self.cdr = cdr
 
-  def mappair(self, f):
+  def map(self, f):
     x = self
     # TODO: code duplication
     top = r = W_Cons(f(x.car), w_nil)
     x = x.cdr
     while isinstance(x, W_Cons):
       r.cdr = W_Cons(f(x.car), w_nil)
+      r = r.cdr
       x = x.cdr
-    r.cdr = f(x)
+    #r.cdr = f(x)
     return top
 
   def join(self, y):
@@ -218,13 +288,15 @@ class W_Cons:
     result   = []
     braces   = "()"
 
-    if (x.car == w_square_brackets or
+    if (x.car == w_list or
         x.car == w_string):
       braces = "[]"
       x = x.cdr
     elif x.car == w_arrow:
       x = x.cdr.car.join(W_Cons(W_Symbol("->"), x.cdr.cdr))
       #print repr(x)
+    #elif x.car == w_apply:
+    #  x = x.cdr
 
     while 1:
       ## It's a proper list: print it as a list or a string
@@ -247,30 +319,21 @@ class W_Cons:
                                               " ".join(str(x) for x in result),
                                               str(x))
 
-def list_to_cons(x):
-  result = w_nil
-  for x in reversed(x):
-    result = W_Cons(x, result)
-  return result
-
-
 class W_Env:
   def __init__(self, parent):
     self.variables = {}
     self.parent = parent
-
   def __getitem__(self, name):
     try:
       return self.variables[name]
     except KeyError:
       return self.parent[name]
-
   def __setitem__(self, name, value):
-    self.value[name] = value
+    self.variables[name] = value
 
 class W_Vau:
   def __init__(self, closure, env, args, body):
-    self.closure = W_Env(closure)
+    self.closure = closure
     self.args    = args
     self.body    = body
     self.env     = env
@@ -279,17 +342,21 @@ class W_Vau:
     return "(&vau)"
 
   def __call__(self, env, args):
-    if self.env != w_tilde:
-      self.closure[self.env] = env
+    # TODO: maybe figure out a way to not need to create and
+    #       destroy a new environment every time the vau is called
+    inner = W_Env(self.closure)
 
-    m = self.pattern_match(self.closure, self.args, args)
+    if self.env != w_tilde:
+      inner[self.env] = env
+
+    m = pattern_match(inner, self.args, args)
     if m == w_false:
       return m
 
     x = self.body
     last = w_false
     while x != w_nil:
-      last = eval_(self.closure, x.car)
+      last = eval_(inner, x.car)
       x = x.cdr
     return last
 
@@ -312,89 +379,55 @@ class W_Vau:
 #        raise Exception("non-cons in pattern: {}".format(x))
 #      x = x.cdr
 
-  def pattern_match(closure, pattern, args):
-    seen = {}
-    def rec(env, p, a):
-      if isinstance(p, W_Cons):
-        if p.car == w_square_brackets:
-          p = p.cdr
-          while isinstance(p, W_Cons):
-            if not isinstance(a, W_Cons):
-              return w_false
-            r = rec(env, p.car, a.car)
-            if r == w_false:
-              return r
-            p = p.cdr
-            a = a.cdr
-          return rec(env, p, a)
-        else:
-          return w_false
-      elif isinstance(p, W_Symbol):
-        if p in seen:
-          if env[p] != a:
-            return w_false
-        else:
-          seen[p] = True
-          env[p] = a
-      elif p == w_tilde:
-        return
-      else:
-        if p != a:
-          return w_false
-    return rec(closure, pattern, args)
-
 class W_Wrapped(W_Vau):
   def __init__(self, f):
     self.value = f
-
   def __repr__(self):
     return "(&fn)"
-
   def __call__(self, env, args):
-    return super().__call__(env, args.mappair(lambda x: eval_(env, x)))
+    return self.value(env, args.map(lambda x: eval_(env, x)))
 
 class W_Builtin(W_Vau):
   def __init__(self, f):
     self.value = f
-
   def __repr__(self):
     return "(&vau {})".format(self.value.__name__)
-
   def __call__(self, env, args):
     return self.value(env, args)
 
 class W_WrappedBuiltin(W_Builtin):
+  def __init__(self, f):
+    self.value = f
   def __repr__(self):
-    return "(&fn {})".format(self.value.__name__)
-
+    return "(&fn {})".format(self.value.value.__name__)
   def __call__(self, env, args):
-    return self.value(env, args.mappair(lambda x: eval_(env, x)))
+    return self.value(env, args.map(lambda x: eval_(env, x)))
     #return self.value(env, [eval_(env, x) for x in args])
 
-
-def join_all(x):
-  pass
-
-def nu_vau(name):
-  def decorator(fn):
-    fn.__name__ = name
-    return W_Builtin(fn)
-  return decorator
-
-def nu_lambda(name):
-  def decorator(fn):
-    fn.__name__ = name
-    return W_WrappedBuiltin(fn)
-  return decorator
-
-
+##############################################################################
+#  Syntax
+##############################################################################
 @nu_vau("&arrow")
 def w_arrow(env, args):
   return W_Wrapped(W_Vau(env, w_tilde, args.car, args.cdr))
 
+@nu_vau("&apply")
+def w_apply(env, args):
+  x = args
+  if x.cdr == w_nil:
+    return eval_(env, x.car)
+  else:
+    while x.cdr.cdr != w_nil:
+      x = x.cdr
+    x.cdr = eval_(env, x.cdr.car)
+    return eval_(env, args)
+
 @nu_lambda("&list")
-def w_square_brackets(env, args):
+def w_list(env, args):
   return args
+
+def join_all(x):
+  return x
 
 @nu_lambda("&string")
 def w_string(env, args):
@@ -403,3 +436,61 @@ def w_string(env, args):
 @nu_lambda("&tilde")
 def w_tilde(env, args):
   return w_true
+
+##############################################################################
+#  Primitives
+##############################################################################
+w_true  = W_Symbol("%t")
+w_false = W_Symbol("%f")
+
+@nu_vau("$set!")
+def w_set(env, args):
+  if args.cdr.cdr != w_nil:
+    return w_false
+  else:
+    x = eval_(env, args.cdr.car)
+    env[args.car] = x
+    return x
+
+@nu_vau("$vau")
+def w_vau(env, args):
+  return W_Vau(env, args.car, args.cdr.car, args.cdr.cdr)
+
+@nu_lambda("add")
+def w_add(env, args):
+  return W_Number(sum(args))
+
+@nu_lambda("eval")
+def w_eval(env, args):
+  if args.cdr.cdr != w_nil:
+    return w_false
+  else:
+    return eval_(env, args.cdr.car)
+
+@nu_lambda("unwrap")
+def w_unwrap(env, args):
+  if args.cdr != w_nil:
+    return w_false
+  else:
+    if isinstance(args.car, (W_Wrapped, W_WrappedBuiltin)):
+      return args.car.value
+    else:
+      return w_false
+
+@nu_lambda("wrap")
+def w_wrap(env, args):
+  if args.cdr != w_nil:
+    return w_false
+  else:
+    return W_Wrapped(car.args)
+
+glob = {
+  "%t"     : w_true,
+  "%f"     : w_false,
+  "$set!"  : w_set,
+  "$vau"   : w_vau,
+  "add"    : w_add,
+  "eval"   : w_eval,
+  "unwrap" : w_unwrap,
+  "wrap"   : w_wrap,
+}

@@ -20,16 +20,16 @@ def to_hex(x):
   return "{:0=4X}".format(x)
 
 
-char_white  = " \n\t"
+char_white  = " \n"
 char_num    = "0123456789"
 char_lower  = "abcdefghijklmnopqrstuvwxyz"
 char_upper  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-char_sym    = char_num + char_lower + char_upper + "=->$%!?" + "+/*" # TODO: unsure about using + / *
-char_number = char_sym + "."
+char_sym    = char_num + char_lower + char_upper + "-$%!?"# + "+/*" # TODO: unsure about using + / *
 
-w_colon     = {}
-w_semicolon = {}
-w_bar       = {}
+## Unique values for the : ; | syntaxes
+#w_colon     = {}
+#w_semicolon = {}
+#w_bar       = {}
 
 def parse_inside_parens(chars, fn, s):
   result = []
@@ -40,20 +40,33 @@ def parse_inside_parens(chars, fn, s):
   while not c in chars:
     if c == ":":
       s.read()
-      result.append(fn(parse_inside_parens(chars + ";", fn, s), line, column))
+      result.append(parse_inside_parens(chars + ";", fn, s))
+      #result.append(fn(parse_inside_parens(chars + ";", fn, s), line, column))
     elif c == ";":
       s.read()
-      result.append(fn(parse_inside_parens(chars, fn, s), line, column))
+      result.append(parse_inside_parens(chars, fn, s))
+      #result.append(fn(parse_inside_parens(chars, fn, s), line, column))
     elif c == "|":
       s.read()
       #line   = s.line
       #column = s.column
-      x = read1(s)
-      if s.peek() in chars:
-        return list_to_cons(result).join(x)
+      result.append(read1(s))
+      result = list_to_cons(result)
+      #x = read1(s)
+      while s.peek() in char_white:
+        s.read()
+      c = s.peek()
+      if c in chars:
+        return W_Cons(w_apply, fn(result, line, column)) #.join(x)
       else:
-        if read1(s) == W_Symbol("->"):
-          result = [w_arrow, fn(list_to_cons(result).join(x), line, column)]
+        #c = s.read()
+        #print c
+        #print s.peek()
+        s.read()
+        if c == "-" and s.peek() == ">":
+          s.read()
+          result = [w_arrow, W_Cons(w_apply, W_Cons(w_list, result))]
+          #list_to_cons(result).join(x)
           #y = parse_inside_parens(chars, fn, s)
           #if y.cdr == w_nil:
           #  result.append(y.car)
@@ -64,22 +77,20 @@ def parse_inside_parens(chars, fn, s):
           raise SyntaxError("illegal use of |")
       ## TODO: proper line and column
       #return result #fn(result, line, column)
+    elif c == "-":
+      s.read()
+      if s.peek() == ">":
+        s.read()
+        result = [w_arrow, W_Cons(w_list, list_to_cons(result))]
+      else:
+        # TODO: not sure how this will interact with infix math -
+        result.append(parse_symbol([c], line, column, s))
     elif c in char_white:
       s.read()
     else:
-      x = read1(s)
-      if x == W_Symbol("->"):
-        result = [w_arrow, fn(list_to_cons(result), line, column)]
-        #print s.peek()
-        #x = parse_inside_parens(chars, fn, s)
-        #if x.cdr == w_nil:
-        #  result.append(x.car)
-        #else:
-        #  result.append(fn(x, line, column))
-      else:
-        result.append(x)
+      result.append(read1(s))
     c = s.peek()
-  return list_to_cons(result)
+  return fn(list_to_cons(result), line, column)
 
 def parse_recursive_until(sym):
   def decorator(fn):
@@ -88,10 +99,12 @@ def parse_recursive_until(sym):
       column = s.column
       s.read()
       try:
+        #return
         x = parse_inside_parens(sym, fn, s)
         s.read()
-        if x:
-          return fn(x, line, column)
+        return x
+        #if x:
+        #  return fn(x, line, column)
       except StopIteration:
         raise SyntaxError("missing ending {} brackets".format(sym))
       #return fn(list_to_cons(result), line, column)
@@ -228,8 +241,86 @@ def parse_string(sym):
 #  #except StopIteration:
 #  #  return 90001
 
+def read_inside_top(unwrap, chars, indent, fn, s):
+  result = []
+  column = s.column
+  line   = s.line
+  try:
+    while s.line == line:
+      c = s.peek()
+      if c in chars:
+        break
+      elif c == ":":
+        s.read()
+        result.append(read_inside_top(False, chars + ";", s.column, fn, s))
+      elif c == ";":
+        s.read()
+        column = s.column
+        result.append(read_inside_top(False, chars, indent, lambda: s.indent < column, s))
+      elif c == "|":
+        s.read()
+        #x = read1(s)
+        result.append(read1(s))
+        result = list_to_cons(result)
+        try:
+          while s.peek() == " ":
+            s.read()
+          c = s.peek()
+          if c in chars + "\n":
+            raise StopIteration
+          else:
+            s.read()
+            if c == "-" and s.peek() == ">":
+              s.read()
+              result = [w_arrow, W_Cons(w_apply, W_Cons(w_list, result))]
+              # list_to_cons(result).join(x)
+              try:
+                result.append(read_inside_top(True, chars, indent, lambda: False, s))
+              except StopIteration:
+                pass
+            else:
+              raise SyntaxError("illegal use of |")
+        except StopIteration:
+          return W_Cons(w_apply, result) #list_to_cons(result).join(x)
+      elif c == "-":
+        s.read()
+        if s.peek() == ">":
+          s.read()
+          result = [w_arrow, W_Cons(w_list, list_to_cons(result))]
+          try:
+            result.append(read_inside_top(True, chars, indent, lambda: False, s))
+          except StopIteration:
+            pass
+        else:
+          # TODO: not sure how this will interact with infix math -
+          result.append(parse_symbol([c], line, column, s))
+      elif c in char_white:
+        s.read()
+      else:
+        result.append(read1(s))
+    while s.peek() == " ":
+      s.read()
+    if s.peek() == "\n":
+      s.read()
+    while s.peek() == " ":
+      s.read()
+    while s.indent > indent and fn():
+      result.append(read_inside_top(True, chars, s.indent, fn, s))
+  except StopIteration:
+    pass
+  result = list_to_cons(result)
+  if result == w_nil:
+    raise StopIteration
+  elif result.cdr == w_nil and unwrap:
+    return result.car
+  else:
+    return result
+
 def read_top(s):
-  return read1(s)
+  while s.peek() in char_white:
+    s.read()
+  return read_inside_top(True, "", s.indent, lambda: True, s)
+
 
 @parse_recursive_until(")")
 def parse_round_bracket(x, line, column):
@@ -239,7 +330,7 @@ def parse_round_bracket(x, line, column):
 
 @parse_recursive_until("]")
 def parse_square_bracket(result, line, column):
-  x = W_Cons(w_square_brackets, result)
+  x = W_Cons(w_list, result)
   x.line   = line
   x.column = column
   return x
@@ -314,8 +405,11 @@ def parse_raw_string(result, s, info):
 #  raise Infixer("&arrow")
 #  #return s.indent > indent #s.indent > column
 
+##  #\|[\s\S]*?\|#
+##  #.*
 def parse_comment(s):
-  if s.read() == "|":
+  if s.peek() == "|":
+    s.read()
     try:
       while 1:
         c = s.read()
@@ -335,6 +429,7 @@ def parse_comment(s):
       pass
   return read1(s)
 
+##  [a-zA-Z0-9\-$%!?]+
 def parse_symbol(result, line, column, s):
   try:
     while s.peek() in char_sym:
@@ -346,20 +441,18 @@ def parse_symbol(result, line, column, s):
   x.column = column
   return x
 
-## \d+\.?\d+
+##  \d+\.?\d+
 def parse_num_or_symbol(s):
   result = []
   column = s.column
   line   = s.line
   dot    = False ## Has the dot been seen yet?
-  first  = True  ## First iteration?
   try:
     while 1:
       c = s.peek()
       if c in char_num:
-        first = False
         result.append(s.read())
-      elif not dot and not first and c == ".":
+      elif c == "." and not dot:
         dot = True
         result.append(s.read())
       elif c in char_sym:
@@ -376,15 +469,15 @@ def read1(s):
     return parse_round_bracket(s)
   elif c == "[":
     return parse_square_bracket(s)
-  elif c == ":":
-    s.read()
-    return w_colon
-  elif c == ";":
-    s.read()
-    return w_semicolon
-  elif c == "|":
-    s.read()
-    return w_bar
+  #elif c == ":":
+  #  s.read()
+  #  return w_colon
+  #elif c == ";":
+  #  s.read()
+  #  return w_semicolon
+  #elif c == "|":
+  #  s.read()
+  #  return w_bar
   #elif c == "-" and s.peek() == ">":
   #  #s.read()
   #  return parse_arrow(s.read(), s)
@@ -404,7 +497,7 @@ def read1(s):
   elif c in char_white:
     s.read()
     return read1(s)
-  elif c in char_number:
+  elif c in char_sym:
     return parse_num_or_symbol(s)
   else:
     raise SyntaxError("invalid character {}".format(c))

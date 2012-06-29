@@ -6,7 +6,7 @@ $set! $quote: $vau ~ [X] X
 
 $set! $fn; $vau Env [Args | Body]
   wrap: eval Env [$vau ~ Args | Body]
-  #eval Env [|Args -> | Body]
+  #eval Env [| Args -> | Body]
 
 # TODO: cons isn't actually used, it's only included here because it is conceptually attached to car/cdr
 $set! cons: X R -> [X | R]
@@ -18,20 +18,16 @@ $set! cdr: [X | R] -> R
 $set! $let; $vau Env [X | R]
   eval Env: $if: null? R
               X
-              [[(car X) -> [$let | R]] (car:cdr X)]
+              [[(car X) -> : $let | R] (car:cdr X)]
 
 
-              [X Y] -> [[X -> [$let | R]] Y]
-                X
+              :[X Y] -> [[X -> : $let | R] Y]
+               X
 
-              [X Y] -> [[$fn [X]
-                          [$let | R]]
-                        Y]
-                X
+              :[X Y] -> [[$fn [X]: $let | R] Y]
+               X
 
-              [[$fn [(car X)]
-                 [$let | R]]
-               (car:cdr X)]
+              [[$fn [(car X)]: $let | R] (car:cdr X)]
 
 # ($let (X 5) X)       => 5
 # ($let (X 5)
@@ -41,7 +37,7 @@ $set! $let; $vau Env [X | R]
 
 $set! $or; $vau Env [X | R]
   $let: X: eval Env X
-    $if X X : eval Env [$or | R]
+    $if X X: eval Env [$or | R]
 
 $set! any: [X | R] F -> $or (F X) (any R F)
 $set! case: X | Fns -> any Fns: F -> F | X
@@ -59,7 +55,7 @@ $def! type; $fn Fns
 $def! list? : X -> $or (cons? X) (is X [])
 
 # TODO: map needs to type check on any list, including dotted
-$def! map: type ~ fn?
+$def! map: type list? fn?
   [X | R] F -> [(F X) | (map R F)]
   X       ~ -> X
 
@@ -71,8 +67,8 @@ $set! $defvau! ; $vau Env [Name | Fns]
 #  $use
 ##############################################################################
 
-$def! each
-  [X | R] F -> (F X) : each R F
+$def! each: type list? fn?
+  [X | R] F -> (F X): each R F
 
 $set! get-current-env: wrap: $vau Env [] Env
 
@@ -83,11 +79,11 @@ $def! make-base-env
 
 
 $defvau! $use
-  |Args -> each Args; X ->
-             $let: New: make-base-env
-               $hook New $env-get-if-unbound
-                 K -> eval K New
-               load-file New X
+  | Args -> each Args; X ->
+              $let: New: make-base-env
+                $hook New $env-get-if-unbound
+                  K -> eval K New
+                load-file New X
 
 ##############################################################################
 #  Other utilities
@@ -96,7 +92,7 @@ $defvau! $use
 # 9 vau
 $defvau! $and
   [X]     -> eval X
-  [X | R] -> $if (eval X) : eval [$and | R]
+  [X | R] -> $if (eval X): eval [$and | R]
 
 $def! not:  X -> $if X &f &t
 $set! all:  [X | R] F -> $and (F X) (all R F)
@@ -122,15 +118,20 @@ $def! rem: type list? fn?
                  rem R F
   X       ~ -> X
 
-$def! zip: type list? list?
-  [X | R1] [Y | R2] -> [[X Y] | (zip R1 R2)]
+$def! zip: type | list?
+#  []       ~        -> []
+#  ~        []       -> []
+#  [X | R1] [Y | R2] -> [[X Y] | (zip R1 R2)]
+  | Args -> $if: some Args null?
+              []
+              [(map Args car) | (zip | (map Args cdr))]
 
 $def! id:   X -> X
 $def! copy: X -> map X id
 
 #|
 # TODO: copy needs to type check when applied to a dotted list
-$def! copy: type ~
+$def! copy: type list?
   [X | R] -> [X | (copy R)]
   X       -> X
 |#
@@ -141,12 +142,12 @@ $def! pair: type list?
   X           -> pair X []
 
 $def! join: type list? ~
-  [X | R] Y -> [X | (pair R Y)]
+  [X | R] Y -> [X | (join R Y)]
   [X]     Y -> [X | Y]
 
 $def! ref: type list? ~
   [K V | R] K -> V
-  [~   | R] K -> ref R K
+  [~ ~ | R] K -> ref R K
 
 #|
 $defvau! $lets
@@ -158,5 +159,6 @@ $defvau! $def-if! ; Name Test | Fns ->
   $let; Orig:  eval Name
         Test:  eval Test
         F:     $fn Args: $if-error: Test | Args
-                           Orig | Args
+                           ~ -> Orig | Args
+                           X -> X
     eval [$def! Name F | Fns]
