@@ -5,59 +5,59 @@ def eval_(env, x):
   # TODO
   if isinstance(x, (w_Symbol, w_Uniq)):
     return env[x]
-  elif isinstance(x, w_Cons):
-    return eval_(env, x.car)(env, x.cdr)
+  elif isinstance(x, w_Seq):
+    return eval_(env, x.first)(env, x.rest)
   else:
     return x
 
-def list_to_cons(x):
+def list_to_seq(x):
   result = w_nil
   for x in reversed(x):
-    result = w_Cons(x, result)
+    result = w_Seq(x, result)
   return result
 
 def join_string(args):
   x = args
   result = []
-  while isinstance(x, w_Cons):
-    if isinstance(x.car, w_Cons):
-      result += join_string(x.car)
-    elif isinstance(x.car, w_Char):
-      result.append(x.car)
+  while isinstance(x, w_Seq):
+    if isinstance(x.first, w_Seq):
+      result += join_string(x.first)
+    elif isinstance(x.first, w_Char):
+      result.append(x.first)
     else:
-      raise TypeError("cannot coerce {} in {} to a string".format(x.car, args))
-    x = x.cdr
-  return list_to_cons(result)
+      raise TypeError("cannot coerce {} in {} to a string".format(x.first, args))
+    x = x.rest
+  return list_to_seq(result)
 
 def pattern_match(closure, pattern, args):
   seen = {}
   def rec(env, p, a):
-    if isinstance(p, w_Cons):
-      if p.car == w_apply:
-        p = p.cdr
-        if p.car == w_list:
-          p = p.cdr
-          while isinstance(p.cdr, w_Cons):
-            if not isinstance(a, w_Cons):
+    if isinstance(p, w_Seq):
+      if p.first == w_apply:
+        p = p.rest
+        if p.first == w_seq:
+          p = p.rest
+          while isinstance(p.rest, w_Seq):
+            if not isinstance(a, w_Seq):
               return w_false
-            r = rec(env, p.car, a.car)
+            r = rec(env, p.first, a.first)
             if r == w_false:
               return r
-            p = p.cdr
-            a = a.cdr
-          return rec(env, p.car, a)
+            p = p.rest
+            a = a.rest
+          return rec(env, p.first, a)
         else:
           raise Exception(p)
-      elif p.car == w_list:
-        p = p.cdr
-      while isinstance(p, w_Cons):
-        if not isinstance(a, w_Cons):
+      elif p.first == w_seq:
+        p = p.rest
+      while isinstance(p, w_Seq):
+        if not isinstance(a, w_Seq):
           return w_false
-        r = rec(env, p.car, a.car)
+        r = rec(env, p.first, a.first)
         if r == w_false:
           return r
-        p = p.cdr
-        a = a.cdr
+        p = p.rest
+        a = a.rest
       return rec(env, p, a)
     # TODO
     elif isinstance(p, (w_Symbol, w_Uniq)):
@@ -234,9 +234,9 @@ class w_Char(w_Base):
   #def __eq__(self, x):
   #         # self.value == x
   #  return (w_Base.__eq__(self, x) or
-  #          (isinstance(x, w_Cons) and
-  #           x.cdr == w_nil and
-  #           x.car == self))
+  #          (isinstance(x, w_Seq) and
+  #           x.rest == w_nil and
+  #           x.first == self))
 
 class w_Symbol(w_Base):
   def __repr__(self):
@@ -260,21 +260,21 @@ class w_Nil(object):
 
 w_nil = w_Nil()
 
-class w_Cons(w_Nil):
-  def __init__(self, car, cdr):
-    self.car = car
-    self.cdr = cdr
+class w_Seq(w_Nil):
+  def __init__(self, first, rest):
+    self.first = first
+    self.rest  = rest
 
   def __iter__(self):
     item = self
     while 1:
-      if isinstance(item, w_Cons):
-        yield item.car
-        item = item.cdr
+      if isinstance(item, w_Seq):
+        yield item.first
+        item = item.rest
       elif item == w_nil:
         return
       else:
-        raise TypeError("can't iterate on a dotted list")
+        raise TypeError("can't iterate on a dotted seq")
 
   def __repr__(self):
     x        = self
@@ -283,21 +283,21 @@ class w_Cons(w_Nil):
     char_all = True ## Are all the elements chars?
     result   = []
     while 1:
-      ## It's a proper list: print it as a list or a string
+      ## It's a proper seq: print it as a seq or a string
       if x == w_nil:
-        ## It's a list of characters: print it as a string
+        ## It's a seq of characters: print it as a string
         if char_all:
           ## This uses str because chars have different printing in strings
           return "'{}'".format("".join(str(x) for x in result))
-        ## Print it as a list
+        ## Print it as a seq
         else:
           return "[{}]".format(" ".join(repr(x) for x in result))
-      if isinstance(x, w_Cons):
-        if char_all and not isinstance(x.car, w_Char):
+      if isinstance(x, w_Seq):
+        if char_all and not isinstance(x.first, w_Char):
           char_all = False
-        result.append(x.car)
-        x = x.cdr
-      ## It's an improper list: print it as a list with a bar
+        result.append(x.first)
+        x = x.rest
+      ## It's an improper seq: print it as a seq with a bar
       else:
         return "[{} | {}]".format(" ".join(repr(x) for x in result), repr(x))
 
@@ -310,40 +310,40 @@ class w_Cons(w_Nil):
     result   = []
     braces   = "[]"
 
-    if (x.car == w_list or
-        x.car == w_string):
+    if (x.first == w_seq or
+        x.first == w_string):
       #braces = "[]"
-      x = x.cdr
-    elif x.car == w_arrow:
-      x = x.cdr
-      x = x.car.cdr.join(w_Cons(w_Symbol("->"), x.cdr))
-    elif x.car == w_apply:
-      x = x.cdr
-      if x.car == w_list:
+      x = x.rest
+    elif x.first == w_arrow:
+      x = x.rest
+      x = x.first.rest.join(w_Seq(w_Symbol("->"), x.rest))
+    elif x.first == w_apply:
+      x = x.rest
+      if x.first == w_seq:
         #braces = "[]"
-        x = x.cdr
+        x = x.rest
 
     while 1:
-      ## It's a proper list: print it as a list or a string
+      ## It's a proper seq: print it as a seq or a string
       if x == w_nil:
-        ## It's a list of characters: print it as a string
+        ## It's a seq of characters: print it as a string
         if char_all:
           ## This uses str because chars have different printing in strings
           return "'{}'".format("".join(str(x) for x in result))
-        ## Print it as a list
+        ## Print it as a seq
         else:
           return "{0[0]}{1}{0[1]}".format(braces, " ".join(str(x) for x in result))
-      if isinstance(x, w_Cons):
-        if x.cdr == w_nil and self.car == w_apply:
+      if isinstance(x, w_Seq):
+        if x.rest == w_nil and self.first == w_apply:
           return "{0[0]}{1} | {2}{0[1]}".format(braces,
                                                 " ".join(str(x) for x in result),
-                                                str(x.car))
+                                                str(x.first))
         else:
-          if char_all and not isinstance(x.car, w_Char):
+          if char_all and not isinstance(x.first, w_Char):
             char_all = False
-          result.append(x.car)
-          x = x.cdr
-      ## It's an improper list: print it as a list with a bar
+          result.append(x.first)
+          x = x.rest
+      ## It's an improper seq: print it as a seq with a bar
       else:
         return "{0[0]}{1} | {2}{0[1]}".format(braces,
                                               " ".join(str(x) for x in result),
@@ -352,28 +352,28 @@ class w_Cons(w_Nil):
   # TODO: code duplication with join
   def mappair(self, f):
     x = self
-    top = r = w_Cons(f(x.car), w_nil)
-    x = x.cdr
-    while isinstance(x, w_Cons):
-      r.cdr = w_Cons(f(x.car), w_nil)
-      r = r.cdr
-      x = x.cdr
+    top = r = w_Seq(f(x.first), w_nil)
+    x = x.rest
+    while isinstance(x, w_Seq):
+      r.rest = w_Seq(f(x.first), w_nil)
+      r = r.rest
+      x = x.rest
     if x != w_nil:
       # TODO: not sure if needed
-      r.cdr = f(x)
+      r.rest = f(x)
     return top
 
   def join(self, y):
     x = self
-    top = r = w_Cons(x.car, w_nil)
-    x = x.cdr
-    while isinstance(x, w_Cons):
-      r.cdr = w_Cons(x.car, w_nil)
-      r = r.cdr
-      x = x.cdr
+    top = r = w_Seq(x.first, w_nil)
+    x = x.rest
+    while isinstance(x, w_Seq):
+      r.rest = w_Seq(x.first, w_nil)
+      r = r.rest
+      x = x.rest
     if x != w_nil:
-      raise TypeError("cannot call join on improper list {}".format(repr(self)))
-    r.cdr = y
+      raise TypeError("cannot call join on improper seq {}".format(repr(self)))
+    r.rest = y
     return top
 
   def tostring(self):
@@ -382,9 +382,9 @@ class w_Cons(w_Nil):
     while 1:
       if x == w_nil:
         break
-      elif isinstance(x, w_Cons) and isinstance(x.car, w_Char):
-        result.append(x.car.value)
-        x = x.cdr
+      elif isinstance(x, w_Seq) and isinstance(x.first, w_Char):
+        result.append(x.first.value)
+        x = x.rest
       else:
         raise TypeError("cannot convert {} to a string".format(repr(self)))
     return "".join(result)
@@ -440,8 +440,8 @@ class w_Vau(object):
     x = self.body
     last = w_false
     while x != w_nil:
-      last = eval_(inner, x.car)
-      x = x.cdr
+      last = eval_(inner, x.first)
+      x = x.rest
     return last
 
 class w_Builtin(w_Vau):
@@ -465,45 +465,45 @@ class w_Wrapped(object):
 ##############################################################################
 #  Syntax
 ##############################################################################
-@nu_vau("&arrow")
+@nu_vau("$fn")
 def w_arrow(env, args):
-  return w_Wrapped(w_Vau(env, w_tilde, args.car, args.cdr))
+  return w_Wrapped(w_Vau(env, w_tilde, args.first, args.rest))
 
 #@nu_vau("&apply")
 #def w_apply(env, args):
 #  x = args
-#  if x.cdr == w_nil:
-#    print x.car
-#    return eval_(env, x.car)
+#  if x.rest == w_nil:
+#    print x.first
+#    return eval_(env, x.first)
 #  else:
-#    while x.cdr.cdr != w_nil:
-#      x = x.cdr
-#    x.cdr = x.cdr.car #eval_(env, )
+#    while x.rest.rest != w_nil:
+#      x = x.rest
+#    x.rest = x.rest.first #eval_(env, )
 #    return eval_(env, args)
 
-@nu_lambda("&apply")
+@nu_lambda("apply")
 def w_apply(env, args):
   x = args
-  if x.cdr == w_nil:
-    return eval_(env, x.car)
+  if x.rest == w_nil:
+    return eval_(env, x.first)
   else:
-    while x.cdr.cdr != w_nil:
-      x = x.cdr
-    x.cdr = x.cdr.car
+    while x.rest.rest != w_nil:
+      x = x.rest
+    x.rest = x.rest.first
     # TODO: code duplication with unwrap
-    #if isinstance(args.car, w_Wrapped):
-    #  args.car = args.car.wrapped
+    #if isinstance(args.first, w_Wrapped):
+    #  args.first = args.first.wrapped
     #else:
-    #  args.car = w_false
-    args.car = w_unwrap(env, w_Cons(args.car, w_nil))
+    #  args.first = w_false
+    args.first = w_unwrap(env, w_Seq(args.first, w_nil))
     #print args
     return eval_(env, args)
 
-@nu_lambda("&list")
-def w_list(env, args):
+@nu_lambda("seq")
+def w_seq(env, args):
   return args
 
-@nu_lambda("&string")
+@nu_lambda("str")
 def w_string(env, args):
   return join_string(args)
 
@@ -521,59 +521,59 @@ w_false = w_Symbol("%f")
 # Non-referentially transparent
 @nu_vau("$set!")
 def w_set(env, args):
-  if args.cdr.cdr != w_nil:
+  if args.rest.rest != w_nil:
     return w_false
   else:
-    x = eval_(env, args.cdr.car)
-    env[args.car] = x
+    x = eval_(env, args.rest.first)
+    env[args.first] = x
     return x
 
 @nu_lambda("pr!")
 def w_pr(env, args):
   x = args
-  while isinstance(x, w_Cons):
+  while isinstance(x, w_Seq):
     try:
-      print x.car.tostring(),
+      print x.first.tostring(),
     except (TypeError, AttributeError):
-      print x.car,
-    x = x.cdr
-  return args.car
+      print x.first,
+    x = x.rest
+  return args.first
 
 @nu_lambda("write!")
 def w_write(env, args):
   x = args
-  while isinstance(x, w_Cons):
-    print x.car,
-    x = x.cdr
-  return args.car
+  while isinstance(x, w_Seq):
+    print x.first,
+    x = x.rest
+  return args.first
 
 # Predicates
 @nu_lambda("fn?")
 def w_fnq(env, args):
-  if args.cdr != w_nil:
+  if args.rest != w_nil:
     return w_false
   else:
-    if isinstance(args.car, w_Wrapped):
-      return args.car
+    if isinstance(args.first, w_Wrapped):
+      return args.first
     else:
       return w_false
 
 @nu_lambda("is?")
 def w_is(env, args):
   while 1:
-    if args.cdr == w_nil:
+    if args.rest == w_nil:
       return w_true
-    elif args.car != args.cdr.car:
+    elif args.first != args.rest.first:
       return w_false
-    args = args.cdr
+    args = args.rest
 
 @nu_lambda("vau?")
 def w_vauq(env, args):
-  if args.cdr != w_nil:
+  if args.rest != w_nil:
     return w_false
   else:
-    if isinstance(args.car, w_Vau):
-      return args.car
+    if isinstance(args.first, w_Vau):
+      return args.first
     else:
       return w_false
 
@@ -581,17 +581,17 @@ def w_vauq(env, args):
 @nu_vau("$if")
 def w_if(env, args):
   try:
-    while eval_(env, args.car) == w_false:
-      args = args.cdr.cdr
-    if args.cdr != w_nil:
-      args = args.cdr
-    return eval_(env, args.car)
+    while eval_(env, args.first) == w_false:
+      args = args.rest.rest
+    if args.rest != w_nil:
+      args = args.rest
+    return eval_(env, args.first)
   except AttributeError:
     return w_false
 
 @nu_vau("$vau")
 def w_vau(env, args):
-  return w_Vau(env, args.car, args.cdr.car, args.cdr.cdr)
+  return w_Vau(env, args.first, args.rest.first, args.rest.rest)
 
 # Fns
 @nu_lambda("add")
@@ -607,10 +607,10 @@ def w_error(env, args):
 
 @nu_lambda("eval")
 def w_eval(env, args):
-  if args.cdr == w_nil:
-    return eval_(eval_(env, w_Symbol("%Env")), args.car)
-  elif args.cdr.cdr == w_nil:
-    return eval_(eval_(env, args.car), args.cdr.car)
+  if args.rest == w_nil:
+    return eval_(eval_(env, w_Symbol("%Env")), args.first)
+  elif args.rest.rest == w_nil:
+    return eval_(eval_(env, args.first), args.rest.first)
   else:
     return w_false
 
@@ -623,22 +623,28 @@ def w_uniq(env, args):
 
 @nu_lambda("unwrap")
 def w_unwrap(env, args):
-  if args.cdr != w_nil:
+  if args.rest != w_nil:
     return w_false
   else:
-    if isinstance(args.car, w_Wrapped):
-      return args.car.wrapped
+    if isinstance(args.first, w_Wrapped):
+      return args.first.wrapped
     else:
       return w_false
 
 @nu_lambda("wrap")
 def w_wrap(env, args):
-  if args.cdr != w_nil:
+  if args.rest != w_nil:
     return w_false
   else:
-    return w_Wrapped(args.car)
+    return w_Wrapped(args.first)
 
 glob = w_GlobalEnv({
+  # Syntax
+  "$fn"    : w_arrow,
+  "apply"  : w_apply,
+  "seq"    : w_seq,
+  "str"    : w_string,
+
   # Constants
   "%t"     : w_true,
   "%f"     : w_false,

@@ -75,23 +75,25 @@ Although Nulan has been entirely my own work, I have taken many ideas from a lar
 
 4. Clojure
   * Generic sequence type that is used uniformly everywhere
-  *
 
 5. http://www.dwheeler.com/readable/
-  * For the idea that a clean, readable, general Lisp with syntax and less parens is possible. The parser Nulan uses is actually very different from the parser described in that page
+  * For the idea that a clean, readable, general Lisp with syntax and less parens is possible. The parser Nulan uses is written from scratch and is a bit different from the parser described in that page: in particular, Nulan is missing curly infix and modern expressions. In addition, two newlines in a row only end the expression in the REPL, not in a file
 
 6. Ruby
-  * For being awesome all-around
+  * For being awesome all-around, major props to Matz and everybody who made Ruby awesome
   * For making me appreciate clean syntax more, which inspired me to get rid of as many parens as I could in Nulan
 
 7. Scheme
   * No ideas were taken directly, but Scheme has had a massive impact on other languages like Kernel, and so there's an indirect debt
 
 8. Lisp
-  * For the original idea of "code is data is code", which in turn inspired a wide variety of different Lisp dialects, all of which are interesting in their own ways
+  * For the original idea of "code is data is code", which in turn inspired a wide variety of different Lisp dialects, all of which are interesting in their own ways. No Lisp means no Scheme which means no Arc/Kernel/Common Lisp/Shen which means no Nulan
 
 9. PyPy
-  * For being awesomesauce, even if it *is* written in a subset of Python, rather than, say, Ruby
+  * For being awesomesauce, even if it *is* written in a subset of Python, rather than, say, Ruby. Without PyPy (and to a much lesser degree Python), Nulan wouldn't have gotten as far as it did
+
+10. Python
+  * I am not fond. But it's what PyPy uses, and it's better than Java, at least...
 
 Great, but how does it all work?
 ================================

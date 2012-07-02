@@ -42,17 +42,17 @@ def parse_inside_parens(chars, fn, s):
           x = read1(s)
         if x is not None:
           result.append(x)
-          result = list_to_cons(result)
+          result = list_to_seq(result)
           while s.peek() in char_white:
             s.read()
           c = s.peek()
           if c in chars + ";":
-            return w_Cons(w_apply, fn(result, line, column)) #.join(x)
+            return w_Seq(w_apply, fn(result, line, column)) #.join(x)
           else:
             s.read()
             if c == "-" and s.peek() == ">":
               s.read()
-              result = [w_arrow, w_Cons(w_apply, w_Cons(w_list, result))]
+              result = [w_arrow, w_Seq(w_apply, w_Seq(w_seq, result))]
             else:
               raise w_SyntaxError("illegal use of |", s)
           break
@@ -60,7 +60,7 @@ def parse_inside_parens(chars, fn, s):
       s.read()
       if s.peek() == ">":
         s.read()
-        result = [w_arrow, w_Cons(w_list, list_to_cons(result))]
+        result = [w_arrow, w_Seq(w_seq, list_to_seq(result))]
       else:
         # TODO: not sure how this will interact with infix math -
         result.append(parse_symbol([c], line, column, s))
@@ -71,7 +71,7 @@ def parse_inside_parens(chars, fn, s):
       if x is not None:
         result.append(x)
     c = s.peek()
-  return fn(list_to_cons(result), line, column)
+  return fn(list_to_seq(result), line, column)
 
 def parse_recursive_until(sym):
   def decorator(fn):
@@ -104,7 +104,7 @@ def parse_string(sym):
         s.read()
       except StopIteration:
         raise w_SyntaxError("missing ending {} quote".format(q), s)
-      x = w_Cons(sym, list_to_cons(result))
+      x = w_Seq(sym, list_to_seq(result))
       x.line   = info["line"]
       x.column = info["column"]
       return x
@@ -150,7 +150,7 @@ def read_inside_top(unwrap, chars, indent, fn, origfn, s):
             comment_seen = True
           else:
             result.append(x)
-            result = list_to_cons(result)
+            result = list_to_seq(result)
             try:
               while s.peek() == " ":
                 s.read()
@@ -161,7 +161,7 @@ def read_inside_top(unwrap, chars, indent, fn, origfn, s):
                 s.read()
                 if c == "-" and s.peek() == ">":
                   s.read()
-                  result = [w_arrow, w_Cons(w_apply, w_Cons(w_list, result))]
+                  result = [w_arrow, w_Seq(w_apply, w_Seq(w_seq, result))]
                   try:
                     result.append(read_inside_top(True, chars, indent, lambda: False, origfn, s)) # + ";"
                   except StopIteration:
@@ -169,13 +169,13 @@ def read_inside_top(unwrap, chars, indent, fn, origfn, s):
                 else:
                   raise w_SyntaxError("illegal use of |", s)
             except StopIteration:
-              return w_Cons(w_apply, result)
+              return w_Seq(w_apply, result)
             break
       elif c == "-":
         s.read()
         if s.peek() == ">":
           s.read()
-          result = [w_arrow, w_Cons(w_list, list_to_cons(result))]
+          result = [w_arrow, w_Seq(w_seq, list_to_seq(result))]
           try:
             result.append(read_inside_top(True, chars, indent, lambda: False, origfn, s)) # + ";"
           except StopIteration:
@@ -206,14 +206,14 @@ def read_inside_top(unwrap, chars, indent, fn, origfn, s):
       result.append(read_inside_top(True, chars, s.indent, origfn, origfn, s))
   except StopIteration:
     pass
-  result = list_to_cons(result)
+  result = list_to_seq(result)
   if result == w_nil:
     if comment_seen:
       return read_inside_top(True, chars, s.indent, origfn, origfn, s)
     else:
       raise StopIteration
-  elif result.cdr == w_nil and unwrap:
-    return result.car
+  elif result.rest == w_nil and unwrap:
+    return result.first
   else:
     return result
 
@@ -234,7 +234,7 @@ def parse_round_bracket(x, line, column):
 
 @parse_recursive_until("]")
 def parse_square_bracket(result, line, column):
-  x = w_Cons(w_list, result)
+  x = w_Seq(w_seq, result)
   x.line   = line
   x.column = column
   return x
