@@ -2,69 +2,74 @@
 #  Core
 ##############################################################################
 
-$set! $quote: $vau ~ [X] X
-
-$set! $fn; $vau Env [Args | Body]
+$set! $fn: $vau Env [Args | Body]:
   wrap: eval Env [$vau ~ Args | Body]
 
-$set! null? : X -> is? X []
-
 #|
-$set! do: $fn [X | R]:
-  $if: null? R;
-    X:
-    do | R
-|#
-
 # => ($let X)
 #    X
 # => ($let (X Y) ...)
-#    ((X -> ($let ...)) Y)
-$set! $let; $vau Env [X | R]
-  #prn! ($quote Args)
-  #prn! [[($quote Args) -> [($quote $let) R]] [uniq]]
-  #prn! X R: null? R
-  #$if: null? R
-  #  prn! 'foo'
-  #  prn! (([X Y] -> [[X -> : $let R] Y])
-  #       X)
-  eval Env: $if: null? R
-              X
-              # Equivalent to ($let: [X Y] X; ...)
-              :[X Y] -> [[X -> : $let | R] Y]
-               X
+#    (($fn [X] ($let ...)) Y)
+$set! $let: $vau Env [X Y | R]:
+  #eval Env
+  #  $if: null? R
+  #    X
+  #    # Equivalent to ($let [X Y] X ...)
+  #    :[X Y] -> [[$fn [X] [$let | R]] Y]
+  #     X
+  eval Env [[X -> | R] Y]
+|#
 
-$set! $or; $vau Env [X | R]
-  $let: X: eval Env X
+$set! $let: $vau Env [X Y | R]:
+  eval Env [[$fn [X] | R] Y]
+
+$set! $quote: $vau ~ [X] X
+
+$set! $or: $vau Env [X | R]:
+  $let X: eval Env X
     $if X X: eval Env [$or | R]
 
-$set! any: [X | R] F -> $or: F X; any R F
+$set! any [X | R] F -> $or: F X; any R F
 
-$set! case; X | Fns -> any Fns: F -> F | X
+$set! case: X | Fns -> any Fns: F -> F | X
 
-$set! $def! ; $vau Env [Name | Fns]
-  $let: Args: uniq
-    eval Env [$set! Name: $fn Args: case Args | Fns]
+$set! $defvau! : $vau Env [Name | Fns]:
+  $let Args (uniq)
+    eval Env [$set! Name
+               [$vau ($quote %Env) Args
+                 [case Args | Fns]]]
+
+$defvau! $def! : Name | Fns ->
+  $let Args (uniq)
+    eval [$set! Name
+           [$fn Args
+             [case Args | Fns]]]
+
+#|
+$set! $let: $vau Env [X Y | R]:
+  [X]         -> eval Env X
+  [[X Y] | R] -> eval [[$fn [X] [$let | R]] Y]
+  eval [[$fn [X] [$let | R]] Y]
+|#
 
 $def! not: X -> $if X %f %t
 
-# TODO: type needs to work with varargs like (type | list?)
-$def! type; $fn Fns
-  $fn Args
-    any: zip Fns Args; [X Y] ->
-      $if: not: X Y
-        error 'type check failed on argument @Y'
+$def! type: | Fns ->
+  $if: seq? Fns
+    | Args -> any: zip Fns Args; [X Y] ->
+                $if: not: X Y
+                  error 'type check failed on argument @Y'
+    | Args -> any Args: X ->
+                $if: not: Fns X
+                  error 'type check failed on argument @Y'
 
+$def! null? : X -> is? X []
 $def! list? : X -> $or: cons? X; null? X
 
 # TODO: map needs to type check on any list, including dotted
 $def! map: type list? fn?
   [X | R] F -> [(F X) | (map R F)]
   X       ~ -> X
-
-$set! $defvau! ; $vau Env [Name | Fns]
-  $let: Args: uniq
-    eval Env [$set! Name: $vau ($quote %Env) Args: case Args | Fns]
 
 ##############################################################################
 #  $use
@@ -75,25 +80,24 @@ $def! each: type list? fn?
 
 $set! get-current-env: wrap: $vau Env [] Env
 
-$def! make-env
-  Env -> eval Env [[$vau ~ ~ [get-current-env]]]
+$def! make-env: Env -> eval Env [[$vau ~ ~ [get-current-env]]]
 
 $def! make-base-env
 
 
-$defvau! $use
-  | Args -> each Args; X ->
-              $let: New: make-base-env
-                $hook New %env-get-if-unbound
-                  K -> eval K New
-                load-file-in New: find-file X
-                eval [$set! (strip-extension:basename X) New]
+$defvau! $use: | Args ->
+  each Args: X ->
+    $let New (make-base-env)
+      $hook New %env-get-if-unbound
+        K -> eval K New
+      load-file-in New: find-file X
+      eval [$set! (strip-extension (basename X)) New]
 
 ##############################################################################
 #  Other utilities
 ##############################################################################
 
-$defvau! do: | Args -> eval [[-> | Args]]
+$defvau! do: | Args -> eval [[$fn [] | Args]]
 
 $defvau! $and
   [X]     -> eval X
@@ -143,7 +147,7 @@ $def! cdr: [X | R] -> R
 $def! zip: type | list?
   | Args -> $if: some Args null?
               []
-              [(map Args car) | (zip | :map Args cdr)]
+              [(map Args car) | (zip | (map Args cdr))]
 
 
 $def! join: type list? ~
@@ -166,11 +170,11 @@ $def! id:   X -> X
 $def! copy: X -> map X id
 
 
-$def! prn! ; | Args ->
+$def! prn! : | Args ->
   pr! | Args
   pr! '\n'
 
-$def! writen! ; | Args ->
+$def! writen! : | Args ->
   write! | Args
   write! '\n'
 
@@ -181,10 +185,54 @@ $def! pair: type list?
   X           -> pair X []
 |#
 
-$defvau! $def-if! ; Name Test | Fns ->
-  $let; Orig:  eval Name
-        Test:  eval Test
-        F:     $fn Args: $if-error: Test | Args
-                           ~ -> Orig | Args
-                           X -> X
+$defvau! $lets
+  [X]         -> eval X
+  [[X Y] | R] -> eval [$let X Y [$lets | R]]
+
+$defvau! $def-if! : Name Test | Fns ->
+  $lets: Orig: eval Name
+         Test: eval Test
+         F:    $fn Args
+                 $if-error: Test | Args
+                   ~ -> Orig | Args
+                   X -> X
     eval [$def! Name F | Fns]
+
+
+
+($defvau! $def-if!
+  (Name Test | Fns ->
+    ($let
+      (Orig  (eval Name))
+      (Test  (eval Test))
+      F
+      ($fn Args
+        ($if-error: Test | Args
+           (~ -> Orig | Args)
+           (X -> X)))
+      (eval [$def! Name F | Fns]))))
+
+
+($defvau! $def-if!
+  ($fn [Name Test | Fns]
+    ($let
+      (Orig
+        (eval Name))
+      (Test
+        (eval Test))
+      (F
+        ($fn Args
+          ($if-error (Test | Args)
+            (~ -> Orig | Args)
+            (X -> X))))
+      (eval [$def! Name F | Fns]))))
+
+($defvau! $def-if!
+  ($fn [Name Test | Fns]
+    ($let (Orig  (eval Name))
+          (Test  (eval Test))
+          (F     ($fn Args
+                   ($if-error (Test | Args)
+                     (~ -> Orig | Args)
+                     (X -> X))))
+      (eval [$def! Name F | Fns]))))
