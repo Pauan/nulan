@@ -2,7 +2,8 @@
 #  Helpers
 ##############################################################################
 def eval_(env, x):
-  if isinstance(x, w_Symbol):
+  # TODO
+  if isinstance(x, (w_Symbol, w_Uniq)):
     return env[x]
   elif isinstance(x, w_Cons):
     return eval_(env, x.car)(env, x.cdr)
@@ -32,7 +33,6 @@ def pattern_match(closure, pattern, args):
   seen = {}
   def rec(env, p, a):
     if isinstance(p, w_Cons):
-      print repr(p)
       if p.car == w_apply:
         p = p.cdr
         if p.car == w_list:
@@ -47,21 +47,20 @@ def pattern_match(closure, pattern, args):
             a = a.cdr
           return rec(env, p.car, a)
         else:
-          raise Exception("foo")
+          raise Exception(p)
       elif p.car == w_list:
         p = p.cdr
-        while isinstance(p, w_Cons):
-          if not isinstance(a, w_Cons):
-            return w_false
-          r = rec(env, p.car, a.car)
-          if r == w_false:
-            return r
-          p = p.cdr
-          a = a.cdr
-        return rec(env, p, a)
-      else:
-        raise Exception("foo")
-    elif isinstance(p, w_Symbol):
+      while isinstance(p, w_Cons):
+        if not isinstance(a, w_Cons):
+          return w_false
+        r = rec(env, p.car, a.car)
+        if r == w_false:
+          return r
+        p = p.cdr
+        a = a.cdr
+      return rec(env, p, a)
+    # TODO
+    elif isinstance(p, (w_Symbol, w_Uniq)):
       if p in seen:
         if env[p] != a:
           return w_false
@@ -131,6 +130,7 @@ class w_Stream(object):
     self.line       = 1
     self.column     = 0
     self.seen       = ""
+    self.isatty     = False
     try:
       self._peeked = self._next()
     except StopIteration:
@@ -174,6 +174,17 @@ class w_Stream(object):
   next = read
   def __iter__(self):
     return self
+
+class w_InputStream(w_Stream):
+  def __init__(self, f):
+    def wrapped():
+      x = f.read(1)
+      if x == "":
+        raise StopIteration
+      else:
+        return x
+    w_Stream.__init__(self, wrapped, name=f.name)
+    self.isatty = f.isatty()
 
 ## Generic stuff for chars, symbols, numbers, etc.
 class w_Base(object):
@@ -244,7 +255,7 @@ class w_Nil(object):
     return "[]"
   def join(self, y):
     return y
-  def map(self, f):
+  def mappair(self, f):
     return self
 
 w_nil = w_Nil()
@@ -297,17 +308,20 @@ class w_Cons(w_Nil):
     x.column = None
     char_all = True ## Are all the elements chars?
     result   = []
-    braces   = "()"
+    braces   = "[]"
 
     if (x.car == w_list or
         x.car == w_string):
-      braces = "[]"
+      #braces = "[]"
       x = x.cdr
     elif x.car == w_arrow:
-      x = x.cdr.car.join(w_Cons(w_Symbol("->"), x.cdr.cdr))
-      #print repr(x)
-    #elif x.car == w_apply:
-    #  x = x.cdr
+      x = x.cdr
+      x = x.car.cdr.join(w_Cons(w_Symbol("->"), x.cdr))
+    elif x.car == w_apply:
+      x = x.cdr
+      if x.car == w_list:
+        #braces = "[]"
+        x = x.cdr
 
     while 1:
       ## It's a proper list: print it as a list or a string
@@ -320,10 +334,15 @@ class w_Cons(w_Nil):
         else:
           return "{0[0]}{1}{0[1]}".format(braces, " ".join(str(x) for x in result))
       if isinstance(x, w_Cons):
-        if char_all and not isinstance(x.car, w_Char):
-          char_all = False
-        result.append(x.car)
-        x = x.cdr
+        if x.cdr == w_nil and self.car == w_apply:
+          return "{0[0]}{1} | {2}{0[1]}".format(braces,
+                                                " ".join(str(x) for x in result),
+                                                str(x.car))
+        else:
+          if char_all and not isinstance(x.car, w_Char):
+            char_all = False
+          result.append(x.car)
+          x = x.cdr
       ## It's an improper list: print it as a list with a bar
       else:
         return "{0[0]}{1} | {2}{0[1]}".format(braces,
@@ -331,7 +350,7 @@ class w_Cons(w_Nil):
                                               str(x))
 
   # TODO: code duplication with join
-  def map(self, f):
+  def mappair(self, f):
     x = self
     top = r = w_Cons(f(x.car), w_nil)
     x = x.cdr
@@ -339,7 +358,9 @@ class w_Cons(w_Nil):
       r.cdr = w_Cons(f(x.car), w_nil)
       r = r.cdr
       x = x.cdr
-    r.cdr = x #f(x)
+    if x != w_nil:
+      # TODO: not sure if needed
+      r.cdr = f(x)
     return top
 
   def join(self, y):
@@ -362,7 +383,7 @@ class w_Cons(w_Nil):
       if x == w_nil:
         break
       elif isinstance(x, w_Cons) and isinstance(x.car, w_Char):
-        result.append(str(x.car))
+        result.append(x.car.value)
         x = x.cdr
       else:
         raise TypeError("cannot convert {} to a string".format(repr(self)))
@@ -403,6 +424,8 @@ class w_Vau(object):
       return "(&vau)"
 
   def __call__(self, env, args):
+    #print env.variables
+    #print
     # TODO: maybe figure out a way to not need to create and
     #       destroy a new environment every time the vau is called
     inner = w_Env(self.closure)
@@ -423,21 +446,21 @@ class w_Vau(object):
 
 class w_Builtin(w_Vau):
   def __init__(self, f):
-    self.value = f
+    self.wrapped = f
     self.__name__ = f.__name__
   def __call__(self, env, args):
-    return self.value(env, args)
+    return self.wrapped(env, args)
 
 class w_Wrapped(object):
   def __init__(self, f):
-    self.value = f
+    self.wrapped = f
   def __repr__(self):
     try:
-      return "(&fn {})".format(self.value.__name__)
+      return "(&fn {})".format(self.wrapped.__name__)
     except AttributeError:
       return "(&fn)"
   def __call__(self, env, args):
-    return self.value(env, args.map(lambda x: eval_(env, x)))
+    return self.wrapped(env, args.mappair(lambda x: eval_(env, x)))
 
 ##############################################################################
 #  Syntax
@@ -446,7 +469,19 @@ class w_Wrapped(object):
 def w_arrow(env, args):
   return w_Wrapped(w_Vau(env, w_tilde, args.car, args.cdr))
 
-@nu_vau("&apply")
+#@nu_vau("&apply")
+#def w_apply(env, args):
+#  x = args
+#  if x.cdr == w_nil:
+#    print x.car
+#    return eval_(env, x.car)
+#  else:
+#    while x.cdr.cdr != w_nil:
+#      x = x.cdr
+#    x.cdr = x.cdr.car #eval_(env, )
+#    return eval_(env, args)
+
+@nu_lambda("&apply")
 def w_apply(env, args):
   x = args
   if x.cdr == w_nil:
@@ -454,7 +489,14 @@ def w_apply(env, args):
   else:
     while x.cdr.cdr != w_nil:
       x = x.cdr
-    x.cdr = eval_(env, x.cdr.car)
+    x.cdr = x.cdr.car
+    # TODO: code duplication with unwrap
+    #if isinstance(args.car, w_Wrapped):
+    #  args.car = args.car.wrapped
+    #else:
+    #  args.car = w_false
+    args.car = w_unwrap(env, w_Cons(args.car, w_nil))
+    #print args
     return eval_(env, args)
 
 @nu_lambda("&list")
@@ -472,9 +514,70 @@ def w_tilde(env, args):
 ##############################################################################
 #  Primitives
 ##############################################################################
+# Constants
 w_true  = w_Symbol("%t")
 w_false = w_Symbol("%f")
 
+# Non-referentially transparent
+@nu_vau("$set!")
+def w_set(env, args):
+  if args.cdr.cdr != w_nil:
+    return w_false
+  else:
+    x = eval_(env, args.cdr.car)
+    env[args.car] = x
+    return x
+
+@nu_lambda("pr!")
+def w_pr(env, args):
+  x = args
+  while isinstance(x, w_Cons):
+    try:
+      print x.car.tostring(),
+    except (TypeError, AttributeError):
+      print x.car,
+    x = x.cdr
+  return args.car
+
+@nu_lambda("write!")
+def w_write(env, args):
+  x = args
+  while isinstance(x, w_Cons):
+    print x.car,
+    x = x.cdr
+  return args.car
+
+# Predicates
+@nu_lambda("fn?")
+def w_fnq(env, args):
+  if args.cdr != w_nil:
+    return w_false
+  else:
+    if isinstance(args.car, w_Wrapped):
+      return args.car
+    else:
+      return w_false
+
+@nu_lambda("is?")
+def w_is(env, args):
+  while 1:
+    if args.cdr == w_nil:
+      return w_true
+    elif args.car != args.cdr.car:
+      return w_false
+    args = args.cdr
+
+@nu_lambda("vau?")
+def w_vauq(env, args):
+  if args.cdr != w_nil:
+    return w_false
+  else:
+    if isinstance(args.car, w_Vau):
+      return args.car
+    else:
+      return w_false
+
+# Vaus
 @nu_vau("$if")
 def w_if(env, args):
   try:
@@ -486,24 +589,16 @@ def w_if(env, args):
   except AttributeError:
     return w_false
 
-@nu_vau("$set!")
-def w_set(env, args):
-  if args.cdr.cdr != w_nil:
-    return w_false
-  else:
-    x = eval_(env, args.cdr.car)
-    env[args.car] = x
-    return x
-
 @nu_vau("$vau")
 def w_vau(env, args):
   return w_Vau(env, args.car, args.cdr.car, args.cdr.cdr)
 
+# Fns
 @nu_lambda("add")
 def w_add(env, args):
   try:
     return w_Number(sum(args))
-  except TypeError:
+  except (TypeError, AttributeError):
     return w_false
 
 @nu_lambda("error")
@@ -519,22 +614,6 @@ def w_eval(env, args):
   else:
     return w_false
 
-@nu_lambda("fn?")
-def w_fnq(env, args):
-  if args.cdr != w_nil:
-    return w_false
-  else:
-    if isinstance(args.car, w_Wrapped):
-      return args.car
-    else:
-      return w_false
-
-@nu_lambda("is")
-def w_is(env, args):
-  while args.car == args.cdr.car:
-    args = args.cdr
-  return w_false
-
 @nu_lambda("uniq")
 def w_uniq(env, args):
   if args != w_nil:
@@ -548,17 +627,7 @@ def w_unwrap(env, args):
     return w_false
   else:
     if isinstance(args.car, w_Wrapped):
-      return args.car.value
-    else:
-      return w_false
-
-@nu_lambda("vau?")
-def w_vauq(env, args):
-  if args.cdr != w_nil:
-    return w_false
-  else:
-    if isinstance(args.car, w_Vau):
-      return args.car
+      return args.car.wrapped
     else:
       return w_false
 
@@ -570,18 +639,29 @@ def w_wrap(env, args):
     return w_Wrapped(args.car)
 
 glob = w_GlobalEnv({
+  # Constants
   "%t"     : w_true,
   "%f"     : w_false,
-  "$if"    : w_if,
+
+  # Non-referentially transparent
   "$set!"  : w_set,
+  "pr!"    : w_pr,
+  "write!" : w_write,
+
+  # Predicates
+  "fn?"    : w_fnq,
+  "is?"    : w_is,
+  "vau?"   : w_vauq,
+
+  # Vaus
+  "$if"    : w_if,
   "$vau"   : w_vau,
+
+  # Fns
   "add"    : w_add,
   "error"  : w_error,
   "eval"   : w_eval,
-  "fn?"    : w_fnq,
-  "is"     : w_is,
   "uniq"   : w_uniq,
   "unwrap" : w_unwrap,
-  "vau?"   : w_vauq,
   "wrap"   : w_wrap,
 })

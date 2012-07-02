@@ -12,35 +12,50 @@ char_lower = "abcdefghijklmnopqrstuvwxyz"
 char_upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 char_sym   = char_num + char_lower + char_upper + "-$%!?"
 
+# TODO: lots of overlap with read_inside_top
 def parse_inside_parens(chars, fn, s):
-  result = []
+  result     = []
   # TODO: correct line/column
-  line   = s.line
-  column = s.column
-  c      = s.peek()
+  line       = s.line
+  column     = s.column
+  c          = s.peek()
+  colon_seen = False # Has the colon been seen?
   while not c in chars:
     if c == ":":
+      colon_seen = True
       s.read()
-      result.append(parse_inside_parens(chars + ";", fn, s))
+      result.append(parse_inside_parens(chars, fn, s)) # + ";"
     elif c == ";":
+      if not colon_seen:
+        break
       s.read()
-      result.append(parse_inside_parens(chars + ";", fn, s))
+      result.append(parse_inside_parens(chars, fn, s)) # + ";"
     elif c == "|":
       s.read()
-      result.append(read1(s))
-      result = list_to_cons(result)
-      while s.peek() in char_white:
-        s.read()
-      c = s.peek()
-      if c in chars:
-        return w_Cons(w_apply, fn(result, line, column)) #.join(x)
-      else:
-        s.read()
-        if c == "-" and s.peek() == ">":
+      while 1:
+        while s.peek() in char_white:
           s.read()
-          result = [w_arrow, w_Cons(w_apply, w_Cons(w_list, result))]
+        if s.peek() == ":":
+          s.read()
+          x = parse_inside_parens(chars, fn, s)
         else:
-          raise w_SyntaxError("illegal use of |", s)
+          x = read1(s)
+        if x is not None:
+          result.append(x)
+          result = list_to_cons(result)
+          while s.peek() in char_white:
+            s.read()
+          c = s.peek()
+          if c in chars + ";":
+            return w_Cons(w_apply, fn(result, line, column)) #.join(x)
+          else:
+            s.read()
+            if c == "-" and s.peek() == ">":
+              s.read()
+              result = [w_arrow, w_Cons(w_apply, w_Cons(w_list, result))]
+            else:
+              raise w_SyntaxError("illegal use of |", s)
+          break
     elif c == "-":
       s.read()
       if s.peek() == ">":
@@ -52,7 +67,9 @@ def parse_inside_parens(chars, fn, s):
     elif c in char_white:
       s.read()
     else:
-      result.append(read1(s))
+      x = read1(s)
+      if x is not None:
+        result.append(x)
     c = s.peek()
   return fn(list_to_cons(result), line, column)
 
@@ -94,52 +111,73 @@ def parse_string(sym):
     return wrapped
   return decorator
 
-def read_inside_top(unwrap, chars, indent, fn, s):
-  result = []
-  column = s.column
-  line   = s.line
+# Flag used when we reach the end of the input
+stop_parsing = False
+
+def read_inside_top(unwrap, chars, indent, fn, origfn, s):
+  global stop_parsing
+  result       = []
+  column       = s.column
+  line         = s.line
+  comment_seen = False # Has a comment been seen?
+  colon_seen   = False # Has the colon been seen?
   try:
     while s.line == line:
       c = s.peek()
       if c in chars:
         break
       elif c == ":":
+        colon_seen = True
         s.read()
-        result.append(read_inside_top(False, chars + ";", s.column, fn, s))
+        result.append(read_inside_top(False, chars + ";", s.column, origfn, origfn, s))
       elif c == ";":
         s.read()
         column = s.column
-        result.append(read_inside_top(True, chars + ";", indent, lambda: s.indent < column, s))
+        result.append(read_inside_top(True, chars + ";", indent, lambda: s.indent < column, origfn, s))
+        #if not colon_seen:
+        #  break
       elif c == "|":
         s.read()
-        result.append(read1(s))
-        result = list_to_cons(result)
-        try:
-          while s.peek() == " ":
+        while 1:
+          while s.peek() in char_white:
             s.read()
-          c = s.peek()
-          if c in chars + "\n":
-            raise StopIteration
+          if s.peek() == ":":
+            s.read()
+            x = read_inside_top(False, chars, s.column, origfn, origfn, s) # + ";"
           else:
-            s.read()
-            if c == "-" and s.peek() == ">":
-              s.read()
-              result = [w_arrow, w_Cons(w_apply, w_Cons(w_list, result))]
-              try:
-                result.append(read_inside_top(True, chars + ";", indent, lambda: False, s))
-              except StopIteration:
-                pass
-            else:
-              raise w_SyntaxError("illegal use of |", s)
-        except StopIteration:
-          return w_Cons(w_apply, result)
+            x = read1(s)
+          if x is None:
+            comment_seen = True
+          else:
+            result.append(x)
+            result = list_to_cons(result)
+            try:
+              while s.peek() == " ":
+                s.read()
+              c = s.peek()
+              if c in chars + ";\n": # TODO: not sure about using ; in here
+                raise StopIteration
+              else:
+                s.read()
+                if c == "-" and s.peek() == ">":
+                  s.read()
+                  result = [w_arrow, w_Cons(w_apply, w_Cons(w_list, result))]
+                  try:
+                    result.append(read_inside_top(True, chars, indent, lambda: False, origfn, s)) # + ";"
+                  except StopIteration:
+                    pass
+                else:
+                  raise w_SyntaxError("illegal use of |", s)
+            except StopIteration:
+              return w_Cons(w_apply, result)
+            break
       elif c == "-":
         s.read()
         if s.peek() == ">":
           s.read()
           result = [w_arrow, w_Cons(w_list, list_to_cons(result))]
           try:
-            result.append(read_inside_top(True, chars + ";", indent, lambda: False, s))
+            result.append(read_inside_top(True, chars, indent, lambda: False, origfn, s)) # + ";"
           except StopIteration:
             pass
         else:
@@ -147,30 +185,45 @@ def read_inside_top(unwrap, chars, indent, fn, s):
           result.append(parse_symbol([c], line, column, s))
       elif c in char_white:
         s.read()
+        if s.isatty and c == "\n" and s.peek() == "\n":
+          stop_parsing = True
+          raise StopIteration
       else:
-        result.append(read1(s))
-    while s.peek() == " ":
+        x = read1(s)
+        if x is None:
+          comment_seen = True
+        else:
+          result.append(x)
+    #while s.peek() == " ":
+    #  s.read()
+    #if s.peek() == "\n":
+    #  s.read()
+    #while s.peek() == " ":
+    #  s.read()
+    while s.peek() in char_white:
       s.read()
-    if s.peek() == "\n":
-      s.read()
-    while s.peek() == " ":
-      s.read()
-    while s.indent > indent and fn():
-      result.append(read_inside_top(True, chars, s.indent, fn, s))
+    while not stop_parsing and s.indent > indent and fn():
+      result.append(read_inside_top(True, chars, s.indent, origfn, origfn, s))
   except StopIteration:
     pass
   result = list_to_cons(result)
   if result == w_nil:
-    raise StopIteration
+    if comment_seen:
+      return read_inside_top(True, chars, s.indent, origfn, origfn, s)
+    else:
+      raise StopIteration
   elif result.cdr == w_nil and unwrap:
     return result.car
   else:
     return result
 
 def read_top(s):
+  global stop_parsing
+  stop_parsing = False
   while s.peek() in char_white:
     s.read()
-  return read_inside_top(True, "", s.indent, lambda: True, s)
+  fn = lambda: True
+  return read_inside_top(True, "", s.indent, fn, fn, s)
 
 
 @parse_recursive_until(")")
@@ -190,7 +243,11 @@ def parse_square_bracket(result, line, column):
 def parse_single_string(result, s, info):
   c = s.read()
   if c == "@":
-    result.append(read1(s))
+    while 1:
+      x = read1(s)
+      if x is not None:
+        result.append(x)
+        break
   elif c == " " and s._at_start and s.indent < info["column"]:
     pass
   else:
@@ -256,7 +313,7 @@ def parse_comment(s):
         pass
     except StopIteration:
       pass
-  return read1(s)
+  #return read_top(s)
 
 ##  [a-zA-Z0-9\-$%!?]+
 def parse_symbol(result, line, column, s):

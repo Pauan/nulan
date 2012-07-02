@@ -7,13 +7,27 @@ $set! $quote: $vau ~ [X] X
 $set! $fn; $vau Env [Args | Body]
   wrap: eval Env [$vau ~ Args | Body]
 
-$set! null? : X -> is X []
+$set! null? : X -> is? X []
+
+#|
+$set! do: $fn [X | R]:
+  $if: null? R;
+    X:
+    do | R
+|#
 
 # => ($let X)
 #    X
 # => ($let (X Y) ...)
 #    ((X -> ($let ...)) Y)
 $set! $let; $vau Env [X | R]
+  #prn! ($quote Args)
+  #prn! [[($quote Args) -> [($quote $let) R]] [uniq]]
+  #prn! X R: null? R
+  #$if: null? R
+  #  prn! 'foo'
+  #  prn! (([X Y] -> [[X -> : $let R] Y])
+  #       X)
   eval Env: $if: null? R
               X
               # Equivalent to ($let: [X Y] X; ...)
@@ -26,7 +40,7 @@ $set! $or; $vau Env [X | R]
 
 $set! any: [X | R] F -> $or: F X; any R F
 
-$set! case: X | Fns -> any Fns: F -> F | X
+$set! case; X | Fns -> any Fns: F -> F | X
 
 $set! $def! ; $vau Env [Name | Fns]
   $let: Args: uniq
@@ -79,6 +93,8 @@ $defvau! $use
 #  Other utilities
 ##############################################################################
 
+$defvau! do: | Args -> eval [[-> | Args]]
+
 $defvau! $and
   [X]     -> eval X
   [X | R] -> $if: eval X; eval [$and | R]
@@ -94,9 +110,9 @@ $def! none: type list? fn?
 $def! fnfn: type fn?
   F -> | Fns -> | Args -> F Fns: X -> X | Args
 
-$def notfn: type | fn? ; fnfn none
-$def andfn: type | fn? ; fnfn all
-$def orfn:  type | fn? ; fnfn any
+$def! notfn: type | fn? ; fnfn none
+$def! andfn: type | fn? ; fnfn all
+$def! orfn:  type | fn? ; fnfn any
 
 
 $def! fold:  type list? fn?
@@ -118,7 +134,7 @@ $def! rem: type list? fn?
   X F -> keep X: notfn F
 
 
-$def! list: | R -> [| R]
+$def! list: | R -> R
 $def! car: [X | R] -> X
 $def! cdr: [X | R] -> R
 
@@ -127,7 +143,7 @@ $def! cdr: [X | R] -> R
 $def! zip: type | list?
   | Args -> $if: some Args null?
               []
-              [(map Args car) | (zip | (map Args cdr))]
+              [(map Args car) | (zip | :map Args cdr)]
 
 
 $def! join: type list? ~
@@ -141,13 +157,22 @@ $def! ref: type list? ~
 
 
 # TODO: maybe make it take rest args?
-$def! iso
+$def! iso?
   X        X        -> %t
-  [X | R1] [Y | R2] -> $and: iso X Y; iso R1 R2
+  [X | R1] [Y | R2] -> $and: iso? X Y; iso? R1 R2
 
 
 $def! id:   X -> X
 $def! copy: X -> map X id
+
+
+$def! prn! ; | Args ->
+  pr! | Args
+  pr! '\n'
+
+$def! writen! ; | Args ->
+  write! | Args
+  write! '\n'
 
 #|
 $def! pair: type list?
