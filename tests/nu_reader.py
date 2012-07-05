@@ -7,6 +7,18 @@
 >>> def write(x):
 ...   print repr(nu_reader.readstring(x, 9001))
 
+>>> def write_all(x):
+...   result = []
+...   x = nu_types.w_Stream(iter(x).next)
+...   while 1:
+...     y = nu_reader.read(x, 9001)
+...     if y == 9001:
+...       break
+...     else:
+...       result.append(y)
+...   for x in result:
+...     print repr(x)
+
 >>> def error(f, x):
 ...   try:
 ...     return f(x)
@@ -71,16 +83,16 @@ error: a is not valid hexadecimal (line 1, column 7):
 
 
 >>> write(r"'foo@bar\nqux'")
-[(&fn &string) (&char f) (&char o) (&char o) (&symbol bar) (&char \n) (&char q) (&char u) (&char x)]
+[(&fn str) (&char f) (&char o) (&char o) (&symbol bar) (&char \n) (&char q) (&char u) (&char x)]
 
 >>> write("'foo@barqux'")
-[(&fn &string) (&char f) (&char o) (&char o) (&symbol barqux)]
+[(&fn str) (&char f) (&char o) (&char o) (&symbol barqux)]
 
 >>> write("'foo@'@'bar''qux'")
-[(&fn &string) (&char f) (&char o) (&char o) [(&fn &string) [(&fn &string) (&char b) (&char a) (&char r)]] (&char q) (&char u) (&char x)]
+[(&fn str) (&char f) (&char o) (&char o) [(&fn str) [(&fn str) (&char b) (&char a) (&char r)]] (&char q) (&char u) (&char x)]
 
 >>> write("'foo@(id bar)qux'")
-[(&fn &string) (&char f) (&char o) (&char o) [(&symbol id) (&symbol bar)] (&char q) (&char u) (&char x)]
+[(&fn str) (&char f) (&char o) (&char o) [(&symbol id) (&symbol bar)] (&char q) (&char u) (&char x)]
 
 >>> read(r'''
 ...       'foo\t
@@ -106,11 +118,17 @@ error: a is not valid hexadecimal (line 1, column 7):
 ...       ''')
 'fo\@o\\\\bar\\\\n\\qux'
 
->>> error(read,
+>>> error(write_all,
 ...       r'''
 ...       `fo@o\\bar`n;qux`
 ...       ''')
 error: missing ending ` quote (line 3, column 6)
+
+>>> error(read,
+...       r'''
+...       `fo@o\\bar`n;qux`
+...       ''')
+['fo\@o\\\\bar' n]
 
 >>> read(r'''
 ...       `fo@o\\bar`
@@ -185,7 +203,7 @@ qux
 
 
 >>> write("'foo@#||#qux'")
-[(&fn &string) (&char f) (&char o) (&char o) (&symbol qux)]
+[(&fn str) (&char f) (&char o) (&char o) (&symbol qux)]
 
 
 >>> write("foo bar #||# qux")
@@ -195,17 +213,17 @@ qux
 [(&symbol foo) (&symbol bar) (&symbol qux)]
 
 >>> write("[foo bar #||# qux]")
-[(&fn &list) (&symbol foo) (&symbol bar) (&symbol qux)]
+[(&fn seq) (&symbol foo) (&symbol bar) (&symbol qux)]
 
 
 >>> write("foo bar | #||# qux")
-[(&fn &apply) (&symbol foo) (&symbol bar) (&symbol qux)]
+[(&fn apply) (&symbol foo) (&symbol bar) (&symbol qux)]
 
 >>> write("(foo bar | #||# qux)")
-[(&fn &apply) (&symbol foo) (&symbol bar) (&symbol qux)]
+[(&fn apply) (&symbol foo) (&symbol bar) (&symbol qux)]
 
 >>> write("[foo bar | #||# qux]")
-[(&fn &apply) (&fn &list) (&symbol foo) (&symbol bar) (&symbol qux)]
+[(&fn apply) (&fn seq) (&symbol foo) (&symbol bar) (&symbol qux)]
 
 ##############################################################################
 #  Symbols
@@ -217,10 +235,11 @@ qux
 [(&symbol foo) (&symbol bar)]
 
 >>> write("foo:bar")
-[(&symbol foo) [(&symbol bar)]]
-
->>> write(r"foo;bar")
 [(&symbol foo) (&symbol bar)]
+
+>>> write_all(r"foo;bar")
+(&symbol foo)
+(&symbol bar)
 
 >>> write("foo1")
 (&symbol foo1)
@@ -311,23 +330,23 @@ error: invalid character . (line 1, column 7):
 #  Bar
 ##############################################################################
 >>> write("|foo")
-[(&fn &apply) (&symbol foo)]
+[(&fn apply) (&symbol foo)]
 
 >>> write("(|foo)")
-[(&fn &apply) (&symbol foo)]
+[(&fn apply) (&symbol foo)]
 
 >>> write("[|foo]")
-[(&fn &apply) (&fn &list) (&symbol foo)]
+[(&fn apply) (&fn seq) (&symbol foo)]
 
 
 >>> write("|foo    ")
-[(&fn &apply) (&symbol foo)]
+[(&fn apply) (&symbol foo)]
 
 >>> write("(|foo    )")
-[(&fn &apply) (&symbol foo)]
+[(&fn apply) (&symbol foo)]
 
 >>> write("[|foo    ]")
-[(&fn &apply) (&fn &list) (&symbol foo)]
+[(&fn apply) (&fn seq) (&symbol foo)]
 
 
 >>> error(write, "|foo bar qux")
@@ -354,13 +373,13 @@ qux             => [1 2 3]
 [foo bar | (add 1 2 3)] => [foo bar 6]
 
 >>> write("(foo bar | qux)")
-[(&fn &apply) (&symbol foo) (&symbol bar) (&symbol qux)]
+[(&fn apply) (&symbol foo) (&symbol bar) (&symbol qux)]
 
 >>> write("foo bar | qux")
-[(&fn &apply) (&symbol foo) (&symbol bar) (&symbol qux)]
+[(&fn apply) (&symbol foo) (&symbol bar) (&symbol qux)]
 
 >>> write("[foo bar | qux]")
-[(&fn &apply) (&fn &list) (&symbol foo) (&symbol bar) (&symbol qux)]
+[(&fn apply) (&fn seq) (&symbol foo) (&symbol bar) (&symbol qux)]
 
 
 >>> error(write, "Test | Args: Orig | Args")
@@ -379,66 +398,79 @@ error: illegal use of | (line 1, column 13):
               ^
 
 
->>> error(write, "Test | Args; Orig | Args")
-[[(&fn &apply) (&symbol Test) (&symbol Args)] [(&fn &apply) (&symbol Orig) (&symbol Args)]]
+>>> write_all("Test | Args; Orig | Args")
+[(&fn apply) (&symbol Test) (&symbol Args)]
+[(&fn apply) (&symbol Orig) (&symbol Args)]u
 
 >>> error(write, "(Test | Args; Orig | Args)")
-[[(&fn &apply) (&symbol Test) (&symbol Args)] [(&fn &apply) (&symbol Orig) (&symbol Args)]]
+[[(&fn apply) (&symbol Test) (&symbol Args)] [(&fn apply) (&symbol Orig) (&symbol Args)]]
 
 >>> error(write, "[Test | Args; Orig | Args]")
-[(&fn &list) [(&fn &apply) (&fn &list) (&symbol Test) (&symbol Args)] [(&fn &apply) (&fn &list) (&symbol Orig) (&symbol Args)]]
+[(&fn seq) [(&fn apply) (&fn seq) (&symbol Test) (&symbol Args)] [(&fn apply) (&fn seq) (&symbol Orig) (&symbol Args)]]
 
 
 >>> write("foo: Test | Args; Orig | Args")
-[(&symbol foo) [(&fn &apply) (&symbol Test) (&symbol Args)] [(&fn &apply) (&symbol Orig) (&symbol Args)]]
+[(&symbol foo) [(&fn apply) (&symbol Test) (&symbol Args)] [(&fn apply) (&symbol Orig) (&symbol Args)]]
 
->>> write("(foo: Test | Args; Orig | Args)")
-[(&symbol foo) [(&fn &apply) (&symbol Test) (&symbol Args)] [(&fn &apply) (&symbol Orig) (&symbol Args)]]
+>>> error(write, "(foo: Test | Args; Orig | Args)")
+error: invalid character : (line 1, column 5):
+  (foo:
+      ^
 
->>> write("[foo: Test | Args; Orig | Args]")
-[(&fn &list) (&symbol foo) [(&fn &apply) (&fn &list) (&symbol Test) (&symbol Args)] [(&fn &apply) (&fn &list) (&symbol Orig) (&symbol Args)]]
+>>> error(write, "[foo: Test | Args; Orig | Args]")
+error: invalid character : (line 1, column 5):
+  [foo:
+      ^
 
 
 >>> write("X | (join R Y)")
-[(&fn &apply) (&symbol X) [(&symbol join) (&symbol R) (&symbol Y)]]
+[(&fn apply) (&symbol X) [(&symbol join) (&symbol R) (&symbol Y)]]
 
 >>> write("(X | (join R Y))")
-[(&fn &apply) (&symbol X) [(&symbol join) (&symbol R) (&symbol Y)]]
+[(&fn apply) (&symbol X) [(&symbol join) (&symbol R) (&symbol Y)]]
 
 >>> write("[X | (join R Y)]")
-[(&fn &apply) (&fn &list) (&symbol X) [(&symbol join) (&symbol R) (&symbol Y)]]
+[(&fn apply) (&fn seq) (&symbol X) [(&symbol join) (&symbol R) (&symbol Y)]]
 
 
 >>> write("X | [join R Y]")
-[(&fn &apply) (&symbol X) [(&fn &list) (&symbol join) (&symbol R) (&symbol Y)]]
+[(&fn apply) (&symbol X) [(&fn seq) (&symbol join) (&symbol R) (&symbol Y)]]
 
 >>> write("(X | [join R Y])")
-[(&fn &apply) (&symbol X) [(&fn &list) (&symbol join) (&symbol R) (&symbol Y)]]
+[(&fn apply) (&symbol X) [(&fn seq) (&symbol join) (&symbol R) (&symbol Y)]]
 
 >>> write("[X | [join R Y]]")
-[(&fn &apply) (&fn &list) (&symbol X) [(&fn &list) (&symbol join) (&symbol R) (&symbol Y)]]
+[(&fn apply) (&fn seq) (&symbol X) [(&fn seq) (&symbol join) (&symbol R) (&symbol Y)]]
 
 ##############################################################################
 #  Colon
 ##############################################################################
 >>> write("zip | : map Args cdr")
-[(&fn &apply) (&symbol zip) [(&symbol map) (&symbol Args) (&symbol cdr)]]
+[(&fn apply) (&symbol zip) [(&symbol map) (&symbol Args) (&symbol cdr)]]
 
->>> write("(zip | : map Args cdr)")
-[(&fn &apply) (&symbol zip) [(&symbol map) (&symbol Args) (&symbol cdr)]]
+>>> error(write, "(zip | : map Args cdr)")
+error: invalid character : (line 1, column 8):
+  (zip | :
+         ^
 
->>> write("[zip | : map Args cdr]")
-[(&fn &apply) (&fn &list) (&symbol zip) [(&fn &list) (&symbol map) (&symbol Args) (&symbol cdr)]]
+>>> error(write, "[zip | : map Args cdr]")
+error: invalid character : (line 1, column 8):
+  [zip | :
+         ^
 
 
 >>> write("zip | : map Args: cdr")
-[(&fn &apply) (&symbol zip) [(&symbol map) (&symbol Args) [(&symbol cdr)]]]
+[(&fn apply) (&symbol zip) [(&symbol map) (&symbol Args) (&symbol cdr)]]
 
->>> write("(zip | : map Args: cdr)")
-[(&fn &apply) (&symbol zip) [(&symbol map) (&symbol Args) [(&symbol cdr)]]]
+>>> error(write, "(zip | : map Args: cdr)")
+error: invalid character : (line 1, column 8):
+  (zip | :
+         ^
 
->>> write("[zip | : map Args: cdr]")
-[(&fn &apply) (&fn &list) (&symbol zip) [(&fn &list) (&symbol map) (&symbol Args) [(&fn &list) (&symbol cdr)]]]
+>>> error(write, "[zip | : map Args: cdr]")
+error: invalid character : (line 1, column 8):
+  [zip | :
+         ^
 
 
 >>> error(write, "zip | : map Args cdr; bar")
@@ -447,71 +479,90 @@ error: illegal use of | (line 1, column 21):
                       ^
 
 >>> error(write, "(zip | : map Args cdr; bar)")
-error: illegal use of | (line 1, column 22):
-  (zip | : map Args cdr;
-                       ^
+error: invalid character : (line 1, column 8):
+  (zip | :
+         ^
 
 >>> error(write, "[zip | : map Args cdr; bar]")
-error: illegal use of | (line 1, column 22):
-  [zip | : map Args cdr;
-                       ^
+error: invalid character : (line 1, column 8):
+  [zip | :
+         ^
 
 
->>> write(
+>>> write_all(
 ... r'''
 ... foo: bar
 ... qux
 ... ''')
-[(&symbol foo) [(&symbol bar)]]
+[(&symbol foo) (&symbol bar)]
+(&symbol qux)
 
 
 >>> write("foo: bar: qux")
-[(&symbol foo) [(&symbol bar) [(&symbol qux)]]]
+[(&symbol foo) [(&symbol bar) (&symbol qux)]]
 
->>> write("(foo: bar: qux)")
-[(&symbol foo) [(&symbol bar) [(&symbol qux)]]]
+>>> error(write, "(foo: bar: qux)")
+error: invalid character : (line 1, column 5):
+  (foo:
+      ^
 
->>> write("[foo: bar: qux]")
-[(&fn &list) (&symbol foo) [(&fn &list) (&symbol bar) [(&fn &list) (&symbol qux)]]]
+>>> error(write, "[foo: bar: qux]")
+error: invalid character : (line 1, column 5):
+  [foo:
+      ^
 
 
 >>> write("foo: bar | qux")
-[(&symbol foo) [(&fn &apply) (&symbol bar) (&symbol qux)]]
+[(&symbol foo) [(&fn apply) (&symbol bar) (&symbol qux)]]
 
->>> write("(foo: bar | qux)")
-[(&symbol foo) [(&fn &apply) (&symbol bar) (&symbol qux)]]
+>>> error(write, "(foo: bar | qux)")
+error: invalid character : (line 1, column 5):
+  (foo:
+      ^
 
->>> write("[foo: bar | qux]")
-[(&fn &list) (&symbol foo) [(&fn &apply) (&fn &list) (&symbol bar) (&symbol qux)]]
+>>> error(write, "[foo: bar | qux]")
+error: invalid character : (line 1, column 5):
+  [foo:
+      ^
 
 
 >>> write("foo: bar; qux")
-[(&symbol foo) [(&symbol bar)] (&symbol qux)]
+[(&symbol foo) (&symbol bar) (&symbol qux)]
 
->>> write("(foo: bar; qux)")
-[(&symbol foo) [(&symbol bar)] [(&symbol qux)]]
+>>> error(write, "(foo: bar; qux)")
+error: invalid character : (line 1, column 5):
+  (foo:
+      ^
 
->>> write("[foo: bar; qux]")
-[(&fn &list) (&symbol foo) [(&fn &list) (&symbol bar)] [(&fn &list) (&symbol qux)]]
+>>> error(write, "[foo: bar; qux]")
+error: invalid character : (line 1, column 5):
+  [foo:
+      ^
 
 
 >>> write("foo: bar; qux; corge")
-[(&symbol foo) [(&symbol bar)] (&symbol qux) (&symbol corge)]
+[(&symbol foo) (&symbol bar) (&symbol qux) (&symbol corge)]
 
->>> write("(foo: bar; qux; corge)")
-[(&symbol foo) [(&symbol bar)] [(&symbol qux)] [(&symbol corge)]]
+>>> error(write, "(foo: bar; qux; corge)")
+error: invalid character : (line 1, column 5):
+  (foo:
+      ^
 
->>> write("[foo: bar; qux; corge]")
-[(&fn &list) (&symbol foo) [(&fn &list) (&symbol bar)] [(&fn &list) (&symbol qux)] [(&fn &list) (&symbol corge)]]
+>>> error(write, "[foo: bar; qux; corge]")
+error: invalid character : (line 1, column 5):
+  [foo:
+      ^
 
 
->>> write(
+>>> error(write,
 ... r'''
 ... (foo:
 ...   bar:
 ...     qux)
 ... ''')
-[(&symbol foo) [(&symbol bar) [(&symbol qux)]]]
+error: invalid character : (line 2, column 5):
+  (foo:
+      ^
 
 
 >>> write(
@@ -521,10 +572,10 @@ error: illegal use of | (line 1, column 22):
 ...            qux
 ...   corge
 ... ''')
-[(&symbol $let) [(&symbol F) [(&symbol $fn) (&symbol Args) [(&symbol foo)] (&symbol bar) (&symbol qux)]] (&symbol corge)]
+[(&symbol $let) [(&symbol F) [(&symbol $fn) (&symbol Args) (&symbol foo) (&symbol bar) (&symbol qux)]] (&symbol corge)]
 
 
->>> write(
+>>> write_all(
 ... r'''
 ... foo bar;qux ->
 ...  $let:Orig:eval Name
@@ -532,9 +583,10 @@ error: illegal use of | (line 1, column 22):
 ...   $let F:corge
 ...    eval F
 ... ''')
-[(&symbol foo) (&symbol bar) [(&vau &arrow) [(&symbol qux)] [(&symbol $let) [(&symbol Orig) [(&symbol eval) (&symbol Name)]] [(&symbol Test) [(&symbol eval) (&symbol Test)]] [(&symbol $let) (&symbol F) [(&symbol corge)] [(&symbol eval) (&symbol F)]]]]]
+[(&symbol foo) (&symbol bar)]
+[(&vau $fn) [(&fn seq) (&symbol qux)] [(&symbol $let) [(&symbol Orig) [(&symbol eval) (&symbol Name)]] [(&symbol Test) [(&symbol eval) (&symbol Test)]] [(&symbol $let) (&symbol F) [(&symbol corge)] [(&symbol eval) (&symbol F)]]]]
 
->>> write(
+>>> write_all(
 ... r'''
 ... foo bar;qux ->
 ...  $let:Orig:eval Name
@@ -542,9 +594,10 @@ error: illegal use of | (line 1, column 22):
 ...   $let F:corge
 ...    eval F
 ... ''')
-[(&symbol foo) (&symbol bar) [(&vau &arrow) [(&symbol qux)] [(&symbol $let) [(&symbol Orig) [(&symbol eval) (&symbol Name)]] [(&symbol Test) [(&symbol eval) (&symbol Test)]] [(&symbol $let) (&symbol F) [(&symbol corge)] [(&symbol eval) (&symbol F)]]]]]
+[(&symbol foo) (&symbol bar)]
+[(&vau $fn) [(&symbol qux)] [(&symbol $let) [(&symbol Orig) [(&symbol eval) (&symbol Name)]] [(&symbol Test) [(&symbol eval) (&symbol Test)]] [(&symbol $let) (&symbol F) [(&symbol corge)] [(&symbol eval) (&symbol F)]]]]
 
->>> write(
+>>> write_all(
 ... r'''
 ... foo bar;qux ->
 ...  $let;Orig:eval Name
@@ -552,7 +605,8 @@ error: illegal use of | (line 1, column 22):
 ...   $let F:corge
 ...    eval F
 ... ''')
-[(&symbol foo) (&symbol bar) [(&vau &arrow) [(&symbol qux)] [(&symbol $let) [(&symbol Orig) [(&symbol eval) (&symbol Name)] [(&symbol Test) [(&symbol eval) (&symbol Test)]] [(&symbol $let) (&symbol F) [(&symbol corge)] [(&symbol eval) (&symbol F)]]]]]]
+[(&symbol foo) (&symbol bar)]
+[(&vau $fn) [(&symbol qux)] [(&symbol $let) [(&symbol Orig) [(&symbol eval) (&symbol Name)] [(&symbol Test) [(&symbol eval) (&symbol Test)]] [(&symbol $let) (&symbol F) [(&symbol corge)] [(&symbol eval) (&symbol F)]]]]]
 
 
 >>> write(
@@ -561,49 +615,49 @@ error: illegal use of | (line 1, column 22):
 ...  $if: not: X Y
 ...   error foo
 ... ''')
-[(&symbol any) [(&symbol zip) (&symbol Fns) (&symbol Args)] [(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&symbol $if) [(&symbol not) [(&symbol X) (&symbol Y)]] [(&symbol error) (&symbol foo)]]]]
+[(&symbol any) [(&symbol zip) (&symbol Fns) (&symbol Args)] [(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&symbol $if) [(&symbol not) [(&symbol X) (&symbol Y)]] [(&symbol error) (&symbol foo)]]]]
 
->>> write(
+>>> write_all(
 ... r'''
 ... any (zip Fns Args); [X Y] ->
 ...  $if: not: X Y
 ...   error foo
 ... ''')
-[(&symbol any) [(&symbol zip) (&symbol Fns) (&symbol Args)] [(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&symbol $if) [(&symbol not) [(&symbol X) (&symbol Y)]] [(&symbol error) (&symbol foo)]]]]
+[(&symbol any) [(&symbol zip) (&symbol Fns) (&symbol Args)] [(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&symbol $if) [(&symbol not) [(&symbol X) (&symbol Y)]] [(&symbol error) (&symbol foo)]]]]
 
->>> write(
+>>> write_all(
 ... r'''
 ... any; [X Y] -> zip: Fns Args
 ...  $if: not: X Y
 ...   error foo
 ... ''')
-[(&symbol any) [(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&symbol zip) [(&symbol Fns) (&symbol Args)]] [(&symbol $if) [(&symbol not) [(&symbol X) (&symbol Y)]] [(&symbol error) (&symbol foo)]]]]
+[(&symbol any) [(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&symbol zip) [(&symbol Fns) (&symbol Args)]] [(&symbol $if) [(&symbol not) [(&symbol X) (&symbol Y)]] [(&symbol error) (&symbol foo)]]]]
 
 
 >>> write(": X -> : $let | R; Y")
-[[(&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&symbol $let) (&symbol R)]] (&symbol Y)]
+[[(&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&symbol $let) (&symbol R)]] (&symbol Y)]
 
 >>> write("((X -> : $let | R) Y)")
-[[(&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&symbol $let) (&symbol R)]] (&symbol Y)]
+[[(&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&symbol $let) (&symbol R)]] (&symbol Y)]
 
 >>> write("[[X -> : $let | R] Y]")
-[(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)]
+[(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)]
 
 
 >>> write(": $fn: X; $let | R; Y")
-[[(&symbol $fn) [(&symbol X)] [(&fn &apply) (&symbol $let) (&symbol R)]] (&symbol Y)]
+[[(&symbol $fn) [(&symbol X)] [(&fn apply) (&symbol $let) (&symbol R)]] (&symbol Y)]
 
 >>> write("(($fn (X): $let | R) Y)")
-[[(&symbol $fn) [(&symbol X)] [(&fn &apply) (&symbol $let) (&symbol R)]] (&symbol Y)]
+[[(&symbol $fn) [(&symbol X)] [(&fn apply) (&symbol $let) (&symbol R)]] (&symbol Y)]
 
 >>> write("[[$fn [X]: $let | R] Y]")
-[(&fn &list) [(&fn &list) (&symbol $fn) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)]
+[(&fn seq) [(&fn seq) (&symbol $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)]
 
 ##############################################################################
 #  Semicolon
 ##############################################################################
 >>> write("[$set! Name: $vau: $quote %Env; Args; case Args | Fns]")
-[(&fn &list) (&symbol $set!) (&symbol Name) [(&fn &list) (&symbol $vau) [(&fn &list) (&symbol $quote) (&symbol %Env)] (&symbol Args) [(&fn &apply) (&fn &list) (&symbol case) (&symbol Args) (&symbol Fns)]]]
+[(&fn seq) (&symbol $set!) (&symbol Name) [(&fn seq) (&symbol $vau) [(&fn seq) (&symbol $quote) (&symbol %Env)] (&symbol Args) [(&fn apply) (&fn seq) (&symbol case) (&symbol Args) (&symbol Fns)]]]
 
 
 >>> write(
@@ -616,19 +670,19 @@ error: illegal use of | (line 1, column 22):
 ... r'''
 ... $def! list? : X -> $or: cons? X; null? X
 ... ''')
-[(&symbol $def!) (&symbol list?) [(&vau &arrow) [(&fn &list) (&symbol X)] [(&symbol $or) [(&symbol cons?) (&symbol X)] [(&symbol null?) (&symbol X)]]]]
+[(&symbol $def!) (&symbol list?) [(&vau $fn) [(&fn seq) (&symbol X)] [(&symbol $or) [(&symbol cons?) (&symbol X)] [(&symbol null?) (&symbol X)]]]]
 
 >>> write(
 ... r'''
 ... ($def! list? : X -> $or: cons? X; null? X)
 ... ''')
-[(&symbol $def!) (&symbol list?) [(&vau &arrow) [(&fn &list) (&symbol X)] (&symbol $or) [(&symbol cons?) (&symbol X)] [(&symbol null?) (&symbol X)]]]
+[(&symbol $def!) (&symbol list?) [(&vau $fn) [(&fn seq) (&symbol X)] (&symbol $or) [(&symbol cons?) (&symbol X)] [(&symbol null?) (&symbol X)]]]
 
 >>> write(
 ... r'''
 ... ($def! list? : X -> ($or: cons? X; null? X))
 ... ''')
-[(&symbol $def!) (&symbol list?) [(&vau &arrow) [(&fn &list) (&symbol X)] [(&symbol $or) [(&symbol cons?) (&symbol X)] [(&symbol null?) (&symbol X)]]]]
+[(&symbol $def!) (&symbol list?) [(&vau $fn) [(&fn seq) (&symbol X)] [(&symbol $or) [(&symbol cons?) (&symbol X)] [(&symbol null?) (&symbol X)]]]]
 
 
 >>> write(
@@ -644,7 +698,7 @@ error: illegal use of | (line 1, column 22):
 ... $def! foo; X ->
 ...  bar
 ... ''')
-[(&symbol $def!) (&symbol foo) [(&vau &arrow) [(&fn &list) (&symbol X)] (&symbol bar)]]
+[(&symbol $def!) (&symbol foo) [(&vau $fn) [(&fn seq) (&symbol X)] (&symbol bar)]]
 
 >>> write(
 ... r'''
@@ -652,7 +706,7 @@ error: illegal use of | (line 1, column 22):
 ...  bar
 ...   qux
 ... ''')
-[(&symbol $def!) (&symbol foo) [(&vau &arrow) [(&fn &list) (&symbol X)] [(&symbol bar) (&symbol qux)]]]
+[(&symbol $def!) (&symbol foo) [(&vau $fn) [(&fn seq) (&symbol X)] [(&symbol bar) (&symbol qux)]]]
 
 >>> write(
 ... r'''
@@ -661,7 +715,7 @@ error: illegal use of | (line 1, column 22):
 ...   qux
 ...  corge
 ... ''')
-[(&symbol $def!) (&symbol foo) [(&vau &arrow) [(&fn &list) (&symbol X)] [(&symbol bar) (&symbol qux)] (&symbol corge)]]
+[(&symbol $def!) (&symbol foo) [(&vau $fn) [(&fn seq) (&symbol X)] [(&symbol bar) (&symbol qux)] (&symbol corge)]]
 
 
 >>> write(
@@ -787,7 +841,7 @@ error: illegal use of | (line 1, column 22):
 ... $let F: $fn Args: $if-error: Test | Args; Orig Args
 ...  eval foo
 ... ''')
-[(&symbol $let) (&symbol F) [(&symbol $fn) (&symbol Args) [(&symbol $if-error) [(&fn &apply) (&symbol Test) (&symbol Args)]]] [(&symbol Orig) (&symbol Args) [(&symbol eval) (&symbol foo)]]]
+[(&symbol $let) (&symbol F) [(&symbol $fn) (&symbol Args) [(&symbol $if-error) [(&fn apply) (&symbol Test) (&symbol Args)]]] [(&symbol Orig) (&symbol Args) [(&symbol eval) (&symbol foo)]]]
 
 >>> write(
 ... r'''
@@ -804,7 +858,7 @@ error:
 ... ''')
 error:
 
-[(&symbol $let) (&symbol F) [(&symbol $fn) (&symbol Args) [(&symbol $if-error) [(&fn &apply) (&symbol Test) (&symbol Args)]]] [(&fn &apply) (&symbol Orig) (&symbol Args)] [(&symbol eval) (&symbol foo)]]
+[(&symbol $let) (&symbol F) [(&symbol $fn) (&symbol Args) [(&symbol $if-error) [(&fn apply) (&symbol Test) (&symbol Args)]]] [(&fn apply) (&symbol Orig) (&symbol Args)] [(&symbol eval) (&symbol foo)]]
 
 ##############################################################################
 #  Arrow
@@ -815,33 +869,33 @@ error: invalid character > (line 1, column 5):
       ^
 
 >>> write("foo -> foo")
-[(&vau &arrow) [(&fn &list) (&symbol foo)] (&symbol foo)]
+[(&vau $fn) [(&fn seq) (&symbol foo)] (&symbol foo)]
 
 >>> write("(foo -> foo)")
-[(&vau &arrow) [(&fn &list) (&symbol foo)] (&symbol foo)]
+[(&vau $fn) [(&fn seq) (&symbol foo)] (&symbol foo)]
 
 >>> write("[foo -> foo]")
-[(&fn &list) (&vau &arrow) [(&fn &list) (&symbol foo)] (&symbol foo)]
+[(&fn seq) (&vau $fn) [(&fn seq) (&symbol foo)] (&symbol foo)]
 
 
 >>> write("foo | bar -> foo")
-[(&vau &arrow) [(&fn &apply) (&fn &list) (&symbol foo) (&symbol bar)] (&symbol foo)]
+[(&vau $fn) [(&fn apply) (&fn seq) (&symbol foo) (&symbol bar)] (&symbol foo)]
 
 >>> write("(foo | bar -> foo)")
-[(&vau &arrow) [(&fn &apply) (&fn &list) (&symbol foo) (&symbol bar)] (&symbol foo)]
+[(&vau $fn) [(&fn apply) (&fn seq) (&symbol foo) (&symbol bar)] (&symbol foo)]
 
 >>> write("[foo | bar -> foo]")
-[(&fn &list) (&vau &arrow) [(&fn &apply) (&fn &list) (&symbol foo) (&symbol bar)] (&symbol foo)]
+[(&fn seq) (&vau $fn) [(&fn apply) (&fn seq) (&symbol foo) (&symbol bar)] (&symbol foo)]
 
 
 >>> write("|foo -> foo")
-[(&vau &arrow) [(&fn &apply) (&fn &list) (&symbol foo)] (&symbol foo)]
+[(&vau $fn) [(&fn apply) (&fn seq) (&symbol foo)] (&symbol foo)]
 
 >>> write("(|foo -> foo)")
-[(&vau &arrow) [(&fn &apply) (&fn &list) (&symbol foo)] (&symbol foo)]
+[(&vau $fn) [(&fn apply) (&fn seq) (&symbol foo)] (&symbol foo)]
 
 >>> write("[|foo -> foo]")
-[(&fn &list) (&vau &arrow) [(&fn &apply) (&fn &list) (&symbol foo)] (&symbol foo)]
+[(&fn seq) (&vau $fn) [(&fn apply) (&fn seq) (&symbol foo)] (&symbol foo)]
 
 
 >>> write("(foo -a foo)")
@@ -854,40 +908,40 @@ error: invalid character > (line 1, column 5):
 ...  foo
 ...  bar
 ... ''')
-[(&vau &arrow) [(&fn &list) (&symbol x) (&symbol y)] (&symbol foo) (&symbol bar)]
+[(&vau $fn) [(&fn seq) (&symbol x) (&symbol y)] (&symbol foo) (&symbol bar)]
 
 >>> write(
 ... r'''
 ... x y -> foo
 ...        bar
 ... ''')
-[(&vau &arrow) [(&fn &list) (&symbol x) (&symbol y)] (&symbol foo) (&symbol bar)]
+[(&vau $fn) [(&fn seq) (&symbol x) (&symbol y)] (&symbol foo) (&symbol bar)]
 
 >>> write("(x y -> foo bar)")
-[(&vau &arrow) [(&fn &list) (&symbol x) (&symbol y)] (&symbol foo) (&symbol bar)]
+[(&vau $fn) [(&fn seq) (&symbol x) (&symbol y)] (&symbol foo) (&symbol bar)]
 
 >>> write("[x y -> foo bar]")
-[(&fn &list) (&vau &arrow) [(&fn &list) (&symbol x) (&symbol y)] (&symbol foo) (&symbol bar)]
+[(&fn seq) (&vau $fn) [(&fn seq) (&symbol x) (&symbol y)] (&symbol foo) (&symbol bar)]
 
 
 >>> write("x y -> foo bar")
-[(&vau &arrow) [(&fn &list) (&symbol x) (&symbol y)] [(&symbol foo) (&symbol bar)]]
+[(&vau $fn) [(&fn seq) (&symbol x) (&symbol y)] [(&symbol foo) (&symbol bar)]]
 
 >>> write("(x y -> (foo bar))")
-[(&vau &arrow) [(&fn &list) (&symbol x) (&symbol y)] [(&symbol foo) (&symbol bar)]]
+[(&vau $fn) [(&fn seq) (&symbol x) (&symbol y)] [(&symbol foo) (&symbol bar)]]
 
 >>> write("[x y -> [foo bar]]")
-[(&fn &list) (&vau &arrow) [(&fn &list) (&symbol x) (&symbol y)] [(&fn &list) (&symbol foo) (&symbol bar)]]
+[(&fn seq) (&vau $fn) [(&fn seq) (&symbol x) (&symbol y)] [(&fn seq) (&symbol foo) (&symbol bar)]]
 
 
 >>> write("|foo -> foo bar")
-[(&vau &arrow) [(&fn &apply) (&fn &list) (&symbol foo)] [(&symbol foo) (&symbol bar)]]
+[(&vau $fn) [(&fn apply) (&fn seq) (&symbol foo)] [(&symbol foo) (&symbol bar)]]
 
 >>> write("(|foo -> (foo bar))")
-[(&vau &arrow) [(&fn &apply) (&fn &list) (&symbol foo)] [(&symbol foo) (&symbol bar)]]
+[(&vau $fn) [(&fn apply) (&fn seq) (&symbol foo)] [(&symbol foo) (&symbol bar)]]
 
 >>> write("[|foo -> [foo bar]]")
-[(&fn &list) (&vau &arrow) [(&fn &apply) (&fn &list) (&symbol foo)] [(&fn &list) (&symbol foo) (&symbol bar)]]
+[(&fn seq) (&vau $fn) [(&fn apply) (&fn seq) (&symbol foo)] [(&fn seq) (&symbol foo) (&symbol bar)]]
 
 
 >>> error(write, "|foo bar -> foo bar")
@@ -907,7 +961,7 @@ error: illegal use of | (line 1, column 7):
 
 
 >>> write("(X Y -> Y)")
-[(&vau &arrow) [(&fn &list) (&symbol X) (&symbol Y)] (&symbol Y)]
+[(&vau $fn) [(&fn seq) (&symbol X) (&symbol Y)] (&symbol Y)]
 
 >>> write(
 ... r'''
@@ -915,10 +969,10 @@ error: illegal use of | (line 1, column 7):
 ... (-> X)
 ...   (-> Y))
 ... ''')
-[(&vau &arrow) [(&fn &list) (&symbol X) (&symbol Y)] [(&vau &arrow) [(&fn &list)] (&symbol X)] [(&vau &arrow) [(&fn &list)] (&symbol Y)]]
+[(&vau $fn) [(&fn seq) (&symbol X) (&symbol Y)] [(&vau $fn) [(&fn seq)] (&symbol X)] [(&vau $fn) [(&fn seq)] (&symbol Y)]]
 
 >>> write("(X Y -> -> X -> Y)")
-[(&vau &arrow) [(&fn &list) (&vau &arrow) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X) (&symbol Y)]] (&symbol X)] (&symbol Y)]
+[(&vau $fn) [(&fn seq) (&vau $fn) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X) (&symbol Y)]] (&symbol X)] (&symbol Y)]
 
 >>> write(
 ... r'''
@@ -926,14 +980,14 @@ error: illegal use of | (line 1, column 7):
 ...   -> X
 ...   -> Y)
 ... ''')
-[(&vau &arrow) [(&fn &list) (&vau &arrow) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X) (&symbol Y)]] (&symbol X)] (&symbol Y)]
+[(&vau $fn) [(&fn seq) (&vau $fn) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X) (&symbol Y)]] (&symbol X)] (&symbol Y)]
 
 
 >>> write(
 ... r'''
 ... (: [X Y] -> [[X -> [$let | R]] Y]; X)
 ... ''')
-[[(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)]] [(&symbol X)]]
+[[(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)]] [(&symbol X)]]
 
 
 >>> write(
@@ -941,42 +995,42 @@ error: illegal use of | (line 1, column 7):
 ... (([X Y] -> [[X -> [$let | R]] Y])
 ...   X)
 ... ''')
-[[(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)]] (&symbol X)]
+[[(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)]] (&symbol X)]
 
 >>> write(
 ... r'''
 ... [X Y] -> [[X -> [$let | R]] Y]
 ...  X
 ... ''')
-[(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)] (&symbol X)]
+[(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)] (&symbol X)]
 
 >>> write(
 ... r'''
 ... [X Y] -> [[X -> [$let | R]] Y]
 ... X
 ... ''')
-[(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)]]
+[(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)]]
 
 >>> write(
 ... r'''
 ... :[X Y] -> [[X -> [$let | R]] Y]
 ...  X
 ... ''')
-[[(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)]] (&symbol X)]
+[[(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)]] (&symbol X)]
 
 >>> write(
 ... r'''
 ... :[X Y] -> [[X -> [$let | R]] Y]
 ...   X
 ... ''')
-[(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)] (&symbol X)]
+[(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)] (&symbol X)]
 
 >>> write(
 ... r'''
 ... [[[X Y] -> [[X -> [$let | R]] Y]]
 ...   X]
 ... ''')
-[(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)]] (&symbol X)]
+[(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)]] (&symbol X)]
 
 
 >>> write(
@@ -984,7 +1038,7 @@ error: illegal use of | (line 1, column 7):
 ... ([X Y] -> [[X -> [$let | R]] Y]
 ...   X)
 ... ''')
-[(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)] (&symbol X)]
+[(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)] (&symbol X)]
 
 >>> write(
 ... r'''
@@ -992,7 +1046,7 @@ error: illegal use of | (line 1, column 7):
 ...   [[X -> [$let | R]] Y]
 ...   X)
 ... ''')
-[(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)] (&symbol X)]
+[(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)] (&symbol X)]
 
 >>> write(
 ... r'''
@@ -1000,13 +1054,13 @@ error: illegal use of | (line 1, column 7):
 ...  [[X -> [$let | R]] Y]
 ...  X
 ... ''')
-[(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)] (&symbol X)]
+[(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)] (&symbol X)]
 
 >>> write(
 ... r'''
 ... [[X Y] -> [[X -> [$let | R]] Y] X]
 ... ''')
-[(&fn &list) (&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)] (&symbol X)]
+[(&fn seq) (&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)] (&symbol X)]
 
 
 >>> write(
@@ -1014,65 +1068,161 @@ error: illegal use of | (line 1, column 7):
 ... $def! each
 ...   [X | R] F -> (F X) each R F
 ... ''')
-[(&symbol $def!) (&symbol each) [(&vau &arrow) [(&fn &list) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] (&symbol each) (&symbol R) (&symbol F)]]
+[(&symbol $def!) (&symbol each) [(&vau $fn) [(&fn seq) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] (&symbol each) (&symbol R) (&symbol F)]]
 
 >>> write(
 ... r'''
 ... $def! each
 ...   [X | R] F -> (F X) (each R F)
 ... ''')
-[(&symbol $def!) (&symbol each) [(&vau &arrow) [(&fn &list) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
+[(&symbol $def!) (&symbol each) [(&vau $fn) [(&fn seq) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
 
 >>> write(
 ... r'''
 ... $def! each
 ...   [X | R] F -> (F X): each R F
 ... ''')
-[(&symbol $def!) (&symbol each) [(&vau &arrow) [(&fn &list) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
+[(&symbol $def!) (&symbol each) [(&vau $fn) [(&fn seq) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
 
 >>> write(
 ... r'''
 ... $def! each
 ...   [X | R] F -> (F X); each R F
 ... ''')
-[(&symbol $def!) (&symbol each) [(&vau &arrow) [(&fn &list) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
+[(&symbol $def!) (&symbol each) [(&vau $fn) [(&fn seq) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
 
 >>> write(
 ... r'''
 ... $def! each
 ...   [X | R] F -> : F X; each R F
 ... ''')
-[(&symbol $def!) (&symbol each) [(&vau &arrow) [(&fn &list) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
+[(&symbol $def!) (&symbol each) [(&vau $fn) [(&fn seq) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
 
 >>> write(
 ... r'''
 ... $def! each
 ...   [X | R] F -> F X; each R F
 ... ''')
-[(&symbol $def!) (&symbol each) [(&vau &arrow) [(&fn &list) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
+[(&symbol $def!) (&symbol each) [(&vau $fn) [(&fn seq) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
 
 >>> write(
 ... r'''
 ... $def! each
 ...   ([X | R] F -> (F X); each R F)
 ... ''')
-[(&symbol $def!) (&symbol each) [(&vau &arrow) [(&fn &list) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
+[(&symbol $def!) (&symbol each) [(&vau $fn) [(&fn seq) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
 
 >>> write(
 ... r'''
 ... $def! each
 ...   ([X | R] F -> : F X; each R F)
 ... ''')
-[(&symbol $def!) (&symbol each) [(&vau &arrow) [(&fn &list) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
+[(&symbol $def!) (&symbol each) [(&vau $fn) [(&fn seq) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol F) (&symbol X)] [(&symbol each) (&symbol R) (&symbol F)]]]
 
 ##############################################################################
 #  Whitespace indentation
 ##############################################################################
+>>> write_all(r'''
+... $pref; foo bar; qux yes
+...   nou
+... ''')
+(&symbol $pref)
+[(&symbol foo) (&symbol bar)]
+[(&symbol qux) (&symbol yes) (&symbol nou)]
+
+>>> write_all(r'''
+... $pref; foo bar: qux yes
+...   nou
+... ''')
+(&symbol $pref)
+[(&symbol foo) (&symbol bar) [(&symbol qux) (&symbol yes)] (&symbol nou)]
+
+>>> write_all(r'''
+... $pref: foo bar; qux yes
+...   nou
+... ''')
+[(&symbol $pref) [(&symbol foo) (&symbol bar)] [(&symbol qux) (&symbol yes)] (&symbol nou)]
+
+>>> write_all(r'''
+... $pref: foo bar: qux yes
+...   nou
+... ''')
+[(&symbol $pref) [(&symbol foo) (&symbol bar) [(&symbol qux) (&symbol yes)]] (&symbol nou)]
+
+>>> write_all(r'''
+... $pref: foo bar: qux yes:
+...   nou
+... ''')
+[(&symbol $pref) [(&symbol foo) (&symbol bar) [(&symbol qux) (&symbol yes) (&symbol nou)]]]
+
+>>> write_all(r'''
+... $pref: foo bar: qux yes:
+...   nou
+...    ohso
+... ''')
+[(&symbol $pref) [(&symbol foo) (&symbol bar) [(&symbol qux) (&symbol yes) [(&symbol nou) (&symbol ohso)]]]]
+
+>>> write_all(r'''
+... $pref; foo bar; qux yes;
+...   nou
+... ''')
+(&symbol $pref)
+[(&symbol foo) (&symbol bar)]
+[(&symbol qux) (&symbol yes)]
+(&symbol nou)
+
+>>> write_all(r'''
+... $pref: foo bar
+...        qux yes
+...   nou
+... ''')
+[(&symbol $pref) [(&symbol foo) (&symbol bar)] [(&symbol qux) (&symbol yes)] (&symbol nou)]
+
+>>> write_all(r'''
+... $pref; foo bar
+...        qux yes
+...   nou
+... ''')
+(&symbol $pref)
+[(&symbol foo) (&symbol bar)]
+[(&symbol qux) (&symbol yes) (&symbol nou)]
+
+>>> write_all(r'''
+... $pref: corge; foo bar
+...               qux yes
+...   nou
+... ''')
+[(&symbol $pref) (&symbol corge) [(&symbol foo) (&symbol bar)] [(&symbol qux) (&symbol yes)] (&symbol nou)]
+
+
+>>> write_all(r'''
+... each Args: X -> foo bar
+...                 qux corge
+...                 yes nou
+... ''')
+[(&symbol $each) (&symbol Args) [(&vau $fn) [(&fn &list) (&symbol X)] [(&symbol foo) (&symbol bar)] [(&symbol qux) (&symbol corge)] [(&symbol yes) (&symbol nou)]]]
+
+>>> write_all(r'''
+... each Args: X -> foo bar
+...   qux corge
+...   yes nou
+... ''')
+[(&symbol $each) (&symbol Args) [(&vau $fn) [(&fn &list) (&symbol X)] [(&symbol foo) (&symbol bar)]] [(&symbol qux) (&symbol corge)] [(&symbol yes) (&symbol nou)]]
+
+>>> write_all(r'''
+... each Args: X ->
+...   foo bar
+...   qux corge
+...   yes nou
+... ''')
+[(&symbol $each) (&symbol Args) [(&vau $fn) [(&fn &list) (&symbol X)] [(&symbol foo) (&symbol bar)] [(&symbol qux) (&symbol corge)] [(&symbol yes) (&symbol nou)]]]
+
+
 >>> write(r'''
 ...                             # TODO
 ... $set! any: [X | R] F -> $or (F X): any R F
 ... ''')
-[(&symbol $set!) (&symbol any) [(&vau &arrow) [(&fn &list) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol $or) [(&symbol F) (&symbol X)] [(&symbol any) (&symbol R) (&symbol F)]]]]
+[(&symbol $set!) (&symbol any) [(&vau $fn) [(&fn seq) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol $or) [(&symbol F) (&symbol X)] [(&symbol any) (&symbol R) (&symbol F)]]]]
 
 >>> write(r'''
 ... $set! $or; $vau Env [X | R]
@@ -1082,7 +1232,7 @@ error: illegal use of | (line 1, column 7):
 ...                             # TODO
 ... $set! any: [X | R] F -> $or (F X): any R F
 ... ''')
-[(&symbol $set!) (&symbol $or) [(&symbol $vau) (&symbol Env) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] [(&symbol $let) [(&symbol X) [(&symbol eval) (&symbol Env) (&symbol X)]] [(&symbol $if) (&symbol X) (&symbol X) [(&symbol eval) (&symbol Env) [(&fn &apply) (&fn &list) (&symbol $or) (&symbol R)]]]]]]
+[(&symbol $set!) (&symbol $or) [(&symbol $vau) (&symbol Env) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] [(&symbol $let) [(&symbol X) [(&symbol eval) (&symbol Env) (&symbol X)]] [(&symbol $if) (&symbol X) (&symbol X) [(&symbol eval) (&symbol Env) [(&fn apply) (&fn seq) (&symbol $or) (&symbol R)]]]]]]
 
 >>> write(r'''
 ... $set! $or; $vau Env [X | R]
@@ -1091,7 +1241,7 @@ error: illegal use of | (line 1, column 7):
 ...                             # TODO
 ... $set! any: [X | R] F -> $or (F X): any R F
 ... ''')
-[(&symbol $set!) (&symbol $or) [(&symbol $vau) (&symbol Env) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] [(&symbol $let) [(&symbol X) [(&symbol eval) (&symbol Env) (&symbol X)]] [(&symbol $if) (&symbol X) (&symbol X) [(&symbol eval) (&symbol Env) [(&fn &apply) (&fn &list) (&symbol $or) (&symbol R)]]]]]]
+[(&symbol $set!) (&symbol $or) [(&symbol $vau) (&symbol Env) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] [(&symbol $let) [(&symbol X) [(&symbol eval) (&symbol Env) (&symbol X)]] [(&symbol $if) (&symbol X) (&symbol X) [(&symbol eval) (&symbol Env) [(&fn apply) (&fn seq) (&symbol $or) (&symbol R)]]]]]]
 
 
 >>> write(r'''
@@ -1101,7 +1251,7 @@ error: illegal use of | (line 1, column 7):
 ...                             'foo'
 ... $set! any: [X | R] F -> $or (F X): any R F
 ... ''')
-[(&symbol $set!) (&symbol $or) [(&symbol $vau) (&symbol Env) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] [(&symbol $let) [(&symbol X) [(&symbol eval) (&symbol Env) (&symbol X)]] [(&symbol $if) (&symbol X) (&symbol X) [(&symbol eval) (&symbol Env) [(&fn &apply) (&fn &list) (&symbol $or) (&symbol R)] [(&fn &string) (&char f) (&char o) (&char o)]]]]]]
+[(&symbol $set!) (&symbol $or) [(&symbol $vau) (&symbol Env) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] [(&symbol $let) [(&symbol X) [(&symbol eval) (&symbol Env) (&symbol X)]] [(&symbol $if) (&symbol X) (&symbol X) [(&symbol eval) (&symbol Env) [(&fn apply) (&fn seq) (&symbol $or) (&symbol R)] [(&fn str) (&char f) (&char o) (&char o)]]]]]]
 
 
 >>> write(r'''
@@ -1111,7 +1261,7 @@ error: illegal use of | (line 1, column 7):
 ...                             # TODO
 ...   $set! any: [X | R] F -> $or (F X): any R F
 ... ''')
-[(&symbol $set!) (&symbol $or) [(&symbol $vau) (&symbol Env) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] [(&symbol $let) [(&symbol X) [(&symbol eval) (&symbol Env) (&symbol X)]] [(&symbol $if) (&symbol X) (&symbol X) [(&symbol eval) (&symbol Env) [(&fn &apply) (&fn &list) (&symbol $or) (&symbol R)]]]] [(&symbol $set!) (&symbol any) [(&vau &arrow) [(&fn &list) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol $or) [(&symbol F) (&symbol X)] [(&symbol any) (&symbol R) (&symbol F)]]]]]]
+[(&symbol $set!) (&symbol $or) [(&symbol $vau) (&symbol Env) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] [(&symbol $let) [(&symbol X) [(&symbol eval) (&symbol Env) (&symbol X)]] [(&symbol $if) (&symbol X) (&symbol X) [(&symbol eval) (&symbol Env) [(&fn apply) (&fn seq) (&symbol $or) (&symbol R)]]]] [(&symbol $set!) (&symbol any) [(&vau $fn) [(&fn seq) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol $or) [(&symbol F) (&symbol X)] [(&symbol any) (&symbol R) (&symbol F)]]]]]]
 
 >>> write(r'''
 ... $set! $or; $vau Env [X | R]
@@ -1121,7 +1271,7 @@ error: illegal use of | (line 1, column 7):
 ...                             # TODO
 ...   $set! any: [X | R] F -> $or (F X): any R F
 ... ''')
-[(&symbol $set!) (&symbol $or) [(&symbol $vau) (&symbol Env) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] [(&symbol $let) [(&symbol X) [(&symbol eval) (&symbol Env) (&symbol X)]] [(&symbol $if) (&symbol X) (&symbol X) [(&symbol eval) (&symbol Env) [(&fn &apply) (&fn &list) (&symbol $or) (&symbol R)]]]] [(&symbol $set!) (&symbol any) [(&vau &arrow) [(&fn &list) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol $or) [(&symbol F) (&symbol X)] [(&symbol any) (&symbol R) (&symbol F)]]]]]]
+[(&symbol $set!) (&symbol $or) [(&symbol $vau) (&symbol Env) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] [(&symbol $let) [(&symbol X) [(&symbol eval) (&symbol Env) (&symbol X)]] [(&symbol $if) (&symbol X) (&symbol X) [(&symbol eval) (&symbol Env) [(&fn apply) (&fn seq) (&symbol $or) (&symbol R)]]]] [(&symbol $set!) (&symbol any) [(&vau $fn) [(&fn seq) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] (&symbol F)] [(&symbol $or) [(&symbol F) (&symbol X)] [(&symbol any) (&symbol R) (&symbol F)]]]]]]
 
 
 >>> read(
@@ -1195,21 +1345,21 @@ error: illegal use of | (line 1, column 7):
 ...    $if: not: X Y
 ...     error 'type check failed on argument @Y'
 ... ''')
-[(&symbol $def!) (&symbol type) [(&symbol $fn) (&symbol Fns) [(&symbol $fn) (&symbol Args) [(&symbol any) [(&symbol zip) (&symbol Fns) (&symbol Args)] [(&vau &arrow) [[(&fn &list) (&symbol X) (&symbol Y)]] [(&symbol $if) [(&symbol not) [(&symbol X) (&symbol Y)]] [(&symbol error) [(&fn &string) (&char t) (&char y) (&char p) (&char e) (&char  ) (&char c) (&char h) (&char e) (&char c) (&char k) (&char  ) (&char f) (&char a) (&char i) (&char l) (&char e) (&char d) (&char  ) (&char o) (&char n) (&char  ) (&char a) (&char r) (&char g) (&char u) (&char m) (&char e) (&char n) (&char t) (&char  ) (&symbol Y)]]]]]]]]
+[(&symbol $def!) (&symbol type) [(&symbol $fn) (&symbol Fns) [(&symbol $fn) (&symbol Args) [(&symbol any) [(&symbol zip) (&symbol Fns) (&symbol Args)] [(&vau $fn) [[(&fn seq) (&symbol X) (&symbol Y)]] [(&symbol $if) [(&symbol not) [(&symbol X) (&symbol Y)]] [(&symbol error) [(&fn str) (&char t) (&char y) (&char p) (&char e) (&char  ) (&char c) (&char h) (&char e) (&char c) (&char k) (&char  ) (&char f) (&char a) (&char i) (&char l) (&char e) (&char d) (&char  ) (&char o) (&char n) (&char  ) (&char a) (&char r) (&char g) (&char u) (&char m) (&char e) (&char n) (&char t) (&char  ) (&symbol Y)]]]]]]]]
 
 
 >>> write(
 ... r'''
 ... $def! foo: type list? any? ; X -> X
 ... ''')
-[(&symbol $def!) (&symbol foo) [(&symbol type) (&symbol list?) (&symbol any?)] [(&vau &arrow) [(&fn &list) (&symbol X)] (&symbol X)]]
+[(&symbol $def!) (&symbol foo) [(&symbol type) (&symbol list?) (&symbol any?)] [(&vau $fn) [(&fn seq) (&symbol X)] (&symbol X)]]
 
 
 >>> write(
 ... r'''
 ... $def! foo: X -> X
 ... ''')
-[(&symbol $def!) (&symbol foo) [(&vau &arrow) [(&fn &list) (&symbol X)] (&symbol X)]]
+[(&symbol $def!) (&symbol foo) [(&vau $fn) [(&fn seq) (&symbol X)] (&symbol X)]]
 
 
 >>> write(
@@ -1232,7 +1382,7 @@ u
 ...     $let F: $fn Args: $if-error (Test | Args): Orig | Args
 ...       eval [$def! Name F | Fns]
 ... ''')
-[(&symbol $defvau!) (&symbol $def-if!) [(&vau &arrow) [(&symbol Name) (&symbol Test) | (&symbol Fns)] [(&symbol $let) [(&symbol Orig) [(&symbol eval) (&symbol Name)] [(&symbol Test) [(&symbol eval) (&symbol Test)]]] [(&symbol $let) (&symbol F) [(&symbol $fn) (&symbol Args) [(&symbol $if-error) [(&symbol Test) | (&symbol Args)] [(&symbol Orig) | (&symbol Args)]]] [(&symbol eval) [(&fn &list) (&symbol $def!) (&symbol Name) (&symbol F) | (&symbol Fns)]]]]]]
+[(&symbol $defvau!) (&symbol $def-if!) [(&vau $fn) [(&symbol Name) (&symbol Test) | (&symbol Fns)] [(&symbol $let) [(&symbol Orig) [(&symbol eval) (&symbol Name)] [(&symbol Test) [(&symbol eval) (&symbol Test)]]] [(&symbol $let) (&symbol F) [(&symbol $fn) (&symbol Args) [(&symbol $if-error) [(&symbol Test) | (&symbol Args)] [(&symbol Orig) | (&symbol Args)]]] [(&symbol eval) [(&fn seq) (&symbol $def!) (&symbol Name) (&symbol F) | (&symbol Fns)]]]]]]
 
 
 >>> write(
@@ -1244,7 +1394,7 @@ u
 ...            -> car X
 ...            -> $set-in! Env X: cdr X
 ... ''')
-[(&symbol $def-if!) (&symbol stream) [(&symbol type) (&symbol list?)] [(&vau &arrow) [(&symbol X)] [(&symbol $let) (&symbol Env) [(&symbol current-env)] [(&symbol make-stream) [(&vau &arrow) [] [(&symbol nil?) (&symbol X)]] [(&vau &arrow) [] [(&symbol car) (&symbol X)]] [(&vau &arrow) [] [(&symbol $set-in!) (&symbol Env) (&symbol X) [(&symbol cdr) (&symbol X)]]]]]]]
+[(&symbol $def-if!) (&symbol stream) [(&symbol type) (&symbol list?)] [(&vau $fn) [(&symbol X)] [(&symbol $let) (&symbol Env) [(&symbol current-env)] [(&symbol make-stream) [(&vau $fn) [] [(&symbol nil?) (&symbol X)]] [(&vau $fn) [] [(&symbol car) (&symbol X)]] [(&vau $fn) [] [(&symbol $set-in!) (&symbol Env) (&symbol X) [(&symbol cdr) (&symbol X)]]]]]]]
 
 
 >>> write(
@@ -1255,7 +1405,7 @@ u
 ...                       -> car X
 ...                       -> $set-in! Env X: cdr X
 ... ''')
-[(&symbol $def-if!) (&symbol stream) [(&symbol type) (&symbol list?)] [(&vau &arrow) [(&symbol X)] [(&symbol $let) (&symbol Env) [(&symbol current-env)] [(&symbol make-stream) [(&vau &arrow) [] [(&symbol nil?) (&symbol X)]] [(&vau &arrow) [] [(&symbol car) (&symbol X)]] [(&vau &arrow) [] [(&symbol $set-in!) (&symbol Env) (&symbol X) [(&symbol cdr) (&symbol X)]]]]]]]
+[(&symbol $def-if!) (&symbol stream) [(&symbol type) (&symbol list?)] [(&vau $fn) [(&symbol X)] [(&symbol $let) (&symbol Env) [(&symbol current-env)] [(&symbol make-stream) [(&vau $fn) [] [(&symbol nil?) (&symbol X)]] [(&vau $fn) [] [(&symbol car) (&symbol X)]] [(&vau $fn) [] [(&symbol $set-in!) (&symbol Env) (&symbol X) [(&symbol cdr) (&symbol X)]]]]]]]
 
 
 >>> write(
@@ -1264,7 +1414,7 @@ u
 ...   [X | R] Y -> [X | (join R Y)]
 ...   [X]     Y -> [X | Y]
 ... ''')
-[(&symbol $def!) (&symbol join) [(&symbol type) (&symbol list?) (&symbol any?)] [(&vau &arrow) [[(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] (&symbol Y)] [(&fn &apply) (&fn &list) (&symbol X) [(&symbol join) (&symbol R) (&symbol Y)]]] [(&vau &arrow) [[(&fn &list) (&symbol X)] (&symbol Y)] [(&fn &apply) (&fn &list) (&symbol X) (&symbol Y)]]]
+[(&symbol $def!) (&symbol join) [(&symbol type) (&symbol list?) (&symbol any?)] [(&vau $fn) [[(&fn apply) (&fn seq) (&symbol X) (&symbol R)] (&symbol Y)] [(&fn apply) (&fn seq) (&symbol X) [(&symbol join) (&symbol R) (&symbol Y)]]] [(&vau $fn) [[(&fn seq) (&symbol X)] (&symbol Y)] [(&fn apply) (&fn seq) (&symbol X) (&symbol Y)]]]
 
 
 >>> write(
@@ -1276,7 +1426,7 @@ u
 ...               :[X Y] -> [[X -> : $let | R] Y]
 ...                X
 ... ''')
-[(&symbol $set!) (&symbol $let) [(&symbol $vau) (&symbol Env) [(&fn &apply) (&fn &list) (&symbol X) (&symbol R)] [(&symbol eval) (&symbol Env) [(&symbol $if) [(&symbol null?) (&symbol R)] (&symbol X) [[(&vau &arrow) [(&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]] (&symbol Y)]] (&symbol X)]]]]]
+[(&symbol $set!) (&symbol $let) [(&symbol $vau) (&symbol Env) [(&fn apply) (&fn seq) (&symbol X) (&symbol R)] [(&symbol eval) (&symbol Env) [(&symbol $if) [(&symbol null?) (&symbol R)] (&symbol X) [[(&vau $fn) [(&fn seq) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]] (&symbol Y)]] (&symbol X)]]]]]
 
 
 >>> write(
@@ -1285,7 +1435,7 @@ u
 ...   $let: Args: uniq
 ...     eval Env [$set! Name: $fn Args: case Args | Fns]
 ... ''')
-[(&symbol $set!) (&symbol $def!) [(&symbol $vau) (&symbol Env) [(&fn &apply) (&fn &list) (&symbol Name) (&symbol Fns)] [(&symbol $let) [(&symbol Args) [(&symbol uniq)]] [(&symbol eval) (&symbol Env) [(&fn &list) (&symbol $set!) (&symbol Name) [(&fn &list) (&symbol $fn) (&symbol Args) [(&fn &apply) (&fn &list) (&symbol case) (&symbol Args) (&symbol Fns)]]]]]]]
+[(&symbol $set!) (&symbol $def!) [(&symbol $vau) (&symbol Env) [(&fn apply) (&fn seq) (&symbol Name) (&symbol Fns)] [(&symbol $let) [(&symbol Args) [(&symbol uniq)]] [(&symbol eval) (&symbol Env) [(&fn seq) (&symbol $set!) (&symbol Name) [(&fn seq) (&symbol $fn) (&symbol Args) [(&fn apply) (&fn seq) (&symbol case) (&symbol Args) (&symbol Fns)]]]]]]]
 
 
 >>> write(
@@ -1298,10 +1448,10 @@ u
 ...                X
 ... ''')
 [(&symbol $set!) (&symbol $let) [(&symbol $vau) (&symbol Env) [(&vau &apply
-) (&fn &list) (&symbol X) (&symbol R)] [(&symbol eval) (&symbol Env) [(&symbol
-$if) [(&symbol null?) (&symbol R)] (&symbol X) [[(&vau &arrow) [(&fn &list) [(&
-fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&vau &arrow) [(&
-fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]]
+) (&fn seq) (&symbol X) (&symbol R)] [(&symbol eval) (&symbol Env) [(&symbol
+$if) [(&symbol null?) (&symbol R)] (&symbol X) [[(&vau $fn) [(&fn seq) [(&
+fn &list) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&vau $fn) [(&
+fn &list) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let) (&symbol R)]]
 (&symbol Y)]] (&symbol X)]]]]]
 
 >>> write(
@@ -1314,10 +1464,10 @@ fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let) (&symbol R)]]
 ...                    X
 ... ''')
 [(&symbol $set!) (&symbol $let) [(&symbol $vau) (&symbol Env) [(&vau &apply
-) (&fn &list) (&symbol X) (&symbol R)] [(&symbol eval) (&symbol Env) [(&symbol
-$if) [(&symbol null?) (&symbol R)] (&symbol X) [(&symbol prn) [(&vau &arrow) [(
-&fn &list) [(&fn &list) (&symbol X) (&symbol Y)]] [(&fn &list) [(&fn &list) (&v
-au &arrow) [(&fn &list) (&symbol X)] [(&fn &apply) (&fn &list) (&symbol $let)
+) (&fn seq) (&symbol X) (&symbol R)] [(&symbol eval) (&symbol Env) [(&symbol
+$if) [(&symbol null?) (&symbol R)] (&symbol X) [(&symbol prn) [(&vau $fn) [(
+&fn &list) [(&fn seq) (&symbol X) (&symbol Y)]] [(&fn seq) [(&fn seq) (&v
+au &arrow) [(&fn seq) (&symbol X)] [(&fn apply) (&fn seq) (&symbol $let)
 (&symbol R)]] (&symbol Y)]] (&symbol X)]]]]]
 
 >>> write(

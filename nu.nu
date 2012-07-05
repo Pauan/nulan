@@ -2,186 +2,296 @@
 #  Core
 ##############################################################################
 
-#$set! $fn: $vau Env [Args | Body]:
-#  wrap: eval Env [$vau ~ Args | Body]
-
-$set! $let: $vau Env [X Y | R]:
+$assign $let: $vau Env [X Y | R]
   eval Env [[$fn [seq X] | R] Y]
 
-$set! $quote: $vau ~ [X] X
+$assign $quote: $vau ~ [X] X
 
-$set! $or: $vau Env [X | R]:
-  $let X: eval Env X
+$assign $or: $vau Env [X | R]
+  $let X: eval Env X;
     $if X X: eval Env [$or | R]
 
-$set! any [X | R] F -> $or: F X; any R F
+$assign any? [X | R] F -> $or (F X) (any? R F)
 
-$set! case: X | Fns -> any Fns: F -> F | X
+$assign case: X | Fns -> any? Fns: F -> F | X
 
-$set! $defvau! : $vau Env [Name | Fns]:
-  $let Args (uniq)
-    eval Env [$set! Name
-               [$vau ($quote %Env) Args
-                 [case Args | Fns]]]
+# TODO is it necessary for this to be a vau rather than an fn?
+$assign case-vau: $vau Env Fns
+  $let Args: uniq;
+    eval Env [$vau ($quote %Env) Args: case Args | Fns]
 
-$defvau! $def! : Name | Fns ->
-  $let Args (uniq)
-    eval [$set! Name
-           [$fn Args
-             [case Args | Fns]]]
+$assign case-fn: |Fns ->
+  |Args -> case Args | Fns
+
+$assign $defvau: $vau Env [Name | Fns]
+  eval Env [$assign Name: case-vau | Fns]
+
+$assign $def: $vau Env [Name | Fns]
+  eval Env [$assign Name: case-fn | Fns]
 
 ##############################################################################
 #  $use
 ##############################################################################
 
-$def! each: type seq? fn?
-  [X | R] F -> F X; each R F
+$def get-current-env: wrap: $vau Env [] Env
 
-$set! get-current-env: wrap: $vau Env [] Env
+$def make-env: Env -> eval Env [[$vau ~ ~ [get-current-env]]]
 
-$def! make-env: Env -> eval Env [[$vau ~ ~ [get-current-env]]]
-
-$def! make-base-env
+$def make-base-env
 
 
-$defvau! $use: | Args ->
+$def $use: $vau Env Args
   each Args: X ->
-    $let New (make-base-env)
-      $hook New env-get-if-unbound
-        K -> eval K New
+    $let New: make-base-env;
+      $hook Env get-if-unbound
+        K -> eval New K
       load-file-in New: find-file X
-      eval [$set! (strip-extension (basename X)) New]
+      eval Env [$def (strip-extension: basename X) New]
 
 ##############################################################################
 #  Other utilities
 ##############################################################################
 
-$def! not: X -> $if X %f %t
+# Could be implemented in terms of each, but it would be inefficient
+$def eachf
+  [X | R] F -> (F X) (each R F)
+  ~       ~ -> %f
 
-$def! type: | Fns ->
-  $if: seq? Fns
-    | Args -> any: zip Fns Args; [X Y] ->
-                $if: not: X Y
-                  error "type check failed on argument @Y"
-    | Args -> any Args: X ->
-                $if: not: Fns X
-                  error "type check failed on argument @Y"
+$def not: X -> $if X %f %t
 
-# TODO: map needs to type check on any seq, including dotted
-$def! map: type seq? fn?
-  [X | R] F -> [(F X) | (map R F)]
-  X       ~ -> X
+#|
+$def type: |Fns ->
+  $if: seq? Fns;
+    |Args -> any? (zip Fns Args): [X Y] ->
+               $if: not: X Y;
+                 type-error "type check failed on argument @Y"
+    |Args -> any? Args: X ->
+               $if: not: Fns X;
+                 type-error "type check failed on argument @Y"
+|#
 
-$defvau! do: | Args -> eval [[$fn [] | Args]]
+$defvau do: |Args -> eval [[$fn [] | Args]]
 
-$defvau! $and
+$defvau $and
   [X]     -> eval X
-  [X | R] -> $if: eval X; eval [$and | R]
+  [X | R] -> $if: eval X;
+               eval [$and | R]
 
-$def! all: type seq? fn?
-  [X | R] F -> $and: F X; all R F
+$def all?
+  [X]     F -> F X
+  [X | R] F -> $and (F X) (all? R F)
 
-$def! none: type seq? fn?
-  X F -> all X: X -> not: F X
+$def none?
+  X F -> all? X: X -> not: F X
 
 
 # Logical functions on functions
-$def! fnfn: type fn?
-  F -> | Fns -> | Args -> F Fns: X -> X | Args
+$def fn-fn
+  F -> |Fns -> |Args -> F Fns: X -> X | Args
 
-$def! notfn: type | fn? ; fnfn none
-$def! andfn: type | fn? ; fnfn all
-$def! orfn:  type | fn? ; fnfn any
+$def fn-not: fn-fn none?
+$def fn-and: fn-fn all?
+$def fn-or:  fn-fn any?
+
+# TODO dotted list support for sum/sumr
+
+# Called foldl/reduce in other languages.
+#
+# Takes 2 to 3 arguments:
+#
+#   => sum [1 2 3] seq
+#   [[1 2] 3]
+#
+#   => sum 0 [1 2 3] seq
+#   [[[0 1] 2] 3]
+#
+$def sum
+  [X | R] F   -> sum1 X R F
+  I       X F -> sum1 I X F
+
+$def sum1
+  I [X | R] F -> sum1 (F I X) R F
+  I ~       ~ -> I
+
+#|
+0 [1 2 3] F
+sum1 (F 0 1) [2 3] F
+sum1 (F (F 0 1) 2) [3] F
+sum1 (F (F (F 0 1) 2) 3) F
+
+[1 2 3] 0 F
+(F 1 (sumr [2 3] 0 F))
+(F 1 (F 2 (sumr [3] 0 F)))
+(F 1 (F 2 (F 3 0)))
+|#
 
 
-$def! fold:  type seq? fn?
-  [X Y | R] F -> fold [(F X Y) | R] F
+# Called foldr/rreduce in other languages.
+#
+# Takes 2 to 3 arguments:
+#
+#   => sumr [1 2 3] seq
+#   [1 [2 3]]
+#
+#   => sumr [1 2 3] 0 seq
+#   [1 [2 [3 0]]]
+#
+$def sumr
+  [X | R] F   -> F X: sumr R F
+  X       ~   -> X
+  X       I F -> sumr1 X I F
+
+$def sumr1
+  [X | R] I F -> F X: sumr R I F
+  ~       I ~ -> I
+
+
+# Whee, function composition implemented with sum
+$def compose
+  |Fns -> sum Fns: X Y -> |Args -> X: Y | Args
+
+
+# Called map in other languages.
+#|
+# It's easier to just define it explicitly, rather than using cons + sumr.
+$def each
+  [X | R] F -> [(F X) | (each R F)]
+  X       ~ -> X
+|#
+$def each: X F ->
+  sumr X []: X Y -> [(F X) | Y]
+
+$def rev: X ->
+  sum [] X: Y X -> [X | Y]
+
+#|
+$def foldr
+  F I X -> sum I X: K X -> K: F X
+
+$def sum1
+  I [X | R] F -> sum1 (F I X) R F
+  I ~       ~ -> I
+
+(def foldl (init x f)
+  (if (acons x)
+      (foldl (f init (car x)) (cdr x) f)
+      init))
+
+(def foldr (x init f)
+  (foldl init x (fn (x y) (f x y)))
+  ;((foldl idfn x (fn (k x) (compose k (f x)))) init)
+  )
+|#
+#|
+$def cons: X Y -> [X | Y]
+|#
+
+
+#|
+$def sum
+  [X Y | R] F -> sum1 [(F X Y) | R] F
   X         ~ -> X
+|#
 
-$def! foldr: type seq? fn?
-  [X Y | R] F -> F X: F Y: foldr R F
-  X         ~ -> X
-
-
-$def! keep: type seq? fn?
-  [X | R] F -> $if: F X
+#|
+$def keep
+  [X | R] F -> $if: F X;
                  [X | (keep R F)]
                  keep R F
   X       ~ -> X
+|#
 
-$def! rem: type seq? fn?
-  X F -> keep X: notfn F
+$def keep: X F ->
+  sumr X []: X Y ->
+    $if: F X;
+      [X | Y]
+      Y
+
+#|
+(def keep (x f)
+  (rreduce (fn (x y) (prn x " " y) (if (f x) (cons x y) y)) x))
+
+(keep '(1 2 3 4 5) (fn (x) (> x 3)))
+|#
+
+$def rem
+  X F -> keep X: fn-not F
 
 
-$def! empty? : []      -> %t
-$def! first  : [X | ~] -> X
-$def! rest   : [~ | R] -> R
+$def empty?: []      -> %t
+$def first:  [X | ~] -> X
+$def rest:   [~ | R] -> R
 
 # => (zip [a 1] [b 2] [c 3])
 #    [[a b c] [1 2 3]]
-$def! zip: type | seq?
-  | Args -> $if: some Args empty?
-              []
-              [(map Args first) | (zip | (map Args rest))]
+$def zip |Args ->
+  $if (any? Args empty?)
+    []
+    [(each Args first) | (zip | (each Args rest))]
 
 
-$def! join: type seq? ~
+# Takes two seqs and returns a single seq.
+#
+# Linear in time to the length of the first argument.
+# This is because it simply conses it directly onto the second argument.
+# This is okay because Nulan doesn't have seq mutation.
+$def join
   [X | R] Y -> [X | (join R Y)]
   [X]     Y -> [X | Y]
 
-# TODO: could use a better name than joinr
-$def! joinr: type seq? ~
+# TODO could use a better name than joinr
+$def joinr
   X Y -> join X [Y]
 
 
-$def! ref: type seq? ~
+$def ref
   [K V | R] K -> V
   [~ ~ | R] K -> ref R K
 
 
-# TODO: maybe make it take rest args?
-$def! iso?
+# TODO maybe make it take rest args?
+$def iso?
   X        X        -> %t
-  [X | R1] [Y | R2] -> $and: iso? X Y; iso? R1 R2
+  [X | R1] [Y | R2] -> $and (iso? X Y) (iso? R1 R2)
 
 
-$def! id:   X -> X
-$def! copy: X -> map X id
+$def id:   X -> X
+$def copy: X -> each X id
 
 
-$def! prn! : | Args ->
+$def prn! : |Args ->
   pr! | Args
   pr! "\n"
 
-$def! writen! : | Args ->
+$def writen! : |Args ->
   write! | Args
   pr! "\n"
 
 #|
-$def! pair: type seq?
+$def pair
   [X Y | R] I -> [[X Y] | (pair R I)]
   [X]       I -> [[X I]]
   X           -> pair X []
 |#
 
-$defvau! $lets
+$defvau $lets
   [X]         -> eval X
-  [[X Y] | R] -> eval [$let X Y [$lets | R]]
+  [[X Y] | R] -> eval [$let X Y: $lets | R]
 
-$defvau! $if-error: [X Y | R] ->
-  $let U (uniq)
+$defvau $if-error: [X Y | R] ->
+  $let U: uniq
     eval [$on-error X
-           [$fn [seq [error ~]] Y] | (joinr R [$fn [seq U] U])]
+           [$fn [seq: error ~] Y] | (joinr R [$fn [seq U] U])]
 
-$defvau! $def-if! : Name Test | Fns ->
-  $lets: Orig:  eval Name
+$defvau $def-if! : Name Test | Fns ->
+  $lets: Orig:  eval Name;
          Test:  eval Test
          F:     $fn Args
-                  $if-error: Test | Args
+                  $if-error: Test | Args;
                     Orig | Args
-    eval [$def! Name F | Fns]
+    eval [$assign! Name: case-fn F | Fns]
 
-$on-error: Test | Args
+$on-error: Test | Args;
   (error ~) -> Orig | Args
   X         -> X
 
@@ -203,7 +313,7 @@ $fn [X]: foo bar;
 X `is?` []
 
 
-#$def! list? : X -> $or: cons? X; null? X
+#$def list?: X -> $or: cons? X; null? X;
 
 
 #|
@@ -211,7 +321,7 @@ X `is?` []
 #    X
 # => ($let (X Y) ...)
 #    (($fn [X] ($let ...)) Y)
-$set! $let: $vau Env [X Y | R]:
+$assign $let: $vau Env [X Y | R]:
   #eval Env
   #  $if: null? R
   #    X
@@ -223,14 +333,14 @@ $set! $let: $vau Env [X Y | R]:
 
 
 #|
-$set! $let: $vau Env [X Y | R]:
+$assign $let: $vau Env [X Y | R]:
   [X]         -> eval Env X
   [[X Y] | R] -> eval [[$fn [seq X] [$let | R]] Y]
   eval [[$fn [seq X] [$let | R]] Y]
 |#
 
 
-($defvau! $def-if!
+($defvau $def-if!
   (Name Test | Fns ->
     ($let
       (Orig  (eval Name))
@@ -240,9 +350,9 @@ $set! $let: $vau Env [X Y | R]:
         ($if-error: Test | Args
            (~ -> Orig | Args)
            (X -> X)))
-      (eval [$def! Name F | Fns]))))
+      (eval [$def Name F | Fns]))))
 
-($defvau! $def-if!
+($defvau $def-if!
   ($fn [Name Test | Fns]
     ($let
       (Orig
@@ -254,9 +364,9 @@ $set! $let: $vau Env [X Y | R]:
           ($if-error (Test | Args)
             (~ -> Orig | Args)
             (X -> X))))
-      (eval [$def! Name F | Fns]))))
+      (eval [$def Name F | Fns]))))
 
-($defvau! $def-if!
+($defvau $def-if!
   ($fn [Name Test | Fns]
     ($let (Orig  (eval Name))
           (Test  (eval Test))
@@ -264,5 +374,5 @@ $set! $let: $vau Env [X Y | R]:
                    ($if-error (Test | Args)
                      (~ -> Orig | Args)
                      (X -> X))))
-      (eval [$def! Name F | Fns]))))
+      (eval [$def Name F | Fns]))))
 |#

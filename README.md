@@ -3,22 +3,64 @@ Overview
 
 For a quick taste of how it looks, here's some standard list utilities written in Nulan:
 
-    $def! map: type list? fn?
-      [X | R] F -> [(F X) | (map R F)]
+    # Called map in other languages.
+    #
+    # It's easier to just define it explicitly, rather than using cons + sumr.
+    $def! each
+      [X | R] F -> [(F X) | (each R F)]
       X       ~ -> X
 
-    $def! each: type list? fn?
-      [X | R] F -> F X; each R F
 
-    $def! fold:  type list? fn?
-      [X Y | R] F -> fold [(F X Y) | R] F
-      X         ~ -> X
+    # Called foldl/reduce in other languages.
+    #
+    # Takes 2 to 3 arguments:
+    #
+    #   => sum [1 2 3] seq
+    #   [[1 2] 3]
+    #
+    #   => sum 0 [1 2 3] seq
+    #   [[[0 1] 2] 3]
+    #
+    $def! sum
+      [X | R] F   -> sum1 X R F
+      I       X F -> sum1 I X F
 
-    $def! foldr: type list? fn?
-      [X Y | R] F -> F X: F Y: foldr R F
-      X         ~ -> X
+    $def! sum1
+      I [X | R] F -> sum1 (F I X) R F
+      I ~       ~ -> I
 
-    $def! join: type list? ~
+
+    # Called foldr/rreduce in other languages.
+    #
+    # Takes 2 to 3 arguments:
+    #
+    #   => sumr [1 2 3] seq
+    #   [1 [2 3]]
+    #
+    #   => sumr [1 2 3] 0 seq
+    #   [1 [2 [3 0]]]
+    #
+    $def! sumr
+      [X | R] F   -> F X: sumr R F
+      X       ~   -> X
+      X       I F -> sumr1 X I F
+
+    $def! sumr1
+      [X | R] I F -> F X: sumr R I F
+      ~       I ~ -> I
+
+
+    # Whee, function composition implemented with sum
+    $def! compose
+      |Fns -> sum Fns: X Y -> |Args -> X: Y | Args
+
+
+    # Takes two seqs and returns a single seq.
+    #
+    # Linear in time to the length of the first argument.
+    # This is because it simply conses it directly onto the second argument.
+    # This is okay because Nulan doesn't have seq mutation.
+    $def! join
       [X | R] Y -> [X | (join R Y)]
       [X]     Y -> [X | Y]
 
@@ -35,7 +77,7 @@ Features
 
 * A very simple (yet powerful) module system based on first-class environments
 
-* Emphasizes functional programming (specifically, referential transparency), but still has some support for side effects
+* Emphasizes functional programming (specifically, referential transparency), but still has some support for side effects, which means Nulan is an impure functional language
 
 * Lots of syntax! This allows you to write programs in a shorter and clearer way
 

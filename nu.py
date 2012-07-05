@@ -47,9 +47,10 @@ def load_file_in(env, name):
         print e
         break
 
-load_file_in(glob, "nu.nu")
+#load_file_in(glob, "nu.nu")
 
 if __name__ == "__main__":
-  #import doctest
-  #doctest.testfile("tests/nu_reader.py")
-  repl()
+  import doctest
+  doctest.testfile("tests/nu_reader.py")
+  #doctest.testfile("tests/TEMP.py")
+  #repl()

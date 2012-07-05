@@ -16,6 +16,23 @@ def list_to_seq(x):
     result = w_Seq(x, result)
   return result
 
+def seq(*args, **kwargs):
+  try:
+    top = r = w_Seq(args[0], w_nil)
+    for x in args[1:]:
+      r.rest = w_Seq(w_Symbol(x), w_nil)
+      r = r.rest
+    try:
+      r.rest = w_Symbol(kwargs["rest"])
+    except KeyError:
+      pass
+  except IndexError:
+    try:
+      return w_Symbol(kwargs["rest"])
+    except KeyError:
+      return w_nil
+  return top
+
 def join_string(args):
   x = args
   result = []
@@ -29,9 +46,8 @@ def join_string(args):
     x = x.rest
   return list_to_seq(result)
 
-def pattern_match(closure, pattern, args):
-  seen = {}
-  def rec(env, p, a):
+def pattern_match(base, pattern, args):
+  def rec(p, a):
     if isinstance(p, w_Seq):
       if p.first == w_apply:
         p = p.rest
@@ -39,51 +55,48 @@ def pattern_match(closure, pattern, args):
           p = p.rest
           while isinstance(p.rest, w_Seq):
             if not isinstance(a, w_Seq):
-              return w_false
-            r = rec(env, p.first, a.first)
-            if r == w_false:
-              return r
+              raise w_PatternFail(p, a)
+            r = rec(p.first, a.first)
+            #if r == w_false:
+            #  return r
             p = p.rest
             a = a.rest
-          return rec(env, p.first, a)
+          return rec(p.first, a)
         else:
           raise Exception(p)
       elif p.first == w_seq:
         p = p.rest
       while isinstance(p, w_Seq):
         if not isinstance(a, w_Seq):
-          return w_false
-        r = rec(env, p.first, a.first)
-        if r == w_false:
-          return r
+          raise w_PatternFail(p, a)
+        r = rec(p.first, a.first)
+        #if r == w_false:
+        #  return r
         p = p.rest
         a = a.rest
-      return rec(env, p, a)
+      return rec(p, a)
     # TODO
     elif isinstance(p, (w_Symbol, w_Uniq)):
-      if p in seen:
-        if env[p] != a:
-          return w_false
-      else:
-        seen[p] = True
-        env[p] = a
+      base(p, a)
     elif p == w_tilde:
       return
     else:
       if p != a:
-        return w_false
-  return rec(closure, pattern, args)
+        raise w_PatternFail(p, a)
+        #return w_false
+  return rec(pattern, args)
 
-def nu_vau(name):
+
+def nu_vau(name, *args, **kwargs):
   def decorator(fn):
     fn.__name__ = name
-    return w_Builtin(fn)
+    return w_Builtin(fn, *args, **kwargs)
   return decorator
 
-def nu_lambda(name):
+def nu_lambda(name, *args, **kwargs):
   def decorator(fn):
     fn.__name__ = name
-    return w_Wrapped(w_Builtin(fn))
+    return w_Wrapped(w_Builtin(fn, *args, **kwargs))
   return decorator
 
 ##############################################################################
@@ -115,6 +128,20 @@ class w_VariableError(w_BaseError):
     self.name = name
   def __str__(self):
     return "error: {} is undefined".format(self.name)
+
+class w_TypeError(w_BaseError):
+  def __init__(self, expected, got):
+    self.expected = expected
+    self.got      = got
+  def __str__(self):
+    return "error: expected something of type {} but instead got {}".format(self.expected, self.got)
+
+class w_PatternFail(w_BaseError):
+  def __init__(self, pat, args):
+    self.pattern   = pat
+    self.arguments = args
+  def __str__(self):
+    return "error: pattern {} failed to match {}".format(self.pattern, self.arguments)
 
 ##############################################################################
 #  Types
@@ -433,9 +460,18 @@ class w_Vau(object):
     if self.env != w_tilde:
       inner[self.env] = env
 
-    m = pattern_match(inner, self.args, args)
-    if m == w_false:
-      return m
+    seen = {}
+    def base(p, a):
+      if p in seen:
+        if inner[p] != a:
+          raise w_PatternFail(p, a)
+      else:
+        seen[p] = True
+        inner[p] = a
+
+    pattern_match(base, self.args, args)
+    #if m == w_false:
+    #  return m
 
     x = self.body
     last = w_false
@@ -445,10 +481,14 @@ class w_Vau(object):
     return last
 
 class w_Builtin(w_Vau):
-  def __init__(self, f):
+  def __init__(self, f, *args, **kwargs):
+    self.args    = seq(*args, **kwargs)
     self.wrapped = f
     self.__name__ = f.__name__
   def __call__(self, env, args):
+    def base(p, a):
+      pass
+    pattern_match(base, self.args, args)
     return self.wrapped(env, args)
 
 class w_Wrapped(object):
@@ -465,9 +505,9 @@ class w_Wrapped(object):
 ##############################################################################
 #  Syntax
 ##############################################################################
-@nu_vau("$fn")
-def w_arrow(env, args):
-  return w_Wrapped(w_Vau(env, w_tilde, args.first, args.rest))
+@nu_vau("$fn", "Args", rest="Body")
+def w_arrow(env, args, body):
+  return w_Wrapped(w_Vau(env, w_tilde, args, body))
 
 #@nu_vau("&apply")
 #def w_apply(env, args):
@@ -481,12 +521,12 @@ def w_arrow(env, args):
 #    x.rest = x.rest.first #eval_(env, )
 #    return eval_(env, args)
 
-@nu_lambda("apply")
-def w_apply(env, args):
-  x = args
-  if x.rest == w_nil:
-    return eval_(env, x.first)
+@nu_lambda("apply", "F", rest="Args")
+def w_apply(env, f, rest):
+  if rest == w_nil:
+    return eval_(env, f)
   else:
+    x = rest
     while x.rest.rest != w_nil:
       x = x.rest
     x.rest = x.rest.first
@@ -495,40 +535,40 @@ def w_apply(env, args):
     #  args.first = args.first.wrapped
     #else:
     #  args.first = w_false
-    args.first = w_unwrap(env, w_Seq(args.first, w_nil))
+    f = w_unwrap(env, w_Seq(f, w_nil))
     #print args
-    return eval_(env, args)
+    return eval_(env, w_Seq(f, args))
 
-@nu_lambda("seq")
+@nu_lambda("seq", rest="Args")
 def w_seq(env, args):
   return args
 
-@nu_lambda("str")
+@nu_lambda("str", rest="Args")
 def w_string(env, args):
   return join_string(args)
 
 @nu_lambda("&tilde")
-def w_tilde(env, args):
+def w_tilde(env):
   return w_true
 
 ##############################################################################
 #  Primitives
 ##############################################################################
+#(x, y)           = destructure(args, "X", "Y")
+#(e, args, *body) = destructure(args, "Env", "Args", rest="Body")
+
 # Constants
 w_true  = w_Symbol("%t")
 w_false = w_Symbol("%f")
 
 # Non-referentially transparent
-@nu_vau("$set!")
-def w_set(env, args):
-  if args.rest.rest != w_nil:
-    return w_false
-  else:
-    x = eval_(env, args.rest.first)
-    env[args.first] = x
-    return x
+@nu_vau("$assign!", "Name", "X")
+def w_assignd(env, x, y):
+  y = eval_(env, y)
+  env[x] = y
+  return y
 
-@nu_lambda("pr!")
+@nu_lambda("pr!", rest="Args")
 def w_pr(env, args):
   x = args
   while isinstance(x, w_Seq):
@@ -539,7 +579,7 @@ def w_pr(env, args):
     x = x.rest
   return args.first
 
-@nu_lambda("write!")
+@nu_lambda("write!", rest="Args")
 def w_write(env, args):
   x = args
   while isinstance(x, w_Seq):
@@ -548,17 +588,14 @@ def w_write(env, args):
   return args.first
 
 # Predicates
-@nu_lambda("fn?")
-def w_fnq(env, args):
-  if args.rest != w_nil:
-    return w_false
+@nu_lambda("fn?", "X")
+def w_fnq(env, x):
+  if isinstance(x, w_Wrapped):
+    return x
   else:
-    if isinstance(args.first, w_Wrapped):
-      return args.first
-    else:
-      return w_false
+    return w_false
 
-@nu_lambda("is?")
+@nu_lambda("is?", rest="Args")
 def w_is(env, args):
   while 1:
     if args.rest == w_nil:
@@ -567,18 +604,25 @@ def w_is(env, args):
       return w_false
     args = args.rest
 
-@nu_lambda("vau?")
-def w_vauq(env, args):
-  if args.rest != w_nil:
-    return w_false
+@nu_lambda("vau?", "X")
+def w_vauq(env, x):
+  if isinstance(x, w_Vau):
+    return x
   else:
-    if isinstance(args.first, w_Vau):
-      return args.first
-    else:
-      return w_false
+    return w_false
 
 # Vaus
-@nu_vau("$if")
+@nu_vau("$assign", "Name", "X")
+def w_assign(env, x, y):
+  try:
+    env[x]
+  except KeyError:
+    y = eval_(env, y)
+    env[x] = y
+    return y
+  raise w_MutationError(x)
+
+@nu_vau("$if", rest="Args")
 def w_if(env, args):
   try:
     while eval_(env, args.first) == w_false:
@@ -589,85 +633,77 @@ def w_if(env, args):
   except AttributeError:
     return w_false
 
-@nu_vau("$vau")
-def w_vau(env, args):
-  return w_Vau(env, args.first, args.rest.first, args.rest.rest)
+@nu_vau("$vau", "Env", "Args", rest="Body")
+def w_vau(env, e, args, body):
+  return w_Vau(env, e, args, body)
 
 # Fns
-@nu_lambda("add")
+@nu_lambda("add", rest="Args")
 def w_add(env, args):
-  try:
-    return w_Number(sum(args))
-  except (TypeError, AttributeError):
-    return w_false
+  #try:
+  return w_Number(sum(args))
+  #except (TypeError, AttributeError):
+  #  return w_false
 
-@nu_lambda("error")
+@nu_lambda("error", rest="Args")
 def w_error(env, args):
   raise w_BaseError(join_string(args).tostring())
 
-@nu_lambda("eval")
+@nu_lambda("eval", rest="Args")
 def w_eval(env, args):
   if args.rest == w_nil:
     return eval_(eval_(env, w_Symbol("%Env")), args.first)
   elif args.rest.rest == w_nil:
     return eval_(eval_(env, args.first), args.rest.first)
   else:
-    return w_false
+    raise w_PatternFail(seq("Env", "X"), args)
 
 @nu_lambda("uniq")
-def w_uniq(env, args):
-  if args != w_nil:
-    return w_false
-  else:
-    return w_Uniq()
+def w_uniq(env):
+  return w_Uniq()
 
-@nu_lambda("unwrap")
-def w_unwrap(env, args):
-  if args.rest != w_nil:
-    return w_false
+@nu_lambda("unwrap", "X")
+def w_unwrap(env, x):
+  if isinstance(x, w_Wrapped):
+    return x.wrapped
   else:
-    if isinstance(args.first, w_Wrapped):
-      return args.first.wrapped
-    else:
-      return w_false
+    raise w_TypeError("fn", x)
 
-@nu_lambda("wrap")
-def w_wrap(env, args):
-  if args.rest != w_nil:
-    return w_false
-  else:
-    return w_Wrapped(args.first)
+@nu_lambda("wrap", "X")
+def w_wrap(env, x):
+  return w_Wrapped(x)
 
 glob = w_GlobalEnv({
   # Syntax
-  "$fn"    : w_arrow,
-  "apply"  : w_apply,
-  "seq"    : w_seq,
-  "str"    : w_string,
+  "$fn"      : w_arrow,
+  "apply"    : w_apply,
+  "seq"      : w_seq,
+  "str"      : w_string,
 
   # Constants
-  "%t"     : w_true,
-  "%f"     : w_false,
+  "%t"       : w_true,
+  "%f"       : w_false,
 
   # Non-referentially transparent
-  "$set!"  : w_set,
-  "pr!"    : w_pr,
-  "write!" : w_write,
+  "$assign!" : w_assignd,
+  "pr!"      : w_pr,
+  "write!"   : w_write,
 
   # Predicates
-  "fn?"    : w_fnq,
-  "is?"    : w_is,
-  "vau?"   : w_vauq,
+  "fn?"      : w_fnq,
+  "is?"      : w_is,
+  "vau?"     : w_vauq,
 
   # Vaus
-  "$if"    : w_if,
-  "$vau"   : w_vau,
+  "$assign"  : w_assign,
+  "$if"      : w_if,
+  "$vau"     : w_vau,
 
   # Fns
-  "add"    : w_add,
-  "error"  : w_error,
-  "eval"   : w_eval,
-  "uniq"   : w_uniq,
-  "unwrap" : w_unwrap,
-  "wrap"   : w_wrap,
+  "add"      : w_add,
+  "error"    : w_error,
+  "eval"     : w_eval,
+  "uniq"     : w_uniq,
+  "unwrap"   : w_unwrap,
+  "wrap"     : w_wrap,
 })
