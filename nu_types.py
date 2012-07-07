@@ -273,11 +273,17 @@ class w_Symbol(w_Base):
 
 class w_Uniq(object):
   counter = 1
-  def __init__(self):
+  def __init__(self, name):
     self.counter = w_Uniq.counter
+    self.name    = name
     w_Uniq.counter += 1
   def __repr__(self):
-    return "(&uniq {})".format(self.counter)
+    if self.name:
+      return self.name
+    else:
+      return "(&uniq {})".format(self.counter)
+  def pretty(self):
+    return str(self)
 
 class w_Nil(object):
   def __repr__(self):
@@ -632,6 +638,7 @@ def w_tilde(env):
 # Constants
 w_true  = w_Symbol("%t")
 w_false = w_Symbol("%f")
+w_eof   = w_Uniq("%eof")
 
 # Non-referentially transparent
 @nu_vau("$assign!", "Name", "X")
@@ -755,6 +762,7 @@ top_env = w_TopEnv({
   # Constants
   "%t"       : w_true,
   "%f"       : w_false,
+  "%eof"     : w_eof,
 
   # Non-referentially transparent
   "$assign!" : w_assignd,

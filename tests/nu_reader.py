@@ -2,17 +2,17 @@
 >>> import nu_types
 
 >>> def read(x):
-...   print nu_reader.readstring(x, 9001)
+...   print nu_reader.readstring(x).pretty()
 
 >>> def write(x):
-...   print repr(nu_reader.readstring(x, 9001))
+...   print repr(nu_reader.readstring(x))
 
 >>> def write_all(x):
 ...   result = []
 ...   x = nu_types.w_Stream(iter(x).next)
 ...   while 1:
-...     y = nu_reader.read(x, 9001)
-...     if y == 9001:
+...     y = nu_reader.read(x)
+...     if y == nu_reader.w_eof:
 ...       break
 ...     else:
 ...       result.append(y)
@@ -83,85 +83,85 @@
 ##############################################################################
 >>> error(read, r'"foo\bar\n\qux"')
 error: unknown escape sequence b (line 1, column 6):
-  'foo\b
+  "foo\b
        ^
 
->>> read(r"'foo\\\@\tbar'")
-'foo\\\@\tbar'
+>>> read(r'"foo\\\@\tbar"')
+"foo\\\@\tbar"
 
->>> error(read, r"'foo\uA00Gbar'")
+>>> error(read, r'"foo\uA00Gbar"')
 error: G is not valid hexadecimal (line 1, column 10):
-  'foo\uA00G
+  "foo\uA00G
            ^
 
->>> error(read, r"'foo\ua00fbar'")
+>>> error(read, r'"foo\ua00fbar"')
 error: a is not valid hexadecimal (line 1, column 7):
-  'foo\ua
+  "foo\ua
         ^
 
->>> read(r"'foo\u0000bar'")
-'foo\u0000bar'
+>>> read(r'"foo\u0000bar"')
+"foo\u0000bar"
 
->>> read(r"'foo\uA00Fbar'")
-'foo\uA00Fbar'
+>>> read(r'"foo\uA00Fbar"')
+"foo\uA00Fbar"
 
->>> read("'fooÀbar'")
-'fooÀbar'
+>>> read('"fooÀbar"')
+"fooÀbar"
 
->>> read(r"'foo\u00C0bar'")
-'foo\u00C0bar'
+>>> read(r'"foo\u00C0bar"')
+"foo\u00C0bar"
 
 
->>> read(r"'foo\u0009bar'")
-'foo\u0009bar'
+>>> read(r'"foo\u0009bar"')
+"foo\u0009bar"
 
->>> read("'foo	bar'")
-'foo  bar'
+>>> read('"foo	bar"')
+"foo  bar"
 
->>> read(r"'foo\tbar'")
-'foo\tbar'
+>>> read(r'"foo\tbar"')
+"foo\tbar"
 
->>> read(r"'foo\u000Abar'")
-'foo\u000Abar'
+>>> read(r'"foo\u000Abar"')
+"foo\u000Abar"
 
 >>> read(r'''
-...       'foo
-...        bar'
+...       "foo
+...        bar"
 ...       ''')
-'foo
- bar'
+"foo
+ bar"
 
->>> read(r"'foo\nbar'")
-'foo\nbar'
+>>> read(r'"foo\nbar"')
+"foo\nbar"
 
 
->>> write(r"'foo@bar\nqux'")
+>>> write(r'"foo@bar\nqux"')
 [(&fn str) (&char f) (&char o) (&char o) (&symbol bar) (&char \n) (&char q) (&char u) (&char x)]
 
->>> write("'foo@barqux'")
+>>> write('"foo@barqux"')
 [(&fn str) (&char f) (&char o) (&char o) (&symbol barqux)]
 
->>> write("'foo@'@'bar''qux'")
+>>> write('"foo@"@"bar""qux"')
 [(&fn str) (&char f) (&char o) (&char o) [(&fn str) [(&fn str) (&char b) (&char a) (&char r)]] (&char q) (&char u) (&char x)]
 
->>> write("'foo@(id bar)qux'")
+>>> write('"foo@(id bar)qux"')
 [(&fn str) (&char f) (&char o) (&char o) [(&symbol id) (&symbol bar)] (&char q) (&char u) (&char x)]
 
 >>> read(r'''
-...       'foo\t
-...        bar'
+...       "foo\t
+...        bar"
 ...       ''')
-'foo\t
- bar'
+"foo\t
+ bar"
 
 >>> read(r'''
-...       'foo
+...       "foo
 ...          bar
-...            qux'
+...            qux"
 ...       ''')
-'foo
+"foo
    bar
-     qux'
+     qux"
 
 ##############################################################################
 #  Raw Strings
@@ -169,34 +169,34 @@ error: a is not valid hexadecimal (line 1, column 7):
 >>> read(r'''
 ...       `fo@o\\bar\\n\qux`
 ...       ''')
-'fo\@o\\\\bar\\\\n\\qux'
+"fo\@o\\\\bar\\\\n\\qux"
 
 >>> error(write_all,
 ...       r'''
-...       `fo@o\\bar`n;qux`
+...       `fo@o\\bar`n:qux`
 ...       ''')
 error: missing ending ` quote (line 3, column 6)
 
 >>> error(read,
 ...       r'''
-...       `fo@o\\bar`n;qux`
+...       `fo@o\\bar`n:qux
 ...       ''')
-['fo\@o\\\\bar' n]
+("fo\@o\\\\bar" n (qux))
 
 >>> read(r'''
 ...       `fo@o\\bar`
 ...       n`\qux`
 ...       ''')
-'fo\@o\\\\bar'
+"fo\@o\\\\bar"
 
 >>> read(r'''
 ...       `foo
 ...          bar
 ...            qux`
 ...       ''')
-'foo
+"foo
          bar
-           qux'
+           qux"
 
 ##############################################################################
 #  Comments
@@ -237,7 +237,7 @@ qux
 ...       bar
 ...       |#
 ...       ''')
-9001
+%eof
 
 >>> write(r'''
 ...       #foobar
@@ -252,7 +252,7 @@ qux
 (&symbol qux)
 
 >>> read("#foobar")
-9001
+%eof
 
 
 >>> write("'foo@#||#qux'")
@@ -382,6 +382,60 @@ error: invalid character . (line 1, column 7):
 ##############################################################################
 #  Bar
 ##############################################################################
+>>> write(r'[foo bar qux | : corge]')
+[(&fn apply) (&fn seq) (&symbol foo) (&symbol bar) (&symbol qux) [(&fn seq) (&symbol corge)]]
+
+>>> write(r'[foo bar qux | : corge      ]')
+[(&fn apply) (&fn seq) (&symbol foo) (&symbol bar) (&symbol qux) [(&fn seq) (&symbol corge)]]
+
+>>> write_all(r'''
+... [foo bar qux | : corge      ]
+... nou
+... ''')
+[(&fn apply) (&fn seq) (&symbol foo) (&symbol bar) (&symbol qux) [(&fn seq) (&symbol corge)]]
+(&symbol nou)
+
+>>> write_all(r'[foo bar qux | : corge      ]nou')
+[[(&fn apply) (&fn seq) (&symbol foo) (&symbol bar) (&symbol qux) [(&fn seq) (&symbol corge)]] (&symbol nou)]
+
+>>> write(r'[foo bar qux | : corge: nou]')
+[(&fn apply) (&fn seq) (&symbol foo) (&symbol bar) (&symbol qux) [(&fn seq) (&symbol corge) [(&fn seq) (&symbol nou)]]]
+
+>>> write(r'[foo: bar: qux: corge]')
+[(&fn seq) (&symbol foo) [(&fn seq) (&symbol bar) [(&fn seq) (&symbol qux) [(&fn seq) (&symbol corge)]]]]
+
+>>> write(r'[foo: bar: qux: corge;]')
+[(&fn seq) (&symbol foo) [(&fn seq) (&symbol bar) [(&fn seq) (&symbol qux) [(&fn seq) (&symbol corge)]]]]
+
+>>> write(r'[foo: bar: qux; corge]')
+[(&fn seq) (&symbol foo) [(&fn seq) (&symbol bar) [(&fn seq) (&symbol qux)]] (&symbol corge)]
+
+>>> write(r'[foo: bar: qux | corge]')
+[(&fn seq) (&symbol foo) [(&fn seq) (&symbol bar) [(&fn apply) (&fn seq) (&symbol qux) (&symbol corge)]]]
+
+>>> write(r'[foo: bar: qux | : corge]')
+[(&fn seq) (&symbol foo) [(&fn seq) (&symbol bar) [(&fn apply) (&fn seq) (&symbol qux) [(&fn seq) (&symbol corge)]]]]
+
+>>> write(r'[foo: bar: qux | : corge;]')
+[(&fn seq) (&symbol foo) [(&fn seq) (&symbol bar) [(&fn apply) (&fn seq) (&symbol qux) [(&fn seq) (&symbol corge)]]]]
+
+>>> error(write, r'[foo: bar: qux | : corge; nou]')
+error: illegal use of | (line 1, column 27):
+  [foo: bar: qux | : corge; n
+                            ^
+
+>>> write(r'[foo: bar: qux | : corge: nou]')
+[(&fn seq) (&symbol foo) [(&fn seq) (&symbol bar) [(&fn apply) (&fn seq) (&symbol qux) [(&fn seq) (&symbol corge) [(&fn seq) (&symbol nou)]]]]]
+
+>>> write(r'[foo: bar: qux | : corge nou]')
+[(&fn seq) (&symbol foo) [(&fn seq) (&symbol bar) [(&fn apply) (&fn seq) (&symbol qux) [(&fn seq) (&symbol corge) (&symbol nou)]]]]
+
+>>> error(write, r'[foo: bar: qux | : corge; nou]')
+error: illegal use of | (line 1, column 27):
+  [foo: bar: qux | : corge; n
+                            ^
+
+
 >>> write("|foo")
 [(&fn apply) (&symbol foo)]
 

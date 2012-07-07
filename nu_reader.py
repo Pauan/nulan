@@ -12,26 +12,16 @@ char_lower = "abcdefghijklmnopqrstuvwxyz"
 char_upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 char_sym   = char_num + char_lower + char_upper + "-$%!?"
 
-class CommaFound(object):
-  def __init__(self, value):
-    self.value = value
-
 def transform_colons(xs, fn, line, column, last=None):
   def f(x, y):
     if x == w_nil:
-      #if last:
-      #  return w_Seq(last, fn(y, line, column))
-      #else:
       x = fn(y, line, column)
-      if last:
-        return last(x)
-      else:
-        return x
+      return last(x) if last else x
     else:
       return fn(y.join(w_Seq(x, w_nil)), line, column)
   return reduce(f, (list_to_seq(x) for x in reversed(xs)), w_nil)
 
-def parse_inside_parens(chars, fn, s, wrap=True):
+def parse_inside_parens(chars, fn, s, bar=False):
   result     = []
   colons     = []
   # TODO: correct line/column
@@ -44,144 +34,59 @@ def parse_inside_parens(chars, fn, s, wrap=True):
       break
     elif c == "|":
       s.read()
-      #return list_to_seq(result)
-      #s.read()
-      while s.peek() in char_white:
-        s.read()
-      if s.peek() == ":":
-        #s.read()
-        x = parse_inside_parens(chars, fn, s, wrap=False)
-        if x.rest != w_nil:
-          raise w_SyntaxError("illegal use of |", s)
-        if colon_seen:
-          #x = parse_inside_parens(chars, lambda x, line, column: x, s)
-          #colons[-1].append(fn(x.first, line, column))
-          colons[-1].append(x.first)
-          #lambda x, line, column: x
-        else:
-          result.append(x.first)
-          #x = parse_inside_parens(chars, lambda x, line, column: x, s)
-          #result.append(fn(x.first, line, column))
-          #result.append(parse_inside_parens(chars, fn, s))
+      #while s.peek() in char_white:
+      #  s.read()
+      x = parse_inside_parens(chars, fn, s, bar=True)
+      #if x.rest != w_nil:
+      #  raise w_SyntaxError("illegal use of |", s)
+      #if s.peek() == ":":
+      #  if colon_seen:
+      #
+      #  else:
+      #
+      #else:
+      #  while 1:
+      #    x = read1(s)
+      #    if x is not None:
+      #      if colon_seen:
+      #        colons[-1].append(x)
+      #      else:
+      #        result.append(x)
+      #      break
+      #while s.peek() in char_white:
+      #  s.read()
+      #if s.peek() in chars:
+      if colon_seen:
+        colons[-1].append(x)
+        result.append(transform_colons(colons, fn, line, column,
+                                       last=lambda x: w_Seq(w_apply, x)))
+        return fn(list_to_seq(result), line, column)
       else:
-        while 1:
-          x = read1(s)
-          if x is not None:
-            if colon_seen:
-              colons[-1].append(x)
-            else:
-              result.append(x)
-            break
-      while s.peek() in char_white:
-        s.read()
-      if s.peek() in chars:
-        if colon_seen:
-          #colons[-1].insert(0, w_apply)
-          #result.append(transform_colons(colons, fn, line, column))
-          result.append(transform_colons(colons, fn, line, column,
-                                         last=lambda x: w_Seq(w_apply, x)))
-          return fn(list_to_seq(result), line, column)
-        else:
-          #result.append(parse_inside_parens(chars, fn, s))
-          return w_Seq(w_apply, fn(list_to_seq(result), line, column))
-      else:
-        raise w_SyntaxError("illegal use of |", s)
-#        colon_seen = True
-#        colons.append([])
-#      #  result.append(parse_inside_parens(chars, {"colon": True}, fn, s))
-#      #  if s.peek() == ";":
-#      #    s.read()
-#      while 1:
-#        x = read1(s)
-#        if x is not None:
-#          c = s.peek()
-#          if colon_seen:
-#            colons[-1].append(x)
-#          else:
-#            result.append(x)
-#          break
-#      while s.peek() in char_white:
-#        s.read()
-#      c = s.peek()
-#      if c == ";":
-#        s.read()
-#        while s.peek() in char_white:
-#          s.read()
-#        if not s.peek() in chars:
-#          s.read()
-#          raise w_SyntaxError("illegal use of |", s)
-#      elif not c in chars:
-#        raise w_SyntaxError("illegal use of |", s)
-
-#      if colon_seen:
-#        #colons[-1].insert(0, w_apply)
-#        #result.append(transform_colons(colons, fn, line, column))
-#        result.append(transform_colons(colons, fn, line, column, last=lambda x: w_Seq(w_apply, x)))
-#        result = list_to_seq(result)
-#        return fn(result, line, column)
-#      else:
-#        result = list_to_seq(result)
-#        return w_Seq(w_apply, fn(result, line, column))
-
+        result.append(x)
+        return w_Seq(w_apply, fn(list_to_seq(result), line, column))
+      #else:
+      #  raise w_SyntaxError("illegal use of |", s)
     elif c == ":":
       s.read()
       colon_seen = True
-      #colon.append(fn(list_to_seq(colon), line, column))
       colons.append([])
-      #colon = []
-      #list_to_seq(result)
-      #new = acc.first = w_Seq(w_nil, w_nil)
-      #acc = fn(acc, line, column)
-      #acc = new
-      #if colon_seen:
-      #  #print acc
-      #  old = acc
-      #  acc = []
-      #  old.append(acc)
-      #  result.append(fn(list_to_seq(old), line, column))
-      #  #result.append()
-      #  #print fn(list_to_seq(acc), line, column)
-      #  #acc.append()
-      #  #old = acc
-      #  #acc = []
-      #  #old.append(acc)
-      #  #old = list_to_seq(old)
-      #else:
-      #  result += acc
-      #  #old = acc
-      #  acc = []
-      #  #old.append(acc)
-      #old.append(acc)
-      #result.append(parse_inside_parens(chars, {"colon": True}, fn, s))
-      #if s.peek() == ";":
-      #  s.read()
-      #colon_seen = True
-      #try:
-      #  result.append(parse_inside_parens(chars, True, fn, s))
-      #except CommaFound:
-      #  pass
     elif c == ";":
       s.read()
       if colon_seen:
-        #print [fn(list_to_seq(x), line, column) for x in colons]
-
         result.append(transform_colons(colons, fn, line, column))
         colons = []
-        #colon = []
         colon_seen = False
-        #acc = fn(list_to_seq(acc), line, column)
       else:
         raise w_SyntaxError("no matching :", s)
-      #result = [list_to_seq(result)]
-      #break
     elif c in char_white:
       s.read()
+    ## You can't have more than one item in `result` when `bar` is true
+    elif result and bar:
+      s.read()
+      raise w_SyntaxError("illegal use of |", s)
     else:
       x = read1(s)
       if x is not None:
-        #acc.first = x
-        #acc.rest = w_Seq(w_nil, w_nil)
-        #acc = acc.rest
         if colon_seen:
           colons[-1].append(x)
         else:
@@ -189,13 +94,11 @@ def parse_inside_parens(chars, fn, s, wrap=True):
     c = s.peek()
   if colon_seen:
     result.append(transform_colons(colons, fn, line, column))
-  #result.append(fn(list_to_seq(acc), line, column))
-  #result.append(acc)
   result = list_to_seq(result)
-  if wrap:
-    return fn(result, line, column)
+  if bar:
+    return result.first
   else:
-    return result
+    return fn(result, line, column)
 
 def parse_recursive_until(sym):
   def decorator(fn):
@@ -619,8 +522,6 @@ def read_indent(s):
     s.read()
   result = []
   print "".join(read_indent1(result, s.indent, s.indent, s))
-
-w_eof = {}
 
 def read(s, eof=w_eof):
   try:
