@@ -12,35 +12,190 @@ char_lower = "abcdefghijklmnopqrstuvwxyz"
 char_upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 char_sym   = char_num + char_lower + char_upper + "-$%!?"
 
-def parse_inside_parens(chars, fn, s):
-  result = []
+class CommaFound(object):
+  def __init__(self, value):
+    self.value = value
+
+def transform_colons(xs, fn, line, column, last=None):
+  def f(x, y):
+    if x == w_nil:
+      #if last:
+      #  return w_Seq(last, fn(y, line, column))
+      #else:
+      x = fn(y, line, column)
+      if last:
+        return last(x)
+      else:
+        return x
+    else:
+      return fn(y.join(w_Seq(x, w_nil)), line, column)
+  return reduce(f, (list_to_seq(x) for x in reversed(xs)), w_nil)
+
+def parse_inside_parens(chars, fn, s, wrap=True):
+  result     = []
+  colons     = []
   # TODO: correct line/column
-  line   = s.line
-  column = s.column
-  c      = s.peek()
-  while not c in chars:
-    if c == "|":
+  line       = s.line
+  column     = s.column
+  c          = s.peek()
+  colon_seen = False
+  while 1:
+    if c in chars:
+      break
+    elif c == "|":
       s.read()
-      while 1:
-        x = read1(s)
-        if x is not None:
-          result.append(x)
-          result = list_to_seq(result)
-          while s.peek() in char_white:
-            s.read()
-          c = s.peek()
-          if c in chars:
-            return w_Seq(w_apply, fn(result, line, column))
-          else:
-            raise w_SyntaxError("illegal use of |", s)
+      #return list_to_seq(result)
+      #s.read()
+      while s.peek() in char_white:
+        s.read()
+      if s.peek() == ":":
+        #s.read()
+        x = parse_inside_parens(chars, fn, s, wrap=False)
+        if x.rest != w_nil:
+          raise w_SyntaxError("illegal use of |", s)
+        if colon_seen:
+          #x = parse_inside_parens(chars, lambda x, line, column: x, s)
+          #colons[-1].append(fn(x.first, line, column))
+          colons[-1].append(x.first)
+          #lambda x, line, column: x
+        else:
+          result.append(x.first)
+          #x = parse_inside_parens(chars, lambda x, line, column: x, s)
+          #result.append(fn(x.first, line, column))
+          #result.append(parse_inside_parens(chars, fn, s))
+      else:
+        while 1:
+          x = read1(s)
+          if x is not None:
+            if colon_seen:
+              colons[-1].append(x)
+            else:
+              result.append(x)
+            break
+      while s.peek() in char_white:
+        s.read()
+      if s.peek() in chars:
+        if colon_seen:
+          #colons[-1].insert(0, w_apply)
+          #result.append(transform_colons(colons, fn, line, column))
+          result.append(transform_colons(colons, fn, line, column,
+                                         last=lambda x: w_Seq(w_apply, x)))
+          return fn(list_to_seq(result), line, column)
+        else:
+          #result.append(parse_inside_parens(chars, fn, s))
+          return w_Seq(w_apply, fn(list_to_seq(result), line, column))
+      else:
+        raise w_SyntaxError("illegal use of |", s)
+#        colon_seen = True
+#        colons.append([])
+#      #  result.append(parse_inside_parens(chars, {"colon": True}, fn, s))
+#      #  if s.peek() == ";":
+#      #    s.read()
+#      while 1:
+#        x = read1(s)
+#        if x is not None:
+#          c = s.peek()
+#          if colon_seen:
+#            colons[-1].append(x)
+#          else:
+#            result.append(x)
+#          break
+#      while s.peek() in char_white:
+#        s.read()
+#      c = s.peek()
+#      if c == ";":
+#        s.read()
+#        while s.peek() in char_white:
+#          s.read()
+#        if not s.peek() in chars:
+#          s.read()
+#          raise w_SyntaxError("illegal use of |", s)
+#      elif not c in chars:
+#        raise w_SyntaxError("illegal use of |", s)
+
+#      if colon_seen:
+#        #colons[-1].insert(0, w_apply)
+#        #result.append(transform_colons(colons, fn, line, column))
+#        result.append(transform_colons(colons, fn, line, column, last=lambda x: w_Seq(w_apply, x)))
+#        result = list_to_seq(result)
+#        return fn(result, line, column)
+#      else:
+#        result = list_to_seq(result)
+#        return w_Seq(w_apply, fn(result, line, column))
+
+    elif c == ":":
+      s.read()
+      colon_seen = True
+      #colon.append(fn(list_to_seq(colon), line, column))
+      colons.append([])
+      #colon = []
+      #list_to_seq(result)
+      #new = acc.first = w_Seq(w_nil, w_nil)
+      #acc = fn(acc, line, column)
+      #acc = new
+      #if colon_seen:
+      #  #print acc
+      #  old = acc
+      #  acc = []
+      #  old.append(acc)
+      #  result.append(fn(list_to_seq(old), line, column))
+      #  #result.append()
+      #  #print fn(list_to_seq(acc), line, column)
+      #  #acc.append()
+      #  #old = acc
+      #  #acc = []
+      #  #old.append(acc)
+      #  #old = list_to_seq(old)
+      #else:
+      #  result += acc
+      #  #old = acc
+      #  acc = []
+      #  #old.append(acc)
+      #old.append(acc)
+      #result.append(parse_inside_parens(chars, {"colon": True}, fn, s))
+      #if s.peek() == ";":
+      #  s.read()
+      #colon_seen = True
+      #try:
+      #  result.append(parse_inside_parens(chars, True, fn, s))
+      #except CommaFound:
+      #  pass
+    elif c == ";":
+      s.read()
+      if colon_seen:
+        #print [fn(list_to_seq(x), line, column) for x in colons]
+
+        result.append(transform_colons(colons, fn, line, column))
+        colons = []
+        #colon = []
+        colon_seen = False
+        #acc = fn(list_to_seq(acc), line, column)
+      else:
+        raise w_SyntaxError("no matching :", s)
+      #result = [list_to_seq(result)]
+      #break
     elif c in char_white:
       s.read()
     else:
       x = read1(s)
       if x is not None:
-        result.append(x)
+        #acc.first = x
+        #acc.rest = w_Seq(w_nil, w_nil)
+        #acc = acc.rest
+        if colon_seen:
+          colons[-1].append(x)
+        else:
+          result.append(x)
     c = s.peek()
-  return fn(list_to_seq(result), line, column)
+  if colon_seen:
+    result.append(transform_colons(colons, fn, line, column))
+  #result.append(fn(list_to_seq(acc), line, column))
+  #result.append(acc)
+  result = list_to_seq(result)
+  if wrap:
+    return fn(result, line, column)
+  else:
+    return result
 
 def parse_recursive_until(sym):
   def decorator(fn):
@@ -83,13 +238,12 @@ def parse_string(sym):
 # Flag used when we reach the end of the input
 stop_parsing = False
 
-def read_inside_top(chars, indent, fn, origfn, s):
+def read_inside_top(indent, seen, fn, origfn, s):
   global stop_parsing
   result         = []
   column         = s.column
   line           = s.line
   comment_seen   = False # Has a comment been seen?
-  colon_seen     = False # Has a colon been seen?
   semicolon_seen = False # Has a semicolon been seen?
   try:
     #c = s.peek()
@@ -112,32 +266,24 @@ def read_inside_top(chars, indent, fn, origfn, s):
     #    return x
     while s.line == line:
       c = s.peek()
-      if c in chars:
-        break
-      elif c == ":":
-        colon_seen = True
+      if c == ":":
         s.read()
-        while s.peek() in " ":
-          s.read()
-        if s.peek() == "\n":
-          s.read()
-          x = read_inside_top(chars + ";", indent, origfn, origfn, s)
-          result.append(x)
-        else:
-          # I have noooo clue how the hell this works, but it does
-          while s.line == line:
-            x = read_inside_top(chars, s.column, origfn, origfn, s)
-            #print x, semicolon_seen, result
-            result.append(x)
-            #x = read_inside_top(chars, 9001, origfn, origfn, s)
-            #result.append(x)
-      # I have noooo clue how the hell this works, but it does
+        #seen = {"colon": True}
+        #r = []
+        #while not stop_parsing and s.indent > indent and fn():
+        #  r.append(read_inside_top(s.indent, seen, origfn, origfn, s))
+        #result.append(list_to_seq(r))
+        ##return list_to_seq(result)
+        #raise StopIteration
+        result.append(read_inside_top(indent, {"colon": True}, origfn, origfn, s))
       elif c == ";":
         s.read()
-        if colon_seen:
-          pass
-        else:
+        try:
+          seen["colon"]
+        except KeyError:
           raise w_SyntaxError("no matching :", s)
+        raise StopIteration
+          #return list_to_seq(result)
         #s.read()
         #semicolon_seen = True
         #raise StopIteration
@@ -148,7 +294,7 @@ def read_inside_top(chars, indent, fn, origfn, s):
             s.read()
           if s.peek() == ":":
             s.read()
-            x = read_inside_top(chars, s.column, origfn, origfn, s)
+            x = read_inside_top(s.column, seen, origfn, origfn, s)
           else:
             x = read1(s)
           if x is None:
@@ -160,7 +306,8 @@ def read_inside_top(chars, indent, fn, origfn, s):
               while s.peek() == " ":
                 s.read()
               c = s.peek()
-              if c == "\n":
+              if c in ";\n":
+                s.read()
                 raise StopIteration
               else:
                 s.read()
@@ -168,7 +315,7 @@ def read_inside_top(chars, indent, fn, origfn, s):
                   s.read()
                   result = [w_arrow, w_Seq(w_apply, w_Seq(w_seq, result))]
                   try:
-                    result.append(read_inside_top(chars, indent, lambda: False, origfn, s))
+                    result.append(read_inside_top(indent, seen, lambda: False, origfn, s))
                   except StopIteration:
                     pass
                 else:
@@ -182,7 +329,7 @@ def read_inside_top(chars, indent, fn, origfn, s):
           s.read()
           result = [w_arrow, w_Seq(w_seq, list_to_seq(result))]
           try:
-            result.append(read_inside_top(chars, indent, lambda: False, origfn, s)) # + ";"
+            result.append(read_inside_top(indent, seen, lambda: False, origfn, s)) # + ";"
           except StopIteration:
             pass
         else:
@@ -202,13 +349,13 @@ def read_inside_top(chars, indent, fn, origfn, s):
     while s.peek() in char_white:
       s.read()
     while not stop_parsing and s.indent > indent and fn():
-      result.append(read_inside_top(chars, s.indent, origfn, origfn, s))
+      result.append(read_inside_top(s.indent, seen, origfn, origfn, s))
   except StopIteration:
     pass
   result = list_to_seq(result)
   if result == w_nil:
     if comment_seen:
-      return read_inside_top(chars, s.indent, origfn, origfn, s)
+      return read_inside_top(s.indent, seen, origfn, origfn, s)
     else:
       raise StopIteration
   elif result.rest == w_nil:
@@ -222,7 +369,7 @@ def read_top(s):
   while s.peek() in char_white:
     s.read()
   fn = lambda: True
-  return read_inside_top("", s.indent, fn, fn, s)
+  return read_inside_top(s.indent, {}, fn, fn, s)
 
 
 @parse_recursive_until(")")
@@ -360,7 +507,7 @@ def read1(s):
     return parse_round_bracket(s)
   elif c == "[":
     return parse_square_bracket(s)
-  elif c == "'":
+  elif c == "\"":
     return parse_single_string(s)
   elif c == "`":
     return parse_raw_string(s)
@@ -473,11 +620,27 @@ def read_indent(s):
   result = []
   print "".join(read_indent1(result, s.indent, s.indent, s))
 
-def read(s, eof):
+w_eof = {}
+
+def read(s, eof=w_eof):
   try:
     return read_top(s)
   except StopIteration:
     return eof
 
-def readstring(s, eof):
+def readstring(s, eof=w_eof):
   return read(w_Stream(iter(s).next), eof)
+
+def read_file(name):
+  with open(name, "r") as f:
+    f = w_InputStream(f)
+    while 1:
+      try:
+        x = read(f)
+        if x == w_eof:
+          break
+        else:
+          yield x
+      except w_BaseError as e:
+        print e
+        break

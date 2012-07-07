@@ -229,6 +229,8 @@ class w_Base(object):
     return hash(self.value)
   def __radd__(self, x):
     return self.__add__(x)
+  def pretty(self):
+    return str(self)
 
 class w_Number(w_Base):
   def __init__(self, value):
@@ -245,8 +247,8 @@ class w_Char(w_Base):
     try:
       return self.tostring
     except AttributeError:
-      ## Prints ' \ and @ with a preceding \
-      if self.value in "'\\@":
+      ## Prints " \ and @ with a preceding \
+      if self.value in "\"\\@":
         return "\\{}".format(self.value)
       else:
         return self.value
@@ -280,6 +282,14 @@ class w_Uniq(object):
 class w_Nil(object):
   def __repr__(self):
     return "[]"
+  def __len__(self):
+    return 0
+  def __iter__(self):
+    return self
+  def next(self):
+    raise StopIteration
+  def pretty(self):
+    return str(self)
   def join(self, y):
     return y
   def mappair(self, f):
@@ -303,7 +313,7 @@ class w_Seq(w_Nil):
       else:
         raise TypeError("can't iterate on a dotted seq")
 
-  def __repr__(self):
+  def print_with(self, f):
     x        = self
     x.line   = None
     x.column = None
@@ -315,10 +325,10 @@ class w_Seq(w_Nil):
         ## It's a seq of characters: print it as a string
         if char_all:
           ## This uses str because chars have different printing in strings
-          return "'{}'".format("".join(str(x) for x in result))
+          return "\"{}\"".format("".join(str(x) for x in result))
         ## Print it as a seq
         else:
-          return "[{}]".format(" ".join(repr(x) for x in result))
+          return "[{}]".format(" ".join(f(x) for x in result))
       if isinstance(x, w_Seq):
         if char_all and not isinstance(x.first, w_Char):
           char_all = False
@@ -326,29 +336,33 @@ class w_Seq(w_Nil):
         x = x.rest
       ## It's an improper seq: print it as a seq with a bar
       else:
-        return "[{} | {}]".format(" ".join(repr(x) for x in result), repr(x))
+        return "[{} | {}]".format(" ".join(f(x) for x in result), f(x))
 
-  ## This is just for pretty printing
-  def __str__(self):
+  def pretty(self):
     x        = self
-    x.line   = None
-    x.column = None
     char_all = True ## Are all the elements chars?
     result   = []
-    braces   = "[]"
+    braces   = "()"
 
-    if (x.first == w_seq or
-        x.first == w_string):
-      #braces = "[]"
+    if x.first == w_seq:
+      braces = "[]"
+      x = x.rest
+      if x == w_nil:
+        return "[]"
+    elif x.first == w_string:
+      braces = "[]"
       x = x.rest
     elif x.first == w_arrow:
-      x = x.rest
-      x = x.first.rest.join(w_Seq(w_Symbol("->"), x.rest))
+      #x = x.rest
+      #x = x.first.rest.join(w_Seq(w_Symbol("->"), x.rest))
+      x.first = w_Symbol("$fn")
     elif x.first == w_apply:
       x = x.rest
       if x.first == w_seq:
-        #braces = "[]"
+        braces = "[]"
         x = x.rest
+        if x.rest == w_nil:
+          return x.first.pretty()
 
     while 1:
       ## It's a proper seq: print it as a seq or a string
@@ -356,15 +370,16 @@ class w_Seq(w_Nil):
         ## It's a seq of characters: print it as a string
         if char_all:
           ## This uses str because chars have different printing in strings
-          return "'{}'".format("".join(str(x) for x in result))
+          return "\"{}\"".format("".join(x.pretty() for x in result))
         ## Print it as a seq
         else:
-          return "{0[0]}{1}{0[1]}".format(braces, " ".join(str(x) for x in result))
+          return "{}{}{}".format(braces[0], " ".join(x.pretty() for x in result), braces[1])
       if isinstance(x, w_Seq):
         if x.rest == w_nil and self.first == w_apply:
-          return "{0[0]}{1} | {2}{0[1]}".format(braces,
-                                                " ".join(str(x) for x in result),
-                                                str(x.first))
+          return "{}{} | {}{}".format(braces[0],
+                                      " ".join(x.pretty() for x in result),
+                                      x.first.pretty(),
+                                      braces[1])
         else:
           if char_all and not isinstance(x.first, w_Char):
             char_all = False
@@ -372,9 +387,61 @@ class w_Seq(w_Nil):
           x = x.rest
       ## It's an improper seq: print it as a seq with a bar
       else:
-        return "{0[0]}{1} | {2}{0[1]}".format(braces,
-                                              " ".join(str(x) for x in result),
-                                              str(x))
+        return "{}{} | {}{}".format(braces[0], " ".join(x.pretty() for x in result), x.pretty(), braces[1])
+
+  def __repr__(self):
+    return self.print_with(repr)
+
+  def __str__(self):
+    return self.print_with(str)
+
+#  ## This is just for pretty printing
+#  def __str__(self):
+#    x        = self
+#    x.line   = None
+#    x.column = None
+#    char_all = True ## Are all the elements chars?
+#    result   = []
+#    braces   = "[]"
+
+#    if (x.first == w_seq or
+#        x.first == w_string):
+#      #braces = "[]"
+#      x = x.rest
+#    elif x.first == w_arrow:
+#      x = x.rest
+#      x = x.first.rest.join(w_Seq(w_Symbol("->"), x.rest))
+#    elif x.first == w_apply:
+#      x = x.rest
+#      if x.first == w_seq:
+#        #braces = "[]"
+#        x = x.rest
+
+#    while 1:
+#      ## It's a proper seq: print it as a seq or a string
+#      if x == w_nil:
+#        ## It's a seq of characters: print it as a string
+#        if char_all:
+#          ## This uses str because chars have different printing in strings
+#          return "'{}'".format("".join(str(x) for x in result))
+#        ## Print it as a seq
+#        else:
+#          return "{0[0]}{1}{0[1]}".format(braces, " ".join(str(x) for x in result))
+#      if isinstance(x, w_Seq):
+#        if x.rest == w_nil and self.first == w_apply:
+#          return "{0[0]}{1} | {2}{0[1]}".format(braces,
+#                                                " ".join(str(x) for x in result),
+#                                                str(x.first))
+#        else:
+#          if char_all and not isinstance(x.first, w_Char):
+#            char_all = False
+#          result.append(x.first)
+#          x = x.rest
+#      ## It's an improper seq: print it as a seq with a bar
+#      else:
+#        return "{0[0]}{1} | {2}{0[1]}".format(braces,
+#                                              " ".join(str(x) for x in result),
+#                                              str(x))
 
   # TODO: code duplication with join
   def mappair(self, f):
@@ -428,7 +495,7 @@ class w_Env(object):
   def __setitem__(self, name, value):
     self.variables[name] = value
 
-class w_GlobalEnv(w_Env):
+class w_TopEnv(w_Env):
   def __init__(self, variables):
     self.variables = variables
   def __getitem__(self, name):
@@ -449,6 +516,9 @@ class w_Vau(object):
       return "(&vau {})".format(self.__name__)
     except AttributeError:
       return "(&vau)"
+
+  def pretty(self):
+    return str(self)
 
   def __call__(self, env, args):
     #print env.variables
@@ -499,6 +569,8 @@ class w_Wrapped(object):
       return "(&fn {})".format(self.wrapped.__name__)
     except AttributeError:
       return "(&fn)"
+  def pretty(self):
+    return str(self)
   def __call__(self, env, args):
     return self.wrapped(env, args.mappair(lambda x: eval_(env, x)))
 
@@ -673,7 +745,7 @@ def w_unwrap(env, x):
 def w_wrap(env, x):
   return w_Wrapped(x)
 
-glob = w_GlobalEnv({
+top_env = w_TopEnv({
   # Syntax
   "$fn"      : w_arrow,
   "apply"    : w_apply,

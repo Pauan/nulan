@@ -26,9 +26,62 @@
 ...     print e
 
 ##############################################################################
+#  nu.nu
+##############################################################################
+>>> for x in nu_reader.read_file("nu.nu"): print x.pretty()
+($assign $let ($vau Env [X Y | R] (eval Env [[$fn [seq X] | R] Y])))
+($assign $quote ($vau (&fn &tilde) [X] X))
+($assign $or ($vau Env [X | R] ($let X (eval Env X) ($if X X (eval Env [$or | R])))))
+($assign any? ($fn [[X | R] F] ($or (F X) (any? R F))))
+($assign case ($fn [X | Fns] (any? Fns ($fn [F] (F | X)))))
+($assign case-vau ($vau Env Fns ($let Args (uniq) (eval Env [$vau ($quote %Env) Args [case Args | Fns]]))))
+($assign case-fn ($fn Fns ($fn Args (case Args | Fns))))
+($assign $defvau ($vau Env [Name | Fns] (eval Env [$assign Name [case-vau | Fns]])))
+($assign $def ($vau Env [Name | Fns] (eval Env [$assign Name [case-fn | Fns]])))
+($def get-current-env (wrap ($vau Env [] Env)))
+($def make-env ($fn [Env] (eval Env [[$vau (&fn &tilde) (&fn &tilde) [get-current-env]]])))
+($def make-base-env)
+($def $use ($vau Env Args (each Args ($fn [X] ($let New (make-base-env) ($hook Env get-if-unbound ($fn [K] (eval New K))) (load-file-in New (find-file X)) (eval Env [$def (strip-extension (basename X)) New]))))))
+($def eachf ($fn [[X | R] F] (F X) (each R F)) ($fn [(&fn &tilde) (&fn &tilde)] %f))
+($def not ($fn [X] ($if X %f %t)))
+($defvau do ($fn Args (eval [[$fn [] | Args]])))
+($defvau $and ($fn [X] (eval X)) ($fn [X | R] ($if (eval X) (eval [$and | R]))))
+($def all? ($fn [[X] F] (F X)) ($fn [[X | R] F] ($and (F X) (all? R F))))
+($def none? ($fn [X F] (all? X ($fn [X] (not (F X))))))
+($def fn-fn ($fn [F] ($fn Fns ($fn Args (F Fns ($fn [X] (X | Args)))))))
+($def fn-not (fn-fn none?))
+($def fn-and (fn-fn all?))
+($def fn-or (fn-fn any?))
+($def sum ($fn [[X | R] F] (sum1 X R F)) ($fn [I X F] (sum1 I X F)))
+($def sum1 ($fn [I [X | R] F] (sum1 (F I X) R F)) ($fn [I (&fn &tilde) (&fn &tilde)] I))
+($def sumr ($fn [[X | R] F] (F X (sumr R F))) ($fn [X (&fn &tilde)] X) ($fn [X I F] (sumr1 X I F)))
+($def sumr1 ($fn [[X | R] I F] (F X (sumr R I F))) ($fn [(&fn &tilde) I (&fn &tilde)] I))
+($def compose ($fn Fns (sum Fns ($fn [X Y] ($fn Args (X (Y | Args)))))))
+($def each ($fn [X F] (sumr X [] ($fn [X Y] [(F X) | Y]))))
+($def rev ($fn [X] (sum [] X ($fn [Y X] [X | Y]))))
+($def keep ($fn [X F] (sumr X [] ($fn [X Y] ($if (F X) [X | Y] Y)))))
+($def rem ($fn [X F] (keep X (fn-not F))))
+($def empty? ($fn [[]] %t))
+($def first ($fn [[X | (&fn &tilde)]] X))
+($def rest ($fn [[(&fn &tilde) | R]] R))
+($def zip ($fn Args ($if (any? Args empty?) [] [(each Args first) | (zip | (each Args rest))])))
+($def join ($fn [[X | R] Y] [X | (join R Y)]) ($fn [[X] Y] [X | Y]))
+($def joinr ($fn [X Y] (join X [Y])))
+($def ref ($fn [[K V | R] K] V) ($fn [[(&fn &tilde) (&fn &tilde) | R] K] (ref R K)))
+($def iso? ($fn [X X] %t) ($fn [[X | R1] [Y | R2]] ($and (iso? X Y) (iso? R1 R2))))
+($def id ($fn [X] X))
+($def copy ($fn [X] (each X id)))
+($def prn! ($fn Args (pr! | Args) (pr! "\n")))
+($def writen! ($fn Args (write! | Args) (pr! "\n")))
+($defvau $lets ($fn [[X]] (eval X)) ($fn [[[X Y] | R]] (eval [$let X Y [$lets | R]])))
+($defvau $if-error ($fn [[X Y | R]] ($let U (uniq) (eval [$on-error X [$fn [seq [error (&fn &tilde)]] Y] | (joinr R [$fn [seq U] U])]))))
+($defvau $def-if! ($fn [Name Test | Fns] ($lets (Orig (eval Name)) (Test (eval Test)) (F ($fn Args ($if-error (Test | Args) (Orig | Args)))) (eval [$assign! Name [case-fn F | Fns]]))))
+
+
+##############################################################################
 #  Strings
 ##############################################################################
->>> error(read, r"'foo\bar\n\qux'")
+>>> error(read, r'"foo\bar\n\qux"')
 error: unknown escape sequence b (line 1, column 6):
   'foo\b
        ^
@@ -365,12 +418,49 @@ error: illegal use of | (line 1, column 7):
         ^
 
 
-$defvau! foo [X | R] -> bar | qux
+>>> error(write, r'''
+... foo bar |
+... qux
+... ''')
+error: expected an expression after | (line 2, column 9):
+  foo bar |
+           ^u
 
-qux             => [1 2 3]
-(foo bar | qux) => (foo bar 1 2 3)
-[foo bar | qux] => [foo bar 1 2 3]
-[foo bar | (add 1 2 3)] => [foo bar 6]
+>>> error(write, r'''
+... (foo bar |)
+... qux
+... ''')
+error: expected an expression after | (line 2, column 9):
+  (foo bar |
+            ^u
+
+>>> error(write, r'''
+... [foo bar |]
+... qux
+... ''')
+error: expected an expression after | (line 2, column 9):
+  (foo bar |
+            ^u
+
+
+>>> write(r'''
+... foo bar |
+...   qux
+... ''')
+[(&fn apply) (&symbol foo) (&symbol bar) (&symbol qux)]u
+
+>>> write(r'''
+... (foo bar |
+...   qux)
+... ''')
+[(&fn apply) (&symbol foo) (&symbol bar) (&symbol qux)]u
+
+>>> error(write, r'''
+... [foo bar |
+...   qux]
+... ''')
+[(&fn apply) (&fn seq) (&symbol foo) (&symbol bar) (&symbol qux)]u
+
 
 >>> write("(foo bar | qux)")
 [(&fn apply) (&symbol foo) (&symbol bar) (&symbol qux)]
@@ -572,7 +662,38 @@ error: invalid character : (line 2, column 5):
 ...            qux
 ...   corge
 ... ''')
-[(&symbol $let) [(&symbol F) [(&symbol $fn) (&symbol Args) (&symbol foo) (&symbol bar) (&symbol qux)]] (&symbol corge)]
+[(&symbol $let) [(&symbol F) [(&symbol $fn) (&symbol Args) [(&symbol foo) (&symbol bar) (&symbol qux) (&symbol corge)]]]]
+
+>>> write(
+... r'''
+... $let: F: $fn Args: foo;
+...            bar
+...            qux
+...   corge
+... ''')
+[(&symbol $let) [(&symbol F) [(&symbol $fn) (&symbol Args) (&symbol foo)]] (&symbol bar) (&symbol qux) (&symbol corge)]
+
+>>> error(write,
+... r'''
+... $let: F: $fn Args: foo;
+...            bar
+...            qux;
+...   corge
+... ''')
+error: no matching : (line 4, column 15):
+  qux;
+     ^
+
+>>> error(write,
+... r'''
+... $let: F: $fn Args (foo)
+...            bar
+...            qux;
+...   corge
+... ''')
+error: no matching : (line 4, column 15):
+  qux;
+     ^
 
 
 >>> write_all(

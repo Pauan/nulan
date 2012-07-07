@@ -11,7 +11,7 @@ $assign $or: $vau Env [X | R]
   $let X: eval Env X;
     $if X X: eval Env [$or | R]
 
-$assign any? [X | R] F -> $or (F X) (any? R F)
+$assign any?: [X | R] F -> $or (F X) (any? R F)
 
 $assign case: X | Fns -> any? Fns: F -> F | X
 
@@ -38,6 +38,8 @@ $def get-current-env: wrap: $vau Env [] Env
 $def make-env: Env -> eval Env [[$vau ~ ~ [get-current-env]]]
 
 $def make-base-env
+  $let Top: get-current-env;
+    -> make-env Top
 
 
 $def $use: $vau Env Args
@@ -73,9 +75,9 @@ $def type: |Fns ->
 $defvau do: |Args -> eval [[$fn [] | Args]]
 
 $defvau $and
-  [X]     -> eval X
-  [X | R] -> $if: eval X;
-               eval [$and | R]
+  X     -> eval X
+  X | R -> $if: eval X;
+             eval [$and | R]
 
 $def all?
   [X]     F -> F X
@@ -224,7 +226,7 @@ $def rest:   [~ | R] -> R
 
 # => (zip [a 1] [b 2] [c 3])
 #    [[a b c] [1 2 3]]
-$def zip |Args ->
+$def zip: |Args ->
   $if (any? Args empty?)
     []
     [(each Args first) | (zip | (each Args rest))]
@@ -279,7 +281,7 @@ $defvau $lets
   [[X Y] | R] -> eval [$let X Y: $lets | R]
 
 $defvau $if-error: [X Y | R] ->
-  $let U: uniq
+  $let U: uniq;
     eval [$on-error X
            [$fn [seq: error ~] Y] | (joinr R [$fn [seq U] U])]
 
@@ -291,10 +293,11 @@ $defvau $def-if! : Name Test | Fns ->
                     Orig | Args
     eval [$assign! Name: case-fn F | Fns]
 
+#|
 $on-error: Test | Args;
   (error ~) -> Orig | Args
   X         -> X
-
+|#
 
 #|
 X -> foo bar
