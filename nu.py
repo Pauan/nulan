@@ -57,6 +57,6 @@ def load_file_in(env, name):
 
 if __name__ == "__main__":
   import doctest
-  #doctest.testfile("tests/nu_reader.py")
-  doctest.testfile("tests/TEMP.py")
+  doctest.testfile("tests/nu_reader.py")
+  #doctest.testfile("tests/TEMP.py")
   #repl()

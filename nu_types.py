@@ -737,6 +737,10 @@ def w_eval(env, args):
   else:
     raise w_PatternFail(seq("Env", "X"), args)
 
+@nu_lambda("mul", rest="Args")
+def w_mul(env, args):
+  return w_Number(reduce(lambda x, y: x * y, args))
+
 @nu_lambda("uniq")
 def w_uniq(env):
   return w_Uniq()
@@ -783,6 +787,7 @@ top_env = w_TopEnv({
   "add"      : w_add,
   "error"    : w_error,
   "eval"     : w_eval,
+  "mul"      : w_mul,
   "uniq"     : w_uniq,
   "unwrap"   : w_unwrap,
   "wrap"     : w_wrap,

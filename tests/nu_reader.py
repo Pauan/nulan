@@ -255,7 +255,7 @@ qux
 %eof
 
 
->>> write("'foo@#||#qux'")
+>>> write('"foo@#||#qux"')
 [(&fn str) (&char f) (&char o) (&char o) (&symbol qux)]
 
 
@@ -267,6 +267,23 @@ qux
 
 >>> write("[foo bar #||# qux]")
 [(&fn seq) (&symbol foo) (&symbol bar) (&symbol qux)]
+
+
+>>> write("()")
+[]
+
+>>> write("[]")
+[]
+
+
+>>> write("#||#")
+%eof
+
+>>> write("(#||#)")
+[]
+
+>>> write("[#||#]")
+[]
 
 
 >>> write("foo bar | #||# qux")
@@ -288,11 +305,12 @@ qux
 [(&symbol foo) (&symbol bar)]
 
 >>> write("foo:bar")
-[(&symbol foo) (&symbol bar)]
+[(&symbol foo) [(&symbol bar)]]
 
->>> write_all(r"foo;bar")
-(&symbol foo)
-(&symbol bar)
+>>> error(write_all, r"foo;bar")
+error: no matching : (line 1, column 4):
+  foo;
+     ^
 
 >>> write("foo1")
 (&symbol foo1)
@@ -359,6 +377,16 @@ error: invalid character . (line 1, column 7):
 
 >>> write("100 / 200")
 [(&fn &div) (&number 100) (&number 200)]
+
+
+>>> write("(100 + 200 * 300)")
+[(&fn &add) (&number 100) [(&fn &mul) (&number 200) (&number 300)]]
+
+>>> write("(100 * 200 + 300)")
+[(&fn &add) [(&fn &mul) (&number 100) (&number 200)] (&number 300)]u
+
+>>> write("((100 + 200) * 300)")
+[(&fn &mul) [(&fn &add) (&number 100) (&number 200)] (&number 300)]
 
 
 >>> write("100 + 200 * 300")
@@ -476,44 +504,44 @@ error: illegal use of | (line 1, column 7):
 ... foo bar |
 ... qux
 ... ''')
-error: expected an expression after | (line 2, column 9):
-  foo bar |
-           ^u
+error: expected an expression after | (line 3, column 1):
+  q
+  ^
 
 >>> error(write, r'''
 ... (foo bar |)
 ... qux
 ... ''')
-error: expected an expression after | (line 2, column 9):
-  (foo bar |
-            ^u
+error: expected an expression after | (line 2, column 11):
+  (foo bar |)
+            ^
 
 >>> error(write, r'''
 ... [foo bar |]
 ... qux
 ... ''')
-error: expected an expression after | (line 2, column 9):
-  (foo bar |
-            ^u
+error: expected an expression after | (line 2, column 11):
+  [foo bar |]
+            ^
 
 
 >>> write(r'''
 ... foo bar |
 ...   qux
 ... ''')
-[(&fn apply) (&symbol foo) (&symbol bar) (&symbol qux)]u
+[(&fn apply) (&symbol foo) (&symbol bar) (&symbol qux)]
 
 >>> write(r'''
 ... (foo bar |
 ...   qux)
 ... ''')
-[(&fn apply) (&symbol foo) (&symbol bar) (&symbol qux)]u
+[(&fn apply) (&symbol foo) (&symbol bar) (&symbol qux)]
 
 >>> error(write, r'''
 ... [foo bar |
 ...   qux]
 ... ''')
-[(&fn apply) (&fn seq) (&symbol foo) (&symbol bar) (&symbol qux)]u
+[(&fn apply) (&fn seq) (&symbol foo) (&symbol bar) (&symbol qux)]
 
 
 >>> write("(foo bar | qux)")
@@ -524,6 +552,22 @@ error: expected an expression after | (line 2, column 9):
 
 >>> write("[foo bar | qux]")
 [(&fn apply) (&fn seq) (&symbol foo) (&symbol bar) (&symbol qux)]
+
+
+>>> error(write, "Test | Args:")
+error: illegal use of | (line 1, column 12):
+  Test | Args:
+             ^
+
+>>> error(write, "(Test | Args:)")
+error: illegal use of | (line 1, column 13):
+  (Test | Args:
+              ^
+
+>>> error(write, "[Test | Args:]")
+error: illegal use of | (line 1, column 13):
+  [Test | Args:
+              ^
 
 
 >>> error(write, "Test | Args: Orig | Args")
@@ -542,29 +586,56 @@ error: illegal use of | (line 1, column 13):
               ^
 
 
->>> write_all("Test | Args; Orig | Args")
-[(&fn apply) (&symbol Test) (&symbol Args)]
-[(&fn apply) (&symbol Orig) (&symbol Args)]u
+>>> error(write, "Test | Args; Orig | Args")
+error: no matching : (line 1, column 12):
+  Test | Args;
+             ^
 
 >>> error(write, "(Test | Args; Orig | Args)")
-[[(&fn apply) (&symbol Test) (&symbol Args)] [(&fn apply) (&symbol Orig) (&symbol Args)]]
+error: no matching : (line 1, column 13):
+  (Test | Args;
+              ^
 
 >>> error(write, "[Test | Args; Orig | Args]")
-[(&fn seq) [(&fn apply) (&fn seq) (&symbol Test) (&symbol Args)] [(&fn apply) (&fn seq) (&symbol Orig) (&symbol Args)]]
+error: no matching : (line 1, column 13):
+  [Test | Args;
+              ^
 
 
->>> write("foo: Test | Args; Orig | Args")
-[(&symbol foo) [(&fn apply) (&symbol Test) (&symbol Args)] [(&fn apply) (&symbol Orig) (&symbol Args)]]
+>>> write("foo: Test | Args")
+[(&symbol foo) [(&fn apply) (&symbol Test) (&symbol Args)]]
+
+>>> write("(foo: Test | Args)")
+[(&symbol foo) [(&fn apply) (&symbol Test) (&symbol Args)]]
+
+>>> write("[foo: Test | Args]")
+[(&fn seq) (&symbol foo) [(&fn apply) (&fn seq) (&symbol Test) (&symbol Args)]]
+
+
+>>> write("foo: Test | Args;")
+[(&symbol foo) [(&fn apply) (&symbol Test) (&symbol Args)]]
+
+>>> write("(foo: Test | Args;)")
+[(&symbol foo) [(&fn apply) (&symbol Test) (&symbol Args)]]
+
+>>> write("[foo: Test | Args;]")
+[(&fn seq) (&symbol foo) [(&fn apply) (&fn seq) (&symbol Test) (&symbol Args)]]
+
+
+>>> error(write, "foo: Test | Args; Orig | Args")
+error: illegal use of | (line 1, column 19):
+  foo: Test | Args; O
+                    ^
 
 >>> error(write, "(foo: Test | Args; Orig | Args)")
-error: invalid character : (line 1, column 5):
-  (foo:
-      ^
+error: illegal use of | (line 1, column 20):
+  (foo: Test | Args; O
+                     ^
 
 >>> error(write, "[foo: Test | Args; Orig | Args]")
-error: invalid character : (line 1, column 5):
-  [foo:
-      ^
+error: illegal use of | (line 1, column 20):
+  [foo: Test | Args; O
+                     ^
 
 
 >>> write("X | (join R Y)")
@@ -593,44 +664,36 @@ error: invalid character : (line 1, column 5):
 [(&fn apply) (&symbol zip) [(&symbol map) (&symbol Args) (&symbol cdr)]]
 
 >>> error(write, "(zip | : map Args cdr)")
-error: invalid character : (line 1, column 8):
-  (zip | :
-         ^
+[(&fn apply) (&symbol zip) [(&symbol map) (&symbol Args) (&symbol cdr)]]
 
 >>> error(write, "[zip | : map Args cdr]")
-error: invalid character : (line 1, column 8):
-  [zip | :
-         ^
+[(&fn apply) (&fn seq) (&symbol zip) [(&fn seq) (&symbol map) (&symbol Args) (&symbol cdr)]]
 
 
 >>> write("zip | : map Args: cdr")
-[(&fn apply) (&symbol zip) [(&symbol map) (&symbol Args) (&symbol cdr)]]
+[(&fn apply) (&symbol zip) [(&symbol map) (&symbol Args) [(&symbol cdr)]]]
 
 >>> error(write, "(zip | : map Args: cdr)")
-error: invalid character : (line 1, column 8):
-  (zip | :
-         ^
+[(&fn apply) (&symbol zip) [(&symbol map) (&symbol Args) [(&symbol cdr)]]]
 
 >>> error(write, "[zip | : map Args: cdr]")
-error: invalid character : (line 1, column 8):
-  [zip | :
-         ^
+[(&fn apply) (&fn seq) (&symbol zip) [(&fn seq) (&symbol map) (&symbol Args) [(&fn seq) (&symbol cdr)]]]
 
 
 >>> error(write, "zip | : map Args cdr; bar")
-error: illegal use of | (line 1, column 21):
-  zip | : map Args cdr;
-                      ^
+error: illegal use of | (line 1, column 23):
+  zip | : map Args cdr; b
+                        ^
 
 >>> error(write, "(zip | : map Args cdr; bar)")
-error: invalid character : (line 1, column 8):
-  (zip | :
-         ^
+error: illegal use of | (line 1, column 24):
+  (zip | : map Args cdr; b
+                         ^
 
 >>> error(write, "[zip | : map Args cdr; bar]")
-error: invalid character : (line 1, column 8):
-  [zip | :
-         ^
+error: illegal use of | (line 1, column 24):
+  [zip | : map Args cdr; b
+                         ^
 
 
 >>> write_all(
@@ -638,75 +701,63 @@ error: invalid character : (line 1, column 8):
 ... foo: bar
 ... qux
 ... ''')
-[(&symbol foo) (&symbol bar)]
+[(&symbol foo) [(&symbol bar)]]
 (&symbol qux)
 
 
 >>> write("foo: bar: qux")
-[(&symbol foo) [(&symbol bar) (&symbol qux)]]
+[(&symbol foo) [(&symbol bar) [(&symbol qux)]]]
 
 >>> error(write, "(foo: bar: qux)")
-error: invalid character : (line 1, column 5):
-  (foo:
-      ^
+[(&symbol foo) [(&symbol bar) [(&symbol qux)]]]
 
 >>> error(write, "[foo: bar: qux]")
-error: invalid character : (line 1, column 5):
-  [foo:
-      ^
+[(&fn seq) (&symbol foo) [(&fn seq) (&symbol bar) [(&fn seq) (&symbol qux)]]]
 
 
 >>> write("foo: bar | qux")
 [(&symbol foo) [(&fn apply) (&symbol bar) (&symbol qux)]]
 
 >>> error(write, "(foo: bar | qux)")
-error: invalid character : (line 1, column 5):
-  (foo:
-      ^
+[(&symbol foo) [(&fn apply) (&symbol bar) (&symbol qux)]]
 
 >>> error(write, "[foo: bar | qux]")
-error: invalid character : (line 1, column 5):
-  [foo:
-      ^
+[(&fn seq) (&symbol foo) [(&fn apply) (&fn seq) (&symbol bar) (&symbol qux)]]
 
 
 >>> write("foo: bar; qux")
-[(&symbol foo) (&symbol bar) (&symbol qux)]
+[(&symbol foo) [(&symbol bar)] (&symbol qux)]
 
 >>> error(write, "(foo: bar; qux)")
-error: invalid character : (line 1, column 5):
-  (foo:
-      ^
+[(&symbol foo) [(&symbol bar)] (&symbol qux)]
 
 >>> error(write, "[foo: bar; qux]")
-error: invalid character : (line 1, column 5):
-  [foo:
-      ^
+[(&fn seq) (&symbol foo) [(&fn seq) (&symbol bar)] (&symbol qux)]
 
 
->>> write("foo: bar; qux; corge")
-[(&symbol foo) (&symbol bar) (&symbol qux) (&symbol corge)]
+>>> error(write, "foo: bar; qux; corge")
+error: no matching : (line 1, column 14):
+  foo: bar; qux;
+               ^
 
 >>> error(write, "(foo: bar; qux; corge)")
-error: invalid character : (line 1, column 5):
-  (foo:
-      ^
+error: no matching : (line 1, column 15):
+  (foo: bar; qux;
+                ^
 
 >>> error(write, "[foo: bar; qux; corge]")
-error: invalid character : (line 1, column 5):
-  [foo:
-      ^
+error: no matching : (line 1, column 15):
+  [foo: bar; qux;
+                ^
 
 
->>> error(write,
+>>> write(
 ... r'''
 ... (foo:
 ...   bar:
 ...     qux)
 ... ''')
-error: invalid character : (line 2, column 5):
-  (foo:
-      ^
+[(&symbol foo) [(&symbol bar) [(&symbol qux)]]]
 
 
 >>> write(
@@ -725,7 +776,7 @@ error: invalid character : (line 2, column 5):
 ...            qux
 ...   corge
 ... ''')
-[(&symbol $let) [(&symbol F) [(&symbol $fn) (&symbol Args) (&symbol foo)]] (&symbol bar) (&symbol qux) (&symbol corge)]
+[(&symbol $let) [(&symbol F) [(&symbol $fn) (&symbol Args) [(&symbol foo)]]] (&symbol bar) (&symbol qux) (&symbol corge)]
 
 >>> error(write,
 ... r'''
@@ -735,8 +786,8 @@ error: invalid character : (line 2, column 5):
 ...   corge
 ... ''')
 error: no matching : (line 4, column 15):
-  qux;
-     ^
+             qux;
+                ^
 
 >>> error(write,
 ... r'''
@@ -745,12 +796,10 @@ error: no matching : (line 4, column 15):
 ...            qux;
 ...   corge
 ... ''')
-error: no matching : (line 4, column 15):
-  qux;
-     ^
+[(&symbol $let) [(&symbol F) [(&symbol $fn) (&symbol Args) [(&symbol foo)] (&symbol bar) (&symbol qux)]] (&symbol corge)]
 
 
->>> write_all(
+>>> error(write_all,
 ... r'''
 ... foo bar;qux ->
 ...  $let:Orig:eval Name
@@ -758,10 +807,11 @@ error: no matching : (line 4, column 15):
 ...   $let F:corge
 ...    eval F
 ... ''')
-[(&symbol foo) (&symbol bar)]
-[(&vau $fn) [(&fn seq) (&symbol qux)] [(&symbol $let) [(&symbol Orig) [(&symbol eval) (&symbol Name)]] [(&symbol Test) [(&symbol eval) (&symbol Test)]] [(&symbol $let) (&symbol F) [(&symbol corge)] [(&symbol eval) (&symbol F)]]]]
+error: no matching : (line 2, column 8):
+  foo bar;
+         ^
 
->>> write_all(
+>>> error(write_all,
 ... r'''
 ... foo bar;qux ->
 ...  $let:Orig:eval Name
@@ -769,10 +819,11 @@ error: no matching : (line 4, column 15):
 ...   $let F:corge
 ...    eval F
 ... ''')
-[(&symbol foo) (&symbol bar)]
-[(&vau $fn) [(&symbol qux)] [(&symbol $let) [(&symbol Orig) [(&symbol eval) (&symbol Name)]] [(&symbol Test) [(&symbol eval) (&symbol Test)]] [(&symbol $let) (&symbol F) [(&symbol corge)] [(&symbol eval) (&symbol F)]]]]
+error: no matching : (line 2, column 8):
+  foo bar;
+         ^
 
->>> write_all(
+>>> error(write_all,
 ... r'''
 ... foo bar;qux ->
 ...  $let;Orig:eval Name
@@ -780,8 +831,9 @@ error: no matching : (line 4, column 15):
 ...   $let F:corge
 ...    eval F
 ... ''')
-[(&symbol foo) (&symbol bar)]
-[(&vau $fn) [(&symbol qux)] [(&symbol $let) [(&symbol Orig) [(&symbol eval) (&symbol Name)] [(&symbol Test) [(&symbol eval) (&symbol Test)]] [(&symbol $let) (&symbol F) [(&symbol corge)] [(&symbol eval) (&symbol F)]]]]]
+error: no matching : (line 2, column 8):
+  foo bar;
+         ^
 
 
 >>> write(
