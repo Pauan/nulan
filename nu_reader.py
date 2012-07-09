@@ -12,6 +12,71 @@ char_lower = "abcdefghijklmnopqrstuvwxyz"
 char_upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 char_sym   = char_num + char_lower + char_upper + "-$%!?"
 
+class CharBuffer(object):
+  def __init__(self, x):
+    self._next  = iter(x).next
+    self.line   = 1
+    self.column = 0
+    self.seen   = []
+
+  def next(self):
+    x = self._next()
+    if x == "\n":
+      self.line  += 1
+      self.column = 0
+      self.seen   = []
+    else:
+      self.column += 1
+      self.seen.append(x)
+    return x
+  def __iter__(self):
+    return self
+
+class IOBuffer(CharBuffer):
+  def __init__(self, f, name=None, isatty=False):
+    if isinstance(f, file):
+      def i(f):
+        while 1:
+          x = f.read(1)
+          if x == "":
+            return
+          else:
+            yield x
+      CharBuffer.__init__(self, i(f))
+      self.filename = name or f.name
+      self.isatty = isatty or f.isatty()
+    else:
+      CharBuffer.__init__(self, f)
+      self.filename = name
+      self.isatty   = isatty
+
+class IterBuffer(object):
+  def __init__(self, f):
+    self._next  = iter(f).next
+    self._empty = False
+    try:
+      self._current = self._next()
+    except StopIteration:
+      self._empty = True
+
+  def __iter__(self):
+    return self
+
+  @property
+  def current(self):
+    if self._empty:
+      raise StopIteration
+    else:
+      return self._current
+
+  def next(self):
+    old = self.current
+    try:
+      self._current = self._next()
+    except StopIteration:
+      self._empty = True
+    return old
+
 def transform_colons(xs, fn, line, column, last=None):
   def f(x, y):
     if x == w_nil:
@@ -20,28 +85,6 @@ def transform_colons(xs, fn, line, column, last=None):
     else:
       return fn(y.join(w_Seq(x, w_nil)), line, column)
   return reduce(f, (list_to_seq(x) for x in reversed(xs)), w_nil)
-
-class Parser(object):
-  def __init__(self, cons=lambda x, *args: x,
-                     end=None,
-                     stop=None,
-                     on_fail=None,
-                     arrow=False,
-                     unwrap=False,
-                     ignore_comments=False,
-                     indent=None,
-                     line=None):
-    if not stop:
-      stop = lambda c, *args: c == self.end
-    self.end             = end
-    self.stop            = stop
-    self.on_fail         = on_fail
-    self.cons            = cons
-    self.arrow           = arrow
-    self.unwrap          = unwrap
-    self.ignore_comments = ignore_comments
-    self.indent          = indent
-    self.line            = line
 
 def parse_inside_parens(info, s,
                         bar=False,
@@ -526,31 +569,334 @@ def read1(s):
   else:
     return parse_num_or_symbol(s)
 
-#[":"            | R] ->
-#[";"            | R] ->
-#["->"           | R] ->
-#[(is? " " "\n") | R] ->
-#[X              | R] ->
+
+class Token(object):
+  bind = 0
+  def __init__(self, s):
+    self.line   = s.line
+    self.column = s.column
+  def __str__(self):
+    return "Token: {}".format(self.__class__.__name__)
+
+class LiteralToken(Token):
+  def __init__(self, value):
+    self.value = value
+  def nud(self, s):
+    return self.value
+
+def nud_pre(pre, bind=None):
+  def f(self, s):
+    if bind is None:
+      bind = self.bind
+    return w_Seq(pre, w_Seq(parse(s, bind), w_nil))
+  return f
+
+def led_pre(pre, bind=None):
+  def f(self, left, s):
+    if bind is None:
+      bind = self.bind
+    return w_Seq(pre, w_Seq(left, w_Seq(parse(s, bind), w_nil)))
+  return f
+
+
+class ArrowToken(Token):
+  def nud(self, s):
+    print parse(s)
+    pass
+  def led(self, left, s):
+    print left, parse(s)
+    pass
+
+class RoundToken(Token):
+  def nud(self, s):
+    expr = parse(s)
+    c = s.next()
+    print expr, c
+    return expr
+
+class EndRoundToken(Token):
+  pass
+
+class IndentToken(Token):
+  def nud(self, s):
+    result = []
+    try:
+      while not isinstance(s.current, DedentToken):
+        expr = parse(s)
+        print expr, s.current
+        result.append(expr)
+      s.next()
+    except StopIteration:
+      raise SyntaxError("missing ending dedent")
+    #c = s.next()
+    #print expr, c
+    #if not isinstance(c, DedentToken):
+    #  raise SyntaxError("missing ending dedent")
+    #  #raise w_Thrown(w_SyntaxError("missing ending deindentation", s))
+    #else:
+    print result
+    return list_to_seq(result)
+
+class DedentToken(Token):
+  pass
+  #def nud(self, s):
+  #  return w_nil
+  #pass
+  #bind = 9001
+  #def led(self, left, s):
+  #  return left
+
+class WhitespaceToken(Token):
+  pass
+  #bind = 2
+  #def led(self, left, s):
+  #  x = parse(s, 1)
+  #  print left, x
+  #  return w_Seq(left, x)
+
+class EOFToken(Token):
+  pass
+
+class MulToken(Token):
+  bind = 30
+  led  = led_pre(w_mul)
+
+class DivToken(Token):
+  bind = 30
+  led  = led_pre(w_div)
+
+class AddToken(Token):
+  bind = 20
+  nud  = nud_pre(w_add, 40)
+  led  = led_pre(w_add)
+
+class SubToken(Token):
+  bind = 20
+  nud  = nud_pre(w_sub, 40)
+  led  = led_pre(w_sub)
+
+class LtToken(Token):
+  bind = 10
+  led  = led_pre(w_lt)
+
+class LteToken(Token):
+  bind = 10
+  led  = led_pre(w_lte)
+
+class GtToken(Token):
+  bind = 10
+  led  = led_pre(w_gt)
+
+class GteToken(Token):
+  bind = 10
+  led  = led_pre(w_gte)
+
+
+## Pratt's Top Down Operator Precedence Parser
+def parse(s, bind=0):
+  #if isinstance(t, Token):
+  left = s.next().nud(s)
+  #else:
+  #  left = t
+  p = s.current
+  print "PARSE2", left, p, bind, p.bind
+  while bind < p.bind:
+    #current = t = s.next()
+    #if isinstance(t, Token):
+    left = s.next().led(left, s)
+  return left
+    #else:
+    #  return left
+
+##  #\|[\s\S]*?\|#
+##  #.*
+def parse_comment(s):
+  c = s.next()
+  if c == "|":
+    try:
+      while 1:
+        c = s.next()
+        if c == "#":
+          c = s.next()
+          if c == "|":
+            parse_comment(s)
+        elif c == "|":
+          c = s.next()
+          if c == "#":
+            break
+    except StopIteration:
+      raise w_Thrown(w_SyntaxError("missing ending |# block", s))
+  else:
+    while c != "\n":
+      c = s.next()
+  return c
+
+##  \d+\.?\d+
+def parse_number(c, s):
+  result = []
+  line   = s.line
+  column = s.column
+  dot    = False ## Has the dot been seen yet?
+  try:
+    while 1:
+      if c in char_num:
+        result.append(c)
+      elif c == "." and not dot:
+        dot = True
+        result.append(c)
+      else:
+        break
+      c = s.next()
+  except StopIteration:
+    c = None
+  return c, w_Number("".join(result), line=line, column=column)
+
+##  [a-zA-Z0-9\-$%!?]+
+def parse_symbol(c, s):
+  result = []
+  line   = s.line
+  column = s.column
+  try:
+    while c in char_sym:
+      result.append(c)
+      c = s.next()
+  except StopIteration:
+    c = None
+  return c, w_Symbol("".join(result), line=line, column=column)
+
+def find_indent(s):
+  indent = 0
+  c = s.next()
+  while c == " ":
+    indent += 1
+    c = s.next()
+  return c, indent
+
+def tokenize(s):
+  indents = []
+
+  c, new = find_indent(s)
+  yield IndentToken(s)
+  indents.append(new)
+
+  try:
+    while 1:
+      if c == "#":
+        c = parse_comment(s)
+        continue
+      elif c == "~":
+        yield w_tilde
+      elif c == " ":
+        #yield WhitespaceToken(s)
+        pass
+      elif c == "\n":
+        c, new = find_indent(s)
+        if c == "\n" and s.isatty:
+          return
+        elif new > indents[-1]:
+          yield IndentToken(s)
+          indents.append(new)
+        else:
+          while indents.pop() <= new:
+            yield DedentToken(s)
+        # Uses the existing value of c
+        continue
+      elif c == "<":
+        o = c
+        c = s.next()
+        if c == "=":
+          yield LteToken(s)
+        else:
+          yield LtToken(s)
+          # Uses the existing value of c
+          continue
+      elif c == ">":
+        o = c
+        c = s.next()
+        if c == "=":
+          yield GteToken(s)
+        else:
+          yield GtToken(s)
+          # Uses the existing value of c
+          continue
+      elif c == "-":
+        o = c
+        c = s.next()
+        if c == ">":
+          yield ArrowToken(s)
+        else:
+          yield SubToken(s)
+          # Uses the existing value of c
+          continue
+      elif c == "+":
+        yield AddToken(s)
+      elif c == "*":
+        yield MulToken(s)
+      elif c == "/":
+        yield DivToken(s)
+      elif c == "(":
+        yield RoundToken(s)
+      elif c == ")":
+        yield EndRoundToken(s)
+      elif c == "[":
+        yield SquareToken(s)
+      elif c == "]":
+        yield EndSquareToken(s)
+      elif c == "{":
+        yield CurlyToken(s)
+      elif c == "}":
+        yield EndCurlyToken(s)
+      elif c == "\"":
+        yield DoubleQuoteToken(s)
+      elif c == "`":
+        yield BackQuoteToken(s)
+      elif c == ":":
+        yield ColonToken(s)
+      elif c == ";":
+        yield SemicolonToken(s)
+      elif c in char_num:
+        c, x = parse_number(c, s)
+        yield LiteralToken(x)
+        if c is None:
+          raise StopIteration
+        else:
+          continue
+      elif c in char_sym:
+        c, x = parse_symbol(c, s)
+        yield LiteralToken(x)
+        if c is None:
+          raise StopIteration
+        else:
+          continue
+      else:
+        raise w_Thrown(w_SyntaxError("invalid character {}".format(c), s))
+      c = s.next()
+  except StopIteration:
+    while indents:
+      indents.pop()
+      yield DedentToken(s)
+    #yield EOFToken(s)
+
+def read_raw(s):
+  yield parse(IterBuffer(tokenize(s)))
 
 def read(s, eof=w_eof):
   try:
-    return read_top(s)
+    return read_raw(IOBuffer(s))
   except StopIteration:
     return eof
 
-def readstring(s, eof=w_eof):
-  return read(w_Stream(iter(s).next), eof)
+def read_all(s):
+  s = IOBuffer(s)
+  try:
+    for x in read_raw(s):
+      yield x
+  except w_Thrown as e:
+    sys.stderr.write("{}\n".format(e))
+    return
+  except StopIteration:
+    return
 
 def read_file(name):
   with open(name, "r") as f:
-    f = w_InputStream(f)
-    while 1:
-      try:
-        x = read(f)
-        if x == w_eof:
-          break
-        else:
-          yield x
-      except w_BaseError as e:
-        print e
-        break
+    return read_all(f)

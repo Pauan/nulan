@@ -87,6 +87,24 @@ def pattern_match(base, pattern, args):
   return rec(pattern, args)
 
 
+def pr(x):
+  result = []
+  while isinstance(x, w_Seq):
+    try:
+      result.append(x.first.tostring())
+    except (TypeError, AttributeError):
+      result.append(x.first)
+    x = x.rest
+  return " ".join(result)
+
+def write(x):
+  result = []
+  while isinstance(x, w_Seq):
+    result.append(x.first)
+    x = x.rest
+  return " ".join(result)
+
+
 def nu_vau(name, *args, **kwargs):
   def decorator(fn):
     fn.__name__ = name
@@ -102,121 +120,75 @@ def nu_lambda(name, *args, **kwargs):
 ##############################################################################
 #  Exceptions
 ##############################################################################
-class w_BaseError(Exception):
-  def __init__(self, message):
-    self.message = message
+## Used anytime something is raised
+class w_Thrown(Exception):
+  def __init__(self, value):
+    self.value = value
   def __str__(self):
-    return "error: {}".format(self.message)
-
-class w_SyntaxError(w_BaseError, SyntaxError):
-  def __init__(self, message, s, line=None, column=None, text=None, filename=None):
-    self.msg      = message
-    self.lineno   = line     or s.line
-    self.offset   = column   or s.column
-    self.text     = text     or (None if s.seen.isspace() else s.seen)
-    self.filename = filename or s.filename
-  def __str__(self):
-    x = "error: {!s} (line {}, column {})".format(self.msg,
-                                                  self.lineno,
-                                                  self.offset)
-    if self.text:
-      x += ":\n  {}\n {}{}".format(self.text, " " * self.offset, "^")
-    return x
-
-class w_VariableError(w_BaseError):
-  def __init__(self, name):
-    self.name = name
-  def __str__(self):
-    return "error: {} is undefined".format(self.name)
-
-class w_TypeError(w_BaseError):
-  def __init__(self, expected, got):
-    self.expected = expected
-    self.got      = got
-  def __str__(self):
-    return "error: expected something of type {} but instead got {}".format(self.expected, self.got)
-
-class w_PatternFail(w_BaseError):
-  def __init__(self, pat, args):
-    self.pattern   = pat
-    self.arguments = args
-  def __str__(self):
-    return "error: pattern {} failed to match {}".format(self.pattern, self.arguments)
+    if isinstance(self.value, w_Error):
+      return str(self.value)
+    else:
+      return "thrown: {}".format(self.value)
 
 ##############################################################################
 #  Types
 ##############################################################################
-class w_Stream(object):
-  def __init__(self, next, name=""):
-    self._next      = next #iter(iterable)
-    self._empty     = False
-    self._at_start  = True
-    self.filename   = name
-    self.old_indent = 0
-    self.indent     = 0
-    self.line       = 1
-    self.column     = 0
-    self.seen       = ""
-    self.isatty     = False
-    try:
-      self._peeked = self._next()
-    except StopIteration:
-      self._empty = True
+class w_Type(object):
+  def __init__(self, args):
+    self.args = args
+  def __str__(self):
+    return "(&type {})".format(self.__name__)
 
-  def peek(self):
-    if self._empty:
-      raise StopIteration
-    else:
-      return self._peeked
+## Base type for errors
+class w_Error(w_Type):
+  def __str__(self):
+    return "error: {}".format(pr(self.args))
 
-  def read(self):
-    if self._empty:
-      raise StopIteration
-    else:
-      old = self._peeked
-      if old == "\n":
-        self._at_start  = True
-        self.old_indent = self.indent
-        self.indent     = 0
-        self.line      += 1
-        self.column     = 0
-        self.seen       = ""
-      else:
-        if old in " \t":
-          if self._at_start:
-            self.indent += 1
-        else:
-          self._at_start = False
-        self.column += 1
-        self.seen += old
-      try:
-        self._peeked = self._next()
-      except StopIteration:
-        self._empty = True
-      return old
+## This is never caught in nu_types.py
+class w_SyntaxError(w_Error):
+  def __init__(self, message, s, line=None, column=None, text=None, filename=None):
+    self.args = list_to_seq([message,
+                             filename or s.filename,
+                             line     or s.line,
+                             column   or s.column,
+                             text     or (None if s.seen.isspace() else s.seen)])
+  def __str__(self):
+    msg, filename, line, column, text = self.args
+    x = "error: {!s} (file {}, line {}, column {})".format(msg, filename, line, column)
+    if text:
+      x += ":\n  {}\n {}{}".format(text, " " * column, "^")
+    return x
 
-  def empty(self):
-    return self._empty
+## This is never caught in nu_types.py
+class w_UndefinedError(w_Error):
+  def __init__(self, name):
+    self.args = w_Seq(name, w_nil)
+  def __str__(self):
+    return "error: {} is undefined".format(self.args.first)
 
-  next = read
-  def __iter__(self):
-    return self
+## This is never caught in nu_types.py
+class w_TypeError(w_Error):
+  def __init__(self, expected, got):
+    self.args = w_Seq(expected, w_Seq(got, w_nil))
+  def __str__(self):
+    expect, got = self.args
+    return "error: expected something of type {} but instead got {}".format(expect, got)
 
-class w_InputStream(w_Stream):
-  def __init__(self, f):
-    def wrapped():
-      x = f.read(1)
-      if x == "":
-        raise StopIteration
-      else:
-        return x
-    w_Stream.__init__(self, wrapped, name=f.name)
-    self.isatty = f.isatty()
+## This is never caught in nu_types.py
+class w_PatternFail(w_Error):
+  def __init__(self, pat, args):
+    self.args = w_Seq(pat, w_Seq(args, w_nil))
+  def __str__(self):
+    pat, args = self.args
+    return "error: pattern {} failed to match {}".format(pat, args)
+
 
 ## Generic stuff for chars, symbols, numbers, etc.
 class w_Base(object):
-  def __init__(self, value):
-    self.value = value
+  def __init__(self, value, line=None, column=None):
+    self.value  = value
+    self.line   = line
+    self.column = column
   def __str__(self):
     return str(self.value)
   def __repr__(self):
@@ -233,8 +205,10 @@ class w_Base(object):
     return str(self)
 
 class w_Number(w_Base):
-  def __init__(self, value):
-    self.value = float(value)
+  def __init__(self, value, line=None, column=None):
+    self.value  = float(value)
+    self.line   = line
+    self.column = column
   def __str__(self):
     return "{:g}".format(self.value)
   def __repr__(self):
@@ -508,7 +482,7 @@ class w_TopEnv(w_Env):
     try:
       return self.variables[name]
     except KeyError:
-      raise w_VariableError(name)
+      raise w_UndefinedError(name)
 
 class w_Vau(object):
   def __init__(self, closure, env, args, body):
@@ -599,6 +573,14 @@ def w_arrow(env, args, body):
 #    x.rest = x.rest.first #eval_(env, )
 #    return eval_(env, args)
 
+@nu_lambda("add", "X", "Y")
+def w_add(env, x, y):
+  #try:
+  return w_Number(x + y)
+  #return w_Number(sum(args))
+  #except (TypeError, AttributeError):
+  #  return w_false
+
 @nu_lambda("apply", "F", rest="Args")
 def w_apply(env, f, rest):
   if rest == w_nil:
@@ -617,6 +599,42 @@ def w_apply(env, f, rest):
     #print args
     return eval_(env, w_Seq(f, args))
 
+@nu_lambda("div", rest="Args")
+def w_div(env, args):
+  return w_Number(reduce(lambda x, y: x / y, args))
+
+@nu_lambda("gt?", "X", "Y")
+def w_gt(env, x, y):
+  if x > y:
+    return w_true
+  else:
+    return w_false
+
+@nu_lambda("gte?", "X", "Y")
+def w_gte(env, x, y):
+  if x >= y:
+    return w_true
+  else:
+    return w_false
+
+@nu_lambda("lt?", "X", "Y")
+def w_lt(env, x, y):
+  if x < y:
+    return w_true
+  else:
+    return w_false
+
+@nu_lambda("lte?", "X", "Y")
+def w_lte(env, x, y):
+  if x <= y:
+    return w_true
+  else:
+    return w_false
+
+@nu_lambda("mul", rest="Args")
+def w_mul(env, args):
+  return w_Number(reduce(lambda x, y: x * y, args))
+
 @nu_lambda("seq", rest="Args")
 def w_seq(env, args):
   return args
@@ -625,7 +643,15 @@ def w_seq(env, args):
 def w_string(env, args):
   return join_string(args)
 
-@nu_lambda("&tilde")
+@nu_lambda("sub", rest="Args")
+def w_sub(env, args):
+  if args.rest == w_nil:
+    return w_Number(-args.first)
+  else:
+    return w_Number(reduce(lambda x, y: x - y, args))
+
+# TODO better name than %tilde
+@nu_lambda("%tilde")
 def w_tilde(env):
   return w_true
 
@@ -649,21 +675,12 @@ def w_assignd(env, x, y):
 
 @nu_lambda("pr!", rest="Args")
 def w_pr(env, args):
-  x = args
-  while isinstance(x, w_Seq):
-    try:
-      print x.first.tostring(),
-    except (TypeError, AttributeError):
-      print x.first,
-    x = x.rest
+  sys.stdout.write(pr(args))
   return args.first
 
 @nu_lambda("write!", rest="Args")
 def w_write(env, args):
-  x = args
-  while isinstance(x, w_Seq):
-    print x.first,
-    x = x.rest
+  sys.stdout.write(write(args))
   return args.first
 
 # Predicates
@@ -701,6 +718,28 @@ def w_assign(env, x, y):
     return y
   raise w_MutationError(x)
 
+@nu_vau("$catch", "X", rest="Fns")
+def w_catch(env, x, fns):
+  try:
+    # If nothing is thrown, it returns the first argument
+    return eval_(env, x)
+  # But if something is thrown...
+  except w_Thrown as e1:
+    try:
+      # ...call all the fns, left-to-right, with the thrown value
+      return call_all(fns, e1.value)
+    except w_Thrown as e2:
+      # If all of the fn's patterns fail...
+      if isinstance(e2.value, w_PatternFail):
+        # ...it's an error, re-raise it
+        if isinstance(e1.value, w_Error):
+          raise e1
+        # ...otherwise, return the first item
+        else:
+          return e1.value
+      else:
+        raise e2
+
 @nu_vau("$if", rest="Args")
 def w_if(env, args):
   try:
@@ -717,17 +756,6 @@ def w_vau(env, e, args, body):
   return w_Vau(env, e, args, body)
 
 # Fns
-@nu_lambda("add", rest="Args")
-def w_add(env, args):
-  #try:
-  return w_Number(sum(args))
-  #except (TypeError, AttributeError):
-  #  return w_false
-
-@nu_lambda("error", rest="Args")
-def w_error(env, args):
-  raise w_BaseError(join_string(args).tostring())
-
 @nu_lambda("eval", rest="Args")
 def w_eval(env, args):
   if args.rest == w_nil:
@@ -737,9 +765,10 @@ def w_eval(env, args):
   else:
     raise w_PatternFail(seq("Env", "X"), args)
 
-@nu_lambda("mul", rest="Args")
-def w_mul(env, args):
-  return w_Number(reduce(lambda x, y: x * y, args))
+@nu_lambda("throw", "X")
+def w_throw(env, x):
+  #join_string(args).tostring()
+  raise w_Thrown(x)
 
 @nu_lambda("uniq")
 def w_uniq(env):
@@ -750,7 +779,7 @@ def w_unwrap(env, x):
   if isinstance(x, w_Wrapped):
     return x.wrapped
   else:
-    raise w_TypeError("fn", x)
+    raise w_TypeError(w_arrow, x)
 
 @nu_lambda("wrap", "X")
 def w_wrap(env, x):
@@ -759,9 +788,18 @@ def w_wrap(env, x):
 top_env = w_TopEnv({
   # Syntax
   "$fn"      : w_arrow,
+  "add"      : w_add,
   "apply"    : w_apply,
+  "div"      : w_div,
+  "gt?"      : w_gt,
+  "gte?"     : w_gte,
+  "lt?"      : w_lt,
+  "lte?"     : w_lte,
+  "mul"      : w_mul,
   "seq"      : w_seq,
   "str"      : w_string,
+  "sub"      : w_sub,
+  "%tilde"   : w_tilde,
 
   # Constants
   "%t"       : w_true,
@@ -780,14 +818,15 @@ top_env = w_TopEnv({
 
   # Vaus
   "$assign"  : w_assign,
+  "$catch"   : w_catch,
   "$if"      : w_if,
   "$vau"     : w_vau,
 
   # Fns
-  "add"      : w_add,
-  "error"    : w_error,
+  #"error"    : w_error,
+  #"error?"   : w_errorp,
   "eval"     : w_eval,
-  "mul"      : w_mul,
+  "throw"    : w_throw,
   "uniq"     : w_uniq,
   "unwrap"   : w_unwrap,
   "wrap"     : w_wrap,

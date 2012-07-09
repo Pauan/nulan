@@ -2,27 +2,19 @@
 >>> import nu_types
 
 >>> def read(x):
-...   print nu_reader.readstring(x).pretty()
+...   print nu_reader.read(x).pretty()
 
 >>> def write(x):
-...   print repr(nu_reader.readstring(x))
+...   print repr(nu_reader.read(x))
 
 >>> def write_all(x):
-...   result = []
-...   x = nu_types.w_Stream(iter(x).next)
-...   while 1:
-...     y = nu_reader.read(x)
-...     if y == nu_reader.w_eof:
-...       break
-...     else:
-...       result.append(y)
-...   for x in result:
+...   for x in nu_reader.read_all(x):
 ...     print repr(x)
 
 >>> def error(f, x):
 ...   try:
 ...     return f(x)
-...   except nu_types.w_BaseError as e:
+...   except nu_types.w_Thrown as e:
 ...     print e
 
 ##############################################################################
