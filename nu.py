@@ -5,8 +5,7 @@ sys.dont_write_bytecode = True
 
 from nu_reader import *
 
-#reader = read(sys.stdin)
-reader = None
+reader = read_all(sys.stdin)
 
 def repl(prompt="=> "):
   try:
@@ -33,6 +32,6 @@ def load_file_in(env, name):
 
 if __name__ == "__main__":
   import doctest
-  #doctest.testfile("tests/nu_reader.py")
+  doctest.testfile("tests/nu_reader.py")
   #doctest.testfile("tests/TEMP.py")
   #repl()

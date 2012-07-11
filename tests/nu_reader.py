@@ -1,15 +1,19 @@
 >>> import nu_reader
 >>> import nu_types
+>>> import sys
 
 >>> def read(x):
-...   print nu_reader.read(x).pretty()
+...   print nu_reader.read1(x).pretty()
 
 >>> def write(x):
-...   print repr(nu_reader.read(x))
+...   print repr(nu_reader.read1(x))
 
 >>> def write_all(x):
+...   o = sys.stderr
+...   sys.stderr = sys.stdout
 ...   for x in nu_reader.read_all(x):
 ...     print repr(x)
+...   sys.stderr = o
 
 >>> def error(f, x):
 ...   try:
@@ -127,7 +131,7 @@ error: a is not valid hexadecimal (line 1, column 7):
 "foo\nbar"
 
 
->>> write(r'"foo@bar\nqux"')
+>>> error(write, r'"foo@bar\nqux"')
 [(&fn str) (&char f) (&char o) (&char o) (&symbol bar) (&char \n) (&char q) (&char u) (&char x)]
 
 >>> write('"foo@barqux"')
@@ -345,59 +349,72 @@ error: invalid character . (line 1, column 7):
 #  Infix Math
 ##############################################################################
 >>> write("+100")
-[(&fn &add) (&number 100)]
+[(&fn add) (&number 100)]
 
 >>> write("-100")
-[(&fn &sub) (&number 100)]
+[(&fn sub) (&number 100)]
 
 
 >>> write("+100.50")
-[(&fn &add) (&number 100.5)]
+[(&fn add) (&number 100.5)]
 
 >>> write("-100.50")
-[(&fn &sub) (&number 100.5)]
+[(&fn sub) (&number 100.5)]
 
 
 >>> write("100 + 200")
-[(&fn &add) (&number 100) (&number 200)]
+[(&fn add) (&number 100) (&number 200)]
 
 >>> write("100 - 200")
-[(&fn &sub) (&number 100) (&number 200)]
+[(&fn sub) (&number 100) (&number 200)]
 
 >>> write("100 * 200")
-[(&fn &mul) (&number 100) (&number 200)]
+[(&fn mul) (&number 100) (&number 200)]
 
 >>> write("100 / 200")
-[(&fn &div) (&number 100) (&number 200)]
+[(&fn div) (&number 100) (&number 200)]
 
+
+>>> write("(100 +)")
+u
 
 >>> write("(100 + 200 * 300)")
-[(&fn &add) (&number 100) [(&fn &mul) (&number 200) (&number 300)]]
+[(&fn add) (&number 100) [(&fn mul) (&number 200) (&number 300)]]
 
 >>> write("(100 * 200 + 300)")
-[(&fn &add) [(&fn &mul) (&number 100) (&number 200)] (&number 300)]u
+[(&fn add) [(&fn mul) (&number 100) (&number 200)] (&number 300)]
 
 >>> write("((100 + 200) * 300)")
-[(&fn &mul) [(&fn &add) (&number 100) (&number 200)] (&number 300)]
+[(&fn mul) [(&fn add) (&number 100) (&number 200)] (&number 300)]
+
+
+>>> write("[100 + 200 * 300]")
+[(&fn seq) (&fn add) (&number 100) [(&fn seq) (&fn mul) (&number 200) (&number 300)]]
+
+>>> write("[100 * 200 + 300]")
+[(&fn seq) (&fn add) [(&fn seq) (&fn mul) (&number 100) (&number 200)] (&number 300)]
+
+>>> write("[[100 + 200] * 300]")
+[(&fn seq) (&fn mul) [(&fn seq) (&fn add) (&number 100) (&number 200)] (&number 300)]
 
 
 >>> write("100 + 200 * 300")
-[(&fn &add) (&number 100) [(&fn &mul) (&number 200) (&number 300)]]
+[(&fn add) (&number 100) [(&fn mul) (&number 200) (&number 300)]]
 
 >>> write("(100 + 200) * 300")
-[(&fn &mul) (&number 300) [(&fn &add) (&number 100) (&number 200)]]
+[(&fn mul) [(&fn add) (&number 100) (&number 200)] (&number 300)]
 
 >>> write("100 + 200 - 300")
-[(&fn &sub) [(&fn &add) (&number 100) (&number 200)] (&number 300)]
+[(&fn sub) [(&fn add) (&number 100) (&number 200)] (&number 300)]
 
 >>> write("100 + (200 - 300)")
-[(&fn &add) (&number 100) [(&fn &sub) (&number 200) (&number 300)]]
+[(&fn add) (&number 100) [(&fn sub) (&number 200) (&number 300)]]
 
 >>> write("100 * 200 / 300")
-[(&fn &div) [(&fn &mul) (&number 100) (&number 200)] (&number 300)]
+[(&fn div) [(&fn mul) (&number 100) (&number 200)] (&number 300)]
 
 >>> write("100 * (200 / 300)")
-[(&fn &mul) (&number 100) [(&fn &div) (&number 200) (&number 300)]]
+[(&fn mul) (&number 100) [(&fn div) (&number 200) (&number 300)]]
 
 ##############################################################################
 #  Bar

@@ -1,9 +1,11 @@
+import sys
+
 ##############################################################################
 #  Helpers
 ##############################################################################
 def eval_(env, x):
   # TODO
-  if isinstance(x, (w_Symbol, w_Uniq)):
+  if isinstance(x, (w_Sym, w_Uniq)):
     return env[x]
   elif isinstance(x, w_Seq):
     return eval_(env, x.first)(env, x.rest)
@@ -20,15 +22,15 @@ def seq(*args, **kwargs):
   try:
     top = r = w_Seq(args[0], w_nil)
     for x in args[1:]:
-      r.rest = w_Seq(w_Symbol(x), w_nil)
+      r.rest = w_Seq(w_Sym(x), w_nil)
       r = r.rest
     try:
-      r.rest = w_Symbol(kwargs["rest"])
+      r.rest = w_Sym(kwargs["rest"])
     except KeyError:
       pass
   except IndexError:
     try:
-      return w_Symbol(kwargs["rest"])
+      return w_Sym(kwargs["rest"])
     except KeyError:
       return w_nil
   return top
@@ -76,7 +78,7 @@ def pattern_match(base, pattern, args):
         a = a.rest
       return rec(p, a)
     # TODO
-    elif isinstance(p, (w_Symbol, w_Uniq)):
+    elif isinstance(p, (w_Sym, w_Uniq)):
       base(p, a)
     elif p == w_tilde:
       return
@@ -147,14 +149,18 @@ class w_Error(w_Type):
 ## This is never caught in nu_types.py
 class w_SyntaxError(w_Error):
   def __init__(self, message, s, line=None, column=None, text=None, filename=None):
+    seen = "".join(s.seen)
     self.args = list_to_seq([message,
                              filename or s.filename,
                              line     or s.line,
                              column   or s.column,
-                             text     or (None if s.seen.isspace() else s.seen)])
+                             text     or (None if seen.isspace() else seen)])
   def __str__(self):
     msg, filename, line, column, text = self.args
-    x = "error: {!s} (file {}, line {}, column {})".format(msg, filename, line, column)
+    x = "error: {!s} (".format(msg)
+    if filename:
+      x += "file {}, ".format(filename)
+    x += "line {}, column {})".format(line, column)
     if text:
       x += ":\n  {}\n {}{}".format(text, " " * column, "^")
     return x
@@ -241,7 +247,7 @@ class w_Char(w_Base):
   #           x.rest == w_nil and
   #           x.first == self))
 
-class w_Symbol(w_Base):
+class w_Sym(w_Base):
   def __repr__(self):
     return "(&symbol {})".format(self.value)
 
@@ -329,13 +335,13 @@ class w_Seq(w_Nil):
       x = x.rest
       if x == w_nil:
         return "[]"
-    elif x.first == w_string:
+    elif x.first == w_str:
       braces = "[]"
       x = x.rest
     elif x.first == w_arrow:
       #x = x.rest
-      #x = x.first.rest.join(w_Seq(w_Symbol("->"), x.rest))
-      x.first = w_Symbol("$fn")
+      #x = x.first.rest.join(w_Seq(w_Sym("->"), x.rest))
+      x.first = w_Sym("$fn")
     elif x.first == w_apply:
       x = x.rest
       if x.first == w_seq:
@@ -385,12 +391,12 @@ class w_Seq(w_Nil):
 #    braces   = "[]"
 
 #    if (x.first == w_seq or
-#        x.first == w_string):
+#        x.first == w_str):
 #      #braces = "[]"
 #      x = x.rest
 #    elif x.first == w_arrow:
 #      x = x.rest
-#      x = x.first.rest.join(w_Seq(w_Symbol("->"), x.rest))
+#      x = x.first.rest.join(w_Seq(w_Sym("->"), x.rest))
 #    elif x.first == w_apply:
 #      x = x.rest
 #      if x.first == w_seq:
@@ -640,7 +646,7 @@ def w_seq(env, args):
   return args
 
 @nu_lambda("str", rest="Args")
-def w_string(env, args):
+def w_str(env, args):
   return join_string(args)
 
 @nu_lambda("sub", rest="Args")
@@ -662,8 +668,8 @@ def w_tilde(env):
 #(e, args, *body) = destructure(args, "Env", "Args", rest="Body")
 
 # Constants
-w_true  = w_Symbol("%t")
-w_false = w_Symbol("%f")
+w_true  = w_Sym("%t")
+w_false = w_Sym("%f")
 w_eof   = w_Uniq("%eof")
 
 # Non-referentially transparent
@@ -759,7 +765,7 @@ def w_vau(env, e, args, body):
 @nu_lambda("eval", rest="Args")
 def w_eval(env, args):
   if args.rest == w_nil:
-    return eval_(eval_(env, w_Symbol("%Env")), args.first)
+    return eval_(eval_(env, w_Sym("%Env")), args.first)
   elif args.rest.rest == w_nil:
     return eval_(eval_(env, args.first), args.rest.first)
   else:
@@ -797,7 +803,7 @@ top_env = w_TopEnv({
   "lte?"     : w_lte,
   "mul"      : w_mul,
   "seq"      : w_seq,
-  "str"      : w_string,
+  "str"      : w_str,
   "sub"      : w_sub,
   "%tilde"   : w_tilde,
 
