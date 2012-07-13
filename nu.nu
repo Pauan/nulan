@@ -154,6 +154,8 @@ sum1 (F (F (F 0 1) 2) 3) F
 |#
 
 
+"foobar@(X \n) foo"
+
 # Called foldr/rreduce in other languages.
 #
 # Takes 2 to 3 arguments:
@@ -200,11 +202,24 @@ $def rev; X ->
 
 #|
 
+# mapreduce
 $def sumeach
   I []      ~ ~ -> I
   I [X]     F ~ -> (F X)
   I [@L @R] F G -> G: sumeach I L F G
                       sumeach I R F G
+
+# map
+$def each
+  X F -> sumeach [] X F tree
+
+$def id: X -> X
+#$def copy: X -> each X id
+
+# reduce
+$def sum
+  I X F -> sumeach I X id F
+
 
 $def first
   []      -> []
@@ -314,15 +329,11 @@ $def iso?
   [X @R1] [Y @R2] -> $and; iso? X Y; iso? R1 R2
 
 
-$def id:   X -> X
-$def copy: X -> each X id
-
-
-$def prn! ; @Args ->
+$def prn!; @Args ->
   pr! @Args
   pr! "\n"
 
-$def writen! ; @Args ->
+$def writen!; @Args ->
   write! @Args
   pr! "\n"
 
@@ -343,7 +354,7 @@ $defvau $if-error; [X Y @R] ->
            [fn [seq: error ~] Y]
            @(joinr R [$fn [seq U] U])]
 
-$defvau $def-if! ; Name Test @Fns ->
+$defvau $def-if!; Name Test @Fns ->
   $lets: Orig:  eval Name
          Test:  eval Test
          F;     $fn Args

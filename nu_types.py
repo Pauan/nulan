@@ -157,12 +157,16 @@ class w_SyntaxError(w_Error):
                              text     or (None if seen.isspace() else seen)])
   def __str__(self):
     msg, filename, line, column, text = self.args
-    x = "error: {!s} (".format(msg)
+    x = "error: {!s}\n  ".format(msg)
+    if text:
+      x += "{}  ".format(text)
     if filename:
-      x += "file {}, ".format(filename)
+      x += "(file {}, ".format(filename)
+    else:
+      x += "("
     x += "line {}, column {})".format(line, column)
     if text:
-      x += ":\n  {}\n {}{}".format(text, " " * column, "^")
+      x += "\n {}{}".format(" " * column, "^")
     return x
 
 ## This is never caught in nu_types.py
@@ -469,6 +473,10 @@ class w_Seq(w_Nil):
         raise TypeError("cannot convert {} to a string".format(repr(self)))
     return "".join(result)
 
+class w_Tree(object):
+  def __init__(self, *args):
+    self.children = args
+
 class w_Env(object):
   def __init__(self, parent):
     self.variables = {}
@@ -560,6 +568,10 @@ class w_Wrapped(object):
   def __call__(self, env, args):
     return self.wrapped(env, args.mappair(lambda x: eval_(env, x)))
 
+class w_Splice(object):
+  def __init__(self, value):
+    self.value = value
+
 ##############################################################################
 #  Syntax
 ##############################################################################
@@ -604,6 +616,10 @@ def w_apply(env, f, rest):
     f = w_unwrap(env, w_Seq(f, w_nil))
     #print args
     return eval_(env, w_Seq(f, args))
+
+@nu_lambda("dict", rest="Args")
+def w_dict(env, args):
+  return args
 
 @nu_lambda("div", rest="Args")
 def w_div(env, args):
@@ -690,12 +706,12 @@ def w_write(env, args):
   return args.first
 
 # Predicates
-@nu_lambda("fn?", "X")
-def w_fnq(env, x):
-  if isinstance(x, w_Wrapped):
-    return x
-  else:
-    return w_false
+#@nu_lambda("fn?", "X")
+#def w_fnq(env, x):
+#  if isinstance(x, w_Wrapped):
+#    return x
+#  else:
+#    return w_false
 
 @nu_lambda("is?", rest="Args")
 def w_is(env, args):
@@ -706,12 +722,19 @@ def w_is(env, args):
       return w_false
     args = args.rest
 
-@nu_lambda("vau?", "X")
-def w_vauq(env, x):
-  if isinstance(x, w_Vau):
+@nu_lambda("splice?", "X")
+def w_spliceq(env, x):
+  if isinstance(x, w_Spliced):
     return x
   else:
     return w_false
+
+#@nu_lambda("vau?", "X")
+#def w_vauq(env, x):
+#  if isinstance(x, w_Vau):
+#    return x
+#  else:
+#    return w_false
 
 # Vaus
 @nu_vau("$assign", "Name", "X")
@@ -771,6 +794,10 @@ def w_eval(env, args):
   else:
     raise w_PatternFail(seq("Env", "X"), args)
 
+@nu_lambda("splice", "X")
+def w_splice(env, x):
+  return w_Splice(x)
+
 @nu_lambda("throw", "X")
 def w_throw(env, x):
   #join_string(args).tostring()
@@ -796,6 +823,7 @@ top_env = w_TopEnv({
   "$fn"      : w_arrow,
   "add"      : w_add,
   "apply"    : w_apply,
+  "dict"     : w_dict,
   "div"      : w_div,
   "gt?"      : w_gt,
   "gte?"     : w_gte,
@@ -818,9 +846,10 @@ top_env = w_TopEnv({
   "write!"   : w_write,
 
   # Predicates
-  "fn?"      : w_fnq,
+  #"fn?"      : w_fnq,
   "is?"      : w_is,
-  "vau?"     : w_vauq,
+  #"vau?"     : w_vauq,
+  "splice?"  : w_spliceq,
 
   # Vaus
   "$assign"  : w_assign,
@@ -832,6 +861,7 @@ top_env = w_TopEnv({
   #"error"    : w_error,
   #"error?"   : w_errorp,
   "eval"     : w_eval,
+  "splice"   : w_splice,
   "throw"    : w_throw,
   "uniq"     : w_uniq,
   "unwrap"   : w_unwrap,

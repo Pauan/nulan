@@ -6,11 +6,13 @@ def from_hex(args):
 def to_hex(x):
   return "{:0=4X}".format(x)
 
+
 char_white = " \n"
 char_num   = "0123456789"
 char_lower = "abcdefghijklmnopqrstuvwxyz"
 char_upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-char_sym   = char_num + char_lower + char_upper + "-$%!?"
+char_sym   = char_num + char_lower + char_upper + "$%!?&" + "+-*/<>="
+
 
 class IterBuffer(object):
   def __init__(self, f):
@@ -77,17 +79,6 @@ class IOBuffer(CharBuffer):
       CharBuffer.__init__(self, f)
 
 
-
-def transform_colons(xs, fn, line, column, last=None):
-  def f(x, y):
-    if x == w_nil:
-      x = fn(y, line, column)
-      return last(x) if last else x
-    else:
-      return fn(y.join(w_Seq(x, w_nil)), line, column)
-  return reduce(f, (list_to_seq(x) for x in reversed(xs)), w_nil)
-
-
 class Token(object):
   bind = 0
   def __init__(self, s):
@@ -96,12 +87,17 @@ class Token(object):
   def __str__(self):
     return "Token: {}".format(self.__class__.__name__)
 
+class InfixToken(Token):
+  pass
+
 class EndToken(Token):
   pass
 
 class LiteralToken(Token):
   def __init__(self, value):
     self.value = value
+  def __str__(self):
+    return str(self.value)
   def nud(self, s):
     return self.value
 
@@ -117,52 +113,34 @@ def led_pre(pre, bind=None):
     return w_Seq(pre, w_Seq(left, w_Seq(parse(s, b), w_nil)))
   return f
 
-def parse_until(end_token, colon=None):
+def parse_until(end_token):
   def decorator(fn):
     def wrapped(self, s):
-      def f(self, fn, s, on_colon=None):
-        result = []
-        while 1:
-          c = s.current
-          if isinstance(c, end_token):
-            break
-          #elif isinstance(c, EndToken):
-          #  raise w_Thrown(w_SyntaxError("missing ending {}".format(bracket), s))
-          elif isinstance(c, BarToken):
-            s.next()
-            x = f(self, lambda x, s: x, s, on_colon=fn)
-            print x, x.rest
-            result += x
-            return w_Seq(w_apply, fn(list_to_seq(result), s))
-          elif isinstance(c, ColonToken):
-            s.next()
-            result.append(f(self, fn, s, on_colon=colon))
-          elif isinstance(c, SemicolonToken):
-            break
-          else:
-            expr = parse(s)
-            if expr == w_arrow:
-              result = [w_arrow, w_Seq(w_seq, list_to_seq(result))]
-            else:
-              result.append(expr)
-        if on_colon:
-          return on_colon(list_to_seq(result), s)
+      result = []
+      while 1:
+        c = s.current
+        if isinstance(c, end_token):
+          break
         else:
-          return fn(list_to_seq(result), s)
-      x = f(self, fn, s)
+          expr = parse(s)
+          if expr == w_arrow:
+            result = [w_arrow, w_Seq(w_seq, list_to_seq(result))]
+          else:
+            result.append(expr)
       s.next()
-      return x
+      return fn(list_to_seq(result), s)
     return wrapped
   return decorator
 
-def unwrap_if(*pre):
+def unwrap_if(typ):
+  infix = [w_mul, w_div, w_add, w_sub, w_lt, w_gt, w_lte, w_gte, w_is]
   def decorator(fn):
     def wrapped(x, s):
       if x == w_nil:
         return x
       elif x.rest == w_nil:
         try:
-          if x.first.first in pre:
+          if x.first.first in infix:
             return fn(x.first, s)
         except AttributeError:
           pass
@@ -172,31 +150,44 @@ def unwrap_if(*pre):
 
 
 class EOFToken(EndToken):
-  pass
+  def nud(self, s):
+    return w_eof
 
 class DedentToken(EndToken):
-  pass
+  def __str__(self):
+    return "<DE>"
+  def nud(self, s):
+    return parse(s)
 
 class EndRoundToken(EndToken):
-  pass
+  def __str__(self):
+    return ")"
 
 class EndSquareToken(EndToken):
-  pass
+  def __str__(self):
+    return "]"
 
-#class BarToken(Token):
-#  pass
+class EndCurlyToken(EndToken):
+  def __str__(self):
+    return "}"
 
-#class ColonToken(Token):
-#  pass
 
-#class SemicolonToken(Token):
-#  pass
+class SpliceToken(Token):
+  def __str__(self):
+    return "@"
+  def nud(self, s):
+    return w_Seq(w_splice, w_Seq(parse(s), w_nil))
 
 
 class IndentToken(Token):
-  @parse_until(DedentToken, colon=lambda x, s: x) #, "deindentation"
+  def __str__(self):
+    return "<IN>"
+  @parse_until(DedentToken)
   def nud(x, s):
     if x == w_nil:
+      #if isinstance(s.current, EndToken):
+      #  return x
+      #else:
       return parse(s)
     elif x.rest == w_nil:
       return x.first
@@ -204,52 +195,66 @@ class IndentToken(Token):
       return x
 
 class RoundToken(Token):
-  @parse_until(EndRoundToken) #, ") bracket"
-  @unwrap_if(w_add, w_sub, w_mul, w_div)
+  def __str__(self):
+    return "("
+  @parse_until(EndRoundToken)
+  @unwrap_if(InfixToken)
   def nud(x, s):
-    #print repr(x)
     return x
 
 class SquareToken(Token):
-  @parse_until(EndSquareToken) #, "] bracket"
-  @unwrap_if(w_add, w_sub, w_mul, w_div)
+  def __str__(self):
+    return "["
+  @parse_until(EndSquareToken)
+  @unwrap_if(InfixToken)
   def nud(x, s):
     return w_Seq(w_seq, x)
 
+class CurlyToken(Token):
+  def __str__(self):
+    return "{"
+  @parse_until(EndCurlyToken)
+  def nud(x, s):
+    return w_Seq(w_dict, x)
 
-class MulToken(Token):
-  bind = 30
+
+class MulToken(InfixToken):
+  bind = 40
   led  = led_pre(w_mul)
 
-class DivToken(Token):
-  bind = 30
+class DivToken(InfixToken):
+  bind = 40
   led  = led_pre(w_div)
 
-class AddToken(Token):
-  bind = 20
-  nud  = nud_pre(w_add, 40)
+class AddToken(InfixToken):
+  bind = 30
+  nud  = nud_pre(w_add, 50)
   led  = led_pre(w_add)
 
-class SubToken(Token):
-  bind = 20
-  nud  = nud_pre(w_sub, 40)
+class SubToken(InfixToken):
+  bind = 30
+  nud  = nud_pre(w_sub, 50)
   led  = led_pre(w_sub)
 
-class LtToken(Token):
-  bind = 10
+class LtToken(InfixToken):
+  bind = 20
   led  = led_pre(w_lt)
 
-class LteToken(Token):
-  bind = 10
+class LteToken(InfixToken):
+  bind = 20
   led  = led_pre(w_lte)
 
-class GtToken(Token):
-  bind = 10
+class GtToken(InfixToken):
+  bind = 20
   led  = led_pre(w_gt)
 
-class GteToken(Token):
-  bind = 10
+class GteToken(InfixToken):
+  bind = 20
   led  = led_pre(w_gte)
+
+class EqualToken(InfixToken):
+  bind = 10
+  led  = led_pre(w_is)
 
 
 ## Pratt's Top Down Operator Precedence Parser.
@@ -260,6 +265,7 @@ def parse(s, bind=0):
   while bind < s.current.bind:
     left = s.next().led(left, s)
   return left
+
 
 def parse_string(fn):
   def wrapped(q, s):
@@ -334,7 +340,6 @@ def parse_back_quotes(result, s, info):
 ##  #\|[\s\S]*?\|#
 ##  #.*
 def parse_comment(s):
-  s.next()
   if s.current == "|":
     try:
       while 1:
@@ -343,7 +348,6 @@ def parse_comment(s):
         if c == "#":
           s.next()
           if s.current == "|":
-            s.next()
             parse_comment(s)
         elif c == "|":
           s.next()
@@ -397,19 +401,24 @@ def find_indent(s):
 
 def tokenize(s, indent=True, one=False):
   def f(s, one, stop):
-    braces  = []
-    indents = []
-    colon_seen    = False
+    braces     = []
+    indents    = []
+    colons     = []
+    semicolons = []
+    on_end     = None
+    #indent_seen = True
     if indent:
-      new = find_indent(s)
-      stop           = False
-      colon_seen     = False
+      new    = find_indent(s)
+      on_end = IndentToken
+      stop   = False
+      braces.append((IndentToken, DedentToken))
       yield IndentToken(s)
       indents.append(new)
+    c = s.current
     try:
       while 1:
-        c = s.current
         if c == "#":
+          s.next()
           parse_comment(s)
         elif c == " ":
           s.next()
@@ -418,164 +427,268 @@ def tokenize(s, indent=True, one=False):
           if s.current == "\n" and s.isatty:
             raise StopIteration
           elif indent:
+            if braces[-1][0] != IndentToken:
+              continue
+              #raise w_Thrown(w_SyntaxError("missing parentheses {}".format(b), s))
+            while colons and colons[-1][0] == IndentToken:
+              yield colons.pop()[1](s)
             new = find_indent(s)
-            if new > indents[-1]:
-              stop           = False
-              colon_seen     = False
-              yield IndentToken(s)
-              indents.append(new)
-            else:
-              while indents:
-                if indents.pop() <= new:
+            #print on_end, new, indents
+            if on_end == IndentToken:
+              indents.pop()
+              yield DedentToken(s)
+            if indents:
+              if new <= indents[-1]:
+                while semicolons and semicolons[-1][0] == IndentToken:
+                  yield semicolons.pop()[1](s)
+                while indents and new <= indents[-1]:
+                  indents.pop()
+                  #if on_end and on_end != IndentToken:
+                  #  s.next()
+                  #  print s.line, s.column, s.seen, s.current
+                  #  raise w_Thrown(w_SyntaxError(on_end, s))
+                  b = braces[-1][0]
+                  if b != IndentToken:
+                    raise w_Thrown(w_SyntaxError("missing parentheses {}".format(b), s))
+                  else:
+                    braces.pop()
                   yield DedentToken(s)
-                else:
-                  break
-              stop           = False
-              colon_seen     = False
-              yield IndentToken(s)
-              indents.append(new)
+            #if on_end == IndentToken or (indents and new >= indents[-1]):
+            #on_end = "expected an expression after indentation"
+            #indent_seen = True
+            on_end = IndentToken
+            stop   = False
+            braces.append((IndentToken, DedentToken))
+            yield IndentToken(s)
+            indents.append(new)
         elif c == "<":
-          c = s.next()
-          if c == "=":
-            if not (braces or indents):
-              raise w_Thrown(w_SyntaxError("<= must occur inside parentheses", s))
-            yield LteToken(s)
-            s.next()
-          else:
-            if not (braces or indents):
+          s.next()
+          try:
+            if s.current == "=":
+              if not braces:
+                raise w_Thrown(w_SyntaxError("<= must occur inside parentheses", s))
+              on_end = "expected an expression after <="
+              yield LteToken(s)
+              s.next()
+            else:
+              raise StopIteration
+          except StopIteration:
+            if not braces:
               raise w_Thrown(w_SyntaxError("< must occur inside parentheses", s))
+            on_end = "expected an expression after <"
             yield LtToken(s)
+        elif c == "=":
+          s.next()
+          try:
+            if s.current == ">":
+              if not braces:
+                raise w_Thrown(w_SyntaxError("=> must occur inside parentheses", s))
+              on_end = "expected an expression after =>"
+              yield GteToken(s)
+              s.next()
+            elif s.current == "=":
+              s.next()
+              raise w_Thrown(w_SyntaxError("== is invalid (you probably meant to use =)", s))
+            else:
+              raise StopIteration
+          except StopIteration:
+            if not braces:
+              raise w_Thrown(w_SyntaxError("= must occur inside parentheses", s))
+            on_end = "expected an expression after ="
+            yield EqualToken(s)
         elif c == ">":
-          c = s.next()
-          if c == "=":
-            if not (braces or indents):
-              raise w_Thrown(w_SyntaxError(">= must occur inside parentheses", s))
-            yield GteToken(s)
-            s.next()
-          else:
-            if not (braces or indents):
+          s.next()
+          try:
+            if s.current == "=":
+              s.next()
+              raise w_Thrown(w_SyntaxError(">= is invalid (you probably meant to use =>)", s))
+            else:
+              raise StopIteration
+          except StopIteration:
+            if not braces:
               raise w_Thrown(w_SyntaxError("> must occur inside parentheses", s))
+            on_end = "expected an expression after >"
             yield GtToken(s)
         elif c == "-":
-          c = s.next()
-          if c == ">":
-            if not (braces or indents):
-              raise w_Thrown(w_SyntaxError("-> must occur inside parentheses", s))
-            yield LiteralToken(w_arrow)
-            s.next()
-            if indent:
-              stop          = False
-              colon_seen    = False
+          s.next()
+          try:
+            if s.current == ">":
+              if not braces:
+                raise w_Thrown(w_SyntaxError("-> must occur inside parentheses", s))
+              yield LiteralToken(w_arrow)
+              s.next()
+              #braces.append((IndentToken, DedentToken))
+              on_end = "expected an expression after ->"
+              semicolons.append((IndentToken, DedentToken))
               yield IndentToken(s)
-              indents.append(s.column)
-          else:
-            if not (braces or indents):
+              #colon_seen = True
+              #if indent:
+              #  stop           = False
+              #  semicolon_seen = True
+              #  yield IndentToken(s)
+              #  indents.append(s.column)
+            else:
+              raise StopIteration
+          except StopIteration:
+            if not braces:
               raise w_Thrown(w_SyntaxError("- must occur inside parentheses", s))
+            on_end = "expected an expression after -"
             yield SubToken(s)
         elif c == "\"":
+          on_end = None
           yield LiteralToken(parse_double_quotes(c, s))
           if stop:
             raise StopIteration
-          #yield DoubleQuoteToken(s)
-          #for x in parse_double_quotes(c, s):
-          #  yield LiteralToken(x)
-          #yield DoubleQuoteToken(s)
-          #continue
         elif c == "`":
+          on_end = None
           yield LiteralToken(parse_back_quotes(c, s))
           if stop:
             raise StopIteration
-          #yield BackQuoteToken(s)
-          #for x in parse_back_quotes(c, s):
-          #  yield LiteralToken(x)
-          #yield BackQuoteToken(s)
-          #continue
         elif c in char_num:
+          on_end = None
           yield LiteralToken(parse_number(s))
           if stop:
             raise StopIteration
-        elif c in char_sym:
+                                        # TODO a little hacky
+        elif c in char_sym and not c in "+*/":
+          on_end = None
           yield LiteralToken(parse_symbol(s))
           if stop:
             raise StopIteration
         else:
           s.next()
           if c == "~":
-            yield w_tilde
+            on_end = None
+            yield LiteralToken(w_tilde)
             if stop:
               raise StopIteration
           elif c == "+":
-            if not (braces or indents):
+            if not braces:
               raise w_Thrown(w_SyntaxError("{} must occur inside parentheses".format(c), s))
+            on_end = "expected an expression after +"
             yield AddToken(s)
           elif c == "*":
-            if not (braces or indents):
+            if not braces:
               raise w_Thrown(w_SyntaxError("{} must occur inside parentheses".format(c), s))
+            on_end = "expected an expression after *"
             yield MulToken(s)
           elif c == "/":
-            if not (braces or indents):
+            if not braces:
               raise w_Thrown(w_SyntaxError("{} must occur inside parentheses".format(c), s))
+            on_end = "expected an expression after /"
             yield DivToken(s)
           elif c == "(":
-            stop          = False
-            colon_seen    = False
-            braces.append(")")
+            on_end = None
+            stop   = False
+            while colons and colons[-1][0] == RoundToken:
+              yield colons.pop()[1](s)
+            braces.append((RoundToken, EndRoundToken))
             yield RoundToken(s)
           elif c == "[":
-            stop          = False
-            colon_seen    = False
-            braces.append("]")
+            on_end = None
+            stop   = False
+            while colons and colons[-1][0] == SquareToken:
+              yield colons.pop()[1](s)
+            braces.append((SquareToken, EndSquareToken))
             yield SquareToken(s)
           elif c == "{":
-            stop          = False
-            colon_seen    = False
-            braces.append("}")
+            on_end = None
+            stop   = False
+            while colons and colons[-1][0] == CurlyToken:
+              yield colons.pop()[1](s)
+            braces.append((CurlyToken, EndCurlyToken))
             yield CurlyToken(s)
           elif c == ")":
+            if on_end:
+              raise w_Thrown(w_SyntaxError(on_end, s))
             b = braces[-1]
-            if b != c:
+            if b[0] != RoundToken:
               raise w_Thrown(w_SyntaxError("mismatched parentheses {}".format(c), s))
             else:
               braces.pop()
+            while colons and colons[-1][0] == b[0]:
+              yield colons.pop()[1](s)
+            while semicolons and semicolons[-1][0] == b[0]:
+              yield semicolons.pop()[1](s)
             yield EndRoundToken(s)
             if one:
               raise StopIteration
           elif c == "]":
+            if on_end:
+              raise w_Thrown(w_SyntaxError(on_end, s))
             b = braces[-1]
-            if b != c:
+            if b[0] != SquareToken:
               raise w_Thrown(w_SyntaxError("mismatched parentheses {}".format(c), s))
             else:
               braces.pop()
+            while colons and colons[-1][0] == b[0]:
+              yield colons.pop()[1](s)
+            while semicolons and semicolons[-1][0] == b[0]:
+              yield semicolons.pop()[1](s)
             yield EndSquareToken(s)
             if one:
               raise StopIteration
           elif c == "}":
+            if on_end:
+              raise w_Thrown(w_SyntaxError(on_end, s))
             b = braces[-1]
-            if b != c:
+            if b[0] != CurlyToken:
               raise w_Thrown(w_SyntaxError("mismatched parentheses {}".format(c), s))
             else:
               braces.pop()
+            while colons and colons[-1][0] == b[0]:
+              yield colons.pop()[1](s)
+            while semicolons and semicolons[-1][0] == b[0]:
+              yield semicolons.pop()[1](s)
             yield EndCurlyToken(s)
             if one:
               raise StopIteration
           elif c == ":":
-            colon_seen = True
-            if not (braces or indents):
+            if not braces:
               raise w_Thrown(w_SyntaxError("{} must occur inside parentheses".format(c), s))
-            yield ColonToken(s)
+            on_end = "expected an expression after :"
+            b = braces[-1]
+            if b[0] == IndentToken:
+              colons.append((IndentToken, EndRoundToken))
+              yield RoundToken(s)
+            else:
+              colons.append((b[0], b[1]))
+              yield b[0](s)
           elif c == ";":
-            if not colon_seen:
-              raise w_Thrown(w_SyntaxError("no matching :", s))
-            yield SemicolonToken(s)
-          elif c == "|":
-            if not (braces or indents):
+            if not braces:
               raise w_Thrown(w_SyntaxError("{} must occur inside parentheses".format(c), s))
-            yield BarToken(s)
+            on_end = "expected an expression after ;"
+            b = braces[-1]
+            while semicolons and semicolons[-1][0] == b[0]:
+              yield semicolons.pop()[1](s)
+            if b[0] == IndentToken:
+              semicolons.append((IndentToken, EndRoundToken))
+              yield RoundToken(s)
+            else:
+              semicolons.append((b[0], b[1]))
+              yield b[0](s)
+          elif c == "@":
+            if not braces:
+              raise w_Thrown(w_SyntaxError("{} must occur inside parentheses".format(c), s))
+            on_end = "expected an expression after @"
+            yield SpliceToken(s)
           else:
             raise w_Thrown(w_SyntaxError("invalid character {}".format(c), s))
+        c = s.current
     except StopIteration:
-      if braces:
-        raise w_Thrown(w_SyntaxError("missing parentheses {}".format(braces[-1]), s))
+      if on_end and on_end != IndentToken:
+        raise w_Thrown(w_SyntaxError(on_end, s))
+      while braces:
+        b = braces[-1][0]
+        if b != IndentToken:
+          raise w_Thrown(w_SyntaxError("missing parentheses {}".format(b), s))
+        else:
+          braces.pop()
+      # TODO verify this works correctly with funky paren mismatches
+      while colons:
+        yield colons.pop()[1](s)
+      while semicolons:
+        yield semicolons.pop()[1](s)
       if indent:
         while indents:
           indents.pop()
@@ -600,6 +713,8 @@ def read_all(s):
     return
   except StopIteration:
     return
+  except Exception as e:
+    print e
 
 def read_file(name):
   f = open(name, "r")
