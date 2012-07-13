@@ -57,7 +57,7 @@ def pattern_match(base, pattern, args):
           p = p.rest
           while isinstance(p.rest, w_Seq):
             if not isinstance(a, w_Seq):
-              raise w_PatternFail(p, a)
+              raise w_Thrown(w_PatternFail(p, a))
             r = rec(p.first, a.first)
             #if r == w_false:
             #  return r
@@ -70,7 +70,7 @@ def pattern_match(base, pattern, args):
         p = p.rest
       while isinstance(p, w_Seq):
         if not isinstance(a, w_Seq):
-          raise w_PatternFail(p, a)
+          raise w_Thrown(w_PatternFail(p, a))
         r = rec(p.first, a.first)
         #if r == w_false:
         #  return r
@@ -84,7 +84,7 @@ def pattern_match(base, pattern, args):
       return
     else:
       if p != a:
-        raise w_PatternFail(p, a)
+        raise w_Thrown(w_PatternFail(p, a))
         #return w_false
   return rec(pattern, args)
 
@@ -371,6 +371,9 @@ class w_Seq(w_Nil):
                                       x.first.pretty(),
                                       braces[1])
         else:
+          if isinstance(x.first, w_Seq) and x.first.first == w_splice:
+            result.append(w_Sym("@"))
+            x = x.first.rest
           if char_all and not isinstance(x.first, w_Char):
             char_all = False
           result.append(x.first)
@@ -496,7 +499,7 @@ class w_TopEnv(w_Env):
     try:
       return self.variables[name]
     except KeyError:
-      raise w_UndefinedError(name)
+      raise w_Thrown(w_UndefinedError(name))
 
 class w_Vau(object):
   def __init__(self, closure, env, args, body):
@@ -528,7 +531,7 @@ class w_Vau(object):
     def base(p, a):
       if p in seen:
         if inner[p] != a:
-          raise w_PatternFail(p, a)
+          raise w_Thrown(w_PatternFail(p, a))
       else:
         seen[p] = True
         inner[p] = a
@@ -745,7 +748,7 @@ def w_assign(env, x, y):
     y = eval_(env, y)
     env[x] = y
     return y
-  raise w_MutationError(x)
+  raise w_Thrown(w_MutationError(x))
 
 @nu_vau("$catch", "X", rest="Fns")
 def w_catch(env, x, fns):
@@ -792,7 +795,7 @@ def w_eval(env, args):
   elif args.rest.rest == w_nil:
     return eval_(eval_(env, args.first), args.rest.first)
   else:
-    raise w_PatternFail(seq("Env", "X"), args)
+    raise w_Thrown(w_PatternFail(seq("Env", "X"), args))
 
 @nu_lambda("splice", "X")
 def w_splice(env, x):
@@ -812,7 +815,7 @@ def w_unwrap(env, x):
   if isinstance(x, w_Wrapped):
     return x.wrapped
   else:
-    raise w_TypeError(w_arrow, x)
+    raise w_Thrown(w_TypeError(w_arrow, x))
 
 @nu_lambda("wrap", "X")
 def w_wrap(env, x):

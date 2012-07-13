@@ -5,17 +5,19 @@ sys.dont_write_bytecode = True
 
 from nu_reader import *
 
-reader = read_all(sys.stdin)
+#reader = read_all(sys.stdin)
 
 def repl(prompt="=> "):
   try:
     sys.stdout.write(prompt)
-    print repr(eval_(top_env, reader.next()))
+    print repr(eval_(top_env, read1(sys.stdin))) #reader.next()
   except w_Thrown as e:
     sys.stderr.write("{}\n".format(e))
   except KeyboardInterrupt:
     print
   except StopIteration:
+    pass
+  except EOFError:
     print
     return
   repl(prompt)
@@ -72,6 +74,6 @@ if __name__ == "__main__":
 
   import doctest
   #doctest.testfile("tests/nu_reader.py")
-  doctest.testfile("tests/nu_reader.py (tokenize)", globs=test_globs)
+  #doctest.testfile("tests/nu_reader.py (tokenize)", globs=test_globs)
   #doctest.testfile("tests/TEMP.py")
-  #repl()
+  repl()

@@ -21,7 +21,8 @@ class IterBuffer(object):
     try:
       self._current = self._next()
     except StopIteration:
-      self._empty = True
+      raise EOFError
+      #self._empty = True
 
   def __iter__(self):
     return self
@@ -167,8 +168,9 @@ def unwrap_if(typ):
 class EOFToken(Token):
   def __init__(self):
     pass
-  #def nud(self, s):
-  #  return w_eof
+  def nud(self, s):
+    #raise EOFError
+    return w_eof
 
 
 class DedentToken(EndToken):
@@ -457,6 +459,7 @@ def tokenize1(s):
         s.next()
         if s.current == "\n" and s.isatty:
           raise StopIteration
+          #raise EOFError
         else:
           if braces == 0:
             new = find_indent(s)
@@ -574,25 +577,39 @@ def tokenize(s, indent=True, one=False):
         return
       elif not indent and isinstance(c, (IndentToken, DedentToken)):
         pass
+      # Is the indent token immediately followed by a dedent token?
+      elif isinstance(c, IndentToken) and isinstance(s.current, DedentToken):
+        s.next()
       elif isinstance(c, StartToken):
-        new = s.next()
-        # Is the indent token immediately followed by a dedent token?
-        if isinstance(c, IndentToken) and isinstance(new, DedentToken):
+        #new = s.next()
+        #if isinstance(c, IndentToken) and isinstance(new, DedentToken):
+        #  pass
+        #else:
+        #  ...
+        #  c = new
+        #  continue
+        # TODO pretty damn hacky in general
+        try:
+          b = braces[-1]
+          if isinstance(c, type(b["start"])):
+            b, colons = b["end"], b["colons"]
+            while colons and colons[-1] == ":":
+              if colons.pop() != "->" and isinstance(b, DedentToken):
+                yield EndRoundToken(c)
+              else:
+                yield b
+        except (KeyError, IndexError):
           pass
-        else:
-          stop = False
-          braces.append({ "start": c, "end": c.match()(c) })
-          yield c
-          c = new
-          continue
+        stop = False
+        braces.append({ "start": c, "end": c.match()(c) })
+        yield c
       elif isinstance(c, EndToken):
         if braces:
           b = braces.pop()
           try:
             colons = b["colons"]
             while colons:
-              colons.pop()
-              if isinstance(b["end"], DedentToken):
+              if colons.pop() != "->" and isinstance(b["end"], DedentToken):
                 yield EndRoundToken(c)
               else:
                 yield b["end"]
@@ -621,7 +638,25 @@ def tokenize(s, indent=True, one=False):
           raise w_Thrown(w_SyntaxError("{} must occur inside parentheses".format(c), c))
         if isinstance(s.current, (EndToken, EOFToken)):
           raise w_Thrown(w_SyntaxError("expected an expression after {}".format(c), s.current))
-        if isinstance(c, ColonToken):
+        if isinstance(c, ArrowToken):
+          yield c
+          #braces.append({ "start": IndentToken(c),
+          #                "end": DedentToken(c),
+          #                "colons": ["->"] })
+          #yield IndentToken(c)
+          if not isinstance(s.current, StartToken):
+            b = braces[-1]
+            try:
+              b["colon_first"]
+            except KeyError:
+              b["colon_first"] = "->"
+            try:
+              colons = b["colons"]
+            except KeyError:
+              colons = b["colons"] = []
+            yield b["start"]
+            colons.append("->")
+        elif isinstance(c, ColonToken):
           b = braces[-1]
           try:
             if b["colon_first"] == ";":
@@ -646,8 +681,8 @@ def tokenize(s, indent=True, one=False):
             b["colon_first"] = ";"
           try:
             colons = b["colons"]
-            colons.pop()
-            if isinstance(b["end"], DedentToken):
+            x = colons.pop()
+            if x != "->" and isinstance(b["end"], DedentToken):
               yield EndRoundToken(c)
             else:
               yield b["end"]
@@ -666,7 +701,7 @@ def tokenize(s, indent=True, one=False):
           yield EOFToken()
           return
       c = s.next()
-  return IterBuffer(f(tokenize1(s), one, one)) #IterBuffer()
+  return IterBuffer(f(IterBuffer(tokenize1(s)), one, one))
 
 #@token_inside_parens
 #@token_prefix(":")
@@ -691,11 +726,12 @@ def tokenize(s, indent=True, one=False):
 #    when([end],      ret(end))
 
 
-def read1(s, eof=w_eof):
-  try:
-    return parse(tokenize(IOBuffer(s)))
-  except StopIteration:
-    return eof
+def read1(s):
+  #try:
+  return parse(tokenize(IOBuffer(s)))
+  #except StopIteration:
+  #  raise EOFError
+    #return eof
 
 def read_all(s):
   s = tokenize(IOBuffer(s))

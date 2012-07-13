@@ -348,7 +348,7 @@ $defvau $lets
 $defvau $if-error; [X Y @R] ->
   $let U: uniq
     eval [$on-error X
-           [fn [seq: error ~] Y]
+           [$fn [seq: error ~] Y]
            @(joinr R [$fn [seq U] U])]
 
 $defvau $def-if!; Name Test @Fns ->
