@@ -5,13 +5,13 @@
 $assign $let; $vau Env [X Y @R]
   eval Env [[$fn [seq X] @R] Y]
 
-$assign $quote; $vau ~ [X] X
+$assign $quote: $vau ~ [X] X
 
 $assign $or; $vau Env [X @R]
   $let X: eval Env X
     $if X X: eval Env [$or @R]
 
-$assign any?: [X @R] F -> $or; F X; any? R F
+$assign any?: [X @R] F -> $or: F X; any? R F
 
 $assign case: X @Fns -> any? Fns: F -> F @X
 
@@ -37,7 +37,7 @@ $assign $def; $vau Env [Name @Fns]
 ($let foo: uniq
   (bar 1))
 
-($or; foo 1; bar 2)
+($or: foo 1; bar 2)
 
 ($if: not: X Y
   (type-error "type check failed on argument @Y"))
@@ -48,11 +48,92 @@ $assign $def; $vau Env [Name @Fns]
 ($assign foo: $or; F X; any? R F)
 ($assign foo ($or (F X) (any? R F)))
 
-foo; bar; qux
-foo (bar) (qux)
+($assign foo: $or: F X; any? R F)
+($assign foo ($or (F X) (any? R F)))
+
 
 foo: bar: qux
 foo (bar (qux))
+
+foo; bar: qux
+foo (bar (qux))
+
+
+foo; bar; qux
+foo (bar) (qux)
+
+foo: bar; qux
+foo (bar) (qux)
+
+
+foo: bar: qux: corge
+foo (bar (qux (corge)))
+
+foo; bar: qux: corge
+foo (bar (qux (corge)))
+
+
+foo: bar: qux; corge
+foo (bar (qux) (corge))
+
+foo; bar: qux; corge
+foo (bar (qux) (corge))
+
+
+foo: bar; qux; corge: nou
+foo (bar) (qux) (corge)
+
+foo; bar; qux: corge: nou
+foo (bar) (qux) (corge nou)
+
+foo: bar; qux: corge
+foo (bar) (qux) (corge)
+
+; ; ; ;
+; ; ; :
+; ; : ;
+; : ; ;
+: ; ; ;
+
+; ; : :
+; : ; :
+: ; ; :
+
+; : : :
+: ; : :
+: : ; :
+: : : ;
+
+
+: : : :
+: : : ;
+: : ; :
+: ; : :
+; : : :
+
+: : ; ;
+: ; : ;
+; : : ;
+
+: ; ; ;
+; : ; ;
+; ; : ;
+; ; ; :
+
+
+
+; ; : :
+; : ; :
+: ; ; :
+
+; : : ;
+: ; : ;
+
+: : ; ;
+
+; : : :
+: : : :
+
 |#
 
 ##############################################################################

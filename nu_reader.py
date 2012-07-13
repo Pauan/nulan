@@ -403,8 +403,8 @@ def tokenize(s, indent=True, one=False):
   def f(s, one, stop):
     braces     = []
     indents    = []
-    colons     = []
-    semicolons = []
+    #colons     = []
+    #semicolons = []
     on_end     = None
     #indent_seen = True
     if indent:
@@ -427,11 +427,20 @@ def tokenize(s, indent=True, one=False):
           if s.current == "\n" and s.isatty:
             raise StopIteration
           elif indent:
-            if braces[-1][0] != IndentToken:
-              continue
+            #if braces[-1][0] != IndentToken:
+            #  continue
+
               #raise w_Thrown(w_SyntaxError("missing parentheses {}".format(b), s))
-            while colons and colons[-1][0] == IndentToken:
-              yield colons.pop()[1](s)
+            #while colons and colons[-1][0] == IndentToken:
+            #  yield colons.pop()[1](s)
+            #while braces and braces[-1][0] == ":":
+            #  yield braces.pop()[1](s)
+            while braces:
+              b = braces[-1]
+              if b[0] == ":" and b[2] == IndentToken:
+                yield braces.pop()[1](s)
+              else:
+                break
             new = find_indent(s)
             #print on_end, new, indents
             if on_end == IndentToken:
@@ -439,8 +448,16 @@ def tokenize(s, indent=True, one=False):
               yield DedentToken(s)
             if indents:
               if new <= indents[-1]:
-                while semicolons and semicolons[-1][0] == IndentToken:
-                  yield semicolons.pop()[1](s)
+                #while braces and braces[-1][0] == ";":
+                #  yield braces.pop()[1](s)
+                while braces:
+                  b = braces[-1]
+                  if b[0] == ";" and b[2] == IndentToken:
+                    yield braces.pop()[1](s)
+                  else:
+                    break
+                #while semicolons and semicolons[-1][0] == IndentToken:
+                #  yield semicolons.pop()[1](s)
                 while indents and new <= indents[-1]:
                   indents.pop()
                   #if on_end and on_end != IndentToken:
@@ -519,7 +536,8 @@ def tokenize(s, indent=True, one=False):
               s.next()
               #braces.append((IndentToken, DedentToken))
               on_end = "expected an expression after ->"
-              semicolons.append((IndentToken, DedentToken))
+              #semicolons.append((IndentToken, DedentToken))
+              braces.append((";", DedentToken, IndentToken))
               yield IndentToken(s)
               #colon_seen = True
               #if indent:
@@ -580,66 +598,126 @@ def tokenize(s, indent=True, one=False):
           elif c == "(":
             on_end = None
             stop   = False
-            while colons and colons[-1][0] == RoundToken:
-              yield colons.pop()[1](s)
+            #while colons and colons[-1][0] == RoundToken:
+            #  yield colons.pop()[1](s)
+            while braces:
+              b = braces[-1]
+              if b[0] == ":" and b[2] == RoundToken:
+                yield braces.pop()[1](s)
+              else:
+                break
+            #while braces and braces[-1][0] == ":":
+            #  yield braces.pop()[1](s)
             braces.append((RoundToken, EndRoundToken))
             yield RoundToken(s)
           elif c == "[":
             on_end = None
             stop   = False
-            while colons and colons[-1][0] == SquareToken:
-              yield colons.pop()[1](s)
+            #while colons and colons[-1][0] == SquareToken:
+            #  yield colons.pop()[1](s)
+            while braces:
+              b = braces[-1]
+              if b[0] == ":" and b[2] == SquareToken:
+                yield braces.pop()[1](s)
+              else:
+                break
+            #while braces and braces[-1][0] == ":":
+            #  yield braces.pop()[1](s)
             braces.append((SquareToken, EndSquareToken))
             yield SquareToken(s)
           elif c == "{":
             on_end = None
             stop   = False
-            while colons and colons[-1][0] == CurlyToken:
-              yield colons.pop()[1](s)
+            #while colons and colons[-1][0] == CurlyToken:
+            #  yield colons.pop()[1](s)
+            while braces:
+              b = braces[-1]
+              if b[0] == ":" and b[2] == CurlyToken:
+                yield braces.pop()[1](s)
+              else:
+                break
+            #while braces and braces[-1][0] == ":":
+            #  yield braces.pop()[1](s)
             braces.append((CurlyToken, EndCurlyToken))
             yield CurlyToken(s)
           elif c == ")":
             if on_end:
               raise w_Thrown(w_SyntaxError(on_end, s))
-            b = braces[-1]
-            if b[0] != RoundToken:
+            old = braces[-1]
+            if not (old[0] == ":" or old[0] == ";" or old[0] == RoundToken):
               raise w_Thrown(w_SyntaxError("mismatched parentheses {}".format(c), s))
             else:
               braces.pop()
-            while colons and colons[-1][0] == b[0]:
-              yield colons.pop()[1](s)
-            while semicolons and semicolons[-1][0] == b[0]:
-              yield semicolons.pop()[1](s)
+            #while colons and colons[-1][0] == b[0]:
+            #  yield colons.pop()[1](s)
+            #while semicolons and semicolons[-1][0] == b[0]:
+            #  yield semicolons.pop()[1](s)
+            #while braces:
+            #  b = braces[-1][0]
+            #  if b == ":" or b == ";":
+            #    yield braces.pop()[1](s)
+            #  else:
+            #    break
+            while braces:
+              b = braces[-1]
+              if (b[0] == ":" or b[0] == ";") and b[2] == old[0]:
+                yield braces.pop()[1](s)
+              else:
+                break
             yield EndRoundToken(s)
             if one:
               raise StopIteration
           elif c == "]":
             if on_end:
               raise w_Thrown(w_SyntaxError(on_end, s))
-            b = braces[-1]
-            if b[0] != SquareToken:
+            old = braces[-1]
+            if not (old[0] == ":" or old[0] == ";" or old[0] == SquareToken):
               raise w_Thrown(w_SyntaxError("mismatched parentheses {}".format(c), s))
             else:
               braces.pop()
-            while colons and colons[-1][0] == b[0]:
-              yield colons.pop()[1](s)
-            while semicolons and semicolons[-1][0] == b[0]:
-              yield semicolons.pop()[1](s)
+            #while colons and colons[-1][0] == b[0]:
+            #  yield colons.pop()[1](s)
+            #while semicolons and semicolons[-1][0] == b[0]:
+            #  yield semicolons.pop()[1](s)
+            #while braces:
+            #  b = braces[-1][0]
+            #  if b == ":" or b == ";":
+            #    yield braces.pop()[1](s)
+            #  else:
+            #    break
+            while braces:
+              b = braces[-1]
+              if (b[0] == ":" or b[0] == ";") and b[2] == old[0]:
+                yield braces.pop()[1](s)
+              else:
+                break
             yield EndSquareToken(s)
             if one:
               raise StopIteration
           elif c == "}":
             if on_end:
               raise w_Thrown(w_SyntaxError(on_end, s))
-            b = braces[-1]
-            if b[0] != CurlyToken:
+            old = braces[-1]
+            if not (old[0] == ":" or old[0] == ";" or old[0] == CurlyToken):
               raise w_Thrown(w_SyntaxError("mismatched parentheses {}".format(c), s))
             else:
               braces.pop()
-            while colons and colons[-1][0] == b[0]:
-              yield colons.pop()[1](s)
-            while semicolons and semicolons[-1][0] == b[0]:
-              yield semicolons.pop()[1](s)
+            #while colons and colons[-1][0] == b[0]:
+            #  yield colons.pop()[1](s)
+            #while semicolons and semicolons[-1][0] == b[0]:
+            #  yield semicolons.pop()[1](s)
+            #while braces:
+            #  b = braces[-1][0]
+            #  if b == ":" or b == ";":
+            #    yield braces.pop()[1](s)
+            #  else:
+            #    break
+            while braces:
+              b = braces[-1]
+              if (b[0] == ":" or b[0] == ";") and b[2] == old[0]:
+                yield braces.pop()[1](s)
+              else:
+                break
             yield EndCurlyToken(s)
             if one:
               raise StopIteration
@@ -647,26 +725,36 @@ def tokenize(s, indent=True, one=False):
             if not braces:
               raise w_Thrown(w_SyntaxError("{} must occur inside parentheses".format(c), s))
             on_end = "expected an expression after :"
-            b = braces[-1]
-            if b[0] == IndentToken:
-              colons.append((IndentToken, EndRoundToken))
+            old = braces[-1]
+            if old[0] == IndentToken:
+              braces.append((":", EndRoundToken, old[0]))
+              #colons.append((IndentToken, EndRoundToken))
               yield RoundToken(s)
             else:
-              colons.append((b[0], b[1]))
-              yield b[0](s)
+              braces.append((":", old[1], old[0]))
+              #colons.append((b[0], b[1]))
+              yield old[0](s)
           elif c == ";":
             if not braces:
               raise w_Thrown(w_SyntaxError("{} must occur inside parentheses".format(c), s))
             on_end = "expected an expression after ;"
-            b = braces[-1]
-            while semicolons and semicolons[-1][0] == b[0]:
-              yield semicolons.pop()[1](s)
-            if b[0] == IndentToken:
-              semicolons.append((IndentToken, EndRoundToken))
+            old = braces[-1]
+            while braces:
+              b = braces[-1]
+              if b[0] == ";" and b[2] == old[0]:
+                yield braces.pop()[1](s)
+              else:
+                break
+            #while semicolons and semicolons[-1][0] == b[0]:
+            #  yield semicolons.pop()[1](s)
+            if old[0] == IndentToken:
+              braces.append((";", EndRoundToken, old[0]))
+              #semicolons.append((IndentToken, EndRoundToken))
               yield RoundToken(s)
             else:
-              semicolons.append((b[0], b[1]))
-              yield b[0](s)
+              braces.append((";", old[1], old[0]))
+              #semicolons.append((b[0], b[1]))
+              yield old[0](s)
           elif c == "@":
             if not braces:
               raise w_Thrown(w_SyntaxError("{} must occur inside parentheses".format(c), s))
@@ -680,19 +768,27 @@ def tokenize(s, indent=True, one=False):
         raise w_Thrown(w_SyntaxError(on_end, s))
       while braces:
         b = braces[-1][0]
-        if b != IndentToken:
-          raise w_Thrown(w_SyntaxError("missing parentheses {}".format(b), s))
+        # TODO
+        if b == ":" or b == ";":
+          yield braces.pop()[1](s)
+        elif b != IndentToken:
+          #yield braces.pop()[1](s)
+          #print braces[-1]
+          raise w_Thrown(w_SyntaxError("missing parentheses {!s}".format(braces[-1][1]), s))
         else:
+          if indent and indents:
+            yield DedentToken(s)
+            indents.pop()
           braces.pop()
-      # TODO verify this works correctly with funky paren mismatches
-      while colons:
-        yield colons.pop()[1](s)
-      while semicolons:
-        yield semicolons.pop()[1](s)
-      if indent:
-        while indents:
-          indents.pop()
-          yield DedentToken(s)
+      ## TODO verify this works correctly with funky paren mismatches
+      #while colons:
+      #  yield colons.pop()[1](s)
+      #while semicolons:
+      #  yield semicolons.pop()[1](s)
+      #if indent:
+      #  while indents:
+      #    indents.pop()
+      #    yield DedentToken(s)
       yield EOFToken(s)
   return IterBuffer(f(s, one, one))
 
