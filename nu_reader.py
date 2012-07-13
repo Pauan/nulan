@@ -792,6 +792,36 @@ def tokenize(s, indent=True, one=False):
       yield EOFToken(s)
   return IterBuffer(f(s, one, one))
 
+token_paren("(", ")", RoundToken,  EndRoundToken)
+token_paren("[", "]", SquareToken, EndSquareToken)
+token_paren("{", "}", CurlyToken,  EndCurlyToken)
+
+token_infix("+", AddToken)
+token_infix("*", MulToken)
+token_infix("/", DivToken)
+
+@token_inside_parens
+@token_prefix(":")
+def f(self, ret, when):
+  start = self.start
+  end   = self.end
+
+  ret(start)()
+  when([";", start, end], ret(end))
+
+@token_inside_parens
+@token_prefix(";")
+def f(self, ret, when):
+  start = self.start
+  end   = self.end
+
+  ret(start)()
+  if self.seen(":"):
+    when([";", end], ret(")"))
+  else:
+    when([":", ";"], self.error("can't use : or ; after ;"))
+    when([end],      ret(end))
+
 
 def read1(s, eof=w_eof):
   try:

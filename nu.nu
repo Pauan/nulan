@@ -50,90 +50,6 @@ $assign $def; $vau Env [Name @Fns]
 
 ($assign foo: $or: F X; any? R F)
 ($assign foo ($or (F X) (any? R F)))
-
-
-foo: bar: qux
-foo (bar (qux))
-
-foo; bar: qux
-foo (bar (qux))
-
-
-foo; bar; qux
-foo (bar) (qux)
-
-foo: bar; qux
-foo (bar) (qux)
-
-
-foo: bar: qux: corge
-foo (bar (qux (corge)))
-
-foo; bar: qux: corge
-foo (bar (qux (corge)))
-
-
-foo: bar: qux; corge
-foo (bar (qux) (corge))
-
-foo; bar: qux; corge
-foo (bar (qux) (corge))
-
-
-foo: bar; qux; corge: nou
-foo (bar) (qux) (corge)
-
-foo; bar; qux: corge: nou
-foo (bar) (qux) (corge nou)
-
-foo: bar; qux: corge
-foo (bar) (qux) (corge)
-
-; ; ; ;
-; ; ; :
-; ; : ;
-; : ; ;
-: ; ; ;
-
-; ; : :
-; : ; :
-: ; ; :
-
-; : : :
-: ; : :
-: : ; :
-: : : ;
-
-
-: : : :
-: : : ;
-: : ; :
-: ; : :
-; : : :
-
-: : ; ;
-: ; : ;
-; : : ;
-
-: ; ; ;
-; : ; ;
-; ; : ;
-; ; ; :
-
-
-
-; ; : :
-; : ; :
-: ; ; :
-
-; : : ;
-: ; : ;
-
-: : ; ;
-
-; : : :
-: : : :
-
 |#
 
 ##############################################################################
@@ -171,7 +87,7 @@ $def not: X -> $if X %f %t
 #|
 $def type; @Fns ->
   $if: seq? Fns
-    @Args -> any?; zip Fns Args; [X Y] ->
+    @Args -> any?: zip Fns Args; [X Y] ->
                $if: not: X Y
                  type-error "type check failed on argument @Y"
     @Args -> any? Args; X ->
@@ -188,7 +104,7 @@ $defvau $and
 
 $def all?
   [X]    F -> F X
-  [X @R] F -> $and; F X; all? R F
+  [X @R] F -> $and: F X; all? R F
 
 $def none?
   X F -> all? X: X -> not: F X
@@ -407,7 +323,7 @@ $def ref
 # TODO maybe make it take rest args?
 $def iso?
   X       X       -> %t
-  [X @R1] [Y @R2] -> $and; iso? X Y; iso? R1 R2
+  [X @R1] [Y @R2] -> $and: iso? X Y; iso? R1 R2
 
 
 $def prn!; @Args ->

@@ -1,32 +1,32 @@
->>> import nu_reader
->>> import nu_types
->>> import sys
+#>>> import nu_reader
+#>>> import nu_types
+#>>> import sys
 
->>> def read(x):
-...   try:
-...     print nu_reader.read1(x).pretty()
-...   except nu_types.w_Thrown as e:
-...     print e
+#>>> def read(x):
+#...   try:
+#...     print nu_reader.read1(x).pretty()
+#...   except nu_types.w_Thrown as e:
+#...     print e
 
-...     print list(nu_reader.tokenize(nu_reader.IOBuffer(x)))
+#...     print list(nu_reader.tokenize(nu_reader.IOBuffer(x)))
 
->>> def write(x):
-...   try:
-...     print repr(nu_reader.read1(x))
-...   except nu_types.w_Thrown as e:
-...     print e
+#>>> def write(x):
+#...   try:
+#...     print repr(nu_reader.read1(x))
+#...   except nu_types.w_Thrown as e:
+#...     print e
 
-...     print list(nu_reader.tokenize(nu_reader.IOBuffer(x)))
+#...     print list(nu_reader.tokenize(nu_reader.IOBuffer(x)))
 
->>> def write_all(x):
-...   try:
-...     o = sys.stderr
-...     sys.stderr = sys.stdout
-...     for x in nu_reader.read_all(x):
-...       print repr(x)
-...     sys.stderr = o
-...   except nu_types.w_Thrown as e:
-...     print e
+#>>> def write_all(x):
+#...   try:
+#...     o = sys.stderr
+#...     sys.stderr = sys.stdout
+#...     for x in nu_reader.read_all(x):
+#...       print repr(x)
+#...     sys.stderr = o
+#...   except nu_types.w_Thrown as e:
+#...     print e
 
 
 ##############################################################################
