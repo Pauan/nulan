@@ -55,14 +55,23 @@ if __name__ == "__main__":
     except w_Thrown as e:
       print e
 
+  def test_tokenize(x, **kwargs):
+    try:
+      for x in tokenize(IOBuffer(x), **kwargs):
+        print x
+    except w_Thrown as e:
+      print e
+
   test_globs = {
     "read": test_read,
     "write": test_write,
     "write_all": test_write_all,
+    "tokenize": test_tokenize,
+    "read_file": read_file,
   }
 
   import doctest
   #doctest.testfile("tests/nu_reader.py")
-  doctest.testfile("tests/nu_reader (abbreviations).py", globs=test_globs)
+  doctest.testfile("tests/nu_reader.py (tokenize)", globs=test_globs)
   #doctest.testfile("tests/TEMP.py")
   #repl()

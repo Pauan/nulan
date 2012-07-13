@@ -151,7 +151,7 @@ sum1 (F (F (F 0 1) 2) 3) F
 |#
 
 
-"foobar@(X \n) foo"
+#"foobar@(X \n) foo"
 
 # Called foldr/rreduce in other languages.
 #
