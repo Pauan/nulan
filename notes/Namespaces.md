@@ -56,11 +56,9 @@ First, let's talk about how a language like Kernel implements first-class enviro
     $set! Env2 Yes 2
     ...
 
-In the above, `make-env` is a function that accepts one argument: the parent environment. It returns a new (mutable) environment that inherits from its argument.
+In the above, `make-env` is a function that accepts one argument: the parent environment. It returns a new (mutable) environment that inherits from its argument. When looking up a symbol, it will first check in the current environment, and if it's not found, it will then recursively check the parent until it finds an environment that doesn't have a parent, in which case it will throw an error.
 
-We then use `$set!` to mutate the environments returned by `make-env`. When looking up a symbol, it will first check in the current environment, and if it's not found, it will then recursively check the parent until it finds an environment that doesn't have a parent, in which case it will throw an error.
-
-Because of environment mutation, the above is written in a linear style, which means it can be used to solve the problem of namespaces. This is roughly the same as Racket's system, except it's more consistent because it uses the same data structure for both global and local scope.
+We then use `$set!` to mutate the environments returned by `make-env`. Because of environment mutation, the above is written in a linear style, which means it can be used to solve the problem of namespaces. This is roughly the same as Racket's system, except it's more consistent because it uses the same data structure for both global and local scope.
 
 There are certain issues with this system, though, like how to control mutability. Kernel uses the policy that "if you have *direct* access to an environment, you can mutate it, otherwise you can't". This makes certain common idioms *much* more verbose, but it does preserve encapsulation.
 
