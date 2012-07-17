@@ -18,7 +18,7 @@ In Racket's namespace system, a module is usually a file, and each module is run
 
     # foo.rkt
     (define yes 1)
-
+##############################################################################
     # bar.rkt
     (require "foo.rkt")
     (define yes 2)
@@ -37,6 +37,7 @@ It turns out, we can! Looking at the above code, what we're trying to do is take
 
     $def Yes 1
     ...
+##############################################################################
     $def Yes 2
     ...
 
@@ -52,6 +53,7 @@ First, let's talk about how a language like Kernel implements first-class enviro
     $def! Env1: make-env %f
     $set! Env1 Yes 1
     ...
+##############################################################################
     $def! Env2: make-env Env1
     $set! Env2 Yes 2
     ...
@@ -93,6 +95,7 @@ Let's rewrite our example to use a single mutable variable:
     $var! Env: make-env
     $set-var! Env: $set Env X 1
     ...
+##############################################################################
     $set-var! Env: $set Env X 2
     ...
 
