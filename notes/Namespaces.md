@@ -64,6 +64,7 @@ We then use `$set!` to mutate the environments returned by `make-env`. Because o
 
 There are certain issues with this system, though, like how to control mutability. Kernel uses the policy that "if you have *direct* access to an environment, you can mutate it, otherwise you can't". This makes certain common idioms *much* more verbose, but it does preserve encapsulation.
 
+------------------------------------------------------------------------------
 
 Nulan, however, does things very different. In Nulan, environments are immutable, so the idea of "mutating an environment" is impossible. Instead, you create a new environment which is just like the old one but with the changes you want:
 
