@@ -1,4 +1,4 @@
-Nulan does not have namespaces. Instead, the very core of its design gives you something that is very much so *like* namespaces, but is more consistent, elegant, and faster.
+Nulan does not have multiple namespaces. Instead, the very core of its design gives you something that is very much so *like* multiple namespaces, but is more consistent, elegant, and faster.
 
 First let's define what the *purpose* of a namespace is. To me, the *one and only* purpose of a namespace is to provide some way of dealing with name collisions. That's it. If you want something more, like a way to write "modular code" or whatever, I would call that a "module". Modules are usually built on top of namespaces, but namespaces are lower-level, dealing only with names.
 
