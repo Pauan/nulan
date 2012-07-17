@@ -143,7 +143,7 @@ And what about selectively importing only certain names from a file? Well, envir
            N:    $quote nou
            Env:  var: Top
       eval Env: $quote: $use! foo
-      set! Top N: Env N
+      set! Top N: (Env) N
 
 Once again, this is clunky enough that there's an `$include!` vau:
 
