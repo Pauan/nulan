@@ -4,9 +4,9 @@ First let's define what the *purpose* of a namespace is. To me, the *one and onl
 
 So, what's the problem with using a single namespace? If you have two files that define the same name, one of the files will overwrite the other one, which is not what you want! You want some way to partition them so they can't interfere with eachother. How do different namespaces handle this partitioning?
 
-Probably the simplest namespace system is user convention. If you have a file called "foo.nu" you can prefix all your globals with "foo-". This is very simple and can be done in any language, but it is a user convention, and it also makes your code more verbose (and thus harder to read).
+Probably the simplest namespace system is user convention. If you have a file called "foo.nu" you can prefix all your globals with `foo-`. This is very simple and can be done in any language, but it is a user convention, and it also makes your code more verbose (and thus harder to read).
 
-As a step up from that, there are symbol-renaming namespaces, which basically function the exact same as user convention, but they *automatically* add in the prefix, so when you load a file "foo.nu" it will automatically add the prefix "foo-". This is *much* more convenient and gives essentially all the same benefits of user convention, but lets you dynamically choose what the prefix should be.
+As a step up from that, there are symbol-renaming namespaces, which basically function the exact same as user convention, but they *automatically* add in the prefix, so when you load a file "foo.nu" it will automatically add the prefix `foo-`. This is *much* more convenient and gives essentially all the same benefits of user convention, but lets you dynamically choose what the prefix should be.
 
 If you make namespaces into a first-class object in your language, it opens up more possibilities. In Python, for instance, the code `import foo` will load the file "foo" and put it into a namespace object called `foo`. Now you can say `foo.bar` to refer to the global name `bar` in the namespace `foo`.
 
@@ -47,11 +47,7 @@ It turns out, we can! Looking at the above code, what we're trying to do is take
       $let Yes 2
         ...
 
-One major difference between Nulan and Racket is that although Racket has first-class namespaces (global scope) it doesn't have first-class environments (local scope). Nulan, however, uses the *exact same* environments for both global and local scope.
-
-First, let's talk about how a language like Kernel implements first-class environments. In a language like Kernel which has mutable environments, it's implemented by having the environment be a special data structure which contains a link to the "parent" environment.
-
-So the above would look something like this:
+First, let's talk about how a language like Kernel implements first-class environments. In a language like Kernel which has mutable environments, it's implemented by having the environment be a special data structure which contains a link to the "parent" environment, so the above would look something like this:
 
     $let Env1: make-env %f
       $set! Env1 Yes 1
