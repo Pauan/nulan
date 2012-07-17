@@ -25,12 +25,15 @@ def seq(*args, **kwargs):
       r.rest = w_Seq(w_Sym(x), w_nil)
       r = r.rest
     try:
-      r.rest = w_Sym(kwargs["rest"])
+      #r.rest = w_Seq(w_splice, w_Seq(w_Sym(kwargs["rest"]), w_nil))
+      pass
     except KeyError:
       pass
   except IndexError:
     try:
-      return w_Sym(kwargs["rest"])
+      return
+      #return w_Seq(w_splice, w_Seq(w_Sym(kwargs["rest"]), w_nil))
+      pass
     except KeyError:
       return w_nil
   return top
@@ -475,10 +478,6 @@ class w_Seq(w_Nil):
       else:
         raise TypeError("cannot convert {} to a string".format(repr(self)))
     return "".join(result)
-
-class w_Tree(object):
-  def __init__(self, *args):
-    self.children = args
 
 class w_Env(object):
   def __init__(self, parent):

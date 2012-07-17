@@ -95,9 +95,10 @@ class Token(object):
       return "Token: {}".format(self.__class__.__name__)
 
 class LiteralToken(Token):
-  def __init__(self, value):
+  def __init__(self, value, s):
     self.value = value
     self.tostr = value
+    Token.__init__(self, s)
   def nud(self, s):
     return self.value
 
@@ -113,22 +114,39 @@ class PrefixToken(Token):
 class InfixToken(PrefixToken):
   pass
 
+infix_transform = None
+
 def nud_pre(pre, bind=None):
   def f(self, s):
+    global infix_transform
     b = self.bind if bind is None else bind
-    return w_Seq(pre, w_Seq(parse(s, b), w_nil))
+    x = w_Seq(pre, w_Seq(parse(s, b), w_nil))
+    if infix_transform and isinstance(self, infix_transform[0]):
+      x = infix_transform[1](x, s)
+      infix_transform = None
+    return x
   return f
 
 def led_pre(pre, bind=None):
   def f(self, left, s):
+    global infix_transform
     b = self.bind if bind is None else bind
-    return w_Seq(pre, w_Seq(left, w_Seq(parse(s, b), w_nil)))
+    x = w_Seq(pre, w_Seq(left, w_Seq(parse(s, b), w_nil)))
+    if infix_transform and isinstance(self, infix_transform[0]):
+      x = infix_transform[1](x, s)
+      infix_transform = None
+    return x
   return f
 
-def parse_until(end_token):
+def parse_until(end_token, unwrap_if=None):
   def decorator(fn):
     def wrapped(self, s):
+      global infix_transform
+      seen_infix = [False]
       result = []
+      def f(x, s):
+        seen_infix[0] = True
+        return fn(x, s)
       while 1:
         c = s.current
         if isinstance(c, end_token):
@@ -142,32 +160,37 @@ def parse_until(end_token):
           #if expr == w_arrow:
           #  result = [w_arrow, w_Seq(w_seq, list_to_seq(result))]
           #else:
+          if unwrap_if:
+            infix_transform = (unwrap_if, f) #unwrap
+          #print x
           result.append(parse(s)) #expr
       s.next()
-      return fn(list_to_seq(result), s)
+      result = list_to_seq(result)
+      print result.rest, unwrap_if, seen_infix[0]
+      if unwrap_if and seen_infix[0] and result.rest == w_nil:
+        #print result.first
+        return result.first
+      else:
+        return fn(result, s)
     return wrapped
   return decorator
 
-def unwrap_if(typ):
-  infix = [w_mul, w_div, w_add, w_sub, w_lt, w_gt, w_lte, w_gte, w_is]
-  def decorator(fn):
-    def wrapped(x, s):
-      if x == w_nil:
-        return x
-      elif x.rest == w_nil:
-        try:
-          if x.first.first in infix:
-            return fn(x.first, s)
-        except AttributeError:
-          pass
-      return fn(x, s)
-    return wrapped
-  return decorator
-
+#def unwrap(x, s):
+#  infix = [w_mul, w_div, w_add, w_sub, w_lt, w_gt, w_lte, w_gte, w_is]
+#  if x == w_nil:
+#    return x
+#  else:
+#    try:
+#      if x.rest == w_nil:
+#        if x.first.first in infix:
+#          return fn(x.first, s)
+#    except AttributeError:
+#      pass
+#  return fn(x, s)
 
 class EOFToken(Token):
-  def __init__(self):
-    pass
+  #def __init__(self):
+  #  pass
   def nud(self, s):
     #raise EOFError
     return w_eof
@@ -211,8 +234,7 @@ class IndentToken(StartToken):
 
 class RoundToken(StartToken):
   tostr = "("
-  @parse_until(EndRoundToken)
-  @unwrap_if(InfixToken)
+  @parse_until(EndRoundToken, unwrap_if=InfixToken)
   def nud(x, s):
     return x
   def match(self):
@@ -220,10 +242,12 @@ class RoundToken(StartToken):
 
 class SquareToken(StartToken):
   tostr = "["
-  @parse_until(EndSquareToken)
-  @unwrap_if(InfixToken)
+  @parse_until(EndSquareToken, unwrap_if=InfixToken)
   def nud(x, s):
-    return w_Seq(w_seq, x)
+    if x == w_nil:
+      return x
+    else:
+      return w_Seq(w_seq, x)
   def match(self):
     return EndSquareToken
 
@@ -231,13 +255,13 @@ class CurlyToken(StartToken):
   tostr = "{"
   @parse_until(EndCurlyToken)
   def nud(x, s):
-    return w_Seq(w_dict, x)
+    if x == w_nil:
+      return x
+    else:
+      return w_Seq(w_dict, x)
   def match(self):
     return EndCurlyToken
 
-
-class ArrowToken(PrefixToken):
-  tostr = "->"
 
 class ColonToken(PrefixToken):
   tostr = ":"
@@ -247,9 +271,11 @@ class SemicolonToken(PrefixToken):
 
 class SpliceToken(PrefixToken):
   tostr = "@"
-  def nud(self, s):
-    return w_Seq(w_splice, w_Seq(parse(s), w_nil))
+  nud   = nud_pre(w_splice)
 
+
+class ArrowToken(InfixToken):
+  tostr = "->"
 
 class MulToken(InfixToken):
   tostr = "*"
@@ -521,17 +547,17 @@ def tokenize1(s):
         s.next()
         yield DivToken(s)
       elif c == "\"":
-        yield LiteralToken(tokenize_double_quotes(c, s))
+        yield LiteralToken(tokenize_double_quotes(c, s), s)
       elif c == "`":
-        yield LiteralToken(tokenize_back_quotes(c, s))
+        yield LiteralToken(tokenize_back_quotes(c, s), s)
       elif c in char_num:
-        yield LiteralToken(tokenize_number(s))
+        yield LiteralToken(tokenize_number(s), s)
       elif c in char_sym:
-        yield LiteralToken(tokenize_symbol(s))
+        yield LiteralToken(tokenize_symbol(s), s)
       else:
         s.next()
         if c == "~":
-          yield LiteralToken(w_tilde)
+          yield LiteralToken(w_tilde, s)
         elif c == "(":
           stop = False
           braces += 1
@@ -565,7 +591,7 @@ def tokenize1(s):
     while indents:
       indents.pop()
       yield DedentToken(s)
-    yield EOFToken()
+    yield EOFToken(s)
 
 def tokenize(s, indent=True, one=False):
   def f(s, stop, one):
@@ -631,12 +657,14 @@ def tokenize(s, indent=True, one=False):
           raise w_Thrown(w_SyntaxError("missing starting {} parenthesis".format(b), c))
         yield c
         if one and not braces:
-          yield EOFToken()
+          yield EOFToken(c)
           return
       elif isinstance(c, PrefixToken):
         if not braces:
           raise w_Thrown(w_SyntaxError("{} must occur inside parentheses".format(c), c))
         if isinstance(s.current, (EndToken, EOFToken)):
+          #if isinstance(s.current, EndToken):
+          #  s.next()
           raise w_Thrown(w_SyntaxError("expected an expression after {}".format(c), s.current))
         if isinstance(c, ArrowToken):
           yield c
@@ -698,7 +726,7 @@ def tokenize(s, indent=True, one=False):
       else:
         yield c
         if stop and isinstance(c, LiteralToken):
-          yield EOFToken()
+          yield EOFToken(c)
           return
       c = s.next()
   return IterBuffer(f(IterBuffer(tokenize1(s)), one, one))

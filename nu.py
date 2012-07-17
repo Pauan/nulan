@@ -38,6 +38,8 @@ if __name__ == "__main__":
       print read1(x).pretty()
     except w_Thrown as e:
       print e
+    except StopIteration:
+      return w_eof
 #      print list(nu_reader.tokenize(nu_reader.IOBuffer(x)))
 
   def test_write(x):
@@ -45,6 +47,8 @@ if __name__ == "__main__":
       print repr(read1(x))
     except w_Thrown as e:
       print e
+    except StopIteration:
+      return w_eof
 #      print list(nu_reader.tokenize(nu_reader.IOBuffer(x)))
 
   def test_write_all(x):
@@ -56,6 +60,8 @@ if __name__ == "__main__":
       sys.stderr = o
     except w_Thrown as e:
       print e
+    except StopIteration:
+      return w_eof
 
   def test_tokenize(x, **kwargs):
     try:
@@ -72,8 +78,7 @@ if __name__ == "__main__":
     "read_file": read_file,
   }
 
-  import doctest
-  #doctest.testfile("tests/nu_reader.py")
+  #import doctest
+  #doctest.testfile("tests/nu_reader.py", globs=test_globs)
   #doctest.testfile("tests/nu_reader.py (tokenize)", globs=test_globs)
-  #doctest.testfile("tests/TEMP.py")
-  repl()
+  #repl()
