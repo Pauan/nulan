@@ -49,30 +49,20 @@ It turns out, we can! Looking at the above code, what we're trying to do is take
 
 First, let's talk about how a language like Kernel implements first-class environments. In a language like Kernel which has mutable environments, it's implemented by having the environment be a special data structure which contains a link to the "parent" environment, so the above would look something like this:
 
-    $let Env1: make-env %f
-      $set! Env1 Yes 1
-      ...
-      $let Env2: make-env Env1
-        $set! Env2 Yes 2
-        ...
+    $def! Env1: make-env %f
+    $set! Env1 Yes 1
+    ...
+    $def! Env2: make-env Env1
+    $set! Env2 Yes 2
+    ...
 
 In the above, `make-env` is a function that accepts one argument: the parent environment. It returns a new (mutable) environment that inherits from its argument.
 
 We then use `$set!` to mutate the environments returned by `make-env`. When looking up a symbol, it will first check in the current environment, and if it's not found, it will then recursively check the parent until it finds an environment that doesn't have a parent, in which case it will throw an error.
 
-As you can see, in the above implementation, environments can only have a single parent. This is how Kernel (and many other languages with first-class environments) implement environments. It is very simple and works well for most cases.
+Because of environment mutation, the above is written in a linear style, which means it can be used to solve the problem of namespaces. This is roughly the same as Racket's system, except it's more consistent because it uses the same data structure for both global and local scope.
 
-Because of mutation, it's also possible to write it in a linear style:
-
-    $def! Env: make-env %f
-    $set! Env Yes 1
-    ...
-    $set! Env Yes 2
-    ...
-
-This means that the mutable first-class environments in Kernel can be used to solve the problem of namespaces. This is roughly the same as Racket's system, except it's more consistent because it uses the same data structure for both global and local scope.
-
-There are certain issues with this system, though, like how to control things like mutability. Kernel uses the policy that "if you have *direct* access to an environment, you can mutate it, otherwise you can't". This makes certain common idioms *much* more verbose, but it does preserve encapsulation.
+There are certain issues with this system, though, like how to control mutability. Kernel uses the policy that "if you have *direct* access to an environment, you can mutate it, otherwise you can't". This makes certain common idioms *much* more verbose, but it does preserve encapsulation.
 
 
 Nulan, however, does things very different. In Nulan, environments are immutable, so the idea of "mutating an environment" is impossible. Instead, you create a new environment which is just like the old one but with the changes you want:
