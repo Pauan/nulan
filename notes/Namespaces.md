@@ -98,9 +98,9 @@ Let's rewrite our example to use a single mutable variable:
 
 What we've done here is, we have created a new variable `Env` which contains an empty environment. We then use `$set` to return a new environment which is just like the old one but `X` is bound to `1`. We then take that new environment and set the variable to it.
 
-And then later on, we do the same thing, except this time `X` is bound to `2`. The interesting thing about this is... because environments are immutable, this has *exactly* the same shadowing effect as multiple nested `$let`s!
+And then later on, we do the same thing, except this time `X` is bound to `2`. The interesting thing about this is... because environments are immutable, this has *exactly* the same shadowing effect as a nested `$let`!
 
-Our goal was to take the linear form of multiple files and somehow express it as nested `$let`s, but we can accomplish the same goal the other way around: if we can express nested `$let`s in a linear style, we can use that for namespaces!
+Our goal was to take the linear form of multiple files and somehow express it as a nested `$let`, but we can accomplish the same goal the other way around: if we can express a nested `$let` in a linear style, we can use that for namespaces!
 
 And in fact, that's exactly what Nulan does. There's an implicit (hidden) environment, just like there's an implicit (hidden) continuation. When you use a form that does symbol binding like `$set!` or `$var!` or `$def!`, it will mutate that hidden environment variable.
 
@@ -134,6 +134,6 @@ Once again, this is clunky enough that there's an `$include!` vau:
     $include! nou
       $use! foo
 
-And the above definitions of `$exclude!` and `$include!` don't use any trickery, they do everything using the *exact same* immutable data + mutable variables system that everything else uses, so it's 100% consistent.
+The above definitions of `$exclude!` and `$include!` don't use any trickery, they do everything using the *exact same* immutable data + mutable variables system that everything else uses, so it's 100% consistent.
 
 This system avoids many of the verbosities of Kernel's system while being easier to reason about, *much* faster, and still retaining tremendous amounts of flexibility. It also integrates in a consistent and seamless way with the rest of the language, which is a huge plus.
