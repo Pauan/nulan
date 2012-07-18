@@ -60,19 +60,25 @@ $set! any?: [X @R] F -> $or: F X; any? R F
 
 $set! case: X @Fns -> any? Fns: F -> F @X
 
-# TODO is it necessary for this to be a vau rather than an fn?
-$set! case-vau; $vau Env Fns
-  $let Args: uniq
-    eval Env [$vau ($quote %Env) Args: case Args @Fns]
-
 $set! case-fn; @Fns ->
   @Args -> case Args @Fns
 
-$set! $defvau!; $vau Env [Name @Fns]
-  eval Env [$set! Name: case-vau @Fns]
+$set! $case-vau; $vau Env [E @Fns]
+  $let Args: uniq
+    eval Env [$vau E Args
+               [$let ($quote eval) [case-fn
+                                     [Args] [eval E Args]
+                                     Args   [eval @Args]]
+                 [case Args @Fns]]]
 
-$set! $def!; $vau Env [Name @Fns]
-  eval Env [$set! Name: case-fn @Fns]
+$set! $defv!; $vau Env [Name E @Fns]
+  eval Env [$def! Name: $case-vau E @Fns]
+
+$defv! $defn Env; @Fns ->
+  eval [$def! Name: case-fn @Fns]
+
+#$set! $defn!; $vau Env [Name @Fns]
+#  eval Env [$def! Name: case-fn @Fns]
 
 #|
 ($set! foo; bar
@@ -100,53 +106,152 @@ $set! $def!; $vau Env [Name @Fns]
 ##############################################################################
 #  $use!
 ##############################################################################
-$defvau! $ref!
+#|
+$defv! $ref!
   X Y -> eval [$set! X: ref Y]
   X   -> eval [$ref! X %f]
+|#
 
-$def! get-current-env: wrap: $vau Env [] Env
+$defn! get-current-env: wrap: $vau Env [] Env
 
-#$def! make-env: Env -> eval Env [[$vau ~ ~ : get-current-env]]
+$defn! make-env; Env ->
+  eval Env [[$vau ~ ~ : get-current-env]]
+
+#$defn! make-env: X -> wrapped-var: X
+
+#make-env
+
+$defn! listify: X -> $if: seq? X; X [X]
+
+$defv! $include! Env; X @Body ->
+  $let New: make-env Env
+    eval New [$do @Body]
+    each: listify X; X ->
+      eval [$set! X (eval New [$get X])]
+      #set! Env X: eval New [$get X]
+      # (New) X
+
+$defv! $exclude! Env; X @Body ->
+  $let X (each: listify X; X ->
+           [X (eval [$get X])])
+           #((Env) X)
+    eval [$do @Body]
+    each X: [L R] -> eval [$set! L R]
+                     #set! Env L R
+
+
+#$defn! make-env: Env -> var: Env
 
 #|
 $ref! make-base-env
 
 $let Top: get-current-env
-  $def! make-base-env
+  $defn! make-base-env
     -> make-env Top
 |#
 #$ref! make-base-env
 
-#$def! make-base-env: -> (get-current-env)
+#$defn! make-base-env: -> (get-current-env)
+
+$defv! $until Env; X Y ->
+  $let X2: eval X
+    $if: is? X2 Y
+      []
+      $lazy [X2 @(eval [$until X Y])]
+
+$defv! $while Env; X ->
+  eval [$until X %f]
+
+
+$defn! path; @Args ->
+  sum Args; X Y ->
+    $let X: expand-path X
+      $if: is? (first Y) "/"
+             Y
+           is? (last X) "/"
+             "@X@Y "
+           "@X/ @Y  "
+
+$defn! abspath: @Args -> path cwd @Args
+
+#|
+(def path args
+  (reduce (fn (x y)
+            (let x (expand-path x)
+              (if (is (y 0) #\/)
+                    y
+                  (is (x (- (len x) 1)) #\/)
+                    (string x y)
+                  (string x "/" y))))
+          args))
+
+$defn! path; casefn
+  "/@X " @R -> "/@X/@(path R) "
+  "/@X " @R -> "/@X@(path R) "
+  X      @R -> $let Y: expand-path X
+                 $if: is? X Y
+                   "@Y@(path R) "
+                   path Y R
+              $ifis? X (expand-path X) Y
+                "@X@(path R) "
+                path X R
+              $ifis? (eval X) Y
+                []
+                $lazy []
+|#
+
+# TODO make it a primitive
+$defn! file-exists?; X ->
+  $catch: read-file X: ~ -> X
+    (%not-found ~) -> %f
+
+$var! file-paths [cwd load-dir]
+
+$defn! find-file; X ->
+  any file-paths; Y ->
+    $let P: abspath X Y
+      $or: file-exists? P
+           file-exists? "@P.nu "
+
+$defn! load-file; X ->
+  read-file X; I -> $while: parse I
+
+$defn! load-file-in; Env X ->
+  each: load-file X; X -> eval Env X
+
+$defv! $use! Env; @Args ->
+  each Args; X ->
+    load-file-in Env: find-file X
+    (Env)
 
 #$let X 5
 #  $let Y: get-current-env
 #    eval Y: $quote X
 #5
 #|
-$defvau! $use!; @Args ->
+$defv! $use! Env; @Args ->
   each Args; X ->
     $let New: make-base-env
-      $hook %Env get-if-unbound
+      $hook Env get-if-unbound
         K -> eval New K
       load-file-in New: find-file X
-      eval %Env [$set! (strip-extension: basename X) New]
+      eval [$set! (strip-extension: basename X) New]
 |#
 
 ##############################################################################
 #  Other utilities
 ##############################################################################
-$defvau! $do: @Body -> eval [[$fn [] @Body]]
+$defv! $do Env: @Body -> eval [[$fn [] @Body]]
 
 # Could be implemented in terms of each, but it would be inefficient
-$def! eachf
-  [X @R] F -> F X; each R F
+$defn! eachf
+  [X @R] F -> F X; eachf R F
   ~      ~ -> %f
 
-$def! not: X -> $if X %f %t
+$defn! not: X -> $if X %f %t
 
 #|
-$def! type; @Fns ->
+$defn! type; @Fns ->
   $if: seq? Fns
     @Args -> any?: zip Fns Args; [X Y] ->
                $if: not: X Y
@@ -156,28 +261,26 @@ $def! type; @Fns ->
                  type-error "type check failed on argument @Y"
 |#
 
-$defvau! do: @Args -> eval [[$fn [] @Args]]
-
-$defvau! $and
+$defv! $and Env
   X    -> eval X
   X @R -> $if: eval X
             eval [$and @R]
 
-$def! all?
+$defn! all?
   [X]    F -> F X
   [X @R] F -> $and: F X; all? R F
 
-$def! none?
-  X F -> all? X: X -> not: F X
+$defn! none?; X F ->
+  all? X: X -> not: F X
 
 
 # Logical functions on functions
-$def! fn-fn
-  F -> @Fns -> @Args -> F Fns: X -> X @Args
+$defn! fn-fn; F ->
+  @Fns -> @Args -> F Fns: X -> X @Args
 
-$def! fn-not: fn-fn none?
-$def! fn-and: fn-fn all?
-$def! fn-or:  fn-fn any?
+$defn! fn-not: fn-fn none?
+$defn! fn-and: fn-fn all?
+$defn! fn-or:  fn-fn any?
 
 # TODO dotted list support for sum/sumr
 
@@ -191,11 +294,11 @@ $def! fn-or:  fn-fn any?
 #   => sum 0 [1 2 3] seq
 #   [[[0 1] 2] 3]
 #
-$def! sum
+$defn! sum
   [X @R] F   -> sum1 X R F
   I      X F -> sum1 I X F
 
-$def! sum1
+$defn! sum1
   I [X @R] F -> sum1 (F I X) R F
   I ~      ~ -> I
 
@@ -224,12 +327,12 @@ sum1 (F (F (F 0 1) 2) 3) F
 #   => sumr [1 2 3] 0 seq
 #   [1 [2 [3 0]]]
 #
-$def! sumr
+$defn! sumr
   [X @R] F   -> F X: sumr R F
   X      ~   -> X
   X      I F -> sumr1 X I F
 
-$def! sumr1
+$defn! sumr1
   [X @R] I F -> F X: sumr R I F
   ~      I ~ -> I
 
@@ -241,7 +344,7 @@ $def! sumr1
 
 
 #|
-$def! map
+$defn! map
   [X @R] F -> $lazy [(F X) @(map R F)]
   X      ~ -> X
 
@@ -268,55 +371,72 @@ $fn [] [(id 4) @(map [] id)]
 
 
 # Whee, function composition implemented with sum
-$def! compose
-  @Fns -> sum Fns: X Y -> @Args -> X: Y @Args
+$defn! compose; @Fns ->
+  sum Fns; X Y ->
+    @Args -> X: Y @Args
+
+#|
+(def compose fns
+  (reduce (fn (x y) (fn args (x (apply y args)))) fns))
+
+(def foldl (f a bs)
+  (.a (foldr (fn (b g) [g:f _ b]) idfn bs)))
+
+(def foldl (f a bs)
+  ((foldr (fn (b g) (fn (x) (g (f x b)))) idfn bs) a))
+|#
+
+
+$defn! inter
+  [X @R] I -> [X I @(inter R)]
+  X      ~ -> X
 
 
 # Called map in other languages.
 #|
 # It's easier to just define it explicitly, rather than using cons + sumr.
-$def! each
+$defn! each
   [X @R] F -> [(F X) @(each R F)]
   X      ~ -> X
 |#
-$def! each; X F ->
+$defn! each; X F ->
   sumr X []: X Y -> [(F X) @Y]
 
-$def! rev; X ->
+$defn! rev; X ->
   sum [] X: Y X -> [X @Y]
 
 #|
 
 # mapreduce
-$def! sumeach
+$defn! sumeach
   I []      ~ ~ -> I
   I [X]     F ~ -> (F X)
   I [@L @R] F G -> G: sumeach I L F G
                       sumeach I R F G
 
 # map
-$def! each
+$defn! each
   X F -> sumeach [] X F tree
 
-$def! id: X -> X
-#$def! copy: X -> each X id
+$defn! id: X -> X
+#$defn! copy: X -> each X id
 
 # reduce
-$def! sum
-  I X F -> sumeach I X id F
+$defn! sum; I X F ->
+  sumeach I X id F
 
 
-$def! first
+$defn! first
   []      -> []
   [X]     -> X
   [@L @R] -> first L
 
-$def! rest
+$defn! rest
   []      -> []
   [X]     -> []
   [@L @R] -> [@(rest L) @R]
 
-$def! each
+$defn! each
   []      ~ -> []
   [X]     F -> F X
   [@L @R] F -> [@(each L F) @(each R F)]
@@ -324,10 +444,10 @@ $def! each
 |#
 
 #|
-$def! foldr
-  F I X -> sum I X: K X -> K: F X
+$defn! foldr; F I X ->
+  sum I X: K X -> K: F X
 
-$def! sum1
+$defn! sum1
   I [X @R] F -> sum1 (F I X) R F
   I ~      ~ -> I
 
@@ -342,25 +462,25 @@ $def! sum1
   )
 |#
 #|
-$def! cons: X Y -> [X @Y]
+$defn! cons: X Y -> [X @Y]
 |#
 
 
 #|
-$def! sum
+$defn! sum
   [X Y @R] F -> sum1 [(F X Y) @R] F
   X        ~ -> X
 |#
 
 #|
-$def! keep
+$defn! keep
   [X @R] F -> $if: F X
                 [X @(keep R F)]
                 keep R F
   X      ~ -> X
 |#
 
-$def! keep; X F ->
+$defn! keep; X F ->
   sumr X []; X Y ->
     $if: F X
       [X @Y]
@@ -373,17 +493,16 @@ $def! keep; X F ->
 (keep '(1 2 3 4 5) (fn (x) (> x 3)))
 |#
 
-$def! rem
-  X F -> keep X: fn-not F
+$defn! rem: X F -> keep X: fn-not F
 
 
-$def! empty?: []     -> %t
-$def! first:  [X @~] -> X
-$def! rest:   [~ @R] -> R
+$defn! empty?: []     -> %t
+$defn! first:  [X @~] -> X
+$defn! rest:   [~ @R] -> R
 
 # => (zip [a 1] [b 2] [c 3])
 #    [[a b c] [1 2 3]]
-$def! zip; @Args ->
+$defn! zip; @Args ->
   $if: any? Args empty?
     []
     [(each Args first) @(zip @(each Args rest))]
@@ -401,46 +520,55 @@ $def! zip; @Args ->
 # Linear in time to the length of the first argument.
 # This is because it simply conses it directly onto the second argument.
 # This is okay because Nulan doesn't have seq mutation.
-$def! join
+$defn! join
   [X @R] Y -> [X @(join R Y)]
   [X]    Y -> [X @Y]
 
 # TODO could use a better name than joinr
-$def! joinr
-  X Y -> join X [Y]
+$defn! joinr: X Y -> join X [Y]
 
-
-$def! ref
+#|
+$defn! ref
   [K V @R] K -> V
   [~ ~ @R] K -> ref R K
+|#
 
-
+#|
 # TODO maybe make it take rest args?
-$def! iso?
+$defn! iso?
   X       X       -> %t
   [X @R1] [Y @R2] -> $and: iso? X Y; iso? R1 R2
+|#
 
-
-$def! prn!; @Args ->
+$defn! prn!; @Args ->
   pr! @Args
   pr! "\n"
 
-$def! writen!; @Args ->
+$defn! writen!; @Args ->
   write! @Args
   pr! "\n"
 
 #|
-$def! pair
+$defn! pair
   [X Y @R] I -> [[X Y] @(pair R I)]
   [X]      I -> [[X I]]
   X          -> pair X []
 |#
 
-$defvau! $lets
+$defv! $lets Env
   [X]        -> eval X
   [[X Y] @R] -> eval [$let X Y: $lets @R]
 
-$defvau! $if-error; [X Y @R] ->
+
+$defn! with1
+  Env [X]        -> eval Env X
+  Env [[X Y] @R] -> set! Env X Y; with1 Env R
+
+$defv! $with Env; @Args ->
+  with1 (make-env Env) Args
+
+
+$defv! $if-error Env; X Y @R ->
   $let U: uniq
     eval [$on-error X
            [$fn [seq: error ~] Y]
@@ -458,7 +586,7 @@ $set! reference
 |#
 
 #|
-$defvau! $def-if!; Name Test @Fns ->
+$defv! $def-if!; Name Test @Fns ->
   $lets: Orig:  eval Name
          Test:  eval Test
          F;     $fn Args
@@ -471,33 +599,63 @@ $defvau! $def-if!; Name Test @Fns ->
 #
 # The expression won't be evaluated until it's actually needed, and if
 # it's evaluated more than once, it'll reuse the previous value
-$defvau! $lazy; X ->
-  $let Saved: ref
+$defv! $lazy Env; X ->
+  $lets: U:      uniq
+         Saved:  var U
     call-on-eval; ->
-      $if *Saved
-        *Saved
-        $set! *Saved: eval X
+      $if: is? Saved U
+        $set-var! Saved: eval X
+        Saved
 
-# Dynamically rebinds a ref while within the $letref's body:
+
+$defv! $get Env: X -> (Env) X
+
+$defv! $get-var Env; X ->
+  $let X: var: eval [$get X] #(Env) X
+    $if: var? X
+      X
+      throw: error "expected var but got @X " #TODO
+
+#$def! $set-var!; vau Env [X Y]
+#  eval Env [set-var! [$get-var X] Y]
+
+#|
+$def! $set!: vau Env [X Y]:
+
+
+$var! bar
+$set! bar: var
+
+$predef! bar
+  $def! foo ...
+  $def! bar ...
+
+$set! bar: var
+$def! foo ...
+$def! bar ...
+$set! bar bar
+|#
+
+# Dynamically rebinds a var while within the $let-var's body:
 #
-#   => $set! *foo 1
+#   => $var! foo 1
 #   1
 #
-#   => $letref foo 5
-#        *foo
+#   => $let-var foo 5
+#        foo
 #   5
 #
-#   => *foo
+#   => foo
 #   1
-$defvau! $letref; X Y @Body ->
-  $lets: Old:  ref
-         X:    eval X
+$defv! $let-var Env; X Y @Body ->
+  $lets: Old:  var
+         X:    eval [$get-var X]
          Y:    eval Y
     eval [dynamic-wind
-           ($fn [] ($set! *Old *X)
-                   ($set! *X Y))
+           ($fn [] ($set-var! Old X)
+                   ($set-var! X Y))
            [$fn [] @Body]
-           ($fn [] ($set! *X *Old))]
+           ($fn [] ($set-var! X Old))]
 
 
 # Evaluates the expression X
@@ -507,14 +665,13 @@ $defvau! $letref; X Y @Body ->
 #
 # This is used for cleanup code, e.g. closing a file after
 # performing some operations on it
-$defvau! $after; X Y ->
-  $lets: Seen:  ref %f
-         F;     $fn []
-                  $if *Seen
-                    throw: error "cannot re-enter an $after with a continuation"
-                    $set! *Seen %t
+$defv! $after Env; X Y ->
+  $let Seen: var %f
     eval [dynamic-wind
-           F
+           ($fn []
+             ($if Seen
+               (throw: error "cannot re-enter an $after")
+               ($set! Seen %t)))
            [$fn [] X]
            [$fn [] Y]]
 
@@ -568,7 +725,7 @@ $set! $let; $vau Env [X Y | R]
 |#
 
 
-($defvau! $def-if!
+($defv! $def-if!
   (Name Test | Fns ->
     ($let
       (Orig  (eval Name))
@@ -580,7 +737,7 @@ $set! $let; $vau Env [X Y | R]
            (X -> X)))
       (eval [$def! Name F | Fns]))))
 
-($defvau! $def-if!
+($defv! $def-if!
   ($fn [Name Test | Fns]
     ($let
       (Orig
@@ -594,7 +751,7 @@ $set! $let; $vau Env [X Y | R]
             (X -> X))))
       (eval [$def! Name F | Fns]))))
 
-($defvau! $def-if!
+($defv! $def-if!
   ($fn [Name Test | Fns]
     ($let (Orig  (eval Name))
           (Test  (eval Test))

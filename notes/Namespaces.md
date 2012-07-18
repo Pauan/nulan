@@ -117,7 +117,7 @@ To demonstrate the power of this namespace system, let's try to accomplish some 
     $lets: Top:  get-current-env
            N:    $quote nou
            Old:  (Top) N
-      eval Top: $quote $use! foo
+      eval Top: $quote: $use! foo
       set! Top N Old
 
 But this is clunky and common enough that there's an `$exclude!` vau which does just that:
