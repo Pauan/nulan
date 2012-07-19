@@ -74,7 +74,7 @@ $set! $case-vau; $vau Env [E @Fns]
 $set! $defv!; $vau Env [Name E @Fns]
   eval Env [$def! Name: $case-vau E @Fns]
 
-$defv! $defn Env; @Fns ->
+$defv! $defn! Env; @Fns ->
   eval [$def! Name: case-fn @Fns]
 
 #$set! $defn!; $vau Env [Name @Fns]
@@ -671,7 +671,7 @@ $defv! $after Env; X Y ->
            ($fn []
              ($if Seen
                (throw: error "cannot re-enter an $after")
-               ($set! Seen %t)))
+               ($set-var! Seen %t)))
            [$fn [] X]
            [$fn [] Y]]
 
