@@ -1,3 +1,5 @@
+# AVL Tree algorithm courtesy of waterhouse (http://www.arclanguage.org/item?id=14181)
+
 class Nil(object):
   count = 0
   depth = 0
@@ -14,7 +16,6 @@ nil.l = nil
 nil.r = nil
 
 
-# AVL Tree
 class Tree(object):
   def __init__(self, l, r):
     self.l     = l
