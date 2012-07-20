@@ -38,28 +38,21 @@ class Tree(object):
     for x in self.l:
       yield x
 
-  #def __repr__(self):
-  #  return "({!r} {!r})".format(self.l, self.r)
-
 
 # Tree with O(1) length and lookup by index
 class Ordered(Tree):
   def __init__(self, l, r):
     Tree.__init__(self, l, r)
-    #self.value = value
     self.count = l.count + r.count + 1
-
-  def __str__(self):
-    return "[{}]".format(" ".join(str(x) for x in self))
 
   def __repr__(self):
     return "(%seq {})".format(" ".join(repr(x) for x in self))
 
+  def __str__(self):
+    return "[{}]".format(" ".join(str(x) for x in self))
+
   def ret(self):
     return self.value
-
-  #def __str__(self):
-  #  return "({} {}={} {})".format(str(self.l), self.value, self.count, str(self.r))
 
   def transfer(self, y):
     self.value = y.value
@@ -68,16 +61,11 @@ class Ordered(Tree):
 
 # Tree that maps keys to values
 class Dictionary(Ordered):
-  def __str__(self):
-    return "{{{}}}".format(" ".join("{} {}".format(*x) for x in self))
-
   def __repr__(self):
     return "(dict {})".format(" ".join("{!r} {!r}".format(*x) for x in self))
-    #result = []
-    #for k, v in self:
-    #  result.append(repr(k))
-    #  result.append(repr(v))
-    #return "(dict {})".format(" ".join(result))
+
+  def __str__(self):
+    return "{{{}}}".format(" ".join("{} {}".format(*x) for x in self))
 
   def ret(self):
     return self.key, self.value
@@ -97,6 +85,8 @@ class Dictionary(Ordered):
 class Set(Dictionary):
   def __repr__(self):
     return "(&set {})".format(" ".join(repr(x) for x in self))
+
+  __str__ = __repr__
 
   def ret(self):
     return self.key
@@ -215,9 +205,9 @@ def key_get(tree, key, default=9001):
     return default
   elif key == tree.key:
     return tree.value
-  elif key < tree.key:  # left branch
+  elif key < tree.key:
     return key_get(tree.l, key, default)
-  else:                 # right branch
+  else:
     return key_get(tree.r, key, default)
 
 def key_ins(cons, tree, key, value):
@@ -225,11 +215,11 @@ def key_ins(cons, tree, key, value):
     return cons(nil, nil).key_ins(key, value)
   elif key == tree.key:
     return cons(tree.l, tree.r).key_ins(key, value)
-  elif key < tree.key:  # left branch
+  elif key < tree.key:
     return bcons(cons, tree,
                  key_ins(cons, tree.l, key, value),
                  tree.r)
-  else:                 # right branch
+  else:
     return bcons(cons, tree,
                  tree.l,
                  key_ins(cons, tree.r, key, value))
@@ -240,11 +230,11 @@ def key_rem(cons, tree, key):
     raise KeyError(key)
   elif key == tree.key:
     return simple_merge(cons, tree.l, tree.r)
-  elif key < tree.key:  # left branch
+  elif key < tree.key:
     return bcons(cons, tree,
                  key_rem(cons, tree.l, key),
                  tree.r)
-  else:                 # right branch
+  else:
     return bcons(cons, tree,
                  tree.l,
                  key_rem(cons, tree.r, key))
