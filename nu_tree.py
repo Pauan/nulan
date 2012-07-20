@@ -1,122 +1,3 @@
-class Tree(object):
-  pass
-
-class BTree(Tree):
-  def __repr__(self):
-    if self.l or self.r:
-      return "({} {} {})".format(self.l, self.key, self.r)
-    else:
-      return str(self.value)
-  def get(self, key):
-    x = self
-    while 1:
-      if key == x.key:
-        return x.value
-      elif key < x.key:
-        x = x.l
-      else:
-        x = x.r
-  #def fold(self, f):
-  #  pass
-  #def __iter__(self):
-  #  if l is not None:
-  #    inorder(self.l)
-  #  if l is None and r is None:
-  #    return node.value
-  #  if r is not None:
-  #    inorder(self.r)
-
-class AATree(BTree):
-  def __init__(self, key, value=None, l=None, r=None):
-    self.l     = l
-    self.r     = r
-    self.key   = key
-    self.value = value
-    self.level = 1
-    #if l is None and r is None:
-    #  self.level = 1
-    #else:
-    #  self.level = l.level + 1
-    #self.rebalance()
-  #def rebalance(self):
-  #  if self.level != 1:
-  #    if self.l.level == self.level:
-  #      l = self.l
-  #      self.l = l.l
-  #      self.r = None
-  #
-  #    print self.level, self.l.level, self.r.level
-  #def __repr__(self):
-  #  if self.l or self.r:
-  #    return "({} {} {})".format(self.l, self.level, self.r)
-  #  else:
-  #    return str(self.value)
-  def set(self, key, value):
-    x = ret = self
-    while 1:
-      if key == x.key:
-        ret = AATree(key, value)
-      elif key < x.key:
-        x = x.l
-      else:
-        x = x.r
-
-
-#T is leaf and L is leaf
-#
-#L - T
-#     \
-#      R
-
-
-def list_to_tree(xs, cons=AATree):
-  xs = enumerate(xs)
-  y = cons(*xs.next())
-  try:
-    while 1:
-      y = y.set(*xs.next())
-      #y = cons(i, x, l=y, r=cons(i, x))
-      print y
-  except StopIteration:
-    return y
-
-def list_to_tree(xs, cons=AATree):
-  l = len(xs)
-  i = l
-
-
-  y = cons(*xs.next())
-  try:
-    while 1:
-      #cons(i / 2, xs[i / 2], )
-      y = y.set(*xs.next())
-      #y = cons(i, x, l=y, r=cons(i, x))
-      print y
-  except StopIteration:
-    return y
-
-
-# [10, 20, 30, 40, 50, 60, 70, 80, 90]
-
-# len(xs) / 2
-
-#    30
-#  20  40
-#10      50
-
-#    40
-#  20  50
-#10  30
-
-
-#     3
-#  1     5
-# 0 2   4 6
-#
-# order: 0 1 2 3 4 5 6
-# depth: 1 2 1 3 1 2 1
-# count: 1 3 1 7 1 3 1
-
 class Nil(object):
   count = 0
   depth = 0
@@ -132,6 +13,7 @@ nil = Nil()
 nil.l = nil
 nil.r = nil
 
+#str(iter_to_tree([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))
 
 #def haskey(self, key):
 #  return False
@@ -148,38 +30,45 @@ class Tree(object):
     self.r     = r
     self.depth = max(l.depth, r.depth) + 1
 
+  def map(self):
+    return self
+
   def __iter__(self):
     for x in self.l:
       yield x
-    yield self
+    yield self.map()
     for x in self.r:
       yield x
 
   def __reversed__(self):
     for x in self.r:
       yield x
-    yield self
+    yield self.map()
     for x in self.l:
       yield x
-
-# AVL Tree + sorted by index
-class Ordered(Tree):
-  def __init__(self, l, r, value):
-    Tree.__init__(self, l, r)
-    self.value = value
-    self.count = l.count + r.count + 1
-
-  def __iter__(self):
-    return (x.value for x in Tree.__iter__(self))
-
-  def __reversed__(self):
-    return (x.value for x in Tree.__reversed__(self))
-
-  def __str__(self):
-    return "[{}]".format("".join(str(x) for x in self))
 
   def __repr__(self):
-    return "(%seq {})".format("".join(repr(x) for x in self))
+    return "({!r} {!r})".format(self.l, self.r)
+
+
+# Tree with O(1) length and lookup by index
+class Ordered(Tree):
+  def __init__(self, l, r):
+    Tree.__init__(self, l, r)
+    #self.value = value
+    self.count = l.count + r.count + 1
+
+  def __str__(self):
+    return "[{}]".format(" ".join(str(x) for x in self))
+
+  def __repr__(self):
+    return "(%seq {})".format(" ".join(repr(x) for x in self))
+
+  #def __str__(self):
+  #  return "({} {}={} {})".format(str(self.l), self.value, self.count, str(self.r))
+
+  def map(self):
+    return self.value
 
   def transfer(self, y):
     self.value = y.value
@@ -189,34 +78,11 @@ class Ordered(Tree):
     self.value = value
     return self
 
-#  def hasind(self, ind):
-#    if key == self.key:
-#      return True
-#    elif key < self.key:
-#      return self.l.haskey(key)
-#    else:
-#      return self.r.haskey(key)
-
-#  def getind(self, ind, default=w_false):
-#    if self.count == ind:
-#      return self.value
-#    elif self.l.count < ind:
-#      return self.l.getind(ind - self.l.count, default=default)
-#    else:
-#      return self.r.getind(ind - self.r.count, default=default)
-
-#  def setind(self, ind, value):
-#    if self is nil:
-#      return List(nil, nil, value)
-#    elif self.count == ind:
-#    elif self.l.count < ind:
-#    else:
-
 
 # Dictionary where the values are the keys
 class Set(Ordered):
-  def __init__(self, l, r, value):
-    Ordered.__init__(self, l, r, value)
+  def __init__(self, l, r):
+    Ordered.__init__(self, l, r)
     self.key = value
 
   def __repr__(self):
@@ -233,11 +99,11 @@ class Set(Ordered):
     else:
       return self.r.haskey(key)
 
-  def getkey(self, key, default=w_false):
-    return self.haskey(key) or default
+  #def getkey(self, key, default=w_false):
+  #  return self.haskey(key) or default
 
   def setkey(self, key, value=None):
-    if self is nil:
+    if self == nil:
       return Set(nil, nil, key)
     elif key == self.key:
       return self
@@ -264,26 +130,26 @@ class Dictionary(Set):
     return "(dict {})".format(" ".join(result))
 
   def __iter__(self):
-
+    pass
 
   def __repr__(self):
-    if self.l is nil:
-      if self.r is nil:
+    if self.l == nil:
+      if self.r == nil:
         return "({}={})".format(self.key, self.value)
       else:
         return "({}={} {})".format(self.key, self.value, self.r)
-    elif self.r is nil:
+    elif self.r == nil:
       return "({} {}={})".format(self.l, self.key, self.value)
     else:
       return "({} {}={} {})".format(self.l, self.key, self.value, self.r)
 
-  def getkey(self, key, default=w_false):
-    if key == self.key:
-      return self.value
-    elif key < self.key:
-      return self.l.getkey(key, default=default)
-    else:
-      return self.r.getkey(key, default=default)
+  #def getkey(self, key, default=w_false):
+  #  if key == self.key:
+  #    return self.value
+  #  elif key < self.key:
+  #    return self.l.getkey(key, default=default)
+  #  else:
+  #    return self.r.getkey(key, default=default)
 
   def setkey(self, key, value):
     if key == self.key:
@@ -312,71 +178,103 @@ class Dictionary(Set):
 
 
 # Balanced tree construction
-def bcons(cons, l, r, value, trans):
+def bcons(cons, l, r, tree):
   if l.depth > r.depth + 1:
     if l.l.depth > l.r.depth:
-      return trans(cons(l.l,
-                        value(cons(l.r, r))),
-                   l)
+      return cons(l.l,
+                  cons(l.r, r).transfer(tree)).transfer(l)
     else:
-      return trans(cons(trans(cons(l.l,   l.r.l),
-                              l),
-                        value(cons(l.r.r, r))),
-                   l.r)
+      return cons(cons(l.l,   l.r.l).transfer(l)
+                  cons(l.r.r, r    ).transfer(tree)).transfer(l.r)
   elif r.depth > l.depth + 1:
     if r.r.depth > r.l.depth:
-      return trans(cons(value(cons(l, r.l)),
-                        r.r),
-                   r)
+      return cons(cons(l, r.l).transfer(tree),
+                  r.r).transfer(r)
     else:
-      return trans(cons(value(cons(l,     r.l.l)),
-                        trans(cons(r.l.r, r.r),
-                              r)),
-                   r.l)
+      return cons(cons(l,     r.l.l).transfer(tree),
+                  cons(r.l.r, r.r  ).transfer(r)).transfer(r.l)
   else:
-    return value(cons(l, r))
+    return cons(l, r).transfer(tree)
+
+# Not a general merge; assumes [all of a] <= [all of b]
+def simple_merge(cons, l, r):
+  if l == nil:
+    return r
+  elif r == nil:
+    return l
+  elif l.depth < b.depth:
+    return bcons(cons, r
+                 simple_merge(l, r.l),
+                 r.r)
+  else:
+    return bcons(cons, l,
+                 l.l,
+                 simple_merge(l.r, r))
 
 
-def getind(tree, ind):
+def ind_get(tree, ind, default=9001):
   c = tree.l.count
-  if ind == c:
-    return tree
+  #print tree, ind, c
+  if tree == nil:
+    return default
+  elif ind == c:
+    return tree.map()
   elif ind < c:  # left branch
-    return getind(tree.l, ind)
+    return ind_get(tree.l, ind, default)
+  #elif ind == tree.r.count:
+  #  return tree.map()
   else:          # right branch
-    return getind(tree.r, ind - c)
+    #print "RIGHT", tree, ind, tree.r.count
+    return ind_get(tree.r, ind - c - 1, default)
 
-def setind(cons, tree, ind, value):
+def ind_ins(cons, tree, ind, value):
   c = tree.l.count
-  if tree is nil:
+  #print c, ind
+  if tree == nil:
     return cons(nil, nil).assign(value)
   elif ind == c:
     return cons(tree.l, tree.r).assign(value)
   elif ind < c:  # left branch
-    return bcons(cons,
-                 setind(cons, tree.l, ind, value),
-                 tree.r,
-                 value=lambda x: x.assign(value),
-                 trans=lambda x, y: x.transfer(y))
+    return bcons(cons, tree
+                 ind_ins(cons, tree.l, ind, value),
+                 tree.r)
   else:          # right branch
-    return bcons(cons,
+    return bcons(cons, tree
                  tree.l,
-                 setind(cons, tree.r, ind - c, value),
-                 value=lambda x: x.assign(value),
-                 trans=lambda x, y: x.transfer(y))
+                 ind_ins(cons, tree.r, ind - c - 1, value))
+
+def ind_rem(cons, tree, ind, default=9001):
+  c = tree.l.count
+  if tree == nil:
+    return default
+  elif ind == c:
+    return simple_merge(cons, tree.l, tree.r)
+  elif ind < c:  # left branch
+    return bcons(cons, tree
+                 ind_rem(cons, tree.l, ind, value),
+                 tree.r)
+  else:          # right branch
+    return bcons(cons, tree
+                 tree.l,
+                 ind_rem(cons, tree.r, ind - c - 1, value))
 
 
 # O(n log2(n))
-def iter_to_tree(xs, cons=Ordered):
+def iter_to_tree(xs, cons):
   xs = iter(xs)
   y  = nil
   try:
     while 1:
-      y = setind(cons, y, y.count, xs.next())
-      print y
+      y = ind_ins(cons, y, y.count, xs.next())
   except StopIteration:
     return y
 
+def iter_to_list(xs):
+  return iter_to_tree(xs, cons=Ordered)
+
+def iter_to_dict(xs):
+  return iter_to_tree(xs, cons=Dictionary)
+
 # O(n)
-def list_to_tree(xs):
+def list_to_list(xs):
   pass
