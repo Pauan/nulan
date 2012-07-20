@@ -42,7 +42,8 @@ class Tree(object):
       yield x
 
 
-# Tree with O(1) length and lookup by index
+# O(1) element count
+# O(log2(n)) lookup by index
 class Ordered(Tree):
   def __init__(self, l, r):
     Tree.__init__(self, l, r)
@@ -65,7 +66,7 @@ class Ordered(Tree):
     return self
 
 
-# Tree that maps keys to values
+# O(log2(n)) lookup by key
 class Dictionary(Ordered):
   def __repr__(self):
     return "(dict {})".format(" ".join("{!r} {!r}".format(*x) for x in self))
@@ -87,7 +88,7 @@ class Dictionary(Ordered):
     return self
 
 
-# Dictionary where the values are the keys
+# O(log2(n)) lookup by value
 class Set(Dictionary):
   def __repr__(self):
     return "(&set {})".format(" ".join(repr(x) for x in self))
