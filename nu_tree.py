@@ -8,6 +8,8 @@ class Nil(object):
     return "[]"
   def __iter__(self):
     return self
+  def __reversed__(self):
+    return self
   def next(self):
     raise StopIteration
 
@@ -33,10 +35,10 @@ class Tree(object):
       yield x
 
   def __reversed__(self):
-    for x in self.r:
+    for x in reversed(self.r):
       yield x
     yield self.ret()
-    for x in self.l:
+    for x in reversed(self.l):
       yield x
 
 
@@ -45,6 +47,9 @@ class Ordered(Tree):
   def __init__(self, l, r):
     Tree.__init__(self, l, r)
     self.count = l.count + r.count + 1
+
+  def __len__(self):
+    return self.count
 
   def __repr__(self):
     return "(%seq {})".format(" ".join(repr(x) for x in self))
