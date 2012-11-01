@@ -237,6 +237,9 @@
   'add   (wrap-fn hash-set*)
   'rem   (wrap-fn hash-remove*)
 
+  'prn   (wrap-fn displayln)
+  'shell-arguments (wrap-fn current-command-line-arguments)
+
   '*     (wrap-fn *)
   '/     (wrap-fn /)
   '+     (wrap-fn +)
@@ -248,3 +251,20 @@
 )))
 
 (set-box! globals (hash-set (unbox globals) 'globals globals))
+
+
+;; Stuff for the "nulan" executable
+(define (nu-eval-string s)
+  (nu-eval globals (read (open-input-string s))))
+
+(define (nu-eval-file s)
+  ;; This is so that it's possible to retrieve the column/line of an input port
+  (parameterize ((port-count-lines-enabled #t))
+    (call-with-input-file s
+      (lambda (p)
+        (let loop ()
+          (let ((x (read p)))
+            (if (eof-object? x)
+                #t ;; TODO: should probably be (void)
+                (begin (nu-eval globals x)
+                       (loop)))))))))
