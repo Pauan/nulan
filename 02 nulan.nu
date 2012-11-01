@@ -27,3 +27,10 @@
   (vau e (list n v)
     (eval e (list do (list var n %f)
                      (list set! n v)))))
+
+(def quote (vau ~ (list x) x))
+
+(def fn
+  (vau e x
+    (add (eval e (list* vau (quote ~) x))
+      %fn %t)))

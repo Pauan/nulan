@@ -232,6 +232,7 @@
   'unbox     (box (wrap-fn unbox))
   'set-box!  (box (wrap-fn (lambda (b v) (set-box! b v) v)))
 
+  'list* (box (wrap-fn list*))
   'car   (box (wrap-fn car))
   'cdr   (box (wrap-fn cdr))
 
