@@ -79,16 +79,16 @@ var NULAN = (function (n) {
         return bcons(x, x.l, x.r.set(key, value))
       }
     },
-    del: function (key) {
+    rem: function (key) {
       var x = this
       if (x === n.nil) {
         return x // TODO: what's the best behavior for this?
       } else if (n.is(key, x.key)) {
         return merge(x.l, x.r)
       } else if (n.lt(key, x.key)) {
-        return bcons(x, x.l.del(key), x.r)
+        return bcons(x, x.l.rem(key), x.r)
       } else {
-        return bcons(x, x.l, x.r.del(key))
+        return bcons(x, x.l, x.r.rem(key))
       }
     },
     toJS: function () {
@@ -115,7 +115,7 @@ var NULAN = (function (n) {
   nil.count = nil.depth = 0
 
   function make(key, value, l, r) {
-    var o = new n.Tree()
+    var o   = new n.Tree()
     o.key   = key
     o.value = value
     o.l     = l
