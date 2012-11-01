@@ -28,11 +28,6 @@
 (define-syntax-rule (match1 x y . body)
   (match-let ((x y)) . body))
 
-#|(define (nu-unbox x)
-  (if (box? x)
-      (unbox x)
-      x))|#
-
 (define (nu-error x . args)
   (error (format "~a error: ~a" x
            (let ([o (open-output-string)])
@@ -60,6 +55,7 @@
 
 ;; Layer 2
 ; (depends get)
+; TODO: get rid of this function (inline it into nu-eval)
 (define (lookup e n)
   (get e (unbox e) n))
 
@@ -77,13 +73,6 @@
 
 
 ;; Layer 4
-; (depends match1 lookup nu-eval)
-(define (set e a)
-  (match1 (list n v) a
-    (let ((v (nu-eval e v)))
-      (set-box! (lookup e n) v)
-      v)))
-
 ; (depends %f nu-eval)
 (define (do e a)
   (if (null? a)
@@ -231,7 +220,6 @@
   'vau   (box vau)
   'do    (box do)
   '&     (box &)
-  'set!  (box set)
 
   ;; Patterns
   'list  (box nu-list)
@@ -240,9 +228,9 @@
   ;; Functions
   'pattern-match (box (hash %call pattern-match1 %fn %t))
 
-  'box   (box (wrap-fn box))
-  'unbox (box (wrap-fn unbox))
-  ;'set!  (box (wrap-fn set-box!))
+  'box       (box (wrap-fn box))
+  'unbox     (box (wrap-fn unbox))
+  'set-box!  (box (wrap-fn (lambda (b v) (set-box! b v) v)))
 
   'car   (box (wrap-fn car))
   'cdr   (box (wrap-fn cdr))

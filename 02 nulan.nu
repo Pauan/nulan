@@ -18,6 +18,11 @@
     (& wrap-fn (&get x))))
 |#
 
+(var set!
+  (vau e (list n v)
+    (set-box! (get (unbox e) n)
+              (eval e v))))
+
 (var def
   (vau e (list n v)
     (eval e (list do (list var n %f)
