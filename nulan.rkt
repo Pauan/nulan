@@ -4,7 +4,6 @@
 
 ;; Layer 0
 (define %call          (gensym))
-(define %vau           (gensym))
 (define %fn            (gensym))
 (define %get           (gensym))
 (define %pattern-match (string->uninterned-symbol "%pattern-match"))
@@ -16,12 +15,6 @@
 (define %f             #f)
 (define %t             #t)
 
-#|(define %add           (gensym))
-(define %rem           (gensym))
-(define %lower         (gensym))
-(define %upper         (gensym))
-(define %len           (gensym))|#
-
 (define (hash-remove* x . a)
   (let loop ((x  x)
              (a  a))
@@ -29,9 +22,6 @@
         x
         (loop (hash-remove x (car a))
               (cdr a)))))
-
-#|(define (update x . args)
-  (set-box! x (apply hash-set* (unbox x) args)))|#
 
 (define-syntax-rule (match1 x y . body)
   (match-let ((x y)) . body))
@@ -41,14 +31,6 @@
            (let ([o (open-output-string)])
              (for ([x args]) (display x o))
              (get-output-string o)))))
-
-(define (timeit f (time 10000))
-  (let ((old (+ (current-milliseconds) time)))
-    (let loop ((i 0))
-      (if (> (current-milliseconds) old)
-          i
-          (begin (f)
-                 (loop (+ i 1)))))))
 
 
 ;; Layer 1
@@ -216,45 +198,6 @@
       %body         (cons do r))))
 
 
-#|
-(vau e {a b}
-  (+ a 1)
-  (+ b 2))
-
-(dict %scope       (dict ...)
-      %environment (quote e)
-      %arguments   (quote {a b})
-      %body        {do @(quote (+ a 1) (+ b 2))}
-      %call        ...)
-
-
-(def do
-  (vau e args
-    ((fn {~}
-       (eval e {do @(cdr args)}))
-     (eval e (car args)))))
-|#
-
-#|
-(nu-eval globals '((fn a (def b 10) (+ b (car a))) 1))
-(nu-eval globals 'b)
-(nu-eval globals '(& + 1 2 5))
-(nu-eval globals '((fn (list a b c) a) 1 2 3))
-(nu-eval globals '((fn (list 1 (list a b)) (+ a b)) 1 (list 2 3)))
-(nu-eval globals '(def a 5))
-|#
-
-#|
-(def list
-  [ %pattern-match (case-loop
-                     ~ e {}       {}       -> e
-                     ~ ~ {}       a        -> (error %pattern-match {} a)
-                     ~ ~ p        {}       -> (error %pattern-match p {})
-                     ~ e {p1 @p2} {a1 @a2} -> (loop ~ (pattern-match e p1 a1) p2 a2))
-  | %call          (wrap-fn list)
-  | %fn            %t ])
-|#
-
 ; (depends %pattern-match %call %fn %t wrap-fn)
 (define dict
   (hash %pattern-match
@@ -263,6 +206,7 @@
         %call
           (wrap-fn hash)
         %fn %t))
+
 
 (define globals (box (hash
   ;; Vaus
@@ -304,128 +248,3 @@
 )))
 
 (set-box! globals (hash-set (unbox globals) 'globals globals))
-
-#|(update globals
-  'globals globals)|#
-
-
-
-#|
-(fn ()
-  (var a 5)
-  (set-var a 10)
-  a)
-
-(fn ()
-  (var a 5)
-  (let a a))
-
-(fn ()
-  (var a a))
-
-(fn ()
-  (var + +))
-
-(fn ()
-  (let a (+ 5 10))
-  a)
-
-(let foo 5)
-|#
-
-#|
-
-; (depends %add %rem %lower %upper %len get-val)
-(define nil (hash
-  %add    (lambda (x k v)
-            (let ((x (hash-set x k v)))
-              (if (integer? k)
-                  (let ((l  (min k (get-val x %lower)))
-                        (u  (max (+ k 1) (get-val x %upper))))
-                    (hash-set* x
-                      %lower (lambda (x) l)
-                      %upper (lambda (x) u)))
-                  x)))
-  %rem    (lambda (x k)
-            (let ((x (hash-remove x k)))
-              (if (integer? k)
-                  (let ((l  (get-val x %lower))
-                        (u  (get-val x %upper)))
-                    (cond ((= k l)
-                            (let loop ((i (+ l 1)))
-                              (if (or (hash-has-key? x i)
-                                      (>= i u))
-                                  (hash-set x %lower (lambda (x) i))
-                                  (loop (+ i 1)))))
-                          ((= k u)
-                            (let loop ((i (- u 1)))
-                              (if (or (hash-has-key? x i)
-                                      (<= i l))
-                                  (hash-set x %upper (lambda (x) i))
-                                  (loop (- i 1)))))
-                          (else x)))
-                  x)))
-  %lower  (lambda (x) 0)
-  %upper  (lambda (x) 0)
-  %len    (lambda (x)
-            (- (get-val x %upper)
-               (get-val x %lower)))))
-
-; (depends %upper nil)
-(define (list->hash x)
-  (let loop ((x  x)
-             (h  nil)
-             (i  0))
-    (if (null? x)
-        (hash-set h %upper (lambda (x) i))
-        (loop (cdr x)
-              (hash-set h i (car x))
-              (+ i 1)))))
-|#
-
-#|
-(eval `(set-box! ,(box 5) 10))
-|#
-
-#|
-
-(let ((x 5))
-  (timeit (lambda () x)))
-130763562
-
-(timeit (lambda () 5))
-130433025
-
-(let ((x (lambda () 5)))
-  (timeit (lambda () (x))))
-126242739
-
-(let ((x (box-immutable 5)))
-  (timeit (lambda () (unbox x))))
-125751269
-
-(let ((x (box 5)))
-  (timeit (lambda () (unbox x))))
-124316219
-
-(let ((x (make-placeholder 5)))
-  (timeit (lambda () (placeholder-get x))))
-109018903
-
-(let ((x (hash 'a 5)))
-  (timeit (lambda () (hash-ref x 'a))))
-80959212
-
-(let ((x (hash 'a (lambda () 5))))
-  (timeit (lambda () ((hash-ref x 'a)))))
-77829131
-
-(let ((x (hash 'a (make-placeholder 5))))
-  (timeit (lambda () (placeholder-get (hash-ref x 'a)))))
-71638887
-
-(let ((x (make-parameter 5)))
-  (timeit (lambda () (x))))
-45191656
-
-|#
