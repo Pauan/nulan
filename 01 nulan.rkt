@@ -14,6 +14,7 @@
 (define %environment   (gensym))
 (define %arguments     (gensym))
 (define %body          (gensym))
+(define %splice        (gensym))
 
 (define %f             #f)
 (define %t             #t)
@@ -166,7 +167,7 @@
                     (nu-error %pattern-match pat " != " val))
                   (else
                     (if (and (pair? (car pat))
-                             (eq? (caar pat) 'splice))
+                             (eq? (caar pat) %splice)) ; TODO
                         (if (null? (cdr pat))
                             (pattern-match1 '~ (list '~ env (cadar pat) val))
                             (let-values (((x y) (split-at-right val (length (cdr pat)))))
@@ -189,7 +190,7 @@
             (cond ((null? pat)
                     env)
                   ((and (pair? (car pat))
-                        (eq? (caar pat) 'splice))
+                        (eq? (caar pat) %splice)) ; TODO
                     (loop (pattern-match1 '~ (list '~ env (cadar pat) val))
                           (cdr pat)
                           val)) ; TODO: not sure what this should be...
@@ -203,10 +204,28 @@
                           (loop (pattern-match1 '~ (list '~ env (cadr pat) (get e val x)))
                                 (cddr pat)
                                 (hash-remove val x))
-                          (nu-error %pattern-match "key " (car pat) " not in " val))))))))))
+                          (nu-error %pattern-match "key " (car pat) " not in " val))))))))
+    #|%pattern-match-splicing
+      (lambda (_ a)
+        (match1 (list _ env pat val) a
+
+          ))|#
+          ))
 
 
 ;; Layer 8
+; (depends %splice dict nu-list)
+(current-readtable
+  (make-readtable #f #\[ 'terminating-macro
+                       (lambda (ch port src line col pos)
+                         (cons dict (read/recursive port ch #f)))
+                     #\{ 'terminating-macro
+                       (lambda (ch port src line col pos)
+                         (cons nu-list (read/recursive port ch #f)))
+                     #\@ 'terminating-macro
+                       (lambda (ch port src line col pos)
+                         (list %splice (read/recursive port #f #f)))))
+
 ; (depends %call %scope %environment %arguments %body get pattern-match nu-eval)
 (define vau-proto
   (hash %call (lambda (e a)
@@ -279,6 +298,7 @@
   '%body           (box %body)
   '%f              (box %f)
   '%t              (box %t)
+  '%splice         (box %splice)
 )))
 
 (set-box! globals (hash-set (unbox globals) 'globals globals))
