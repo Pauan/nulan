@@ -1,0 +1,38 @@
+(let ((x 5))
+  (timeit (lambda () x)))
+130763562
+
+(timeit (lambda () 5))
+130433025
+
+(let ((x (lambda () 5)))
+  (timeit (lambda () (x))))
+126242739
+
+(let ((x (box-immutable 5)))
+  (timeit (lambda () (unbox x))))
+125751269
+
+(let ((x (box 5)))
+  (timeit (lambda () (unbox x))))
+124316219
+
+(let ((x (make-placeholder 5)))
+  (timeit (lambda () (placeholder-get x))))
+109018903
+
+(let ((x (hash 'a 5)))
+  (timeit (lambda () (hash-ref x 'a))))
+80959212
+
+(let ((x (hash 'a (lambda () 5))))
+  (timeit (lambda () ((hash-ref x 'a)))))
+77829131
+
+(let ((x (hash 'a (make-placeholder 5))))
+  (timeit (lambda () (placeholder-get (hash-ref x 'a)))))
+71638887
+
+(let ((x (make-parameter 5)))
+  (timeit (lambda () (x))))
+45191656
