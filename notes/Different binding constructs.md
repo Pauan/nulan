@@ -23,18 +23,17 @@
                *  E  N
                *  E  V  *
                *  E  V
-        $def!  *     N  *  # generic assignment
-       $defn!  *     N  *  # recursive functions
-       $defv!  *     N  *  # recursive vaus
+               *     N  *
                *     N
-        $var!  *     V  *  # recursive mutable functions
+               *     V  *
                *     V
                *        *
-    $set-var!  *           # variable mutation
-       $setr!     A  N  *  # recursive binding
-        $set!     A  N     # binding
+        $set!  *           # variable mutation
+        $defn     A  N  *  # recursive binding
+      $defvau     A  N  *  # recursive vau binding
+         $def     A  N     # binding
                   A  V  *
-                  A  V
+        $def!     A  V     # implicit variable creation
                   E  N  *
                   E  N
                   E  V  *
@@ -60,9 +59,10 @@
                *     V  *
                *     V
                *        *
-     $let-var  *
-        $letr     A  N  *
-         $let     A  N
+        $let!  *           # dynamic variable
+        $letn     A  N  *  # local recursive binding
+         $let     A  N     # local binding
+        $lets     A  N     # nested $let
                   A  V  *
                   A  V
                   E  N  *
