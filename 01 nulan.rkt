@@ -115,22 +115,22 @@
 ;; Layer 5
 ; (depends %pattern-match nu-eval get call)
 (define (pattern-match1 _ a)
-  (match1 (list _ env pat args) a
+  (match1 (list _ env pat val) a
     (cond ((null? pat)
             env)
           ((pair? pat)
             (let* ((e  (box env))
                    (f  (nu-eval e (car pat)))
                    (c  (get e f %pattern-match)))
-              (call c e (list f env (cdr pat) args))))
+              (call c e (list f env (cdr pat) val))))
           ((eq? pat '~)
             env)
           ((symbol? pat)
-            (hash-set env pat args))
+            (hash-set env pat val))
           (else
-            (if (eq? args pat)
+            (if (eq? pat val)
                 env
-                (nu-error %pattern-match pat " != " args))))))
+                (nu-error %pattern-match pat " != " val))))))
 
 
 ;; Layer 6
@@ -143,34 +143,56 @@
       v)))
 
 ; (depends pattern-match1)
-(define (pattern-match e name dynamic pat args)
+(define (pattern-match e name dynamic pat val)
   (box (pattern-match1 dynamic
                        (list '~
                              (if (eq? name '~)
                                  e
                                  (hash-set e name dynamic))
-                             pat args))))
+                             pat val))))
 
 ; (depends %pattern-match %call %fn %t wrap-fn match1 nu-error pattern-match1)
 (define nu-list
   (hash %pattern-match
           (lambda (e a)
-            (match1 (list x env pat arg) a
+            (match1 (list _ env pat val) a
               (let loop ((env  env)
                          (pat  pat)
-                         (arg  arg))
+                         (val  val))
                 (cond ((null? pat)
-                        (if (null? arg)
+                        (if (null? val)
                             env
-                            (nu-error %pattern-match pat " != " arg)))
-                      ((null? arg)
-                        (nu-error %pattern-match pat " != " arg))
+                            (nu-error %pattern-match pat " != " val)))
+                      ((null? val)
+                        (nu-error %pattern-match pat " != " val))
                       (else
-                        (loop (pattern-match1 '~ (list '~ env (car pat) (car arg)))
+                        (loop (pattern-match1 '~ (list '~ env (car pat) (car val)))
                               (cdr pat)
-                              (cdr arg)))))))
+                              (cdr val)))))))
         %call
           (wrap-fn list)
+        %fn %t))
+
+; (depends %pattern-match %call %fn %t wrap-fn match1 pattern-match1)
+(define dict
+  (hash %pattern-match
+          (lambda (e a)
+            (match1 (list _ env pat val) a
+              (let loop ((env  env)
+                         (pat  pat))
+                (cond ((null? pat)
+                        env)
+                      ((null? (cdr pat))
+                        (nu-error %pattern-match "missing pattern " (car pat)))
+                      (else
+                        ; TODO: maybe this should evaluate in env rather than e
+                        (let ((x (nu-eval e (car pat))))
+                          (if (hash-has-key? val x)
+                              (loop (pattern-match1 '~ (list '~ env (cadr pat) (get e val x))) ; TODO: ditto for get
+                                (cddr pat))
+                              (nu-error %pattern-match "key " (car pat) " not in " val))))))))
+        %call
+          (wrap-fn hash)
         %fn %t))
 
 
@@ -196,16 +218,6 @@
       %environment  x
       %arguments    y
       %body         (cons do r))))
-
-
-; (depends %pattern-match %call %fn %t wrap-fn)
-(define dict
-  (hash %pattern-match
-          (lambda (e a)
-            (displayln a))
-        %call
-          (wrap-fn hash)
-        %fn %t))
 
 
 (define globals (box (hash
