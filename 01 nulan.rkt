@@ -119,6 +119,7 @@
     (cond ((null? pat)
             env)
           ((pair? pat)
+                   ; TODO: verify that this is correct behavior, ideally with unit tests
             (let* ((e  (box env))
                    (f  (nu-eval e (car pat)))
                    (c  (get e f %pattern-match)))
@@ -155,7 +156,7 @@
 (define nu-list
   (hash-set (wrap-fn list)
     %pattern-match
-      (lambda (e a)
+      (lambda (_ a)
         (match1 (list _ env pat val) a
           (let loop ((env  env)
                      (pat  pat)
@@ -171,11 +172,11 @@
                           (cdr pat)
                           (cdr val)))))))))
 
-; (depends %pattern-match %call %fn %t wrap-fn match1 pattern-match1)
+; (depends %pattern-match %call %fn %t wrap-fn match1 nu-error pattern-match1)
 (define dict
   (hash-set (wrap-fn hash)
     %pattern-match
-      (lambda (e a)
+      (lambda (_ a)
         (match1 (list _ env pat val) a
           (let loop ((env  env)
                      (pat  pat))
@@ -184,10 +185,11 @@
                   ((null? (cdr pat))
                     (nu-error %pattern-match "missing pattern " (car pat)))
                   (else
-                    ; TODO: maybe this should evaluate in env rather than e
-                    (let ((x (nu-eval e (car pat))))
+                           ; TODO: verify that this is correct behavior, ideally with unit tests
+                    (let* ((e  (box env))
+                           (x  (nu-eval e (car pat))))
                       (if (hash-has-key? val x)
-                          (loop (pattern-match1 '~ (list '~ env (cadr pat) (get e val x))) ; TODO: ditto for get
+                          (loop (pattern-match1 '~ (list '~ env (cadr pat) (get e val x)))
                                 (cddr pat))
                           (nu-error %pattern-match "key " (car pat) " not in " val))))))))))
 
