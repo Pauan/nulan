@@ -42,7 +42,7 @@ class Tree(object):
       yield x
 
 
-# O(1) element count
+# O(1)       element count
 # O(log2(n)) lookup by index
 class Ordered(Tree):
   def __init__(self, l, r):

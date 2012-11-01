@@ -7,11 +7,14 @@ def to_hex(x):
   return "{:0=4X}".format(x)
 
 
-char_white = " \n"
-char_num   = "0123456789"
-char_lower = "abcdefghijklmnopqrstuvwxyz"
-char_upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-char_sym   = char_num + char_lower + char_upper + "$%!?&" + "+-*/<>="
+# TODO Not actually used
+char_space     = u"\t \u00A0\u1680\u180E\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000"
+char_separator = u"\u000A\u000B\u000C\u000D\u0085\u2028\u2029"
+
+char_num       = "0123456789"
+char_lower     = "abcdefghijklmnopqrstuvwxyz"
+char_upper     = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+char_sym       = char_num + char_lower + char_upper + "$%!?&" + "+-*/<>="
 
 
 class IterBuffer(object):
@@ -362,7 +365,7 @@ def tokenize_double_quotes(result, s, info):
   c = s.current
   if (c == " " and
       info["at_start"] and
-      info["indent"] < info["column"]):
+      info["indent"] <= info["column"]):
     info["indent"] += 1
     s.next()
   else:
@@ -465,6 +468,12 @@ def find_indent(s):
   while s.current == " ":
     indent += 1
     s.next()
+  if indent:
+    try:
+      if s.current == "\n":
+        raise StopIteration
+    except StopIteration:
+      raise w_Thrown(w_SyntaxError("useless whitespace", s))
   return indent
 
 def tokenize1(s):
@@ -481,6 +490,11 @@ def tokenize1(s):
         tokenize_comment(s)
       elif c == " ":
         s.next()
+        try:
+          if s.current == "\n":
+            raise StopIteration
+        except StopIteration:
+          raise w_Thrown(w_SyntaxError("useless whitespace", s))
       elif c == "\n":
         s.next()
         if s.current == "\n" and s.isatty:

@@ -36,6 +36,31 @@ error: invalid character ,
   ,  (line 1, column 1)
   ^
 
+>>> write('5 ')
+error: useless whitespace
+  5   (line 1, column 2)
+   ^
+
+>>> write(' \n5 ')
+error: useless whitespace
+     (line 1, column 1)
+  ^
+
+>>> write('\n\n5 ')
+error: useless whitespace
+  5   (line 3, column 2)
+   ^
+
+>>> write('\n \n5 ')
+error: useless whitespace
+     (line 2, column 1)
+  ^
+
+>>> write('5 \n10')
+error: useless whitespace
+  5   (line 1, column 2)
+   ^
+
 ##############################################################################
 #  tokenize errors
 ##############################################################################
@@ -114,6 +139,14 @@ U
 ]
 deindentation
 Token: EOFToken
+
+
+>>> write(r'''
+... "foo
+...  bar
+...  qux"
+... ''')
+u
 
 ##############################################################################
 #  tokenize one

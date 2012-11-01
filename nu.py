@@ -78,7 +78,7 @@ if __name__ == "__main__":
     "read_file": read_file,
   }
 
-  #import doctest
+  import doctest
   #doctest.testfile("tests/nu_reader.py", globs=test_globs)
-  #doctest.testfile("tests/nu_reader.py (tokenize)", globs=test_globs)
+  doctest.testfile("tests/nu_reader.py (tokenize)", globs=test_globs)
   #repl()

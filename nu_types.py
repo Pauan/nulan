@@ -157,7 +157,7 @@ class w_SyntaxError(w_Error):
                              filename or s.filename,
                              line     or s.line,
                              column   or s.column,
-                             text     or (None if seen.isspace() else seen)])
+                             text     or seen]) #(None if seen.isspace() else seen)
   def __str__(self):
     msg, filename, line, column, text = self.args
     x = "error: {!s}\n  ".format(msg)
