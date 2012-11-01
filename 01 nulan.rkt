@@ -247,7 +247,16 @@
   'mod   (wrap-fn modulo)
 
   ;; Uniqs
-  '%get  %get
+  '%call           %call
+  '%fn             %fn
+  '%get            %get
+  '%pattern-match  %pattern-match
+  '%scope          %scope
+  '%environment    %environment
+  '%arguments      %arguments
+  '%body           %body
+  '%f              %f
+  '%t              %t
 )))
 
 (set-box! globals (hash-set (unbox globals) 'globals globals))
