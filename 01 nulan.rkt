@@ -1,4 +1,6 @@
-#lang racket
+#lang racket/base
+
+(require racket/match)
 
 (provide (all-defined-out))
 
@@ -26,6 +28,11 @@
 (define-syntax-rule (match1 x y . body)
   (match-let ((x y)) . body))
 
+#|(define (nu-unbox x)
+  (if (box? x)
+      (unbox x)
+      x))|#
+
 (define (nu-error x . args)
   (error (format "~a error: ~a" x
            (let ([o (open-output-string)])
@@ -34,11 +41,6 @@
 
 
 ;; Layer 1
-; (depends match1)
-(define (&get _ a)
-  (match1 (list x) a
-    (eval x)))
-
 ; (depends %call %fn %t)
 (define (wrap-fn f)
   (hash %call  (lambda (_ a)
@@ -57,26 +59,30 @@
 
 
 ;; Layer 2
-; (depends match1 wrap-fn)
-(define (&fn _ a)
-  (match1 (list x) a
-    (wrap-fn (eval x))))
-
-; (mutual call)
 ; (depends get)
+(define (lookup e n)
+  (get e (unbox e) n))
+
+
+;; Layer 3
+; (mutual call)
+; (depends lookup)
 ; (recursive nu-eval)
 (define (nu-eval e x)
   (cond ((symbol? x)
-          (get e (unbox e) x))
+          (unbox (lookup e x)))
         ((pair? x)
           (call (nu-eval e (car x)) e (cdr x)))
         (else x)))
 
 
-;; Layer 3
-; (depends %fn %t nu-eval)
-(define (fn e a)
-  (hash-set (nu-eval e (list* vau '~ a)) %fn %t))
+;; Layer 4
+; (depends match1 lookup nu-eval)
+(define (set e a)
+  (match1 (list n v) a
+    (let ((v (nu-eval e v)))
+      (set-box! (lookup e n) v)
+      v)))
 
 ; (depends %f nu-eval)
 (define (do e a)
@@ -90,10 +96,12 @@
   (map (lambda (x) (nu-eval e x)) a))
 
 
-;; Layer 4
+;; Layer 5
 ; (depends match1 map-eval)
+; TODO: make this work in the REPL
 (define (& e a)
   (match1 (cons f r) a
+    (displayln (eval f))
     (apply (eval f) (map-eval e r))))
 
 ; (mutual get nu-eval)
@@ -112,13 +120,11 @@
                       a))))))
 
 
-;; Layer 5
+;; Layer 6
 ; (depends %pattern-match nu-eval get call)
 (define (pattern-match1 _ a)
   (match1 (list _ env pat val) a
-    (cond ((null? pat)
-            env)
-          ((pair? pat)
+    (cond ((pair? pat)
                    ; TODO: verify that this is correct behavior, ideally with unit tests
             (let* ((e  (box env))
                    (f  (nu-eval e (car pat)))
@@ -127,16 +133,16 @@
           ((eq? pat '~)
             env)
           ((symbol? pat)
-            (hash-set env pat val))
+            (hash-set env pat (box val)))
           (else
             (if (eq? pat val)
                 env
                 (nu-error %pattern-match pat " != " val))))))
 
 
-;; Layer 6
+;; Layer 7
 ; (depends match1 nu-eval pattern-match1)
-(define (def e a)
+(define (var e a)
   (match1 (list n v) a
     ;(update e n (nu-eval e v))
     (let ((v (nu-eval e v)))
@@ -149,7 +155,8 @@
                        (list '~
                              (if (eq? name '~)
                                  e
-                                 (hash-set e name dynamic))
+                                 ; dynamic is doubly wrapped to avoid a bug with (def b b)
+                                 (hash-set e name (box dynamic)))
                              pat val))))
 
 ; (depends %pattern-match %call %fn %t wrap-fn match1 nu-error pattern-match1)
@@ -194,7 +201,7 @@
                           (nu-error %pattern-match "key " (car pat) " not in " val))))))))))
 
 
-;; Layer 7
+;; Layer 8
 ; (depends %call %scope %environment %arguments %body get pattern-match nu-eval)
 (define vau-proto
   (hash %call (lambda (e a)
@@ -207,7 +214,7 @@
                   (nu-eval s (get e x %body))))))
 
 
-;; Layer 8
+;; Layer 9
 ; (depends %scope %environment %arguments %body match1 vau-proto do)
 (define (vau e a)
   (match1 (list-rest x y r) a
@@ -220,53 +227,53 @@
 
 (define globals (box (hash
   ;; Vaus
-  'vau   vau
-  'do    do
-  'fn    fn
-  'def   def
-  '&get  &get
-  '&fn   &fn
-  '&     &
+  'var   (box var)
+  'vau   (box vau)
+  'do    (box do)
+  '&     (box &)
+  'set!  (box set)
 
   ;; Patterns
-  'list  nu-list
-  'dict  dict
+  'list  (box nu-list)
+  'dict  (box dict)
 
   ;; Functions
-  'pattern-match (hash %call pattern-match1 %fn %t)
+  'pattern-match (box (hash %call pattern-match1 %fn %t))
 
-  'box   (wrap-fn box)
-  'unbox (wrap-fn unbox)
-  'set!  (wrap-fn set-box!)
+  'box   (box (wrap-fn box))
+  'unbox (box (wrap-fn unbox))
+  ;'set!  (box (wrap-fn set-box!))
 
-  'car   (wrap-fn car)
-  'cdr   (wrap-fn cdr)
+  'car   (box (wrap-fn car))
+  'cdr   (box (wrap-fn cdr))
 
-  'has   (wrap-fn hash-has-key?)
-  'get   (wrap-fn hash-ref)
-  'add   (wrap-fn hash-set*)
-  'rem   (wrap-fn hash-remove*)
+  'eval  (box (wrap-fn nu-eval))
 
-  'prn   (wrap-fn displayln)
-  'shell-arguments (wrap-fn current-command-line-arguments)
+  'has   (box (wrap-fn hash-has-key?))
+  'get   (box (wrap-fn hash-ref))
+  'add   (box (wrap-fn hash-set*))
+  'rem   (box (wrap-fn hash-remove*))
 
-  '*     (wrap-fn *)
-  '/     (wrap-fn /)
-  '+     (wrap-fn +)
-  '-     (wrap-fn -)
-  'mod   (wrap-fn modulo)
+  'prn   (box (wrap-fn displayln))
+  'shell-arguments (box (wrap-fn current-command-line-arguments))
+
+  '*     (box (wrap-fn *))
+  '/     (box (wrap-fn /))
+  '+     (box (wrap-fn +))
+  '-     (box (wrap-fn -))
+  'mod   (box (wrap-fn modulo))
 
   ;; Uniqs
-  '%call           %call
-  '%fn             %fn
-  '%get            %get
-  '%pattern-match  %pattern-match
-  '%scope          %scope
-  '%environment    %environment
-  '%arguments      %arguments
-  '%body           %body
-  '%f              %f
-  '%t              %t
+  '%call           (box %call)
+  '%fn             (box %fn)
+  '%get            (box %get)
+  '%pattern-match  (box %pattern-match)
+  '%scope          (box %scope)
+  '%environment    (box %environment)
+  '%arguments      (box %arguments)
+  '%body           (box %body)
+  '%f              (box %f)
+  '%t              (box %t)
 )))
 
 (set-box! globals (hash-set (unbox globals) 'globals globals))
@@ -283,10 +290,9 @@
       (lambda (p)
         (let loop ()
           (let ((x (read p)))
-            (if (eof-object? x)
-                #t ;; TODO: should probably be (void)
-                (begin (nu-eval globals x)
-                       (loop)))))))))
+            (unless (eof-object? x)
+              (nu-eval globals x)
+              (loop))))))))
 
 
 ;(require readline/pread)

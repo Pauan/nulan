@@ -2,12 +2,13 @@
 #lang racket/base
 
 (require (file "01 nulan.rkt"))
-
 (require racket/cmdline)
 
 (define all   (make-parameter #f))
 (define debug (make-parameter #f))
 (define repl  (make-parameter #f))
+
+(nu-eval-file "02 nulan.nu")
 
 (command-line
   #:program "Nulan"
