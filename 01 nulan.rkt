@@ -153,47 +153,43 @@
 
 ; (depends %pattern-match %call %fn %t wrap-fn match1 nu-error pattern-match1)
 (define nu-list
-  (hash %pattern-match
-          (lambda (e a)
-            (match1 (list _ env pat val) a
-              (let loop ((env  env)
-                         (pat  pat)
-                         (val  val))
-                (cond ((null? pat)
-                        (if (null? val)
-                            env
-                            (nu-error %pattern-match pat " != " val)))
-                      ((null? val)
-                        (nu-error %pattern-match pat " != " val))
-                      (else
-                        (loop (pattern-match1 '~ (list '~ env (car pat) (car val)))
-                              (cdr pat)
-                              (cdr val)))))))
-        %call
-          (wrap-fn list)
-        %fn %t))
+  (hash-set (wrap-fn list)
+    %pattern-match
+      (lambda (e a)
+        (match1 (list _ env pat val) a
+          (let loop ((env  env)
+                     (pat  pat)
+                     (val  val))
+            (cond ((null? pat)
+                    (if (null? val)
+                        env
+                        (nu-error %pattern-match pat " != " val)))
+                  ((null? val)
+                    (nu-error %pattern-match pat " != " val))
+                  (else
+                    (loop (pattern-match1 '~ (list '~ env (car pat) (car val)))
+                          (cdr pat)
+                          (cdr val)))))))))
 
 ; (depends %pattern-match %call %fn %t wrap-fn match1 pattern-match1)
 (define dict
-  (hash %pattern-match
-          (lambda (e a)
-            (match1 (list _ env pat val) a
-              (let loop ((env  env)
-                         (pat  pat))
-                (cond ((null? pat)
-                        env)
-                      ((null? (cdr pat))
-                        (nu-error %pattern-match "missing pattern " (car pat)))
-                      (else
-                        ; TODO: maybe this should evaluate in env rather than e
-                        (let ((x (nu-eval e (car pat))))
-                          (if (hash-has-key? val x)
-                              (loop (pattern-match1 '~ (list '~ env (cadr pat) (get e val x))) ; TODO: ditto for get
+  (hash-set (wrap-fn hash)
+    %pattern-match
+      (lambda (e a)
+        (match1 (list _ env pat val) a
+          (let loop ((env  env)
+                     (pat  pat))
+            (cond ((null? pat)
+                    env)
+                  ((null? (cdr pat))
+                    (nu-error %pattern-match "missing pattern " (car pat)))
+                  (else
+                    ; TODO: maybe this should evaluate in env rather than e
+                    (let ((x (nu-eval e (car pat))))
+                      (if (hash-has-key? val x)
+                          (loop (pattern-match1 '~ (list '~ env (cadr pat) (get e val x))) ; TODO: ditto for get
                                 (cddr pat))
-                              (nu-error %pattern-match "key " (car pat) " not in " val))))))))
-        %call
-          (wrap-fn hash)
-        %fn %t))
+                          (nu-error %pattern-match "key " (car pat) " not in " val))))))))))
 
 
 ;; Layer 7
