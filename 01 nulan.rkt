@@ -268,3 +268,39 @@
                 #t ;; TODO: should probably be (void)
                 (begin (nu-eval globals x)
                        (loop)))))))))
+
+
+;(require readline/pread)
+
+(define (nu-repl)
+  ;; http://arclanguage.org/item?id=10344
+  (let ((interactive (terminal-port? (current-input-port))))
+    (when interactive
+      (namespace-require 'readline/rep-start)
+      ;(namespace-require 'readline/pread)
+      ;(dynamic-require 'readline/rep-start #f)
+      ;(current-prompt #"=> ")
+      )
+
+    (let loop ()
+      ;; This causes Ctrl+C to return to the REPL, rather than aborting.
+      ;; Technique was taken from Racket's (read-eval-print-loop) which
+      ;; I found in /usr/share/racket/collects/racket/private/misc.rkt
+      (call-with-continuation-prompt
+        (lambda ()
+          ;; http://arclanguage.org/item?id=10344
+          (let* ((it    (if interactive
+                            ((current-prompt-read))
+                            (read)))
+                 (expr  (if (syntax? it)
+                            (syntax->datum it)
+                            it)))
+            (if (eof-object? expr)
+                (when interactive (newline))
+                (begin (write (nu-eval globals expr))
+                       (newline)
+                       (when interactive (newline))
+                       ;; Abort to loop. (Calling `repl` directly would not be a tail call.)
+                       (abort-current-continuation (default-continuation-prompt-tag))))))
+        (default-continuation-prompt-tag)
+        (lambda _ (loop))))))

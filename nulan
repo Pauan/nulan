@@ -12,10 +12,11 @@
 (command-line
   #:program "Nulan"
   #:once-each
-  [("-e" "--eval") s "Evaluates the string and prints the result"            (displayln (nu-eval-string s))]
-  [("-a" "--all")    "Execute every file rather than only the first"         (all #t)]
-  [("-d" "--debug")  "Turns debug mode on, causing extra messages to appear" (debug #t)]
-  [("-i" "--repl")   "Always execute the repl"                               (repl #t)]
+  [("-e" "--eval" ) s "Evaluates the string and prints the result"
+    (displayln (nu-eval-string s))]
+  [("-a" "--all"  )   "Execute every file rather than only the first"         (all #t)]
+  [("-d" "--debug")   "Turns debug mode on, causing extra messages to appear" (debug #t)]
+  [("-i" "--repl" )   "Always execute the repl"                               (repl #t)]
   #:args args
   (unless (null? args)
     (if (all)
@@ -23,5 +24,5 @@
         (parameterize ((current-command-line-arguments (list->vector (cdr args))))
           (nu-eval-file (car args)))))
   (when (or (null? args) (repl))
-    (repl))
+    (nu-repl))
   (void))
