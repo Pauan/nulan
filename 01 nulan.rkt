@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require racket/match)
+(require racket/list)
 
 (provide (all-defined-out))
 
@@ -164,9 +165,17 @@
                   ((null? val)
                     (nu-error %pattern-match pat " != " val))
                   (else
-                    (loop (pattern-match1 '~ (list '~ env (car pat) (car val)))
-                          (cdr pat)
-                          (cdr val)))))))))
+                    (if (and (pair? (car pat))
+                             (eq? (caar pat) 'splice))
+                        (if (null? (cdr pat))
+                            (pattern-match1 '~ (list '~ env (cadar pat) val))
+                            (let-values (((x y) (split-at-right val (length (cdr pat)))))
+                              (loop (pattern-match1 '~ (list '~ env (cadar pat) x))
+                                    (cdr pat)
+                                    y)))
+                        (loop (pattern-match1 '~ (list '~ env (car pat) (car val)))
+                              (cdr pat)
+                              (cdr val))))))))))
 
 ; (depends %pattern-match %call %fn %t wrap-fn match1 nu-error pattern-match1)
 (define dict
