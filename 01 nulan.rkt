@@ -184,9 +184,15 @@
       (lambda (_ a)
         (match1 (list _ env pat val) a
           (let loop ((env  env)
-                     (pat  pat))
+                     (pat  pat)
+                     (val  val))
             (cond ((null? pat)
                     env)
+                  ((and (pair? (car pat))
+                        (eq? (caar pat) 'splice))
+                    (loop (pattern-match1 '~ (list '~ env (cadar pat) val))
+                          (cdr pat)
+                          val)) ; TODO: not sure what this should be...
                   ((null? (cdr pat))
                     (nu-error %pattern-match "missing pattern " (car pat)))
                   (else
@@ -195,7 +201,8 @@
                            (x  (nu-eval e (car pat))))
                       (if (hash-has-key? val x)
                           (loop (pattern-match1 '~ (list '~ env (cadr pat) (get e val x)))
-                                (cddr pat))
+                                (cddr pat)
+                                (hash-remove val x))
                           (nu-error %pattern-match "key " (car pat) " not in " val))))))))))
 
 
