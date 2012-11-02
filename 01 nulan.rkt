@@ -15,7 +15,6 @@
 (define %arguments     (gensym))
 (define %body          (gensym))
 (define %splice        (gensym))
-
 (define %f             #f)
 (define %t             #t)
 
@@ -38,6 +37,13 @@
 
 
 ;; Layer 1
+; (depends %pattern-match match1)
+(define ignore
+  (hash %pattern-match
+    (lambda (_ a)
+      (match1 (list _ env pat val) a
+        env))))
+
 ; (depends %call %fn %t)
 (define (wrap-fn f)
   (hash %call  (lambda (_ a)
@@ -118,11 +124,8 @@
     (cond ((pair? pat)
                    ; TODO: verify that this is correct behavior, ideally with unit tests
             (let* ((e  (box env))
-                   (f  (nu-eval e (car pat)))
-                   (c  (get e f %pattern-match)))
-              (call c e (list f env (cdr pat) val))))
-          ((eq? pat '~)
-            env)
+                   (f  (nu-eval e (car pat))))
+              (call (get e f %pattern-match) e (list f env (cdr pat) val))))
           ((symbol? pat)
             (hash-set env pat (box val)))
           (else
@@ -224,7 +227,10 @@
                          (cons nu-list (read/recursive port ch #f)))
                      #\@ 'terminating-macro
                        (lambda (ch port src line col pos)
-                         (list %splice (read/recursive port #f #f)))))
+                         (list %splice (read/recursive port #f #f)))
+                     #\~ 'non-terminating-macro
+                       (lambda (ch port src line col pos)
+                         (list ignore))))
 
 ; (depends %call %scope %environment %arguments %body get pattern-match nu-eval)
 (define vau-proto
@@ -257,8 +263,9 @@
   '&     (box &)
 
   ;; Patterns
-  'list  (box nu-list)
-  'dict  (box dict)
+  'list    (box nu-list)
+  'dict    (box dict)
+  'ignore  (box ignore)
 
   ;; Functions
   'pattern-match (box (hash %call pattern-match1 %fn %t))
