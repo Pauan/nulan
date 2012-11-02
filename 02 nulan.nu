@@ -35,7 +35,12 @@
 
 (def quote
   (add (vau ~ {x} x)
-    %pattern-match (vau ~ {x e {p} v}
+    %pattern-match (vau ~ {~ e {p} v}
                      (if (is p v)
                          e
                          (error %pattern-match p " != " v)))))
+
+(def uniqs
+  (vau e {x}
+    (prn {var x (make-uniq x)})
+    (eval e {var x {quote (make-uniq x)}})))

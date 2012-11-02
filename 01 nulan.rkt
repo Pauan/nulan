@@ -6,19 +6,12 @@
 (provide (all-defined-out))
 
 ;; Layer 0
-(define %call          (gensym))
-(define %fn            (gensym))
-(define %get           (gensym))
-(define %pattern-match (string->uninterned-symbol "%pattern-match"))
-(define %scope         (gensym))
-(define %environment   (gensym))
-(define %arguments     (gensym))
-(define %body          (gensym))
-(define %splice        (gensym))
 (define %f             #f)
 (define %t             #t)
-
 (define pattern-seen   (make-parameter (hash)))
+
+(define (make-uniq [s '%])
+  (string->uninterned-symbol (symbol->string s)))
 
 (define (hash-remove* x . a)
   (let loop ((x  x)
@@ -39,6 +32,19 @@
 
 
 ;; Layer 1
+; (depends make-uniq)
+(define %call          (make-uniq '%call))
+(define %fn            (make-uniq '%fn))
+(define %get           (make-uniq '%get))
+(define %pattern-match (make-uniq '%pattern-match))
+(define %scope         (make-uniq '%scope))
+(define %environment   (make-uniq '%environment))
+(define %arguments     (make-uniq '%arguments))
+(define %body          (make-uniq '%body))
+(define %splice        (make-uniq '%splice))
+
+
+;; Layer 2
 ; (depends %pattern-match match1)
 (define ~
   (hash %pattern-match
@@ -63,14 +69,14 @@
       (hash-ref x k)))
 
 
-;; Layer 2
+;; Layer 3
 ; (depends get)
 ; TODO: get rid of this function (inline it into nu-eval)
 (define (lookup e n)
   (get e (unbox e) n))
 
 
-;; Layer 3
+;; Layer 4
 ; (mutual call)
 ; (depends lookup)
 ; (recursive nu-eval)
@@ -82,7 +88,7 @@
         (else x)))
 
 
-;; Layer 4
+;; Layer 5
 ; (depends nu-eval)
 (define (nu-if e a)
   ; TODO: simplify this
@@ -107,7 +113,7 @@
   (map (lambda (x) (nu-eval e x)) a))
 
 
-;; Layer 5
+;; Layer 6
 ; (depends match1 map-eval)
 ; TODO: make this work in the REPL
 (define (& e a)
@@ -131,7 +137,7 @@
                       a))))))
 
 
-;; Layer 6
+;; Layer 7
 ; (depends %pattern-match pattern-seen nu-eval get call)
 (define (pattern-match1 _ a)
   (match1 (list _ env pat val) a
@@ -155,7 +161,7 @@
                 (nu-error %pattern-match pat " != " val))))))
 
 
-;; Layer 7
+;; Layer 8
 ; (depends match1 nu-eval pattern-match1)
 (define (var e a)
   (match1 (list n v) a
@@ -245,7 +251,7 @@
           (pattern-match1 ~ (list ~ env pat (unbox val)))))))
 
 
-;; Layer 8
+;; Layer 9
 ; (depends %splice dict nu-list)
 (current-readtable
   (make-readtable #f #\[ 'terminating-macro
@@ -273,7 +279,7 @@
                   (nu-eval s (get e x %body))))))
 
 
-;; Layer 9
+;; Layer 10
 ; (depends %scope %environment %arguments %body match1 vau-proto do)
 (define (vau e a)
   (match1 (list-rest x y r) a
@@ -299,6 +305,9 @@
 
   ;; Functions
   'error  (box (wrap-fn nu-error))
+
+  'make-uniq (box (wrap-fn make-uniq))
+  'uniq?     (box (wrap-fn (lambda (x) (not (symbol-interned? x)))))
 
   'is    (box (wrap-fn eq?))
   'not   (box (wrap-fn not))
@@ -343,7 +352,7 @@
   '%splice         (box %splice)
 )))
 
-(set-box! globals (hash-set (unbox globals) 'globals globals))
+(set-box! globals (hash-set (unbox globals) 'globals (box globals)))
 
 
 ;; Stuff for the "nulan" executable
