@@ -13,7 +13,7 @@
 (define (make-uniq [s '%])
   (string->uninterned-symbol (symbol->string s)))
 
-; Generic equality predicate, similar to egal
+; Generic equality predicate, based on egal
 ; http://home.pipeline.com/~hbaker1/ObjectIdentity.html
 (define (is? x y)
   (if (number? x)
@@ -21,8 +21,10 @@
           (= x y)
           #f)
       (if (immutable? x)
+          ; TODO: do I need to check if y is immutable too?
           (equal? x y)
-          (eq? x y))))
+          ; need to use eqv? for characters
+          (eqv? x y))))
 
 (define (hash-remove* x . a)
   (let loop ((x  x)
@@ -176,7 +178,6 @@
 ; (depends match1 nu-eval pattern-match1)
 (define (var e a)
   (match1 (list n v) a
-    ;(update e n (nu-eval e v))
     (let ((v (nu-eval e v)))
       (set-box! e (pattern-match1 ~ (list ~ (unbox e) n v)))
       v)))
@@ -184,10 +185,6 @@
 ; (depends pattern-match1)
 (define (pattern-match e name dynamic pat val)
   (parameterize ((pattern-seen (pattern-seen)))
-    #|(if (eq? name '~)
-                                   e
-                                   ; dynamic is doubly wrapped to avoid a bug with (def b b)
-                                   (hash-set e name (box dynamic)))|#
     (box (pattern-match1 ~ (list ~ (pattern-match1 ~ (list ~ e name dynamic)) pat val)))))
 
 ; (depends %pattern-match %call %fn %t wrap-fn match1 nu-error pattern-match1)
