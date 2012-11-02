@@ -13,6 +13,17 @@
 (define (make-uniq [s '%])
   (string->uninterned-symbol (symbol->string s)))
 
+; Generic equality predicate, similar to egal
+; http://home.pipeline.com/~hbaker1/ObjectIdentity.html
+(define (is? x y)
+  (if (number? x)
+      (if (number? y)
+          (= x y)
+          #f)
+      (if (immutable? x)
+          (equal? x y)
+          (eq? x y))))
+
 (define (hash-remove* x . a)
   (let loop ((x  x)
              (a  a))
@@ -149,14 +160,14 @@
           ((symbol? pat)
             (let ((seen (pattern-seen)))
               (if (hash-has-key? seen pat)
-                  (if (eq? (hash-ref seen pat) val)
+                  (if (is? (hash-ref seen pat) val)
                       env
                       (nu-error %pattern-match (hash-ref seen pat) " != " val))
                   (begin (pattern-seen (hash-set seen pat val))
                          ;; TODO: replace with generic setter
                          (hash-set env pat (box val))))))
           (else
-            (if (eq? pat val)
+            (if (is? pat val)
                 env
                 (nu-error %pattern-match pat " != " val))))))
 
@@ -197,7 +208,7 @@
                       (nu-error %pattern-match pat " != " val))
                     (else
                       (if (and (pair? (car pat))
-                               (eq? (caar pat) %splice)) ; TODO
+                               (is? (caar pat) %splice)) ; TODO
                           (if (null? (cdr pat))
                               (pattern-match1 ~ (list ~ env (cadar pat) val))
                               (let-values (((x y) (split-at-right val (length (cdr pat)))))
@@ -220,7 +231,7 @@
             (cond ((null? pat)
                     env)
                   ((and (pair? (car pat))
-                        (eq? (caar pat) %splice)) ; TODO
+                        (is? (caar pat) %splice)) ; TODO
                     (loop (pattern-match1 ~ (list ~ env (cadar pat) val))
                           (cdr pat)
                           val)) ; TODO: not sure what this should be...
@@ -309,8 +320,7 @@
   'make-uniq (box (wrap-fn make-uniq))
   'uniq?     (box (wrap-fn (lambda (x) (not (symbol-interned? x)))))
 
-  'is    (box (wrap-fn eq?))
-  'not   (box (wrap-fn not))
+  'is  (box (wrap-fn is?))
 
   'pattern-match (box (hash %call pattern-match1 %fn %t))
 
