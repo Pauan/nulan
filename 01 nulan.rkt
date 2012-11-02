@@ -18,6 +18,8 @@
 (define %f             #f)
 (define %t             #t)
 
+(define pattern-seen   (make-parameter (hash)))
+
 (define (hash-remove* x . a)
   (let loop ((x  x)
              (a  a))
@@ -38,7 +40,7 @@
 
 ;; Layer 1
 ; (depends %pattern-match match1)
-(define ignore
+(define ~
   (hash %pattern-match
     (lambda (_ a)
       (match1 (list _ env pat val) a
@@ -81,6 +83,18 @@
 
 
 ;; Layer 4
+; (depends nu-eval)
+(define (nu-if e a)
+  ; TODO: simplify this
+  (if (null? a)
+      %f
+      (let ((c (nu-eval e (car a))))
+        (if c
+            (if (null? (cdr a))
+                c
+                (nu-eval e (cadr a)))
+            (nu-if e (cddr a))))))
+
 ; (depends %f nu-eval)
 (define (do e a)
   (if (null? a)
@@ -118,16 +132,23 @@
 
 
 ;; Layer 6
-; (depends %pattern-match nu-eval get call)
+; (depends %pattern-match pattern-seen nu-eval get call)
 (define (pattern-match1 _ a)
   (match1 (list _ env pat val) a
     (cond ((pair? pat)
                    ; TODO: verify that this is correct behavior, ideally with unit tests
             (let* ((e  (box env))
                    (f  (nu-eval e (car pat))))
-              (call (get e f %pattern-match) e (list f env (cdr pat) val))))
+                (call (get e f %pattern-match) e (list f env (cdr pat) val))))
           ((symbol? pat)
-            (hash-set env pat (box val)))
+            (let ((seen (pattern-seen)))
+              (if (hash-has-key? seen pat)
+                  (if (eq? (hash-ref seen pat) val)
+                      env
+                      (nu-error %pattern-match (hash-ref seen pat) " != " val))
+                  (begin (pattern-seen (hash-set seen pat val))
+                         ;; TODO: replace with generic setter
+                         (hash-set env pat (box val))))))
           (else
             (if (eq? pat val)
                 env
@@ -140,18 +161,17 @@
   (match1 (list n v) a
     ;(update e n (nu-eval e v))
     (let ((v (nu-eval e v)))
-      (set-box! e (pattern-match1 '~ (list '~ (unbox e) n v)))
+      (set-box! e (pattern-match1 ~ (list ~ (unbox e) n v)))
       v)))
 
 ; (depends pattern-match1)
 (define (pattern-match e name dynamic pat val)
-  (box (pattern-match1 dynamic
-                       (list '~
-                             (if (eq? name '~)
-                                 e
-                                 ; dynamic is doubly wrapped to avoid a bug with (def b b)
-                                 (hash-set e name (box dynamic)))
-                             pat val))))
+  (parameterize ((pattern-seen (pattern-seen)))
+    #|(if (eq? name '~)
+                                   e
+                                   ; dynamic is doubly wrapped to avoid a bug with (def b b)
+                                   (hash-set e name (box dynamic)))|#
+    (box (pattern-match1 ~ (list ~ (pattern-match1 ~ (list ~ e name dynamic)) pat val)))))
 
 ; (depends %pattern-match %call %fn %t wrap-fn match1 nu-error pattern-match1)
 (define nu-list
@@ -159,27 +179,28 @@
     %pattern-match
       (lambda (_ a)
         (match1 (list _ env pat val) a
-          (let loop ((env  env)
-                     (pat  pat)
-                     (val  val))
-            (cond ((null? pat)
-                    (if (null? val)
-                        env
-                        (nu-error %pattern-match pat " != " val)))
-                  ((null? val)
-                    (nu-error %pattern-match pat " != " val))
-                  (else
-                    (if (and (pair? (car pat))
-                             (eq? (caar pat) %splice)) ; TODO
-                        (if (null? (cdr pat))
-                            (pattern-match1 '~ (list '~ env (cadar pat) val))
-                            (let-values (((x y) (split-at-right val (length (cdr pat)))))
-                              (loop (pattern-match1 '~ (list '~ env (cadar pat) x))
-                                    (cdr pat)
-                                    y)))
-                        (loop (pattern-match1 '~ (list '~ env (car pat) (car val)))
-                              (cdr pat)
-                              (cdr val))))))))))
+          (parameterize ((pattern-seen (pattern-seen)))
+            (let loop ((env  env)
+                       (pat  pat)
+                       (val  val))
+              (cond ((null? pat)
+                      (if (null? val)
+                          env
+                          (nu-error %pattern-match pat " != " val)))
+                    ((null? val)
+                      (nu-error %pattern-match pat " != " val))
+                    (else
+                      (if (and (pair? (car pat))
+                               (eq? (caar pat) %splice)) ; TODO
+                          (if (null? (cdr pat))
+                              (pattern-match1 ~ (list ~ env (cadar pat) val))
+                              (let-values (((x y) (split-at-right val (length (cdr pat)))))
+                                (loop (pattern-match1 ~ (list ~ env (cadar pat) x))
+                                      (cdr pat)
+                                      y)))
+                          (loop (pattern-match1 ~ (list ~ env (car pat) (car val)))
+                                (cdr pat)
+                                (cdr val)))))))))))
 
 ; (depends %pattern-match %call %fn %t wrap-fn match1 nu-error pattern-match1)
 (define dict
@@ -194,7 +215,7 @@
                     env)
                   ((and (pair? (car pat))
                         (eq? (caar pat) %splice)) ; TODO
-                    (loop (pattern-match1 '~ (list '~ env (cadar pat) val))
+                    (loop (pattern-match1 ~ (list ~ env (cadar pat) val))
                           (cdr pat)
                           val)) ; TODO: not sure what this should be...
                   ((null? (cdr pat))
@@ -204,7 +225,7 @@
                     (let* ((e  (box env))
                            (x  (nu-eval e (car pat))))
                       (if (hash-has-key? val x)
-                          (loop (pattern-match1 '~ (list '~ env (cadr pat) (get e val x)))
+                          (loop (pattern-match1 ~ (list ~ env (cadr pat) (get e val x)))
                                 (cddr pat)
                                 (hash-remove val x))
                           (nu-error %pattern-match "key " (car pat) " not in " val))))))))
@@ -214,6 +235,14 @@
 
           ))|#
           ))
+
+; (depends %pattern-match wrap-fn match1 pattern-match1)
+(define nu-box
+  (hash-set (wrap-fn box)
+    %pattern-match
+      (lambda (_ a)
+        (match1 (list _ env (list pat) val) a
+          (pattern-match1 ~ (list ~ env pat (unbox val)))))))
 
 
 ;; Layer 8
@@ -230,7 +259,7 @@
                          (list %splice (read/recursive port #f #f)))
                      #\~ 'non-terminating-macro
                        (lambda (ch port src line col pos)
-                         (list ignore))))
+                         (list ~))))
 
 ; (depends %call %scope %environment %arguments %body get pattern-match nu-eval)
 (define vau-proto
@@ -257,6 +286,7 @@
 
 (define globals (box (hash
   ;; Vaus
+  'if    (box nu-if)
   'var   (box var)
   'vau   (box vau)
   'do    (box do)
@@ -265,12 +295,17 @@
   ;; Patterns
   'list    (box nu-list)
   'dict    (box dict)
-  'ignore  (box ignore)
+  'ignore  (box ~)
 
   ;; Functions
+  'error  (box (wrap-fn nu-error))
+
+  'is    (box (wrap-fn eq?))
+  'not   (box (wrap-fn not))
+
   'pattern-match (box (hash %call pattern-match1 %fn %t))
 
-  'box       (box (wrap-fn box))
+  'box       (box nu-box)
   'unbox     (box (wrap-fn unbox))
   'set-box!  (box (wrap-fn (lambda (b v) (set-box! b v) v)))
 

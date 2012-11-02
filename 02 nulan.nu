@@ -2,7 +2,7 @@
 
 (var fn
   (vau e x
-    (add (eval e {vau (quote ~) @x})
+    (add (eval e {vau ~ @x})
       %fn %t)))
 
 (var let
@@ -28,9 +28,14 @@
     (eval e {do {var n %f}
                 {set! n v}})))
 
-(def quote (vau ~ {x} x))
-
 (def fn
   (vau e x
-    (add (eval e (list* vau (quote ~) x))
+    (add (eval e (list* vau {ignore} x))
       %fn %t)))
+
+(def quote
+  (add (vau ~ {x} x)
+    %pattern-match (vau ~ {x e {p} v}
+                     (if (is p v)
+                         e
+                         (error %pattern-match p " != " v)))))
