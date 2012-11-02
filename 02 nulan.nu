@@ -40,7 +40,11 @@
                          e
                          (error %pattern-match p " != " v)))))
 
+(var set-in!
+  (fn {e n v}
+    (set-box! e (pattern-match (unbox e) n v))
+    v))
+
 (def uniqs
   (vau e {x}
-    (prn {var x (make-uniq x)})
-    (eval e {var x {quote (make-uniq x)}})))
+    (set-in! e x (make-uniq x))))
