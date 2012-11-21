@@ -8,7 +8,7 @@
 ;; Layer 0
 (define %f             #f)
 (define %t             #t)
-(define pattern-seen   (make-parameter (hash)))
+(define pattern-seen   (make-parameter #f))
 
 (define (make-uniq [s '%])
   (string->uninterned-symbol (symbol->string s)))
@@ -47,8 +47,12 @@
 ;; Layer 1
 ; (depends make-uniq)
 (define %call          (make-uniq '%call))
-(define %fn            (make-uniq '%fn))
+
+(define %has           (make-uniq '%has))
 (define %get           (make-uniq '%get))
+(define %set           (make-uniq '%set))
+(define %rem           (make-uniq '%rem))
+
 (define %pattern-match (make-uniq '%pattern-match))
 (define %scope         (make-uniq '%scope))
 (define %environment   (make-uniq '%environment))
@@ -61,32 +65,32 @@
 ; (depends %pattern-match match1)
 (define ~
   (hash %pattern-match
-    (lambda (_ a)
-      (match1 (list _ env pat val) a
-        env))))
+    (lambda (e a)
+      (match1 (list _ _ (list) _) a
+        e))))
 
-; (depends %call %fn %t)
-(define (wrap-fn f)
-  (hash %call  (lambda (_ a)
-                 (apply f (cdr a)))
-        %fn    %t))
-
-; (mutual call)
-; (depends %get)
-(define (get e x k)
-  ; TODO: can't do (get x %get) if x has a %get
-  (if (hash-has-key? x %get)
-      (call (hash-ref x %get)
-            e
-            (list (hash-remove x %get) k))
-      (hash-ref x k)))
+; (mutual call nu-has)
+; (depends %get is?)
+(define (nu-get e x k)
+  (cond ((hash? x)
+          ; TODO: can't do (get x %get) if x has a %get
+          (if (nu-has e x %get)
+              (call (hash-ref x %get)
+                    e
+                    ; TODO: use nu-remove?
+                    (list (hash-remove x %get) k))
+              (hash-ref x k)))
+        ((procedure? x)
+          (if (is? k %call)
+              x
+              (hash-ref x k)))))
 
 
 ;; Layer 3
-; (depends get)
+; (depends nu-get)
 ; TODO: get rid of this function (inline it into nu-eval)
 (define (lookup e n)
-  (get e (unbox e) n))
+  (nu-get e (unbox e) n))
 
 
 ;; Layer 4
@@ -127,6 +131,16 @@
 
 
 ;; Layer 6
+; (depends map-eval)
+(define (vau->fn f)
+  (lambda (e a)
+    (f e (map-eval e a))))
+
+; (depends map-eval)
+(define (racket->fn f)
+  (lambda (e a)
+    (apply f (map-eval e a))))
+
 ; (depends match1 map-eval)
 ; TODO: make this work in the REPL
 (define (& e a)
@@ -134,115 +148,168 @@
     (displayln (eval f))
     (apply (eval f) (map-eval e r))))
 
-; (mutual get nu-eval)
-; (depends %call %fn map-eval)
+; (mutual nu-get nu-eval)
+; (depends %call map-eval)
 ; (recursive call)
 (define (call f e a)
   (if (procedure? f)
       (f e a)
-      (let loop ((x  f)
-                 (a  a))
+      (let loop ((x f))
         (if (procedure? x)
             (x e (cons f a))
-            (loop (get e x %call)
-                  (if (hash-has-key? x %fn)
-                      (map-eval e a)
-                      a))))))
+            (loop (nu-get e x %call))))))
 
 
 ;; Layer 7
-; (depends %pattern-match pattern-seen nu-eval get call)
-(define (pattern-match1 _ a)
-  (match1 (list _ env pat val) a
-    (cond ((pair? pat)
-                   ; TODO: verify that this is correct behavior, ideally with unit tests
-            (let* ((e  (box env))
-                   (f  (nu-eval e (car pat))))
-                (call (get e f %pattern-match) e (list f env (cdr pat) val))))
-          ((symbol? pat)
-            (let ((seen (pattern-seen)))
-              (if (hash-has-key? seen pat)
-                  (if (is? (hash-ref seen pat) val)
-                      env
-                      (nu-error %pattern-match (hash-ref seen pat) " != " val))
-                  (begin (pattern-seen (hash-set seen pat val))
-                         ;; TODO: replace with generic setter
-                         (hash-set env pat (box val))))))
-          (else
-            (if (is? pat val)
-                env
-                (nu-error %pattern-match pat " != " val))))))
+; (mutual nu-get)
+; (depends %has call is?)
+(define (nu-has e x k)
+  (cond ((hash? x)
+          (if (hash-has-key? x %has)
+              (call (nu-get x %has)
+                    e
+                    ; TODO: use nu-remove?
+                    (list (hash-remove x %has) k))
+              (hash-has-key? x k)))
+        ((procedure? x)
+          (if (is? k %call)
+              %t
+              %f))))
 
 
 ;; Layer 8
-; (depends match1 nu-eval pattern-match1)
+; (depends %call %set call nu-get nu-has)
+(define (nu-set e x . a)
+  (cond ((hash? x)
+          (let loop ((x  x)
+                     (a  a))
+            (cond ((null? a)
+                    x)
+                  ((nu-has x %set)
+                    (loop (call (nu-get x %set)
+                                e
+                                (list x (car a) (cadr a)))
+                          (cddr a)))
+                  (else
+                    (loop (hash-set x (car a) (cadr a))
+                          (cddr a))))))
+        ((procedure? x)
+          (apply hash-set* (hash %call x) a))))
+
+; (depends %call %rem nu-has nu-get call is?)
+(define (nu-rem e x k . rest)
+  (cond ((hash? x)
+          (let loop ((x  x)
+                     (k  rest))
+            (cond ((null? k)
+                    x)
+                  ((nu-has e x %rem)
+                    (loop (call (nu-get x %rem)
+                                e
+                                (list (hash-remove x %rem) (car k)))
+                          (cdr k)))
+                  (else
+                    (loop (hash-remove x k)
+                          (cdr k))))))
+        ((procedure? x)
+          (if (is? k %call)
+              (hash)
+              x))))
+
+; (depends %pattern-match pattern-seen match1 nu-eval nu-get call)
+(define (pattern-match1 _ a)
+  (match1 (list _ b p v) a
+    (cond ((pair? p)
+                  ; TODO: verify that this is correct behavior, ideally with unit tests
+            (let ((f (nu-eval b (car p))))
+              (call (nu-get b f %pattern-match) b (list f pattern-match2 (cdr p) v))))
+          ((symbol? p)
+            (let ((seen (pattern-seen)))
+              (if (hash-has-key? seen p)
+                  (if (is? (hash-ref seen p) v)
+                      b
+                      (nu-error %pattern-match (hash-ref seen p) " != " v))
+                  (begin (pattern-seen (hash-set seen p v))
+                         (box (nu-set b (unbox b) p (box v)))))))
+          (else
+            (if (is? p v)
+                b
+                (nu-error %pattern-match p " != " v))))))
+
+; (mutual pattern-match1)
+; (depends %call %t)
+(define pattern-match2 (vau->fn pattern-match1))
+
+
+; (depends pattern-seen pattern-match1 ~)
+(define (pattern-match b p v)
+  (parameterize ((pattern-seen (hash)))
+    (call pattern-match1 b (list ~ (box (unbox b)) p v))
+    (pattern-match1 ~ (list ~ (box (unbox b)) p v))))
+
+
+; (depends match1 nu-eval pattern-match)
 (define (var e a)
   (match1 (list n v) a
     (let ((v (nu-eval e v)))
-      (set-box! e (pattern-match1 ~ (list ~ (unbox e) n v)))
+      (set-box! e (unbox (pattern-match e n v)))
       v)))
 
-; (depends pattern-match1)
-(define (pattern-match e name dynamic pat val)
-  (parameterize ((pattern-seen (pattern-seen)))
-    (box (pattern-match1 ~ (list ~ (pattern-match1 ~ (list ~ e name dynamic)) pat val)))))
-
-; (depends %pattern-match %call %fn %t wrap-fn match1 nu-error pattern-match1)
+; (depends %pattern-match %call %t racket->fn match1 nu-error)
 (define nu-list
-  (hash-set (wrap-fn list)
+  (hash %call (racket->fn list)
     %pattern-match
-      (lambda (_ a)
-        (match1 (list _ env pat val) a
-          (parameterize ((pattern-seen (pattern-seen)))
-            (let loop ((env  env)
-                       (pat  pat)
-                       (val  val))
-              (cond ((null? pat)
-                      (if (null? val)
-                          env
-                          (nu-error %pattern-match pat " != " val)))
-                    ((null? val)
-                      (nu-error %pattern-match pat " != " val))
-                    (else
-                      (if (and (pair? (car pat))
-                               (is? (caar pat) %splice)) ; TODO
-                          (if (null? (cdr pat))
-                              (pattern-match1 ~ (list ~ env (cadar pat) val))
-                              (let-values (((x y) (split-at-right val (length (cdr pat)))))
-                                (loop (pattern-match1 ~ (list ~ env (cadar pat) x))
-                                      (cdr pat)
-                                      y)))
-                          (loop (pattern-match1 ~ (list ~ env (car pat) (car val)))
-                                (cdr pat)
-                                (cdr val)))))))))))
-
-; (depends %pattern-match %call %fn %t wrap-fn match1 nu-error pattern-match1)
-(define dict
-  (hash-set (wrap-fn hash)
-    %pattern-match
-      (lambda (_ a)
-        (match1 (list _ env pat val) a
-          (let loop ((env  env)
+      (lambda (e a)
+        (match1 (list _ f pat val) a
+          (let loop ((e    e)
                      (pat  pat)
                      (val  val))
             (cond ((null? pat)
-                    env)
+                    (call f e (list e pat val)))
+                  ((null? val)
+                    (loop (call f e (list e (car pat) %f))
+                          (cdr pat)
+                          val))
+                  (else
+                    (if (and (pair? (car pat))
+                             (is? (caar pat) %splice)) ; TODO
+                        (if (null? (cdr pat))
+                            (call f e (list e (cadar pat) val))
+                            (let-values (((x y) (split-at-right val (length (cdr pat)))))
+                              (loop (call f e (list e (cadar pat) x))
+                                    (cdr pat)
+                                    y)))
+                        (loop (call f e (list e (car pat) (car val)))
+                              (cdr pat)
+                              (cdr val))))))))))
+
+; (depends %pattern-match %call %t racket->fn match1 nu-error nu-get)
+(define dict
+  (hash %call (racket->fn hash)
+    %pattern-match
+      (lambda (e a)
+        (match1 (list _ f e pat val) a
+          (let loop ((e    e)
+                     (pat  pat)
+                     (val  val))
+            (cond ((null? pat)
+                    e)
                   ((and (pair? (car pat))
                         (is? (caar pat) %splice)) ; TODO
-                    (loop (pattern-match1 ~ (list ~ env (cadar pat) val))
+                    (loop (call f e (list e (cadar pat) val))
                           (cdr pat)
                           val)) ; TODO: not sure what this should be...
                   ((null? (cdr pat))
                     (nu-error %pattern-match "missing pattern " (car pat)))
                   (else
-                           ; TODO: verify that this is correct behavior, ideally with unit tests
-                    (let* ((e  (box env))
-                           (x  (nu-eval e (car pat))))
-                      (if (hash-has-key? val x)
-                          (loop (pattern-match1 ~ (list ~ env (cadr pat) (get e val x)))
+                          ; TODO: verify that this is correct behavior, ideally with unit tests
+                    (let ((x (nu-eval e (car pat))))
+                      (if (nu-has e val x)
+                          (loop (call f e (list e (cadr pat) (nu-get e val x)))
                                 (cddr pat)
-                                (hash-remove val x))
-                          (nu-error %pattern-match "key " (car pat) " not in " val))))))))
+                                (nu-rem e val x))
+                          ; (nu-error %pattern-match "key " (car pat) " not in " val)
+                          (call f e (list e (cadr pat) %f)))))))))
     #|%pattern-match-splicing
       (lambda (_ a)
         (match1 (list _ env pat val) a
@@ -250,16 +317,26 @@
           ))|#
           ))
 
-; (depends %pattern-match wrap-fn match1 pattern-match1)
+; (depends %pattern-match racket->fn match1)
 (define nu-box
-  (hash-set (wrap-fn box)
+  (hash %call (racket->fn box)
     %pattern-match
-      (lambda (_ a)
-        (match1 (list _ env (list pat) val) a
-          (pattern-match1 ~ (list ~ env pat (unbox val)))))))
+      (lambda (e a)
+        (match1 (list _ f (list pat) val) a
+          (call f e (list e pat (unbox val)))))))
 
 
 ;; Layer 9
+; (depends %call nu-set match1 map-eval call)
+(define (fn e a)
+  (match1 (list f) a
+    (nu-set e f %call (lambda (e a)
+                        (call f e (map-eval e a))))))
+
+; (depends fn ~ vau)
+(define (nu-fn e a)
+  (fn e (list (vau e (cons (list ~) a)))))
+
 ; (depends %splice dict nu-list)
 (current-readtable
   (make-readtable #f #\[ 'terminating-macro
@@ -273,18 +350,40 @@
                          (list %splice (read/recursive port #f #f)))
                      #\~ 'non-terminating-macro
                        (lambda (ch port src line col pos)
-                         (list ~))))
+                         (list ~))
+                     #\- 'terminating-macro
+                       (lambda (ch port src line col pos)
+                         (if (eqv? (peek-char port) #\>)
+                             (begin (read-char port)
+                                    (let loop ((args null))
+                                      (let ((c (peek-char port)))
+                                        (displayln (eqv? c #\newline))
+                                        (cond ((eqv? c #\space)
+                                                (read-char port)
+                                                (loop args))
+                                              ((or (eqv? c #\))
+                                                   (eqv? c #\])
+                                                   (eqv? c #\})
+                                                   (eqv? c #\|)
+                                                   (eqv? c #\newline)
+                                                   (eqv? c #\return)
+                                                   (eof-object? c))
+                                                `(,nu-fn ,(reverse (cdr args)) ,(car args)))
+                                              (else
+                                                (loop (cons (read/recursive port) args)))))))
+                             (read/recursive port ch #f)))))
 
-; (depends %call %scope %environment %arguments %body get pattern-match nu-eval)
+; (depends %call %scope %environment %arguments %body nu-get pattern-match nu-eval)
 (define vau-proto
+  ; TODO: using nu-get is potentially insecure: it can leak out hidden gensyms
   (hash %call (lambda (e a)
                 (let* ((x  (car a))
-                       (s  (pattern-match (get e x %scope)
-                                          (get e x %environment)
-                                          e
-                                          (get e x %arguments)
+                       (s  (pattern-match (pattern-match (box (nu-get e x %scope))
+                                                         (nu-get e x %environment)
+                                                         e)
+                                          (nu-get e x %arguments)
                                           (cdr a))))
-                  (nu-eval s (get e x %body))))))
+                  (nu-eval s (nu-get e x %body))))))
 
 
 ;; Layer 10
@@ -312,42 +411,43 @@
   'ignore  (box ~)
 
   ;; Functions
-  'error  (box (wrap-fn nu-error))
+  'fn  (box (vau->fn fn))
 
-  'make-uniq (box (wrap-fn make-uniq))
-  'uniq?     (box (wrap-fn (lambda (x) (not (symbol-interned? x)))))
+  'error  (box (racket->fn nu-error))
 
-  'is  (box (wrap-fn is?))
+  'make-uniq (box (racket->fn make-uniq))
+  'uniq?     (box (racket->fn (lambda (x) (not (symbol-interned? x)))))
 
-  'pattern-match (box (hash %call pattern-match1 %fn %t))
+  'is  (box (racket->fn is?))
+
+  'pattern-match (box (racket->fn pattern-match))
 
   'box       (box nu-box)
-  'unbox     (box (wrap-fn unbox))
-  'set-box!  (box (wrap-fn (lambda (b v) (set-box! b v) v)))
+  'unbox     (box (racket->fn unbox))
+  'set-box!  (box (racket->fn (lambda (b v) (set-box! b v) v)))
 
-  'list* (box (wrap-fn list*))
-  'car   (box (wrap-fn car))
-  'cdr   (box (wrap-fn cdr))
+  'list* (box (racket->fn list*))
+  'car   (box (racket->fn car))
+  'cdr   (box (racket->fn cdr))
 
-  'eval  (box (wrap-fn nu-eval))
+  'eval  (box (racket->fn nu-eval))
 
-  'has   (box (wrap-fn hash-has-key?))
-  'get   (box (wrap-fn hash-ref))
-  'add   (box (wrap-fn hash-set*))
-  'rem   (box (wrap-fn hash-remove*))
+  'has   (box (racket->fn nu-has))
+  'get   (box (racket->fn nu-get))
+  'add   (box (racket->fn nu-set))
+  'rem   (box (racket->fn nu-rem))
 
-  'prn   (box (wrap-fn displayln))
-  'shell-arguments (box (wrap-fn current-command-line-arguments))
+  'prn   (box (racket->fn displayln))
+  'shell-arguments (box (racket->fn current-command-line-arguments))
 
-  '*     (box (wrap-fn *))
-  '/     (box (wrap-fn /))
-  '+     (box (wrap-fn +))
-  '-     (box (wrap-fn -))
-  'mod   (box (wrap-fn modulo))
+  '*     (box (racket->fn *))
+  '/     (box (racket->fn /))
+  '+     (box (racket->fn +))
+  '-     (box (racket->fn -))
+  'mod   (box (racket->fn modulo))
 
   ;; Uniqs
   '%call           (box %call)
-  '%fn             (box %fn)
   '%get            (box %get)
   '%pattern-match  (box %pattern-match)
   '%scope          (box %scope)
