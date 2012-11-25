@@ -1,27 +1,130 @@
-#! /usr/bin/env racket
-#lang racket/base
+#! /usr/bin/env node
+"use strict";
 
-(require (file "01 nulan.rkt"))
+// http://stackoverflow.com/a/8808162/449477
+var vm = require("vm")
+var fs = require("fs")
+function load(path, context) {
+  var data = fs.readFileSync(path, "utf8")
+  vm.runInThisContext(data, path)
+}
 
-(require racket/cmdline)
+load("./lib/NINO.compile.js")
+load("./NULAN.js")
 
-(define all   (make-parameter #f))
-(define debug (make-parameter #f))
-(define repl  (make-parameter #f))
+load("./lib/PARSE.js")
+load("./NULAN.parse.js")
 
-(command-line
-  #:program "Nulan"
-  #:once-each
-  [("-e" "--eval") s "Evaluates the string and prints the result"            (displayln (nu-eval-string s))]
-  [("-a" "--all")    "Execute every file rather than only the first"         (all #t)]
-  [("-d" "--debug")  "Turns debug mode on, causing extra messages to appear" (debug #t)]
-  [("-i" "--repl")   "Always execute the repl"                               (repl #t)]
-  #:args args
-  (unless (null? args)
-    (if (all)
-        (map nu-eval-file args)
-        (parameterize ((current-command-line-arguments (list->vector (cdr args))))
-          (nu-eval-file (car args)))))
-  (when (or (null? args) (repl))
-    (repl))
-  (void))
+
+var globals = {}
+
+var readline = require("readline")
+
+var rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+  completer: function (s) {
+    var a = Object.keys(NULAN.vars).filter(function (s2) {
+      return s2.indexOf(s) === 0
+    })
+    return [a, s]
+  }
+})
+
+rl.setPrompt("> ")
+rl.prompt()
+
+rl.on("line", function (s) {
+  try {
+    var x = NULAN.compile(NULAN.parse(s))
+    console.log(x)
+
+    x = vm.runInNewContext(x, globals)
+    console.log(x)
+  } catch (e) {
+    console.error(e)
+  }
+
+  console.log()
+  rl.prompt()
+})
+
+rl.on("close", function () {
+  console.log()
+})
+
+/*
+var stdin = process.openStdin()
+
+process.stdout.write("> ")
+
+stdin.addListener("data", function (s) {
+  //process.stdout.write("\u001B[J")
+
+  s = ("" + s).replace(/\n$/, "")
+  //var lines = s.split(/\n/).length
+  try {
+    var x = NULAN.compile(s)
+    //lines += x.split(/\n/).length
+    console.log(x)
+
+    x = "" + vm.runInNewContext(x, globals)
+    //lines += x.split(/\n/).length
+    console.log(x)
+  } catch (e) {
+    console.error(e)
+    //++lines
+  } finally {
+    console.log()
+    //process.stdout.write("\u001B[" + lines + "A")
+    //process.stdout.write("\u001B[2K")
+    process.stdout.write("> ")
+  }
+})
+
+stdin.addListener("end", function () {
+  //process.stdout.write("\u001B[" + 1 + "A")
+  //process.stdout.write("\u001B[2K")
+  console.log()
+})
+*/
+
+/*
+;[ "(var foo 1)",
+  "(+ foo 2)",
+  "(var foo 2)",
+  "(+ foo 3)",
+  "(&eval (+ 3 5))",
+  "(&eval +)",
+  "(set! foo 5)",
+  "(&eval (var + (fn)))",
+  "(&eval +)",
+  "(&eval (var foo (fn)))",
+  "(&eval foo)",
+  "+",
+  "(& +)",
+  "(& (+ 1 2))",
+
+  "(namespace bar)",
+  "(var foo 5)",
+  "(+ foo 10)",
+  "(var foo 10)",
+  "(+ foo 20)",
+  "(w/namespace bar (var foo 20) (+ foo 30) (var foo 30) (+ foo 40))",
+  "(+ foo 20)",
+  "(let foo 30)",
+  "(+ foo 20)",
+  "(var foo 30)",
+  "(let! foo 50)",
+  // "(prn +)",
+].forEach(function (s) {
+  console.log()
+
+  var x = NULAN.compile(s)
+  console.log(x)
+
+  //console.log(NULAN.eval(x))
+})
+
+console.log()
+*/
