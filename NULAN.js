@@ -8,6 +8,8 @@ function prn(x) {
   }
 }
 
+
+
 var NULAN = (function (n) {
   "use strict";
 
@@ -18,7 +20,7 @@ var NULAN = (function (n) {
     return "#<mac>"
   }
 
-  n.Number = function (value) {
+  n.Bypass = function (value) {
     this.value = value
   }
 
@@ -29,18 +31,13 @@ var NULAN = (function (n) {
   function Uniq() {}
 
 
-  var vars    = {} // Compile-time variables
-    , js_vars = {} // JavaScript run-time variables
+  var vars    = {} // Nulan variables -> JS variables
+    , locals  = {} // Nulan variables -> true (if variable is local)
+    , js_vars = {} // JS variables    -> true (if variable exists)
+    , values  = {} // JS variables    -> Compile-time values
     , namespace
 
-  function withNamespace(s, f) {
-    var old = namespace
-    namespace = s
-    var x = f()
-    namespace = old
-    return x
-  }
-
+  // Stuff dealing with variables
   function findUniq(sOld) {
     var s = sOld
       , i = 2
@@ -52,9 +49,22 @@ var NULAN = (function (n) {
     return s
   }
 
+  function uniqToSym(s) {
+    if (s instanceof Uniq) {
+      if (s.var) {
+        return s.var
+      } else {
+        return s.var = setUniq("_u")
+      }
+    } else {
+      return s
+    }
+  }
+
   function setUniq(s) {
     if (s instanceof Uniq) {
-      return setUniq("u_")
+      // TODO is this code needed in both setUniq and getUniq?
+      return uniqToSym(s)
     } else if (typeof s === "string") {
       return vars[s] = findUniq(s)
     } else {
@@ -64,16 +74,21 @@ var NULAN = (function (n) {
 
   function getUniq(s) {
     if (s instanceof Uniq) {
-      return getUniq("u_")
+      // TODO is this code needed in both setUniq and getUniq?
+      return uniqToSym(s)
+    } else if (s instanceof n.Bypass) {
+      return s.value
     } else if (typeof s === "string") {
       if (s in vars) {
         return vars[s]
       } else {
         throw new Error("undefined variable: " + s)
       }
-    } else {
-      throw new Error("invalid variable: " + s)
     }
+  }
+
+  function isValue(x, s) {
+    return x === values[s] || getUniq(x) === s
   }
 
   function mangle(s) {
@@ -89,29 +104,126 @@ var NULAN = (function (n) {
     })
   }
 
+
+  // Stuff dealing with scope
+  function withNewScope(f) {
+    var old  = vars
+      , old2 = locals
+    vars   = Object.create(vars)
+    locals = Object.create(locals)
+    var x = f()
+    vars   = old
+    locals = old2
+    return x
+  }
+
+  function withNamespace(s, f) {
+    var old = namespace
+    namespace = s
+    var x = f()
+    namespace = old
+    return x
+  }
+
+  function splicingArgsRest(x, i, iLen, a) {
+    var r = [x]
+    while (i < iLen) {
+      x = a[i]
+      if (Array.isArray(x) && isValue(x[0], "&splice")) {
+        r.push(mac(x[1]))
+      } else {
+        r.push(["array", [mac(x)]])
+      }
+      ++i
+    }
+    return r
+  }
+
+  function arrayJoiner(a, when, end) {
+    var x, x2, l = [], r = []
+    for (var i = 0, iLen = a.length; i < iLen; ++i) {
+      x = a[i]
+      x2 = when(x)
+      if (x2) {
+        r.push(mac(x2))
+        ++i
+
+        while (i < iLen) {
+          x = a[i]
+          x2 = when(x)
+          if (x2) {
+            r.push(mac(x2))
+          } else {
+            r.push(["array", [mac(x)]])
+          }
+          ++i
+        }
+
+        return end((l.length === 0
+                     ? (r.length === 1
+                         ? r[0]
+                         : ["call", [".", r[0], "concat"], r.slice(1)])
+                     : ["call", [".", ["array", l], "concat"], r]),
+                   true)
+      } else {
+        l.push(mac(x))
+      }
+    }
+    return end(l, false)
+  }
+
+  function splicingArgs(f, a) {
+    return arrayJoiner(a, function (x) {
+      if (Array.isArray(x) && isValue(x[0], "&splice")) {
+        return x[1]
+      }
+    }, function (x, b) {
+      return ["call", (b ? [".", f, "apply"] : f), [["null"], x]]
+    })
+/*
+    var x, r2, r = []
+    for (var i = 0, iLen = a.length; i < iLen; ++i) {
+      x = a[i]
+      if (Array.isArray(x) && isValue(x[0], "&splice")) {
+        r2 = splicingArgsRest(mac(x[1]), i + 1, iLen, a)
+        return ["call", [".", f, "apply"],
+                        [["null"],
+                         (r.length === 0 && r2.length === 1
+                           ? r2[0]
+                           : ["call", [".", ["array", r], "concat"], r2])]]
+      } else {
+        r.push(mac(x))
+      }
+    }
+    return ["call", f, r]*/
+  }
+
   function mac(a) {
+    var x
     if (Array.isArray(a)) {
-      var x;
       if ((x = a[0]) instanceof Macro ||
-          //!(a[0] in js_vars) &&
-          // vars[]
-          (x = getUniq(a[0])) instanceof Macro) {
+          (x = values[getUniq(a[0])]) instanceof Macro) {
         return x.value.apply(null, a.slice(1))
       } else {
-        return ["call", mac(a[0]), a.slice(1).map(mac)]
+        return splicingArgs(mac(a[0]), a.slice(1))
       }
     } else {
-      if (a instanceof n.Number) {
-        return ["number", a.value]
+      if (typeof a === "number") {
+        return ["number", "" + a]
       } else if (a instanceof n.String) {
         return ["string", a.value]
       } else if (a === void 0) {
         return ["void", ["number", "0"]]
       } else {
-        if (namespace) {
-          return ["[]", ["name", namespace], ["string", getUniq(a)]]
+        x = getUniq(a)
+        if (typeof x !== "string") {
+          throw new Error("invalid variable: " + x)
+        }
+        if (namespace && !locals[a]) {
+          return ["[]", ["name", namespace],
+                        ["string", x]] // (typeof x === "string" ? x : a)
         } else {
-          return ["name", mangle(getUniq(a))]
+          return ["name", mangle(x)]
         }
       }
     }
@@ -122,8 +234,8 @@ var NULAN = (function (n) {
     if (Array.isArray(a)) {
       return ["call", $mac(a[0]), a.slice(1).map($mac)]
     } else {
-      if (a instanceof n.Number) {
-        return ["number", a.value]
+      if (typeof a === "number") {
+        return ["number", "" + a]
       } else if (a instanceof n.String) {
         return ["string", a.value]
       } else {
@@ -140,7 +252,7 @@ var NULAN = (function (n) {
     return r
   }
 
-  function bin(s, a, i) {
+  function binr(s, a, i) {
     return a.reduce(function (x, y) {
       return [s, x, y]
     })
@@ -154,7 +266,7 @@ var NULAN = (function (n) {
       case 1:
         return mac(arguments[0])
       default:
-        return bin(s, [].map.call(arguments, mac))
+        return binr(s, [].map.call(arguments, mac))
       }
     })
   }
@@ -163,11 +275,8 @@ var NULAN = (function (n) {
     return new Macro(function () {
       switch (arguments.length) {
       case 0:
-        if (typeof i === "string") {
-          throw new Error(i + " cannot be called with 0 arguments")
-        } else {
-          throw new Error(s + " cannot be called with 0 arguments")
-        }
+        throw new Error((typeof i === "string" ? i : s) +
+                        " cannot be called with 0 arguments")
       case 1:
         if (typeof i === "function") {
           return i(mac(arguments[0]))
@@ -175,7 +284,7 @@ var NULAN = (function (n) {
           return mac(arguments[0])
         }
       default:
-        return bin(s, [].map.call(arguments, mac))
+        return binr(s, [].map.call(arguments, mac))
       }
     })
   }
@@ -192,33 +301,37 @@ var NULAN = (function (n) {
     })
   }
 
+  function evalIn(s, x) {
+    return withNamespace(s, function () {
+      x = mac(x)
+      x = NINO.compile1(x)
+      console.log(x)
+      return ["id", eval(x)]
+    })
+  }
 
-  vars["not"] = unary("!")
-  vars["num"] = unary("u+")
 
-  vars["mod"] = binary("%")
+  values["not"] = unary("!")
+  values["num"] = unary("u+")
 
-  vars["add"] = binreduce0("+", ["number", "0"])
-  vars["mul"] = binreduce0("*", ["number", "1"])
-  vars["and"] = binreduce0("&&", ["boolean", "true"])
-  vars["or"]  = binreduce0("||", ["boolean", "false"])
+  values["mod"] = binary("%")
 
-  vars["sub"] = binreduce1("-", function (x) { return ["u-", x] })
-  vars["div"] = binreduce1("/")
-  vars["do"]  = binreduce1(";", "do")
+  values["add"] = binreduce0("+", ["number", "0"])
+  values["mul"] = binreduce0("*", ["number", "1"])
+  values["and"] = binreduce0("&&", ["boolean", "true"])
+  values["or"]  = binreduce0("||", ["boolean", "false"])
 
-  vars["str"] = new Macro(function () {
-    // TODO: a little clunky
-    return mac([vars["+"]].concat(new n.String(""), [].slice.call(arguments)))
-  })
+  values["sub"] = binreduce1("-", function (x) { return ["u-", x] })
+  values["div"] = binreduce1("/")
+  values["do"]  = binreduce1(";", "do")
 
-  vars["new"] = new Macro(function (x) {
+  values["new"] = new Macro(function (x) {
     var args = [].slice.call(arguments, 1).map(mac)
     return ["new", mac(x), args]
   })
 
-  vars["var"] = new Macro(function (x, y) {
-    if (namespace) {
+  values["var"] = new Macro(function (x, y) {
+    if (namespace && !locals[x]) {
       return ["=", ["[]", ["name", namespace], ["string", setUniq(x)]], mac(y)]
     } else {
       if (y === void 0) {
@@ -233,7 +346,7 @@ var NULAN = (function (n) {
     }
   })
 
-  vars["del"] = new Macro(function (x) {
+  values["del"] = new Macro(function (x) {
     if (typeof x === "string") {
       var s = mac(x)
       delete vars[x]
@@ -242,6 +355,14 @@ var NULAN = (function (n) {
       // TODO: return the value that's being deleted
       return ["delete", mac(x)]
     }
+  })
+
+  values["include"] = new Macro(function () {
+    [].forEach.call(arguments, function (x) {
+      vars[x] = x
+      js_vars[x] = true
+    })
+    return ["id"]
   })
 /*
   ++
@@ -255,26 +376,36 @@ var NULAN = (function (n) {
   if
 */
 
-  vars["dict"] = new Macro(function () {
+  values["dict"] = new Macro(function () {
     if (arguments.length === 0) {
       return ["object", []]
     } else {
       // TODO
       var a = pair(arguments).map(function (a) {
-        return [vars["set!"], ["get", "foo", a[0]], a[1]]
+        return [values["set!"], ["get", "foo", a[0]], a[1]]
       })
-      return mac([vars["do"], [vars["var"], "foo", [vars["dict"]]]].concat(a))
+      return mac([values["do"], [values["var"], "foo", [values["dict"]]]].concat(a))
     }
     /*var x = setUniq("foo")
     var a = pair(arguments).map(function (a) {
       return ["=", [".", ["name", x], a[0]], mac(a[1])]
     })
     a.unshift(["var", [[x, ["object", []]]]])
-    return bin(";", a)*/
+    return binr(";", a)*/
   })
 
-  vars["uniq"] = new Macro(function () {
+  values["list"] = new Macro(function () {
+    return ["array", [].map.call(arguments, mac)]
+  })
+
+  values["uniq"] = new Macro(function () {
     return ["string", mangle(setUniq("u_"))]
+  })
+
+  values["w/newScope"] = new Macro(function (body) {
+    return withNewScope(function () {
+      return mac(body)
+    })
   })
 
 
@@ -323,19 +454,73 @@ var NULAN = (function (n) {
 */
 
 
-  vars["set!"] = new Macro(function (x, y) {
+  values["set!"] = new Macro(function (x, y) {
     return ["=", mac(x), mac(y)]
   })
 
-  vars["get"] = new Macro(function (x, y) {
-    return ["[]", mac(x), mac(y)]
+  values["get"] = new Macro(function (x, y) {
+    if ((y instanceof n.String || typeof y === "number") &&
+        /^[$_a-zA-Z][$_a-zA-Z0-9]*$/.test(y.value)) {
+      return [".", mac(x), y.value]
+    } else {
+      return ["[]", mac(x), mac(y)]
+    }
   })
 
-  vars["fn"] = new Macro(function () {
-    return ["function", "", [], []]
+  values["fn"] = new Macro(function (args, body) {
+    if (typeof args === "string") {
+      var x = ["call", [".", [".", ["array", []], "slice"], "call"],
+                       [["name", "arguments"]]]
+      return withNewScope(function () {
+        args = uniqToSym(args)
+        vars[args] = args
+        locals[args] = true
+        return ["function", "", [],
+                 [["var", [[mangle(args), x]]],
+                  ["return", mac(body)]]]
+      })
+    } else if (isValue(args[0], "list")) {
+      return withNewScope(function () {
+        args = args.slice(1).map(function (s) {
+          s = uniqToSym(s)
+          console.log(s)
+          vars[s] = s
+          locals[s] = true
+          return mangle(s)
+        })
+        return ["function", "", args, [["return", mac(body)]]]
+      })
+    }
   })
+/*
+  (mac foo ->
+    (let u (uniq)
+      '(let u 5 u)))
 
-  vars["namespace"] = new Macro(function (x) {
+  (mac foo ->
+    (let u (uniq)
+      '("let" u 5 u)))
+
+  {a b @c}  -> {a b @c}
+  '{a b @c} -> {list a b {splice c}}
+
+  (let n (sym "foo")
+    '(n bar qux))
+
+  (mac foo -> (let n (sym "list") '(n 1 2)))
+
+  (mac foo -> {"list" 1 2})
+
+  (mac foo -> (let u (uniq) (let v (uniq) '(fn {u v} (add u v)))))
+
+  mac foo ->
+    let u (uniq)
+      let v (uniq)
+        'fn {u v}
+           add u v
+*/
+
+  values["namespace"] = new Macro(function (x) {
     namespace = x
     js_vars   = {}
     return ["id"]
@@ -345,82 +530,224 @@ var NULAN = (function (n) {
     return [].map.call(a, mac).reduce(f)
   }*/
 
-  vars["w/namespace"] = new Macro(function (x) {
+  values["w/namespace"] = new Macro(function (x, body) {
     var old1 = namespace
       , old2 = js_vars
     namespace = x
     js_vars   = {}
-    var r = bin(",", [].slice.call(arguments, 1).map(mac))
+    var r = mac(body)
+    //var r = binr(",", [].slice.call(arguments, 1).map(mac))
     namespace = old1
     js_vars   = old2
     return r
   })
 
-  vars["let"] = new Macro(function (x, y) {
-    var body = [].slice.call(arguments, 2)
-    var r = mac([vars["do"], [vars["var"], x, y]].concat(body))
-    --js_vars[x] // TODO
+  values["let"] = new Macro(function (x, y, body) {
+    var old, b = (x in vars)
+    if (b) {
+      old = vars[x]
+    }
+
+    var r = mac([values["do"], [values["var"], x, y], body])
+
+    if (b) {
+      vars[x] = old
+    } else {
+      delete vars[x]
+    }
     return r
   })
 
-  // Macros
-  vars["let!"] = new Macro(function (x, y) {
-    var body = [].slice.call(arguments, 2)
-      , u    = new Uniq()
-    return mac([vars["let"], u, x,
-                 [vars["set!"], x, y]].concat(body, [[vars["set!"], x, u]]))
+  values["let"] = new Macro(function (x, y, body) {
+    return mac([[values["fn"], [values["list"], x], body], y])
   })
 
 
-  vars["&typeof"]     = unary("typeof")
-  vars["&in"]         = binary("in")
-  vars["&instanceof"] = binary("instanceof")
+  // Implementation specific stuff
+  values["&typeof"]     = unary("typeof")
+  values["&in"]         = binary("in")
+  values["&instanceof"] = binary("instanceof")
 
-  vars["&"] = new Macro(function (x) {
+  values["&"] = new Macro(function (x) {
     return $mac(x)
   })
 
-  vars["&eval"] = new Macro(function (x) {
-    return withNamespace("vars", function () {
-      x = mac(x)
-      x = NINO.compile1(x)
-      console.log(x)
-      return ["id", eval(x)]
-    })
+  values["&eval"] = new Macro(function (x) {
+    return evalIn("values", x)
   })
+
+  // (&eval '{1 2 3})
+  // (&eval (let u (sym "foo") u))
+
+  values["&quote"] = new Macro(function (x) {
+    function spliceLoop(x) {
+      var r = []
+      x.forEach(function (x) {
+        if (Array.isArray(x)) {
+
+          if (isValue(x[0], "&comma")) {
+            x = x[1]
+            if (Array.isArray(x) && isValue(x[0], "&splice")) {
+              console.log(mac(x[1]))
+              return mac(x[1])
+            } else {
+              r.push(mac(x))
+            }
+          } else {
+            r.push(["array", spliceLoop(x)])
+          }
+        } else {
+          r.push(mac(x))
+        }
+      })
+      return r
+    }
+
+    function loop(x) {
+      if (Array.isArray(x)) {
+        return arrayJoiner(x, function (x) {
+          if (Array.isArray(x) && isValue(x[0], "&comma") &&
+              Array.isArray(x[1]) && isValue(x[1][0], "&splice")) {
+            return x[1][1]
+          }
+        }, function (x, b) {
+          if (b) {
+            return x
+          } else {
+            return ["array", x]
+          }
+        })
+        //return ["array", spliceLoop(x)]
+      } else {
+        return mac(x)
+      }
+    }
+    x = loop(x)
+    console.log(x[1])
+    return x
+  })
+
+
+
+  // '(1 2 ,@{3 4} 5)
+  // {1 2 @{3 4} 5}
+  // [1, 2].concat([3, 4], [5])
+
+  // '({1 2} ,@{3 4} @5)
+  // {{list 1 2} @{3 4} {&splice 5}}
+  // [["list", 1, 2]].concat([3, 4], [["&splice", 5]])
+
+  values["&comma"] = new Macro(function (x) {
+    return mac(x)
+  })
+
+  values["sym"] = function (x) {
+    return x
+  }
+
+  values["finally"] = new Macro(function (x, y) {
+    var u = new Uniq()
+    return ["try", [mac([values["var"], u, x])], ["finally", [mac(y), mac(u)]]]
+  })
+
+
+/*
+  (&eval (var mac (&mac -> n v
+    (let u (uniq)
+      {&eval
+        {var n
+
+        {fn u
+        {apply v u}
+
+        }}}
+    )))
+
+  (mac foo -> a b {a b})
+
+  (&eval (var foo (&mac -> a b (&compile {a b}))))
+
+  (&eval (var foo (&mac (&compiler -> a b {a b}))))
+
+  (&compile )
+
+  (mac foo -> (let u (uniq) {let u 5 u}))
+*/
+  // Functions
+  values["uniq"] = function () {
+    return new Uniq()
+  }
+
+  /*
+  values["&mac"] = function (f) {
+    return new Macro(f)
+  }
+
+  values["&compile"] = mac
+
+  values["&compiler"] = function (f) {
+    return function () {
+      return mac(f.apply(this, arguments))
+    }
+  }*/
+
+  values["mac"] = new Macro(function (n, v) {
+    v = evalIn("values", v)[1]
+    values[setUniq(n)] = new Macro(function () {
+      return mac(v.apply(this, arguments))
+    })
+    return ["id"]
+  })
+
+  // TODO: lots of code duplication with mac
+  values["&mac"] = new Macro(function (n, v) {
+    v = evalIn("values", v)[1]
+    values[setUniq(n)] = new Macro(function () {
+      return v.apply(this, arguments)
+    })
+    return ["id"]
+  })
+
+
+  // Macros
+  /*values["str"] = new Macro(function () {
+    // TODO: a little clunky
+    return mac([values["add"]].concat(new n.String(""), [].slice.call(arguments)))
+  })
+
+  values["let!"] = new Macro(function (x, y, body) {
+    var u = new Uniq()
+    return mac([values["let"], u, x,
+                 [values["do"], [values["set!"], x, y],
+                                [values["finally"], body,
+                                                    [values["set!"], x, u]]]])
+  })
+
+  values["def"] = new Macro(function (n, v) {
+    return mac([values["do"], [values["var"], n], [values["set!"], n, v]])
+  })*/
 
 
   // TODO: ew
-  Object.keys(vars).forEach(function (s) {
+  Object.keys(values).forEach(function (s) {
+    vars[s] = s
     js_vars[s] = true
   })
 
+  n.import = function () {
+    [].forEach.call(arguments, function (s) {
+      s = n.parse(n.readFile(s))
+      console.log(n.compile(s))
+    })
+  }
+
   n.vars    = vars
+  n.values  = values
   n.js_vars = js_vars
   n.macex   = mac
 
-  function transform(x) {
-    if (Array.isArray(x)) {
-      return x.map(transform)
-    } else if (/^[0-9.]+$/.test(x)) {
-      return new n.Number(x)
-    } else {
-      return x
-    }
-  }
-
-  n.parse = function (s) {
-    s = s.replace(/\(/g, "[")
-         .replace(/\)/g, "]")
-         .replace(/ +/g, ", ")
-         .replace(/[^\[\], \n]+/g, "\"$&\"")
-         //.replace(/[a-zA-Z\.+]+/g, "[\"name\", \"$&\"]")
-         //.replace(/[0-9\.]+/g, "[\"number\", \"$&\"]")
-    return transform(JSON.parse(s))
-  }
-
-  n.compile = function (s) {
-    return NINO.compile1(mac(n.parse(s)))
+  n.compile = function (a) {
+    return NINO.compile(a.map(mac)) // NINO.hoistVars(
   }
 
   return n

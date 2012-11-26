@@ -1,0 +1,13 @@
+(mac str -> @args
+  '(add "" ,@args))
+
+(mac let! -> x y body
+  (let u (uniq)
+    (let u x
+      '(do (set! x y)
+           (finally body
+                    (set! x u))))))
+
+(mac def -> n v
+  '(do (var n)
+       (set! n v)))

@@ -7,7 +7,7 @@ var NULAN = (function (n) {
   t.binary = function (s, i, s2) {
     return this.infix(s, i, function (l, r) {
       hadOperator = true
-      return [n.vars[s2], l, r]
+      return [new n.Bypass(s2), l, r]
     })
   }
 
@@ -22,7 +22,6 @@ var NULAN = (function (n) {
 
         var a = []
         while (o.has() && o.peek() !== t[r]) {
-          console.log(o.peek())
           a.push(PARSE.expression(o))
         }
         PARSE.check(o, t[r])
@@ -42,7 +41,7 @@ var NULAN = (function (n) {
 
   t.prefix("u-", 40, function (r) {
     hadOperator = true
-    return [n.vars["sub"], r]
+    return [new n.Bypass("sub"), r]
   })
 
   t.binary("*", 30, "mul")
@@ -50,7 +49,7 @@ var NULAN = (function (n) {
   t.binary("+", 20, "add")
   t.binary("-", 20, "sub")/*.prefix = function (o) {
     hadOperator = true
-    return [n.vars["sub"], PARSE.expression(o, 40)]
+    return [new n.Bypass("sub"), PARSE.expression(o, 40)]
   }*/
 
   t["->"] = {
@@ -61,23 +60,34 @@ var NULAN = (function (n) {
 
       var c, r = []
       while (o.has() && (c = o.peek()) !== t[")"] && c !== t["]"] && c !== t["}"]) {
-        console.log(o.peek())
         r.push(PARSE.expression(o, 10))
       }
       var args = r.slice(0, -1)
-      args.unshift(n.vars["list"])
-      return [n.vars["fn"], args, r[r.length - 1]]
+      args.unshift(new n.Bypass("list"))
+      return [new n.Bypass("fn"), args, r[r.length - 1]]
     }
   }
+
+  t.prefix("'", 0, function (r) {
+    return [new n.Bypass("&quote"), r]
+  })
+
+  t.prefix(",", 0, function (r) {
+    return [new n.Bypass("&comma"), r]
+  })
+
+  t.prefix("@", 0, function (r) {
+    return [new n.Bypass("&splice"), r]
+  })
 
   t.braces("{", "}", {
     single: function (a) {
       a = a[0]
-      a.unshift(n.vars["list"])
+      a.unshift(new n.Bypass("list"))
       return a
     },
     transform: function (a) {
-      a.unshift(n.vars["list"])
+      a.unshift(new n.Bypass("list"))
       return a
     }
   })
@@ -85,11 +95,11 @@ var NULAN = (function (n) {
   t.braces("[", "]", {
     single: function (r) {
       a = a[0]
-      a.unshift(n.vars["dict"])
+      a.unshift(new n.Bypass("dict"))
       return a
     },
     transform: function (a) {
-      a.unshift(n.vars["dict"])
+      a.unshift(new n.Bypass("dict"))
       return a
     }
   })
@@ -105,6 +115,10 @@ var NULAN = (function (n) {
 
   // NULAN.parse("{(id -foo)}")
 
+  function number(s) {
+    return /^(?:\d+\.)?\d+$/.test(s)
+  }
+
 
   function tokenizeNumOrSym(o) {
     var r = []
@@ -115,13 +129,29 @@ var NULAN = (function (n) {
     r = r.join("")
     if (r === "+" || r === "*" || r === "/" || r === "->") {
       return t[r]
-    } else if (/^(?:\d+\.)?\d+$/.test(r)) {
-      return PARSE.literal(new n.Number(r))
+    } else if (number(r)) {
+      return PARSE.literal(+r)
     } else {
-      return PARSE.literal(r.replace(/(.)\-([a-z])/g, function (s, s1, s2) {
+      r = r.replace(/(.)\-([a-z])/g, function (s, s1, s2) {
         return s1 + s2.toLocaleUpperCase()
-      }))
+      })
+      r = r.split(/\./).reduce(function (x, y) {
+        return [new n.Bypass("get"), x, (number(y) ? +y : new n.String(y))]
+      })
+      return PARSE.literal(r)
     }
+  }
+
+  function tokenizeString(o, a) {
+    var q = o.peek()
+      , r = []
+    o.read()
+    while (o.has() && o.peek() !== q) {
+      r.push(o.read())
+    }
+    o.read()
+    r = r.join("")
+    a.push(PARSE.literal(new n.String(r)))
   }
 
   function tokenize(o) {
@@ -129,18 +159,25 @@ var NULAN = (function (n) {
     while (o.has()) {
       c = o.peek()
       if (c !== " " && c !== "\n") {
-        if (c === "(" || c === ")" || c === "[" || c === "]" || c === "{" || c === "}") {
+        if (c === "(" || c === ")" ||
+            c === "[" || c === "]" ||
+            c === "{" || c === "}" ||
+            c === "'" || c === "," || c === "@") {
           r.push(t[c])
         } else if (c === "-") {
           o.read()
           c = o.peek()
           if (c === ">") {
+            o.read()
             r.push(t["->"])
           } else if (c === " " || c === "\n") {
             r.push(t["-"])
           } else {
             r.push(t["u-"])
           }
+          continue
+        } else if (c === "\"") {
+          tokenizeString(o, r)
           continue
         } else {
           r.push(tokenizeNumOrSym(o))

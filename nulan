@@ -10,10 +10,17 @@ function load(path, context) {
 }
 
 load("./lib/NINO.compile.js")
+load("./lib/NINO.optimize.js")
 load("./NULAN.js")
 
 load("./lib/PARSE.js")
 load("./NULAN.parse.js")
+
+NULAN.readFile = function (s) {
+  return fs.readFileSync(s, "utf8")
+}
+
+//NULAN.import("NULAN.macros")
 
 
 var globals = {}
