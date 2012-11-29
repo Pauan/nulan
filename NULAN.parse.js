@@ -41,13 +41,13 @@ var NULAN = (function (n) {
 
   t.prefix("u-", 40, function (r) {
     hadOperator = true
-    return [new n.Bypass("sub"), r]
+    return [new n.Bypass("&sub"), r]
   })
 
-  t.binary("*", 30, "mul")
-  t.binary("/", 30, "div")
-  t.binary("+", 20, "add")
-  t.binary("-", 20, "sub")/*.prefix = function (o) {
+  t.binary("*", 30, "&mul")
+  t.binary("/", 30, "&div")
+  t.binary("+", 20, "&add")
+  t.binary("-", 20, "&sub")/*.prefix = function (o) {
     hadOperator = true
     return [new n.Bypass("sub"), PARSE.expression(o, 40)]
   }*/
@@ -63,8 +63,8 @@ var NULAN = (function (n) {
         r.push(PARSE.expression(o, 10))
       }
       var args = r.slice(0, -1)
-      args.unshift(new n.Bypass("list"))
-      return [new n.Bypass("fn"), args, r[r.length - 1]]
+      args.unshift(new n.Bypass("&list"))
+      return [new n.Bypass("&fn"), args, r[r.length - 1]]
     }
   }
 
@@ -80,14 +80,18 @@ var NULAN = (function (n) {
     return [new n.Bypass("&splice"), r]
   })
 
+  t.prefix("!", 0, function (r) {
+    return [new n.Bypass("&not"), r]
+  })
+
   t.braces("{", "}", {
     single: function (a) {
       a = a[0]
-      a.unshift(new n.Bypass("list"))
+      a.unshift(new n.Bypass("&list"))
       return a
     },
     transform: function (a) {
-      a.unshift(new n.Bypass("list"))
+      a.unshift(new n.Bypass("&list"))
       return a
     }
   })
@@ -95,11 +99,11 @@ var NULAN = (function (n) {
   t.braces("[", "]", {
     single: function (r) {
       a = a[0]
-      a.unshift(new n.Bypass("dict"))
+      a.unshift(new n.Bypass("&dict"))
       return a
     },
     transform: function (a) {
-      a.unshift(new n.Bypass("dict"))
+      a.unshift(new n.Bypass("&dict"))
       return a
     }
   })
@@ -135,9 +139,14 @@ var NULAN = (function (n) {
       r = r.replace(/(.)\-([a-z])/g, function (s, s1, s2) {
         return s1 + s2.toLocaleUpperCase()
       })
-      r = r.split(/\./).reduce(function (x, y) {
-        return [new n.Bypass("get"), x, (number(y) ? +y : new n.String(y))]
-      })
+      r = r.split(/\./)
+      if (r.length === 1) {
+        r = new n.Symbol(r[0])
+      } else {
+        r = r.reduce(function (x, y) {
+          return [new n.Bypass("&get"), new n.Symbol(x), (number(y) ? +y : y)]
+        })
+      }
       return PARSE.literal(r)
     }
   }
@@ -151,40 +160,43 @@ var NULAN = (function (n) {
     }
     o.read()
     r = r.join("")
-    a.push(PARSE.literal(new n.String(r)))
+    a.push(PARSE.literal(r))
   }
 
   function tokenize(o) {
     var c, r = []
     while (o.has()) {
       c = o.peek()
-      if (c !== " " && c !== "\n") {
-        if (c === "(" || c === ")" ||
-            c === "[" || c === "]" ||
-            c === "{" || c === "}" ||
-            c === "'" || c === "," || c === "@") {
-          r.push(t[c])
-        } else if (c === "-") {
+      if (c === " " || c === "\n") {
+        o.read()
+      } else if (c === "(" || c === ")" ||
+                 c === "[" || c === "]" ||
+                 c === "{" || c === "}" ||
+                 c === "'" || c === "," ||
+                 c === "@" || c === "!") {
+        r.push(t[c])
+        o.read()
+      } else if (c === "#") {
+        // TODO: multi-line comments
+        while (o.has() && o.peek() !== "\n") {
           o.read()
-          c = o.peek()
-          if (c === ">") {
-            o.read()
-            r.push(t["->"])
-          } else if (c === " " || c === "\n") {
-            r.push(t["-"])
-          } else {
-            r.push(t["u-"])
-          }
-          continue
-        } else if (c === "\"") {
-          tokenizeString(o, r)
-          continue
-        } else {
-          r.push(tokenizeNumOrSym(o))
-          continue
         }
+      } else if (c === "-") {
+        o.read()
+        c = o.peek()
+        if (c === ">") {
+          o.read()
+          r.push(t["->"])
+        } else if (c === " " || c === "\n") {
+          r.push(t["-"])
+        } else {
+          r.push(t["u-"])
+        }
+      } else if (c === "\"") {
+        tokenizeString(o, r)
+      } else {
+        r.push(tokenizeNumOrSym(o))
       }
-      o.read()
     }
     return r
   }

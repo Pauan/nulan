@@ -10,17 +10,19 @@ function load(path, context) {
 }
 
 load("./lib/NINO.compile.js")
-load("./lib/NINO.optimize.js")
+load("./lib/NINO.transform.js")
 load("./NULAN.js")
 
 load("./lib/PARSE.js")
 load("./NULAN.parse.js")
 
+load("./lib/NUIT.serialize.js")
+
 NULAN.readFile = function (s) {
   return fs.readFileSync(s, "utf8")
 }
 
-//NULAN.import("NULAN.macros")
+NULAN.import("NULAN.macros")
 
 
 var globals = {}
@@ -44,10 +46,14 @@ rl.prompt()
 rl.on("line", function (s) {
   try {
     var x = NULAN.compile(NULAN.parse(s))
-    console.log(x)
+    console.log()
+    console.log(NUIT.serialize([["compile", x]], { multiline: true }))
+    //console.log("@compile\n" + x.replace(/^/gm, "  "))
 
     x = vm.runInNewContext(x, globals)
-    console.log(x)
+    console.log()
+    console.log(NUIT.serialize([["eval", "" + x]], { multiline: true }))
+    //console.log("@eval\n" + ("" + x).replace(/^/gm, "  "))
   } catch (e) {
     console.error(e)
   }

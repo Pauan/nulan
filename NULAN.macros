@@ -1,13 +1,30 @@
 (mac str -> @args
-  '(add "" ,@args))
+  '(&add "" ,@args))
 
 (mac let! -> x y body
   (let u (uniq)
-    (let u x
-      '(do (set! x y)
+    '(let u x
+       (do (set! x y)
            (finally body
                     (set! x u))))))
 
 (mac def -> n v
   '(do (var n)
        (set! n v)))
+
+(mac call -> x y z @args
+  '((&get (&get x y) "call") z ,@args))
+
+(mac call-own -> x y @args
+  '((&get x y) ,@args))
+
+(mac in -> @args
+  (let r {}
+    (do (args.reduce -> x y
+          (do (r.push {x y})
+              x))
+        '(or ,@(r.map -> x '(is ,@x))))))
+
+(mac isnt -> @args
+  # TODO: special case for 2-arguments
+  '!(is ,@args))
