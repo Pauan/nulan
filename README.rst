@@ -19,6 +19,6 @@ Features
 
 * Syntax to make common idioms shorter and easier to read
 
-* The compiler is written in JavaScript, and is capable of running in a browser: you can incrementally compile/eval Nulan programs at runtime
+* The compiler is written in JavaScript and is capable of running in a browser: you can incrementally compile/eval Nulan programs at runtime
 
 * Compiles ahead-of-time to extremely fast JavaScript: it should be just as fast or faster than handwritten JS code

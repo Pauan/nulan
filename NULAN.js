@@ -357,18 +357,30 @@ var NULAN = (function (n) {
     return withNamespace(s, function () {
       x = mac(x)
       x = NINO.compile(NINO.transform([x]))
-      //console.log(x)
+      console.log(x)
       return ["id", eval(x)]
     })
   }
 
-
   values["num"] = unary("u+")
   values["mod"] = binary("%")
-  values["and"] = binreduce0("&&", ["boolean", "true"])
-  values["or"]  = binreduce0("||", ["boolean", "false"])
   values["do"]  = binreduce1(",", "do")
-  values["is"]  = binand("===", ["boolean", "true"])
+
+  values["++"] = new Macro(function (x, y) {
+    if (y === void 0 || y === 1) {
+      return ["++", mac(x)]
+    } else {
+      return ["+=", mac(x), mac(y)]
+    }
+  })
+
+  values["--"] = new Macro(function (x, y) {
+    if (y === void 0 || y === 1) {
+      return ["--", mac(x)]
+    } else {
+      return ["-=", mac(x), mac(y)]
+    }
+  })
 
   values["new"] = new Macro(function (x) {
     var args = [].slice.call(arguments, 1).map(mac)
@@ -381,11 +393,14 @@ var NULAN = (function (n) {
       return ["=", ["[]", ["name", namespace], ["string", setUniq(x)]], mac(y)]
     } else {
       if (y === void 0) {
-        return ["var", [[mangle(setUniq(x))]]]
+        x = setUniq(x)
+        values[x] = new n.Symbol(x) // TODO
+        return ["var", [[mangle(x)]]]
       } else {
         y = mac(y)
-        x = mangle(setUniq(x))
-        return ["var", [[x, y]]]
+        x = setUniq(x)
+        values[x] = new n.Symbol(x) // TODO
+        return ["var", [[mangle(x), y]]]
       }
     }
   })
@@ -425,9 +440,9 @@ var NULAN = (function (n) {
   if
 */
 
-  values["uniq"] = new Macro(function () {
+  /*values["uniq"] = new Macro(function () {
     return ["string", mangle(setUniq("u_"))]
-  })
+  })*/
 
   values["w/newScope"] = new Macro(function (body) {
     return withNewScope(function () {
@@ -479,11 +494,6 @@ var NULAN = (function (n) {
     x y
     foo x y
 */
-
-
-  values["set!"] = new Macro(function (x, y) {
-    return ["=", mac(x), mac(y)]
-  })
 
 /*
   (mac foo ->
@@ -620,14 +630,29 @@ var NULAN = (function (n) {
 
 
   // Implementation specific stuff
-  values["&not"]        = unary("!")
-  values["&add"]        = binreduce0("+", ["number", "0"])
-  values["&mul"]        = binreduce0("*", ["number", "1"])
-  values["&sub"]        = binreduce1("-", function (x) { return ["u-", x] })
-  values["&div"]        = binreduce1("/")
   values["&typeof"]     = unary("typeof")
+  values["&not"]        = unary("!")
+
   values["&in"]         = binary("in")
   values["&instanceof"] = binary("instanceof")
+
+  values["&is"]         = binand("===", ["boolean", "true"])
+  values["&lt"]         = binand("<",   ["boolean", "true"])
+  values["&lte"]        = binand("<=",  ["boolean", "true"])
+  values["&gt"]         = binand(">",   ["boolean", "true"])
+  values["&gte"]        = binand(">=",  ["boolean", "true"])
+
+  values["&and"]        = binreduce0("&&", ["boolean", "true"])
+  values["&or"]         = binreduce0("||", ["boolean", "false"])
+  values["&add"]        = binreduce0("+",  ["number", "0"])
+  values["&mul"]        = binreduce0("*",  ["number", "1"])
+
+  values["&sub"]        = binreduce1("-", function (x) { return ["u-", x] })
+  values["&div"]        = binreduce1("/")
+
+  values["&set!"] = new Macro(function (x, y) {
+    return ["=", mac(x), mac(y)]
+  })
 
   values["&dict"] = new Macro(function () {
     if (arguments.length === 0) {

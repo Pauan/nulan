@@ -22,7 +22,7 @@ NULAN.readFile = function (s) {
   return fs.readFileSync(s, "utf8")
 }
 
-NULAN.import("NULAN.macros")
+//NULAN.import("NULAN.macros")
 
 
 var globals = {}

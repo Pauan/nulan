@@ -1,0 +1,38 @@
+#! /usr/bin/env node
+"use strict";
+
+// http://stackoverflow.com/a/8808162/449477
+var vm = require("vm")
+var fs = require("fs")
+function load(path, context) {
+  var data = fs.readFileSync(path, "utf8")
+  vm.runInThisContext(data, path)
+}
+
+load("./NULAN.js")
+
+load("./lib/PARSE.js")
+load("./NULAN.parse.js")
+
+
+function transform(x) {
+  if (Array.isArray(x)) {
+    return x.map(transform)
+  } else if (x instanceof NULAN.Symbol || x instanceof NULAN.Bypass) {
+    return x.value
+  } else if (typeof x === "string") {
+    return "\"" + x + "\""
+  } else {
+    return x
+  }
+}
+
+require("./lib/cli").on("input", function (s) {
+  try {
+    console.log(JSON.stringify(transform(NULAN.parse(s))))
+  } catch (e) {
+    console.error(e)
+  }
+
+  console.log()
+})
