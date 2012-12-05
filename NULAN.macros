@@ -2,15 +2,15 @@ mac str -> @args
   '&add "" ,@args
 
 mac let! -> x y body
-  let u uniq()
-    'let u x
-       x =< y
-       finally body
-               x =< u
+  let u = uniq()
+    'let u = x
+       | x =< y
+       | finally body
+                 x =< u
 
 mac def -> n v
-  'var n
-   n =< v
+  '| var n
+   | n =< v
 
 mac call -> x y @args
   '(&get x y).call ,@args
@@ -19,12 +19,45 @@ mac call-own -> x y @args
   '(&get x y) ,@args
 
 mac in -> @args
-  let r {}
-    args.reduce -> x y
-      r.push {x y}
-      x
-    'or ,@(r.map -> x '(is ,@x))
+  let r = {}
+    | args.reduce -> x y
+        | r.push {x y}
+        | x
+    | 'or ,@(r.map -> x '(is ,@x))
 
 mac isnt -> @args
   # TODO: special case for 2-arguments
   '~(is ,@args)
+
+[ foo -> 10
+| bar -> 20
+| qux -> 30 ]
+
+| foo | bar | qux
+
+
+let u {}
+  | foo 1
+  | bar 5
+  | qux 10
+
+
+|||| foo | bar ||| qux
+
+
+-> a a | 5
+
+
+{ -> a b c | -> a b c | -> a b c }
+
+
+if qux corge
+  | a
+  | b
+  if foo bar
+    | d
+    | e
+    if nou yesno
+      | f
+      | g
+      h

@@ -25,44 +25,71 @@ NULAN.readFile = function (s) {
 //NULAN.import("NULAN.macros")
 
 
-var globals = {}
+var globals = { require: require }
 
-var readline = require("readline")
+NULAN.vars["require"] = "require"
 
-var rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
+
+var util = require("util")
+
+var rl = require("./lib/cli").create({
   completer: function (s) {
     var a = Object.keys(NULAN.vars).filter(function (s2) {
       return s2.indexOf(s) === 0
+    }).sort(function (l, r) {
+      if (l[0] === "&" && r[0] !== "&") {
+        return 1
+      } else if (l[0] !== "&" && r[0] === "&") {
+        return -1
+      } else {
+        return l.localeCompare(r)
+        //return l < r ? -1 : l > r ? 1 : 0
+      }
     })
     return [a, s]
   }
 })
 
-rl.setPrompt("> ")
-rl.prompt()
+function print(a) {
+  console.log(NUIT.serialize([a], { multiline: true }))
+}
 
-rl.on("line", function (s) {
+function pretty(x) {
+  return util.inspect(x, false, null, false)
+}
+
+function transform(a) {
+  if (Array.isArray(a)) {
+    return a.map(transform)
+  } else if (a instanceof NULAN.Symbol || a instanceof NULAN.Bypass) {
+    return a.value
+  } else if (typeof a === "string") {
+    return "\"" + a + "\"" // TODO replace " inside the string with \"
+  } else {
+    return a
+  }
+}
+
+rl.on("input", function (s) {
   try {
-    var x = NULAN.compile(NULAN.parse(s))
     console.log()
-    console.log(NUIT.serialize([["compile", x]], { multiline: true }))
+    var x = NULAN.parse(s)
+    print(["parse"].concat(transform(x).map(pretty)))
+
+    console.log()
+    x = NULAN.compile(x)
+    print(["compile", x])
+
     //console.log("@compile\n" + x.replace(/^/gm, "  "))
 
-    x = vm.runInNewContext(x, globals)
     console.log()
-    console.log(NUIT.serialize([["eval", "" + x]], { multiline: true }))
+    x = vm.runInNewContext(x, globals)
+    print(["eval", pretty(x)])
     //console.log("@eval\n" + ("" + x).replace(/^/gm, "  "))
   } catch (e) {
-    console.error(e)
+    console.error("" + e)
   }
 
-  console.log()
-  rl.prompt()
-})
-
-rl.on("close", function () {
   console.log()
 })
 

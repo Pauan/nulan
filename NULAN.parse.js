@@ -25,7 +25,7 @@ var NULAN = (function (n) {
       name: l,
       prefix: function (o) {
         var a = []
-        while (o.has() && o.peek() !== t[r]) {
+        while (o.has() && !PARSE.is(o.peek(), t[r])) {
           a.push(PARSE.expression(o))
         }
         PARSE.check(o, t[r])
@@ -36,14 +36,18 @@ var NULAN = (function (n) {
 
   function untilBraces(o, i, f) {
     var c, r = []
-    while (o.has() && (c = o.peek()) !== t[")"] && c !== t["]"] && c !== t["}"]) {
+    while (o.has() && (c = o.peek()) &&
+           !PARSE.is(c, t[")"]) &&
+           !PARSE.is(c, t["]"]) &&
+           !PARSE.is(c, t["}"]) &&
+           !PARSE.is(c, t["|"])) {
       r.push(PARSE.expression(o, i))
     }
     return f(r)
   }
 
 
-  t.infix(".", 90, function (l, r) {
+  t.infix(".", 100, function (l, r) {
     if (r instanceof n.Symbol) {
       r = r.value
     }
@@ -51,26 +55,29 @@ var NULAN = (function (n) {
   })
   //t.binary(".",   90, "&get")
 
-  t.unary("u-",   80, "&sub")
+  t.unary("u-",   90, "&sub")
 
-  t.binary("*",   70, "&mul")
-  t.binary("/",   70, "&div")
+  t.binary("*",   80, "&mul")
+  t.binary("/",   80, "&div")
 
-  t.binary("+",   60, "&add")
-  t.binary("-",   60, "&sub")
+  t.binary("+",   70, "&add")
+  t.binary("-",   70, "&sub")
 
-  t.binary("<",   50, "&lt")
-  t.binary("<=",  50, "&ltis")
-  t.binary(">",   50, "&gt")
-  t.binary(">=",  50, "&gte")
+  t.binary("<",   60, "&lt")
+  t.binary("<=",  60, "&ltis")
+  t.binary(">",   60, "&gt")
+  t.binary(">=",  60, "&gte")
 
-  t.binary("=",   40, "&is")
-  t.binary("!=",  40, "&isnt")
+  t.binary("=",   50, "&is")
+  t.binary("!=",  50, "&isnt")
 
-  t.binary("&&",  30, "&and")
-  t.binary("||",  20, "&or")
+  t.binary("&&",  40, "&and")
 
-  t.binary("=<",  10, "&set!")
+  t.binary("||",  30, "&or")
+
+  t.binary("=<",  20, "&set!")
+
+  t.binary(";",   10, "&do")
 
   t.unary("~",     0, "&not") // TODO: not sure if this should be 0 or 80 priority
   t.unary("'",     0, "&quote")
@@ -97,14 +104,30 @@ var NULAN = (function (n) {
     }
   }
 
+  t["|"] = {
+    name: "|",
+    prefix: function (o) {
+      return PARSE.expression(o)
+    }
+  }
+
   t.braces("{", "}", function (a) {
     a.unshift(new n.Bypass("&list"))
     return a
   })
 
   t.braces("[", "]", function (a) {
-    a.unshift(new n.Bypass("&dict"))
-    return a
+    var r = [new n.Bypass("dict")]
+    // TODO: pair is defined in NULAN.js
+    n.pair(a).forEach(function (x) {
+      if (x[0] instanceof n.Symbol) {
+        r.push(x[0].value)
+      } else {
+        r.push(x[0])
+      }
+      r.push(x[1])
+    })
+    return r
   })
 
   t.braces("(", ")", function (a) {
@@ -121,14 +144,29 @@ var NULAN = (function (n) {
 
   // NULAN.parse("{(id -foo)}")
 
-  var delimiters = /^[ \n()[\]{}',@~:;."]$/
+  var delimiters = /^[ \n()[\]{}',@~:;."|]$/
+
+  function enrich(x, o) {
+    x = Object.create(x)
+    x.text = o.text
+    x.line = o.line
+    x.column = o.column
+    return x
+  }
+
+  function store(o) {
+    return { text: o.text
+           , line: o.line
+           , column: o.column + 1 }
+  }
 
   function number(s) {
     return /^(?:\d+\.)?\d+$/.test(s)
   }
 
   function tokenizeNumOrSym(o, a) {
-    var r = []
+    var s = store(o)
+      , r = []
     while (o.has() && !delimiters.test(o.peek())) {
       r.push(o.read())
     }
@@ -138,9 +176,9 @@ var NULAN = (function (n) {
         r === "<"  || r === ">"  || r === "<=" ||
         r === ">=" || r === "||" || r === "&&" ||
         r === "=<") {
-      a.push(t[r])
+      a.push(enrich(t[r], s))
     } else if (number(r)) {
-      a.push(PARSE.literal(+r))
+      a.push(enrich(t.literal(+r), s))
     } else {
       r = r.replace(/(.)\-([a-z])/g, function (s, s1, s2) {
         return s1 + s2.toLocaleUpperCase()
@@ -153,12 +191,13 @@ var NULAN = (function (n) {
           return [new n.Bypass("&get"), new n.Symbol(x), (number(y) ? +y : y)]
         })
       }
-      a.push(PARSE.literal(r))
+      a.push(enrich(t.literal(r), s))
     }
   }
 
   function tokenizeString(o, a) {
-    var q = o.peek()
+    var s = store(o)
+      , q = o.peek()
       , r = []
     o.read()
     while (o.has() && o.peek() !== q) {
@@ -166,17 +205,17 @@ var NULAN = (function (n) {
     }
     o.read()
     r = r.join("")
-    a.push(PARSE.literal(r))
+    a.push(enrich(t.literal(r), s))
   }
 
-  function getIndent(o) {
+  /*function getIndent(o) {
     var i = 0
     while (o.peek() === " ") {
       o.read()
       ++i
     }
     return i
-  }
+  }*/
 /*
     foo 1 2 3
     bar 1 2 3
@@ -216,32 +255,42 @@ var NULAN = (function (n) {
     }
   }
 
-  function tokenize1(o) {
-    var a, c, i2
-      , r = [t["("]]
-      , i = [getIndent(o)]
+  function tokenize(o) {
+    var c, r = []
+      //, r = [enrich(t["("], o)]
+      //, i = [getIndent(o)]
+
     while (o.has()) {
       c = o.peek()
-      if (c === "\n") {
+/*      if (c === "\n") {
         o.read()
 
         i2 = getIndent(o)
+        //console.log(i2, i)
         while (i2 <= i[i.length - 1]) {
           i.pop()
-          r.push(t[")"])
+          r.push(enrich(t[")"], o))
+        }
+
+        if (o.peek() !== "\n" && !i.length) {
+        r.push(enrich(t[";"], o))
         }
 
         //console.log(o.peek())
 
         //if (delimiters.test(o.peek())) {
-        if (o.peek() === ".") {
-          r.push(t["."])
+        c = o.peek()
+
+        if (c === ".") {
+          r.push(enrich(t[c], o))
           o.read()
         }
 
-        r.push(t["("])
-        i.push(i2)
-
+        if (c !== "\n") {
+          r.push(enrich(t["("], o))
+          i.push(i2)
+        }
+*/
 /*
         //console.log(i1, i2, o.peek())
         if (i2 === i1) {
@@ -252,16 +301,16 @@ var NULAN = (function (n) {
           // TODO: a bit hacky
           if (o.peek() === ".") {
             a = tokenize1(i2, o).slice(1)
-            a.splice(1, 0, t["("])
+            a.splice(1, 0, enrich(t["("], o))
           } else {
             a = tokenize1(i2, o)
           }
           //console.log(trans(tokenize1(i2, o)))
           r.push.apply(r, a)
         } else {
-          throw new Error("expected >= " + i1 + " indentation but got " + i2)
+          throw new PARSE.Error(o, "expected >= " + i1 + " indentation but got " + i2)
         }*/
-      } else if (c === " ") {
+      if (c === " " || c === "\n") {
         o.read()
       } else if (c === "#") {
         // TODO: multi-line comments
@@ -273,44 +322,124 @@ var NULAN = (function (n) {
         c = o.peek()
         if (c === ">") {
           o.read()
-          r.push(t["->"])
+          // TODO: should enrich with a stored version of <o>
+          r.push(enrich(t["->"], o))
         } else if (c === " " || c === "\n") {
-          r.push(t["-"])
+          r.push(enrich(t["-"], o))
         } else if (c === "-") {
           o.read()
-          r.push(PARSE.literal(new n.Symbol("--"))) // TODO a bit hacky
+          // TODO: should enrich with a stored version of <o>
+          r.push(enrich(t.literal(new n.Symbol("--")), o)) // TODO a bit hacky
         } else {
-          r.push(t["u-"])
+          r.push(enrich(t["u-"], o))
         }
       } else if (c === "\"") {
         tokenizeString(o, r)
-      } else if (c === "'") {
-        r.push(t[c])
-        r.push(t["("])
-        i.push(i[i.length - 1])
+      /*} else if (c === "'") {
         o.read()
+        r.push(enrich(t[c], o))
+        r.push(enrich(t["("], o))
+        i.push(i[i.length - 1])*/
       } else if (delimiters.test(c)) {
-        r.push(t[c])
         o.read()
+        r.push(enrich(t[c], o))
       } else {
         tokenizeNumOrSym(o, r)
       }
     }
 
     /*if (i.length === 1) {
-      r.push(t[")"])
+      r.push(enrich(t[")"], o))
     } else if (i.length === 2) {
-      throw new Error("expected >= " + i[0] + " indentation but got " + i[1])
+      throw new PARSE.Error(o, "expected >= " + i[0] + " indentation but got " + i[1])
     } else {
-      throw new Error("invalid indentation " + JSON.stringify(i))
+      throw new PARSE.Error(o, "invalid indentation " + JSON.stringify(i))
     }*/
 
-    while (i.length) {
+    /*while (i.length) {
       i.pop()
-      r.push(t[")"])
+      r.push(enrich(t[")"], o))
+    }*/
+
+    return r
+  }
+
+  // This inserts ( and ) based on indentation
+  function indent(a) {
+    var x    = a[0]
+      , r    = [enrich(t["("], x), x]
+      , s    = [x.column]
+      , i    = 1
+      , iOld = i - 1
+
+    while (i < a.length) {
+      if (a[i].line > x.line) {
+        x = a[i]
+        while (x.column <= s[s.length - 1]) {
+          s.pop()
+          r.push(enrich(t[")"], x))
+        }
+
+        /*if (!s.length) {
+          r.push(enrich(t[";"], x))
+        }*/
+
+        if (PARSE.is(x, t["."])) {
+          // TODO: not sure if this is enriching correctly
+          r.splice(iOld, 0, enrich(t["("], x))
+          s.push(x.column)
+          //r.push(x)
+        } else {
+          // TODO: not sure if this is enriching correctly
+          r.push(enrich(t["("], x))
+          s.push(x.column)
+          iOld = i + 1
+        }
+      }
+/*
+      foo
+        .bar 1 2 3
+        .qux 5 10 20
+        .corge
+
+      ((foo.bar 1 2 3).qux 5 10 20).corge
+*/
+      r.push(a[i])
+
+      if (PARSE.is(a[i], t["'"])) {
+        r.push(enrich(t["("], a[i]))
+        s.push(a[i].column)
+      }
+
+      ++i
     }
 
-    console.log(trans(r))
+    while (s.length) {
+      r.push(enrich(t[")"], a[i - 1]))
+      s.pop()
+    }
+
+    /*if (o.peek() !== "\n" && !i.length) {
+    r.push(enrich(t[";"], o))
+    }*/
+
+    //console.log(o.peek())
+
+    //if (delimiters.test(o.peek())) {
+    /*c = o.peek()
+
+    if (c === ".") {
+      r.push(enrich(t[c], o))
+      o.read()
+    }
+
+    if (c !== "\n") {
+      r.push(enrich(t["("], o))
+      i.push(i2)
+    }
+    r.push(enrich(t[")"], a[i - 1]))*/
+
+    console.log(trans(r).join(" "))
     return r
   }
 
@@ -318,22 +447,14 @@ var NULAN = (function (n) {
 
   //[ ['foobar', 'quxcorge', 'nou'] ]
 
-  function tokenize(o) {
-    var r = []
-    while (o.has()) {
-      r.push(tokenize1(o))
-    }
-    return r
-  }
-
   n.tokenize = function (s) {
-    return tokenize(PARSE.iter(s))
+    s = indent(tokenize(PARSE.stringBuffer(s)))
+    //console.log(trans(s).join(" "))
+    return s
   }
 
   n.parse = function (s) {
-    return n.tokenize(s).map(function (x) {
-      return PARSE.parse(PARSE.iter(x))
-    })
+    return PARSE.parseAll(PARSE.iter(n.tokenize(s)))
   }
 
   return n

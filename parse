@@ -15,6 +15,9 @@ load("./lib/PARSE.js")
 load("./NULAN.parse.js")
 
 
+var util = require("util")
+
+
 function transform(x) {
   if (Array.isArray(x)) {
     return x.map(transform)
@@ -27,12 +30,48 @@ function transform(x) {
   }
 }
 
-require("./lib/cli").on("input", function (s) {
+function foo(a) {
+  a.forEach(function (x) {
+    try {
+      transform(NULAN.parse(x + "\n")).forEach(function (x) {
+        console.log(util.inspect(x, false, null, true))
+      })
+    } catch (e) {
+      console.error("" + e)
+    }
+    console.log()
+  })
+}
+
+foo(["foo 123\n  bar 2 3)\n  corge 60 70\n\nqux 5 10\n",
+     "(foobar",
+     "foobar)",
+     "(foobar +",
+     "+ 5",
+     "1 + 2 3 + 4",
+     "foo 1 2 3 4 5",
+     "foo 1 2 3\n  bar 3 4 5",
+     "foo 1 2 3\n  bar 3 4 5\n  qux 10 20 30",
+     "foo 1 2 3\n  bar 3 4 5\n    qux 10 20 30\n  nou yes 10",
+     "foo 1 2 3\n\nbar 1 2 3",
+     "foo 1 2 3\n  bar 1 2 3\n\n  qux 1 2 3\ncorge 1 2 3\n\nyesnou",
+     "mac isnt -> @args\n  # TODO: special case for 2-arguments\n  '~(is ,@args)",
+     "mac str -> @args\n  '&add \"\" ,@args",
+     "foo\n  .bar",
+     "foo\n  .bar 10 20\n  .qux 10 20\n  .corge 10 20",
+     "foo\n  .bar 1 2 3\n  .qux 5 10 20\n  .corge",
+     "foo 10 20\nfoo\n  .bar 1 2 3\n  .qux 5 10 20\n  .corge",
+     "foo 10\n  bar\n    .qux 20 30\n    .corge 40 50"])
+
+// ( foo 10 ( ( bar.qux 20 30 ) . corge 40 50 ) )
+
+/*
+require("./lib/cli").create().on("input", function (s) {
   try {
-    console.log(JSON.stringify(transform(NULAN.parse(s))))
+    console.log(util.inspect(transform(NULAN.parse(s)), false, null, true))
   } catch (e) {
     console.error(e)
   }
 
   console.log()
-})
+})*/

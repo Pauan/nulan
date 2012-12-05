@@ -28,6 +28,13 @@ var NULAN = (function (n) {
     this.value = value
   }
 
+  n.Error = function (s) {
+    this.message = s
+  }
+  n.Error.prototype = new Error()
+  n.Error.prototype.constructor = n.Error
+  n.Error.prototype.name = "NULAN.Error"
+
   function Uniq() {}
 
 
@@ -68,7 +75,7 @@ var NULAN = (function (n) {
     } else if (s instanceof n.Symbol) {
       return vars[s.value] = findUniq(s.value)
     } else {
-      throw new Error("invalid variable: " + s)
+      throw new n.Error("invalid variable: " + s)
     }
   }
 
@@ -83,7 +90,7 @@ var NULAN = (function (n) {
       if (s in vars) {
         return vars[s]
       } else {
-        throw new Error("undefined variable: " + s)
+        throw new n.Error("undefined variable: " + s)
       }
     }
   }
@@ -227,7 +234,7 @@ var NULAN = (function (n) {
       } else {
         x = getUniq(a)
         if (typeof x !== "string") {
-          throw new Error("invalid variable: " + x)
+          throw new n.Error("invalid variable: " + x)
         }
                           // TODO
         if (namespace && !locals[a.value]) {
@@ -252,12 +259,13 @@ var NULAN = (function (n) {
       } else if (a instanceof n.Symbol) {
         return ["name", a.value]
       } else {
-        throw new Error("invalid expression: " + a)
+        throw new n.Error("invalid expression: " + a)
       }
     }
   }
 
-  function pair(a) {
+  // TODO: ugh I wish I could do this natively in JS
+  n.pair = function (a) {
     var r = []
     for (var i = 0, iLen = a.length - 1; i < iLen; i += 2) {
       r.push([a[i], a[i + 1]])
@@ -288,8 +296,8 @@ var NULAN = (function (n) {
     return new Macro(function () {
       switch (arguments.length) {
       case 0:
-        throw new Error((typeof i === "string" ? i : s) +
-                        " cannot be called with 0 arguments")
+        throw new n.Error((typeof i === "string" ? i : s) +
+                          " cannot be called with 0 arguments")
       case 1:
         if (typeof i === "function") {
           return i(mac(arguments[0]))
@@ -364,7 +372,24 @@ var NULAN = (function (n) {
 
   values["num"] = unary("u+")
   values["mod"] = binary("%")
-  values["do"]  = binreduce1(",", "do")
+
+  values["dict"] = new Macro(function () {
+    if (arguments.length === 0) {
+      return ["object", []]
+    } else {
+      // TODO
+      var a = n.pair(arguments).map(function (a) {
+        return [values["set!"], ["get", "foo", a[0]], a[1]]
+      })
+      return mac([values["&do"], [values["var"], "foo", [values["dict"]]]].concat(a))
+    }
+    /*var x = setUniq("foo")
+    var a = n.pair(arguments).map(function (a) {
+      return ["=", [".", ["name", x], a[0]], mac(a[1])]
+    })
+    a.unshift(["var", [[x, ["object", []]]]])
+    return binr(",", a)*/
+  })
 
   values["++"] = new Macro(function (x, y) {
     if (y === void 0 || y === 1) {
@@ -554,7 +579,7 @@ var NULAN = (function (n) {
     }
     locals[s] = true // TODO
 
-    var r = mac([values["do"], [values["var"], x, y], body])
+    var r = mac([values["&do"], [values["var"], x, y], body])
 
     if (b) {
       vars[s] = old
@@ -648,28 +673,11 @@ var NULAN = (function (n) {
   values["&mul"]        = binreduce0("*",  ["number", "1"])
 
   values["&sub"]        = binreduce1("-", function (x) { return ["u-", x] })
+  values["&do"]         = binreduce1(",", "&do")
   values["&div"]        = binreduce1("/")
 
   values["&set!"] = new Macro(function (x, y) {
     return ["=", mac(x), mac(y)]
-  })
-
-  values["&dict"] = new Macro(function () {
-    if (arguments.length === 0) {
-      return ["object", []]
-    } else {
-      // TODO
-      var a = pair(arguments).map(function (a) {
-        return [values["set!"], ["get", "foo", a[0]], a[1]]
-      })
-      return mac([values["do"], [values["var"], "foo", [values["dict"]]]].concat(a))
-    }
-    /*var x = setUniq("foo")
-    var a = pair(arguments).map(function (a) {
-      return ["=", [".", ["name", x], a[0]], mac(a[1])]
-    })
-    a.unshift(["var", [[x, ["object", []]]]])
-    return binr(",", a)*/
   })
 
   values["&list"] = new Macro(function () {
@@ -901,7 +909,7 @@ var NULAN = (function (n) {
       js_vars = old
       return r
     } else {
-      throw new Error("invalid function argument list: " + args)
+      throw new n.Error("invalid function argument list: " + args)
     }
   })
 
@@ -925,7 +933,7 @@ var NULAN = (function (n) {
     if (Array.isArray(x)) {
       if (isValue(x[0], "&comma") && (x = x[1])) {
         if (Array.isArray(x) && isValue(x[0], "&splice")) {
-          throw new Error("',@ is invalid")
+          throw new n.Error("',@ is invalid")
         } else {
           return mac(x)
         }
@@ -1001,8 +1009,7 @@ var NULAN = (function (n) {
 
   n.import = function () {
     [].forEach.call(arguments, function (s) {
-      s = n.parse(n.readFile(s))
-      n.compile(s)
+      n.compile(n.parse(n.readFile(s)))
     })
   }
 
