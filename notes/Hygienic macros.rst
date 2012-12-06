@@ -16,7 +16,7 @@ I'm not a fan of text-book definitions, so instead I'll give an example to demon
 
   (foo 20)
 
-The above creates a macro ``foo`` that replaces ``(foo y)`` with ``(let x 10 (+ x y))``.
+The above creates a macro ``foo`` that replaces ``(foo y)`` with ``(let x 10 (+ x y))``
 
 We then call the macro, which will be expanded to ``(let x 10 (+ x 20))``.  This works just fine and returns ``30``
 
@@ -49,7 +49,7 @@ The above throws an error. Expanding it, we can see why::
     (let x 10
       (+ x 20)))
 
-In this case, we're using ``let`` to change the definition of ``+``, which certainly isn't what we were expecting to happen. In general, this kind of hygiene violation cannot be solved in Arc.
+In this case, we're using ``let`` to change the definition of ``+``, which certainly isn't what we were expecting to happen! In general, this kind of hygiene violation **cannot** be solved in Arc.
 
 The Scheme macro system uses syntax objects and all kinds of buffoonery to fix these hygiene problems, but the end result is a system that is **very** complicated.
 
@@ -61,7 +61,7 @@ But first, I would like to point out that this problem of "hygiene" is not speci
 
 - A language uses lexical scope if the body of a function is evaluated in the environment where the function was *defined*.
 
-Of course, we're using macros rather than functions, but the principle is the same. The problem in all of the examples above is that the variables like ``x``, ``let``, and ``+`` are resolved according to where the macro is *called*. We want it to resolve the variables where the macro is *defined*.
+Of course, we're using macros rather than functions, but the principle is the same. The problem in all of the examples above is that variables like ``x``, ``let``, and ``+`` are resolved according to where the macro is *called*. We want it to resolve the variables where the macro is *defined*.
 
 So "lack of hygiene" really just means "dynamic scope" and "hygienic macros" really just means "lexically scoped macros". This alone is a massive clarification, and I think it's a shame that the Lisp community has treated hygiene as a separate topic, rather than a specific example of dynamic vs lexical.
 
@@ -104,11 +104,11 @@ So, why don't we just use ``,`` to evaluate everything in the environment where 
 
 Nulan implements all of the above changes, except:
 
-- There is no ``quasiquote`` operator, only ``quote``, and ``quote`` evaluates symbols::
+- There is no ``\``` operator, only ``'``, and ``'`` evaluates symbols::
 
     '(foo bar qux) -> (list foo bar qux)
 
-- The ``quote`` operator supports ``unquote``, just like ``quasiquote`` in other Lisps::
+- The ``'`` operator supports ``,``, just like ``\``` in other Lisps::
 
     '(foo (bar) qux)  -> (list foo (list bar) qux)
     '(foo ,(bar) qux) -> (list foo (bar) qux)
