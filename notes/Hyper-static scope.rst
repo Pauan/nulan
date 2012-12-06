@@ -16,19 +16,19 @@ So, let's start with something more concrete. In older languages, especially old
     return x
   }
 
-The code is fairly straightforward. We have a global variable ``x``, a function ``foo`` that assigns to ``x`` and a function ``bar`` that creates a local variable ``x``, calls the ``foo`` function, then returns ``x``.
+The code is fairly straightforward. We have a global variable ``x``. A function ``foo`` that assigns to ``x``. And a function ``bar`` that creates a local variable ``x``, calls the ``foo`` function, then returns ``x``.
 
 Now, the question is, what is the value of the variable ``x``?
 
-In a dynamically scoped language, ``bar`` would return 2, and the global ``x`` would be 1.
+In a dynamically scoped language, ``bar`` would return ``2``, and the global ``x`` would be ``1``.
 
-In a lexically scoped language, ``bar`` would return 3, and the global ``x`` would be 2.
+In a lexically scoped language, ``bar`` would return ``3``, and the global ``x`` would be ``2``.
 
 This phenomenom is quite easy to explain with the concept of "environments", which are data structures that map variables to values:
 
-A language uses dynamic scope if the body of a function is evaluated in the environment where the function was *called*.
+- A language uses dynamic scope if the body of a function is evaluated in the environment where the function was *called*.
 
-A language uses lexical scope if the body of a function is evaluated in the environment where the function was *defined*.
+- A language uses lexical scope if the body of a function is evaluated in the environment where the function was *defined*.
 
 This is the key distinction between dynamic and lexical scope: whether variables are resolved according to where the function is *called* or *defined*.
 
@@ -61,21 +61,17 @@ What happened is that JavaScript re-arranges ``var`` so that they always occur a
     x = 5
   }
 
-And so, even though JavaScript's functions use "lexical scope", they treat the locals as being almost-kinda dynamic in some ways, and global variables are fully dynamic.
+And so, even though JavaScript's functions use "lexical scope", they treat locals as being almost-kinda dynamic in some ways, and global variables are fully dynamic.
 
 Nulan, however, uses hyper-static scope *everywhere*, at both the global and the local level. Another way of putting it is to say that Nulan enforces strict lexical scope everywhere.
 
-The idea of hyper-static scope is not new:
+The idea of hyper-static scope is not new (http://c2.com/cgi/wiki?HyperStaticGlobalEnvironment) but most mainstream languages don't support it.
 
-http://c2.com/cgi/wiki?HyperStaticGlobalEnvironment
-
-But most mainstream languages don't support it. How does hyper-static scope work? Using our previous definitions of dynamic/lexical scope, hyper-static scope simply means that an expression can only refer to variables that exist at the time the expression is defined. As an example, assuming JavaScript used hyper-static scope, these would be errors::
+How does hyper-static scope work? Using our previous definitions of dynamic/lexical scope, hyper-static scope simply means that an expression can only refer to variables that exist at the time the expression is defined. As an example, assuming JavaScript used hyper-static scope, these would be errors::
 
   function foo() {
     return bar()
   }
-
-  ... many lines later ...
 
   function bar() {
     return 1
