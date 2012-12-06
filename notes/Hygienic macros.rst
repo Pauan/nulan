@@ -69,9 +69,9 @@ Now that we understand the problem that we're trying to solve, how do we actuall
 
 Macros are really just functions that accept an S-expression and return an S-expression. And functions are lexically scoped. So why can't we use the lexical scope of functions to make macros lexically scoped?
 
-The problem is that macros are written using ``quote``, which returns an unevaluated expression. In particular, in the expression ```(let x 10 x)``, the symbols ``let`` and ``x`` are not evaluated. The macro is then expanded, and the symbols are evaluated in the environment where the macro is called.
+The problem is that macros are written using ``quote``, which returns an unevaluated expression. In particular, in the expression ```(let x 5 x)``, the symbols ``let`` and ``x`` are not evaluated. The macro is then expanded, and the symbols are evaluated in the environment where the macro is called.
 
-So, why don't we just use ``,`` to evaluate everything in the environment where the macro is defined? In other words, we would write ```(,let ,x ,10 ,x)``. So, that's it, right? We just don't use ``quote`` and we get lexical scope, right? Well, yes, with a few caveats:
+So, why don't we just use ``,`` to evaluate everything in the environment where the macro is defined? In other words, we would write ```(,let ,x ,5 ,x)``. So, that's it, right? We just don't use ``quote`` and we get lexical scope, right? Well, yes, with a few caveats:
 
 - In Scheme, you can't access the *value* of a macro, so macros **must** be referred to with a symbol.
 
@@ -94,7 +94,7 @@ So, why don't we just use ``,`` to evaluate everything in the environment where 
 
   ...then ``(bar)`` will still return ``5``, rather than ``10``. Nulan solves this problem by having every variable be a *box* rather than a *value*. So the macro ``bar`` inserts a box that refers to ``foo``, rather than inserting ``foo`` directly. And now any changes to the box will show up in the macro.
 
-- Having to use ``,`` on every variable is not only very verbose and ugly, but it's error-prone: if you forget to use it, your macro is now dynamically scoped! It would be better to have ``,`` be the default, so you can write ```(let x 10 x)`` and have it be lexical. This is an easy change to make, but a lot of people are used to having ``quote`` be the default, so there would be a painful transition period.
+- Having to use ``,`` on every variable is not only very verbose and ugly, but it's error-prone: if you forget to use it, your macro is now dynamically scoped! It would be better to have ``,`` be the default, so you can write ```(let x 5 x)`` and have it be lexical. This is an easy change to make, but a lot of people are used to having ``quote`` be the default, so there would be a painful transition period.
 
 - Having macros be lexically scoped by default is great, but there are some situations where you intentionally want a variable to be dynamic. If ``,`` is the default, then how do you write unhygienic macros? The answer is actually really simple::
 
