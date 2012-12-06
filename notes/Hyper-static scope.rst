@@ -24,13 +24,13 @@ The code is fairly straightforward:
 
 Now, the question is, what is the value of the variable ``x``?
 
-- In a dynamically scoped language, ``bar`` would return ``2``, and the global ``x`` would be ``1``.
+- In a dynamically scoped language, ``bar`` would return ``2``, and the global ``x`` would be ``1``
 
-- In a lexically scoped language, ``bar`` would return ``3``, and the global ``x`` would be ``2``.
+- In a lexically scoped language, ``bar`` would return ``3``, and the global ``x`` would be ``2``
 
 This phenomenom is quite easy to explain with the concept of "environments", which are data structures that map variables to values:
 
-- A language uses dynamic scope if the body of a function is evaluated in the environment where the function was *called*.
+- A language uses dynamic scope if the body of a function is evaluated in the environment where the function is *called*.
 
 - A language uses lexical scope if the body of a function is evaluated in the environment where the function was *defined*.
 
@@ -124,23 +124,23 @@ You, as a programmer, want to be able to use the same variable name for two diff
 
    Some examples of this system are Python, Node.js, and Racket. Python and Node.js solve this problem with first-class objects and a module loading system that lets you import these objects into a particular variable. For instance, in Node.js::
 
-  var lib1 = require("lib1")
-    , lib2 = require("lib2")
+    var lib1 = require("lib1")
+      , lib2 = require("lib2")
 
-  lib1.foo()
-  lib1.bar()
-  lib2.foo()
+    lib1.foo()
+    lib1.bar()
+    lib2.foo()
 
    This solves the problem of two libraries using the same prefix, because the prefix is assigned when the library is imported, rather than when it's defined. But it only helps a little with the problem of verbosity: ``lib1.foo`` is the same number of characters as ``lib1_foo``. The only benefit is that you can rename the library to something shorter, like ``l``, in which case you can say ``l.foo``.
 
    Racket has multiple namespaces, but unlike Python and Node.js, it doesn't use any prefixes at all, and namespaces are not available at runtime. That is, namespaces in Racket are not first-class. The above would be written like this in Racket::
 
-  (require (rename-in lib1 [foo foo1]))
-  (require (rename-in lib2 [foo foo2]))
+    (require (rename-in lib1 [foo foo1]))
+    (require (rename-in lib2 [foo foo2]))
 
-  (foo1)
-  (bar)
-  (foo2)
+    (foo1)
+    (bar)
+    (foo2)
 
    Notice that there is no ``lib1`` or ``lib2`` prefix. You simply use the variables normally, like as if they were in a single namespace. To resolve name conflicts, Racket lets you rename variables. In this case, we're renaming ``foo`` in ``lib1`` to ``foo1`` and ``foo`` in ``lib2`` to ``foo2``.
 
