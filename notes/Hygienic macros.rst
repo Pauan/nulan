@@ -104,16 +104,16 @@ So, why don't we just use ``,`` to evaluate everything in the environment where 
 
 Nulan implements all of the above changes, except:
 
-- There is no ``\``` operator, only ``'``, and ``'`` evaluates symbols::
+- There is no ````` operator, only ``'``, and ``'`` evaluates symbols::
 
     '(foo bar qux) -> (list foo bar qux)
 
-- The ``'`` operator supports ``,``, just like ``\``` in other Lisps::
+- The ``'`` operator supports ``,`` just like ````` in other Lisps::
 
     '(foo (bar) qux)  -> (list foo (list bar) qux)
     '(foo ,(bar) qux) -> (list foo (bar) qux)
 
-- If you want to write an "unhygienic macro", you need to use the ``sym`` function, which converts a string to a symbol:
+- If you want to write an "unhygienic macro", you need to use the ``sym`` function, which converts a string to a symbol::
 
     '(let ,(sym "x") 5 ,(sym "x"))
 
