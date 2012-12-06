@@ -13,7 +13,7 @@ Features
 
 * Pattern matching for function/macro arguments
 
-* `Hyper-static scope <blob/javascript/notes/Hyper-static%20scope.rst>`_ at both the global and function level
+* `Hyper-static scope <nulan/blob/javascript/notes/Hyper-static%20scope.rst>`_ at both the global and function level
 
 * Hygienic macros which are even easier to use than Arc/Common Lisp macros
 
