@@ -1,6 +1,6 @@
 There are different ways to describe and understand the concept of "hyper-static scope".
 
-One way is to view hyper-static scope as being a particular kind of lexical scoping. This is true, but the phrase "lexical scope" itself isn't particularly well defined, so I think this way of thinking is useless, especially because it doesn't help us to understand how hyper-static scope differs from other lexical scoping strategies.
+One way is to view hyper-static scope as being a particular kind of lexical scoping. This is true, but the phrase "lexical scope" itself isn't particularly well defined, so I think this way of thinking is mostly useless, especially because it doesn't help us to understand how hyper-static scope differs from other lexical scoping strategies.
 
 So, let's start with something more concrete. In older languages, especially older Lisps, the concept of dynamic scope was popular. It was easy to implement, and lots of time was invested into making it fast. What is dynamic scope? Rather than covering the text-book definition, I will show an example. First, some JavaScript code::
 
@@ -16,13 +16,17 @@ So, let's start with something more concrete. In older languages, especially old
     return x
   }
 
-The code is fairly straightforward. We have a global variable ``x``. A function ``foo`` that assigns to ``x``. And a function ``bar`` that creates a local variable ``x``, calls the ``foo`` function, then returns ``x``.
+The code is fairly straightforward:
+
+- We have a global variable ``x``
+- A function ``foo`` that assigns to ``x``
+- And a function ``bar`` that creates a local variable ``x``, calls the ``foo`` function, then returns ``x``
 
 Now, the question is, what is the value of the variable ``x``?
 
-In a dynamically scoped language, ``bar`` would return ``2``, and the global ``x`` would be ``1``.
+- In a dynamically scoped language, ``bar`` would return ``2``, and the global ``x`` would be ``1``.
 
-In a lexically scoped language, ``bar`` would return ``3``, and the global ``x`` would be ``2``.
+- In a lexically scoped language, ``bar`` would return ``3``, and the global ``x`` would be ``2``.
 
 This phenomenom is quite easy to explain with the concept of "environments", which are data structures that map variables to values:
 
@@ -53,7 +57,7 @@ Even local variables in JavaScript are a bit funky because of var hoisting. That
     var x = 5
   }
 
-What happened is that JavaScript re-arranges ``var`` so that they always occur at the top of the function's body. In other words, the above function was automatically re-written into this::
+What happened is that JavaScript re-arranges ``var`` so that it always occurs at the top of the function's body. In other words, the above function was automatically re-written into this::
 
   function foo() {
     var x
@@ -84,7 +88,7 @@ How does hyper-static scope work? Using our previous definitions of dynamic/lexi
 
 The function ``foo`` throws an error because at the *time the function is defined*, the variable ``bar`` doesn't exist. And the function ``qux`` throws an error because at the time the expression ``return x`` is defined, the variable ``x`` doesn't exist.
 
-To fix this, you would have to write them like this::
+To fix this, you would have to write it like this::
 
   function bar() {
     return 1
@@ -106,19 +110,19 @@ This system is also much faster, because every variable has only a single locati
 
 This system also gives you most of the benefits of multiple namespaces, but with much lower cost and complexity.
 
-The fundamental problem that namespaces are trying to solve is "name resolution". Dynamic scope and lexical scope are really just two different algorithms for name resolution. Hyper-static scope is a particular kind of lexical scope, and thus it too is an algorithm for name resolution.
+To explain further, the fundamental problem that namespaces are trying to solve is "name resolution". Dynamic scope and lexical scope are really just two different algorithms for name resolution. Hyper-static scope is a particular kind of lexical scope, and thus it too is an algorithm for name resolution.
 
 You, as a programmer, want to be able to use the same variable name for two different things. Most languages solve this in one of two ways:
 
 1) Everything is evaluated in a single namespace. This system is used by C, JavaScript, Ruby, Emacs Lisp, Arc, Scheme, and many others. In these languages, name conflicts are common. That is, if two different programs use the same variable name, one of them will clobber the other, and thus the two programs *cannot* be used together. This has serious implications for libraries, which are supposed to be building blocks that you can freely mix and match together.
 
-These languages solve the problem by adding a prefix to all the variables that might cause collisions. For instance, if you're writing a library called "foobarqux", which defines the global variables ``yes``, ``no``, and ``maybe``, you might instead call them ``foobarqux_yes``, ``foobarqux_no``, ``foobarqux_maybe``
+   These languages solve the problem by adding a prefix to all the variables that might cause collisions. For instance, if you're writing a library called "foobarqux", which defines the global variables ``yes``, ``no``, and ``maybe``, you might instead call them ``foobarqux_yes``, ``foobarqux_no``, ``foobarqux_maybe``
 
-Effectively, by appending a unique identifier to all exposed variables, you prevent name collisions from occuring. This is not without its drawbacks, however. It is very verbose, making code harder to read and write. It also does not solve the problem of two different libraries that use the same prefix. For instance, there might be two different "foobarqux" libraries, which both use the "foobarqux" prefix.
+   Effectively, by appending a unique identifier to all exposed variables, you prevent name collisions from occuring. This is not without its drawbacks, however. It is very verbose, making code harder to read and write. It also does not solve the problem of two different libraries that use the same prefix. For instance, there might be two different "foobarqux" libraries, which both use the "foobarqux" prefix.
 
 2) Multiple namespaces. These languages have some sort of mechanism that allows code to be run in a new namespace, which is a kind of sandbox, isolating it from all other code. These languages also provide some way to import another namespace into the current namespace.
 
-Some examples of this system are Python, Node.js, and Racket. Python and Node.js solve this problem with first-class objects and a module loading system that lets you import these objects into a particular variable. For instance, in Node.js::
+   Some examples of this system are Python, Node.js, and Racket. Python and Node.js solve this problem with first-class objects and a module loading system that lets you import these objects into a particular variable. For instance, in Node.js::
 
   var lib1 = require("lib1")
     , lib2 = require("lib2")
@@ -127,9 +131,9 @@ Some examples of this system are Python, Node.js, and Racket. Python and Node.js
   lib1.bar()
   lib2.foo()
 
-This solves the problem of two libraries using the same prefix, because the prefix is assigned when the library is imported, rather than when it's defined. But it only helps a little with the problem of verbosity: ``lib1.foo`` is the same number of characters as ``lib1_foo``. The only benefit is that you can rename the library to something shorter, like ``l``, in which case you can say ``l.foo``.
+   This solves the problem of two libraries using the same prefix, because the prefix is assigned when the library is imported, rather than when it's defined. But it only helps a little with the problem of verbosity: ``lib1.foo`` is the same number of characters as ``lib1_foo``. The only benefit is that you can rename the library to something shorter, like ``l``, in which case you can say ``l.foo``.
 
-Racket has multiple namespaces, but unlike Python and Node.js, it doesn't use any prefixes at all, and namespaces are not available at runtime. That is, namespaces in Racket are not first-class. The above would be written like this in Racket::
+   Racket has multiple namespaces, but unlike Python and Node.js, it doesn't use any prefixes at all, and namespaces are not available at runtime. That is, namespaces in Racket are not first-class. The above would be written like this in Racket::
 
   (require (rename-in lib1 [foo foo1]))
   (require (rename-in lib2 [foo foo2]))
@@ -138,9 +142,9 @@ Racket has multiple namespaces, but unlike Python and Node.js, it doesn't use an
   (bar)
   (foo2)
 
-Notice that there is no ``lib1`` or ``lib2`` prefix. You simply use the variables normally, like as if they were in a single namespace. To resolve name conflicts, Racket lets you rename variables. In this case, we're renaming ``foo`` in ``lib1`` to ``foo1`` and ``foo`` in ``lib2`` to ``foo2``.
+   Notice that there is no ``lib1`` or ``lib2`` prefix. You simply use the variables normally, like as if they were in a single namespace. To resolve name conflicts, Racket lets you rename variables. In this case, we're renaming ``foo`` in ``lib1`` to ``foo1`` and ``foo`` in ``lib2`` to ``foo2``.
 
-The problem that I have with Racket is that it's very very very static, complicated, and in my opinion, bloated. I want a system that is as concise and easy to use as Racket's system, but is also easy to implement.
+   The problem that I have with Racket is that it's very very very static, complicated, and in my opinion, bloated. I want a system that is as concise and easy to use as Racket's system, but is also easy to implement.
 
 Hyper-static scope gives you most of Racket's namespace system, but for much lower cost. To explain how it works, I like to use the concept of "boxes", even if the implementation doesn't use boxes.
 
