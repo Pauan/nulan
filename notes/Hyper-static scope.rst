@@ -114,9 +114,9 @@ To explain further, the fundamental problem that namespaces are trying to solve 
 
 You, as a programmer, want to be able to use the same variable name for two different things. Most languages solve this in one of two ways:
 
-1) Everything is evaluated in a single namespace. This system is used by C, JavaScript, Ruby, Emacs Lisp, Arc, Scheme, and many others. In these languages, name conflicts are common. That is, if two different programs use the same variable name, one of them will clobber the other, and thus the two programs *cannot* be used together. This has serious implications for libraries, which are supposed to be building blocks that you can freely mix and match together.
+1) Everything is evaluated in a single namespace. This system is used by C, JavaScript, Emacs Lisp, Arc, Scheme, and many others. In these languages, name conflicts are common. That is, if two different programs use the same variable name, one of them will clobber the other, and thus the two programs *cannot* be used together. This has serious implications for libraries, which are supposed to be building blocks that you can freely mix and match together.
 
-   These languages solve the problem by adding a prefix to all the variables that might cause collisions. For instance, if you're writing a library called "foobarqux", which defines the global variables ``yes``, ``no``, and ``maybe``, you might instead call them ``foobarqux_yes``, ``foobarqux_no``, ``foobarqux_maybe``
+   These languages solve the problem by adding a prefix to all the variables that might cause collisions. For instance, if you're writing a library called "foobarqux", which defines the global variables ``yes``, ``no``, and ``maybe``, you might instead call them ``foobarqux_yes``, ``foobarqux_no``, and ``foobarqux_maybe``
 
    Effectively, by appending a unique identifier to all exposed variables, you prevent name collisions from occuring. This is not without its drawbacks, however. It is very verbose, making code harder to read and write. It also does not solve the problem of two different libraries that use the same prefix. For instance, there might be two different "foobarqux" libraries, which both use the "foobarqux" prefix.
 
@@ -128,10 +128,11 @@ You, as a programmer, want to be able to use the same variable name for two diff
       , lib2 = require("lib2")
 
     lib1.foo()
-    lib1.bar()
     lib2.foo()
 
-   This solves the problem of two libraries using the same prefix, because the prefix is assigned when the library is imported, rather than when it's defined. But it only helps a little with the problem of verbosity: ``lib1.foo`` is the same number of characters as ``lib1_foo``. The only benefit is that you can rename the library to something shorter, like ``l``, in which case you can say ``l.foo``.
+    lib1.bar()
+
+   This solves the problem of two libraries using the same prefix, because the prefix is assigned when the library is imported, rather than when it's defined. But it only helps a little with the problem of verbosity: ``lib1.foo`` is the same number of characters as ``lib1_foo``. The only benefit is that you can rename the library to something shorter, like ``a``, in which case you can say ``a.foo``.
 
    Racket has multiple namespaces, but unlike Python and Node.js, it doesn't use any prefixes at all, and namespaces are not available at runtime. That is, namespaces in Racket are not first-class. The above would be written like this in Racket::
 
@@ -139,12 +140,13 @@ You, as a programmer, want to be able to use the same variable name for two diff
     (require (rename-in lib2 [foo foo2]))
 
     (foo1)
-    (bar)
     (foo2)
 
-   Notice that there is no ``lib1`` or ``lib2`` prefix. You simply use the variables normally, like as if they were in a single namespace. To resolve name conflicts, Racket lets you rename variables. In this case, we're renaming ``foo`` in ``lib1`` to ``foo1`` and ``foo`` in ``lib2`` to ``foo2``.
+    (bar)
 
-   The problem that I have with Racket is that it's very very very static, complicated, and in my opinion, bloated. I want a system that is as concise and easy to use as Racket's system, but is also easy to implement.
+   Notice that there is no ``lib1`` or ``lib2`` prefix. You simply use the variables normally, like as if they were in a single namespace. To resolve name conflicts, Racket lets you rename variables. In this case, we're renaming ``lib1``'s ``foo`` to ``foo1`` and ``lib2``'s ``foo`` to ``foo2``.
+
+   The problem that I have with Racket is that it's *very very very* static, complicated, and in my opinion, bloated. I want a system that is as concise and easy to use as Racket's system, but is also easy to implement.
 
 Hyper-static scope gives you most of Racket's namespace system, but for much lower cost. To explain how it works, I like to use the concept of "boxes", even if the implementation doesn't use boxes.
 
@@ -160,11 +162,11 @@ The basic idea is that at compile-time, all variables are replaced with boxes. T
 
   bar()
 
-Here we have created a global variable ``foo``, a function ``bar`` that returns ``foo``, another global variable ``foo``, and then we call the function ``bar``. According to hyper-static scope, variables are always resolved according to where they are defined, thus the call to ``bar`` returns 5.
+Here we have created a global variable ``foo``, a function ``bar`` that returns ``foo``, another global variable ``foo``, and then we call the function ``bar``. According to hyper-static scope, variables are always resolved according to where they are defined, thus the call to ``bar`` returns ``5``.
 
-Using the idea of boxes, when the compiler encounters ``var foo = 5``, it creates a new box and binds it to the variable ``foo``. Inside the function ``bar``, it then replaces the variable ``foo`` with the box.
+Using the idea of boxes, when the compiler encounters ``var foo = 5``, it creates a new box and binds it to the variable ``foo``. Inside the function ``bar``, it replaces the variable ``foo`` with the box.
 
-Then, when the compiler encounters ``var foo = 10``, it creates a new box and binds it to the variable ``foo``, but the variable ``foo`` inside ``bar`` was already replaced with a box, so this has no effect on any previous uses of the variable ``foo``.
+Then, when the compiler encounters ``var foo = 10``, it creates a new box and binds it to the variable ``foo``, but inside ``bar``, the variable ``foo`` was already replaced with a box, so this has no effect on any previous uses of the variable ``foo``.
 
 Thus, the second ``var`` expression shadows the previous variable: previous uses of ``foo`` will continue to use the old version of ``foo``, but new uses of ``foo`` will use the new version.
 
@@ -189,12 +191,13 @@ Going back to the example of conflicting libraries, it could be written like thi
   var foo2 = foo
 
   foo1()
-  bar()
   foo2()
+
+  bar()
 
 As you can see, we're using a plain-old ``var`` to rename the conflicting variables. In languages which use dynamic scope for global variables, when importing the library ``lib2``, it would overwrite the variable ``foo``. But in Nulan, thanks to hyper-static scope, this works.
 
-The above is common enough that Nulan provides a ``rename`` macro which does the same thing:
+The above is common enough that Nulan provides a ``rename`` macro which does the same thing::
 
   rename foo = foo1
     import lib1
