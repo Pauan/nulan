@@ -15,7 +15,7 @@ Features
 
 * `Hyper-static scope <nulan/blob/javascript/notes/Hyper-static%20scope.rst>`_ at both the global and function level
 
-* Hygienic macros which are even easier to use than Arc/Common Lisp macros
+* `Hygienic macros <nulan/blob/javascript/notes/Hygienic%20macros.rst>`_ which are even easier to use than Arc/Common Lisp macros
 
 * Syntax to make common idioms shorter and easier to read
 
