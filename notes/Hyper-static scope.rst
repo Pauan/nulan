@@ -146,7 +146,7 @@ You, as a programmer, want to be able to use the same variable name for two diff
 
    Notice that there is no ``lib1`` or ``lib2`` prefix. You simply use the variables normally, like as if they were in a single namespace. To resolve name conflicts, Racket lets you rename variables. In this case, we're renaming ``lib1``'s ``foo`` to ``foo1`` and ``lib2``'s ``foo`` to ``foo2``.
 
-   The problem that I have with Racket is that it's *very very very* static, complicated, and in my opinion, bloated. I want a system that is as concise and easy to use as Racket's system, but is also easy to implement.
+   The problem that I have with Racket is that it's *very very* static, complicated, and in my opinion, bloated. I want a system that is as concise and easy to use as Racket's system, but is also easy to implement.
 
 Hyper-static scope gives you most of Racket's namespace system, but for much lower cost. To explain how it works, I like to use the concept of "boxes", even if the implementation doesn't use boxes.
 
@@ -166,9 +166,9 @@ Here we have created a global variable ``foo``, a function ``bar`` that returns 
 
 Using the idea of boxes, when the compiler encounters ``var foo = 5``, it creates a new box and binds it to the variable ``foo``. Inside the function ``bar``, it replaces the variable ``foo`` with the box.
 
-Then, when the compiler encounters ``var foo = 10``, it creates a new box and binds it to the variable ``foo``, but inside ``bar``, the variable ``foo`` was already replaced with a box, so this has no effect on any previous uses of the variable ``foo``.
+Then, when the compiler encounters ``var foo = 10``, it creates a new box and binds it to the variable ``foo``, but inside ``bar``, the variable ``foo`` was already replaced with a box, so ``bar`` remains unchanged.
 
-Thus, the second ``var`` expression shadows the previous variable: previous uses of ``foo`` will continue to use the old version of ``foo``, but new uses of ``foo`` will use the new version.
+Thus, old uses of ``foo`` will continue to use the old version of ``foo``, but new uses of ``foo`` will use the new version.
 
 This completely solves the namespace problem. Consider two libraries that both define the same name::
 
@@ -180,7 +180,7 @@ This completely solves the namespace problem. Consider two libraries that both d
   def foo -> 10
   def qux -> foo()
 
-If you import both libraries, the functions ``bar`` and ``qux`` will refer to the function ``foo`` defined in the library where they were defined. That is, when one library defines a variable ``foo``, it doesn't clobber any already-existing uses of ``foo``, it simply shadows it.
+If you import both libraries, the functions ``bar`` and ``qux`` will refer to the correct version of ``foo``. That is, when one library defines a variable ``foo``, it doesn't clobber any already-existing uses of ``foo``, it simply shadows it.
 
 Going back to the example of conflicting libraries, it could be written like this in Nulan::
 
@@ -196,11 +196,3 @@ Going back to the example of conflicting libraries, it could be written like thi
   bar()
 
 As you can see, we're using a plain-old ``var`` to rename the conflicting variables. In languages which use dynamic scope for global variables, when importing the library ``lib2``, it would overwrite the variable ``foo``. But in Nulan, thanks to hyper-static scope, this works.
-
-The above is common enough that Nulan provides a ``rename`` macro which does the same thing::
-
-  rename foo = foo1
-    import lib1
-
-  rename foo = foo2
-    import lib2
