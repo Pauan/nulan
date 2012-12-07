@@ -6,12 +6,31 @@ Make sure you have Node.js installed (I've only tested with version 0.8.5)
 Then just use ``./nulan`` to get to a REPL
 
 
+Examples
+========
+
+::
+  var foo = [ bar 5 qux 10 ]
+
+  foo.bar
+  foo.qux
+
+  foo.bar <= 20
+  foo.qux <= 30
+
+  def fn -> a
+    get foo a
+
+  fn "bar"
+  fn "qux"
+
+
 Features
 ========
 
 * A full-blown Lisp, which means programs are parsed as S-expressions, and there's a very heavy emphasis on "code is data is code"
 
-* Pattern matching for function/macro arguments
+* `Pattern matching <nulan/blob/javascript/notes/Pattern%20matching.rst>`_ for function/macro arguments
 
 * `Hyper-static scope <nulan/blob/javascript/notes/Hyper-static%20scope.rst>`_ at both the global and function level
 

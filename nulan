@@ -86,6 +86,8 @@ rl.on("input", function (s) {
     console.log()
     x = vm.runInNewContext(x, globals)
     print(["eval", pretty(x)])
+    //console.log(pretty(x))
+
     //console.log("@eval\n" + ("" + x).replace(/^/gm, "  "))
   } catch (e) {
     console.error("" + e)
