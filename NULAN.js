@@ -27,6 +27,9 @@ var NULAN = (function (n) {
   n.Symbol = function (value) {
     this.value = value
   }
+  n.Symbol.prototype.toString = function () {
+    return this.value
+  }
 
   n.Error = function (s) {
     this.message = s
@@ -137,7 +140,7 @@ var NULAN = (function (n) {
     var r = [x]
     while (i < iLen) {
       x = a[i]
-      if (Array.isArray(x) && isValue(x[0], "&splice")) {
+      if (Array.isArray(x) && isValue(x[0], "splice")) {
         r.push(mac(x[1]))
       } else {
         r.push(["array", [mac(x)]])
@@ -185,7 +188,7 @@ var NULAN = (function (n) {
 
   function splicingArgs(f, a) {
     return arraySplitter(a, function (x) {
-      if (Array.isArray(x) && isValue(x[0], "&splice")) {
+      if (Array.isArray(x) && isValue(x[0], "splice")) {
         return x[1]
       }
     }, function (x) {
@@ -201,7 +204,7 @@ var NULAN = (function (n) {
     var x, r2, r = []
     for (var i = 0, iLen = a.length; i < iLen; ++i) {
       x = a[i]
-      if (Array.isArray(x) && isValue(x[0], "&splice")) {
+      if (Array.isArray(x) && isValue(x[0], "splice")) {
         r2 = splicingArgsRest(mac(x[1]), i + 1, iLen, a)
         return ["call", [".", f, "apply"],
                         [["null"],
@@ -221,6 +224,8 @@ var NULAN = (function (n) {
       if ((x = a[0]) instanceof Macro ||
           (x = values[getUniq(a[0])]) instanceof Macro) {
         return x.value.apply(null, a.slice(1))
+      } else if (a.length === 0) { // TODO: this should probably be in splicingArgs
+        return ["void", ["number", "0"]]
       } else {
         return splicingArgs(mac(a[0]), a.slice(1))
       }
@@ -370,25 +375,33 @@ var NULAN = (function (n) {
     })
   }
 
+
+  vars["%t"] = "true"
+
   values["num"] = unary("u+")
   values["mod"] = binary("%")
 
   values["dict"] = new Macro(function () {
-    if (arguments.length === 0) {
-      return ["object", []]
-    } else {
-      // TODO
-      var a = n.pair(arguments).map(function (a) {
-        return [values["set!"], ["get", "foo", a[0]], a[1]]
+    var args = n.pair(arguments)
+      , a
+      , u
+    if (args.every(function (a) { return a[0] instanceof n.Symbol })) {
+      a = args.map(function (a) {
+        return [a[0].value, mac(a[1])]
       })
-      return mac([values["&do"], [values["var"], "foo", [values["dict"]]]].concat(a))
+      return ["object", a]
+    } else {
+      u = new Uniq()
+      a = args.map(function (a) {
+        var x = a[0]
+          , y = a[1]
+        if (x instanceof n.Symbol) {
+          x = x.value
+        }
+        return [values["set!"], [values["get"], u, x], y]
+      })
+      return mac([values["do"], [values["var"], [values["is"], u, [values["dict"]]]]].concat(a))
     }
-    /*var x = setUniq("foo")
-    var a = n.pair(arguments).map(function (a) {
-      return ["=", [".", ["name", x], a[0]], mac(a[1])]
-    })
-    a.unshift(["var", [[x, ["object", []]]]])
-    return binr(",", a)*/
   })
 
   values["++"] = new Macro(function (x, y) {
@@ -412,7 +425,23 @@ var NULAN = (function (n) {
     return ["new", mac(x), args]
   })
 
-  values["var"] = new Macro(function (x, y) {
+  values["var"] = new Macro(function (x) {
+    var y, body
+
+    if (Array.isArray(x)) {
+      // TODO: code duplication with "let"
+      if (!isValue(x[0], "is")) {
+        y = [].slice.call(arguments, 1).join(" ")
+        throw new n.Error("expected <" + x + " = " + y +
+                          "> but got <" + x + " " + y + ">")
+      }
+
+      y = (arguments.length > 1
+            ? [x[2]].concat([].slice.call(arguments, 1))
+            : x[2])
+      x = x[1]
+    }
+
                       // TODO
     if (namespace && !locals[x.value]) {
       return ["=", ["[]", ["name", namespace], ["string", setUniq(x)]], mac(y)]
@@ -570,16 +599,32 @@ var NULAN = (function (n) {
     return r
   })
 
-  values["let"] = new Macro(function (x, y, body) {
+  values["let"] = new Macro(function (x) {
+    var y, body
+
+    // TODO: code duplication with var
+    if (!isValue(x[0], "is")) {
+      y = [].slice.call(arguments, 1, -1).join(" ")
+      throw new n.Error("expected <" + x + " = " + y +
+                        "> but got <" + x + " " + y + ">")
+    }
+
+    y = (arguments.length > 2
+          ? [x[2]].concat([].slice.call(arguments, 1, -1))
+          : x[2])
+    body = arguments[arguments.length - 1]
+    x = x[1]
+
     var old
-      , b = (x in vars)
       , s = symToString(x)
+      , b = (s in vars)
+
     if (b) {
       old = vars[s]
     }
     locals[s] = true // TODO
 
-    var r = mac([values["&do"], [values["var"], x, y], body])
+    var r = mac([values["do"], [values["var"], [values["is"], x, y]], body])
 
     if (b) {
       vars[s] = old
@@ -587,11 +632,12 @@ var NULAN = (function (n) {
       delete vars[s]
     }
     delete locals[s] // TODO
+
     return r
   })
 
   /*values["let"] = new Macro(function (x, y, body) {
-    return mac([[values["&fn"], [values["&list"], x], body], y])
+    return mac([[values["fn"], [values["list"], x], body], y])
   })*/
 
   values["sym"] = function (x) {
@@ -601,7 +647,7 @@ var NULAN = (function (n) {
   values["finally"] = new Macro(function (x, y) {
     return ["try", [mac(x)], ["finally", [mac(y)]]]
     /*var u = new Uniq()
-    return ["try", [mac([values["var"], u, x])], ["finally", [mac(y), mac(u)]]]*/
+    return ["try", [mac([values["var"], [values["is"], u, x]])], ["finally", [mac(y), mac(u)]]]*/
   })
 
 
@@ -656,35 +702,35 @@ var NULAN = (function (n) {
 
   // Implementation specific stuff
   values["&typeof"]     = unary("typeof")
-  values["&not"]        = unary("!")
+  values["not"]         = unary("!")
 
   values["&in"]         = binary("in")
   values["&instanceof"] = binary("instanceof")
 
-  values["&is"]         = binand("===", ["boolean", "true"])
-  values["&lt"]         = binand("<",   ["boolean", "true"])
-  values["&lte"]        = binand("<=",  ["boolean", "true"])
-  values["&gt"]         = binand(">",   ["boolean", "true"])
-  values["&gte"]        = binand(">=",  ["boolean", "true"])
+  values["is"]          = binand("===", ["boolean", "true"])
+  values["lt"]          = binand("<",   ["boolean", "true"])
+  values["islt"]        = binand("<=",  ["boolean", "true"])
+  values["gt"]          = binand(">",   ["boolean", "true"])
+  values["gtis"]        = binand(">=",  ["boolean", "true"])
 
-  values["&and"]        = binreduce0("&&", ["boolean", "true"])
-  values["&or"]         = binreduce0("||", ["boolean", "false"])
-  values["&add"]        = binreduce0("+",  ["number", "0"])
-  values["&mul"]        = binreduce0("*",  ["number", "1"])
+  values["and"]         = binreduce0("&&", ["boolean", "true"])
+  values["or"]          = binreduce0("||", ["boolean", "false"])
+  values["add"]         = binreduce0("+",  ["number", "0"])
+  values["mul"]         = binreduce0("*",  ["number", "1"])
 
-  values["&sub"]        = binreduce1("-", function (x) { return ["u-", x] })
-  values["&do"]         = binreduce1(",", "&do")
-  values["&div"]        = binreduce1("/")
+  values["sub"]         = binreduce1("-", function (x) { return ["u-", x] })
+  values["do"]          = binreduce1(",", "do")
+  values["div"]         = binreduce1("/")
 
-  values["&set!"] = new Macro(function (x, y) {
+  values["set!"] = new Macro(function (x, y) {
     return ["=", mac(x), mac(y)]
   })
 
-  values["&list"] = new Macro(function () {
+  values["list"] = new Macro(function () {
     return ["array", [].map.call(arguments, mac)]
   })
 
-  values["&get"] = new Macro(function (x, y) {
+  values["get"] = new Macro(function (x, y) {
     if ((typeof y === "string" || typeof y === "number") &&
         /^[$_a-zA-Z][$_a-zA-Z0-9]*$/.test(y)) {
       return [".", mac(x), y]
@@ -795,10 +841,11 @@ var NULAN = (function (n) {
 
   }
 
-  values["&fn"] = new Macro(function anon(args, body) {
+  values["fn"] = new Macro(function anon(args, body) {
     if (args instanceof n.Symbol) {
-      return anon(["&splice", args], body)
-    } else if (isValue(args[0], "&list")) {
+      // TODO
+      return anon(["splice", args], body)
+    } else if (isValue(args[0], "list")) {
       var old = js_vars
       js_vars = {}
       var r = withNewScope(function () {
@@ -864,7 +911,7 @@ var NULAN = (function (n) {
             locals[s] = true
             r.push(mangle(s))
           } else if (Array.isArray(x)) {
-            if (isValue(x[0], "&splice")) {
+            if (isValue(x[0], "splice")) {
               var aArgs, iLeft = (i - iLen + 1)
               aArgs = (iLeft === 0
                         ? (i === 0
@@ -898,7 +945,7 @@ var NULAN = (function (n) {
             body = [values["if"],
                      [values["is"], s, x],
                      body,
-                     [values["error"], [values["&add"], "expected " + x + " but got ", s]]]
+                     [values["error"], [values["add"], "expected " + x + " but got ", s]]]
             r.push(mangle(symToString(s)))
           }
         }
@@ -928,19 +975,19 @@ var NULAN = (function (n) {
   // (&eval '{1 ,@2 ,@{3 4 5}})
   // (&eval '(1 2 '(3 {4} 5)))
 
-  values["&quote"] = new Macro(function loop(x) {
+  values["quote"] = new Macro(function loop(x) {
     // TODO: a little bit hacky, but it'll do for now
     if (Array.isArray(x)) {
-      if (isValue(x[0], "&comma") && (x = x[1])) {
-        if (Array.isArray(x) && isValue(x[0], "&splice")) {
+      if (isValue(x[0], "comma") && (x = x[1])) {
+        if (Array.isArray(x) && isValue(x[0], "splice")) {
           throw new n.Error("',@ is invalid")
         } else {
           return mac(x)
         }
       } else {
         return arraySplitter(x, function (x) {
-          if (Array.isArray(x) && isValue(x[0], "&comma")  && (x = x[1]) &&
-              Array.isArray(x) && isValue(x[0], "&splice") && (x = x[1])) {
+          if (Array.isArray(x) && isValue(x[0], "comma")  && (x = x[1]) &&
+              Array.isArray(x) && isValue(x[0], "splice") && (x = x[1])) {
             return x
           }
         }, function (x, b) {
@@ -966,9 +1013,9 @@ var NULAN = (function (n) {
 
   // '({1 2} ,@{3 4} @5)
   // {{list 1 2} @{3 4} {&splice 5}}
-  // [["list", 1, 2]].concat([3, 4], [["&splice", 5]])
+  // [["list", 1, 2]].concat([3, 4], [["splice", 5]])
 
-  values["&comma"] = new Macro(function (x) {
+  values["comma"] = new Macro(function (x) {
     return mac(x)
   })
 
@@ -988,7 +1035,7 @@ var NULAN = (function (n) {
     if (arguments.length === 2) {
       return ["!==", mac(arguments[0]), mac(arguments[1])]
     } else {
-      return mac([values["&not"], [values["is"]].concat([].slice.call(arguments))])
+      return mac([values["not"], [values["is"]].concat([].slice.call(arguments))])
     }
   })
 */

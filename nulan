@@ -22,7 +22,7 @@ NULAN.readFile = function (s) {
   return fs.readFileSync(s, "utf8")
 }
 
-//NULAN.import("NULAN.macros")
+NULAN.import("NULAN.macros")
 
 
 var globals = { require: require }
@@ -58,6 +58,7 @@ function pretty(x) {
   return util.inspect(x, false, null, false)
 }
 
+// TODO: move into NULAN.js
 function transform(a) {
   if (Array.isArray(a)) {
     return a.map(transform)

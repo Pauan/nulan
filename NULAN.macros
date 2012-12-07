@@ -1,34 +1,34 @@
 mac str -> @args
-  '&add "" ,@args
+  'add "" ,@args
 
 mac let! -> x y body
   let u = uniq()
     'let u = x
-       | x =< y
+       | x <= y
        | finally body
-                 x =< u
+                 x <= u
 
 mac def -> n v
-  '| var n
-   | n =< v
+  '(| var n) # TODO
+   | n <= v
 
 mac call -> x y @args
-  '(&get x y).call ,@args
+  '(get x y).call ,@args
 
 mac call-own -> x y @args
-  '(&get x y) ,@args
-
+  '(get x y) ,@args
+#|
 mac in -> @args
   let r = {}
     | args.reduce -> x y
         | r.push {x y}
         | x
     | 'or ,@(r.map -> x '(is ,@x))
-
+|#
 mac isnt -> @args
   # TODO: special case for 2-arguments
   '~(is ,@args)
-
+#|
 [ foo -> 10
 | bar -> 20
 | qux -> 30 ]
@@ -61,3 +61,4 @@ if qux corge
       | f
       | g
       h
+|#
