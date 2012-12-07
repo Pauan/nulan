@@ -12,7 +12,7 @@ Functions that accept only a fixed number of arguments are boring, so let's writ
 
 The above uses a ``splice`` pattern, which simply says "take all the arguments and put them into the symbol ``a``"
 
-You can, of course, combine these two together:
+You can, of course, combine these two together::
 
   -> a b @c d
     ...
@@ -59,10 +59,12 @@ Literals match themself::
 
 The above is a function that accepts 3 arguments, and the first argument **must** be ``1``, the second argument **must** be ``"2"``, and the third argument **must** be ``3``.
 
+Nulan also supports "optional arguments"::
+
   -> a = 5
     ...
 
-The ``is`` pattern will bind ``a`` to ``5`` if ``a`` is ``()``. It is equivalent to this:
+The above is equivalent to this::
 
   -> a
     if a = ()
