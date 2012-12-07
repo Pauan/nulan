@@ -1,5 +1,3 @@
-Nulan supports pattern matching on data in various places.
-
 One of the simplest patterns is a symbol, which simply binds the data to a variable::
 
   -> a a
@@ -19,7 +17,9 @@ You can, of course, combine these two together::
 
 The above is a function that accepts 3 or more arguments. The first two arguments are put into ``a`` and ``b``, the last argument is put into ``d``, and everything between the second and last arguments are put into ``c``.
 
-Nulan also supports pattern matching on *complex data*, like lists and dictionaries::
+----
+
+Nulan also supports pattern matching on lists::
 
   -> {a b c}
     ...
@@ -30,6 +30,8 @@ Nulan also supports pattern matching on *complex data*, like lists and dictionar
 The first function accepts a *single argument*, which is expected to be a list of three elements. It binds the elements in order to ``a``, ``b``, and ``c``.
 
 The second function demonstrates that ``splice`` works on lists as well.
+
+----
 
 Nulan can also pattern match on dictionaries::
 
@@ -45,6 +47,8 @@ And of course all of these can be combined as much as you like::
 
 The above is a function that accepts 4 arguments. The first argument is a list that has 1 or more elements, with the first element being a dictionary that has a ``foo`` key that is bound to a list of 3 elements.
 
+----
+
 There is also a special ``~`` pattern that matches anything::
 
   -> ~ a b ~
@@ -52,12 +56,16 @@ There is also a special ``~`` pattern that matches anything::
 
 The above is a function that accepts 4 arguments, and it doesn't care what the first and last arguments are.
 
+----
+
 Literals match themself::
 
   -> 1 "2" 3
     ...
 
 The above is a function that accepts 3 arguments, and the first argument **must** be ``1``, the second argument **must** be ``"2"``, and the third argument **must** be ``3``.
+
+----
 
 Nulan also supports "optional arguments"::
 
