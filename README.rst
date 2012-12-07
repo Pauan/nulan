@@ -10,6 +10,7 @@ Examples
 ========
 
 ::
+
   var foo = [ bar 5 qux 10 ]
 
   foo.bar

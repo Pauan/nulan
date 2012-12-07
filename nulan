@@ -25,9 +25,25 @@ NULAN.readFile = function (s) {
 NULAN.import("NULAN.macros")
 
 
-var globals = { require: require }
+var opts = { debug: false }
+
+var args = process.argv.slice(2).filter(function (x) {
+  // TODO: better cli parsing
+  if (x === "-d") {
+    opts.debug = true
+    return false
+  } else {
+    return true
+  }
+})
+
+var globals = { require:    require
+              , "_38_src":  process.argv[1]
+              , "_38_args": args }
 
 NULAN.vars["require"] = "require"
+NULAN.vars["&src"]    = "&src"
+NULAN.vars["&args"]   = "&args"
 
 
 var util = require("util")
@@ -73,21 +89,22 @@ function transform(a) {
 
 rl.on("input", function (s) {
   try {
-    console.log()
-    var x = NULAN.parse(s)
-    print(["parse"].concat(transform(x).map(pretty)))
+    if (opts.debug) {
+      var x = NULAN.parse(s)
+      print(["parse"].concat(transform(x).map(pretty)))
+      console.log()
 
-    console.log()
-    x = NULAN.compile(x)
-    print(["compile", x])
+      x = NULAN.compile(x)
+      print(["compile", x])
+      console.log()
 
-    //console.log("@compile\n" + x.replace(/^/gm, "  "))
+      //console.log("@compile\n" + x.replace(/^/gm, "  "))
 
-    console.log()
-    x = vm.runInNewContext(x, globals)
-    print(["eval", pretty(x)])
-    //console.log(pretty(x))
-
+      x = vm.runInNewContext(x, globals)
+      print(["eval", pretty(x)])
+    } else {
+      console.log(pretty(vm.runInNewContext(NULAN.compile(NULAN.parse(s)), globals)))
+    }
     //console.log("@eval\n" + ("" + x).replace(/^/gm, "  "))
   } catch (e) {
     console.error("" + e)
