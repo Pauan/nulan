@@ -1,12 +1,14 @@
 One of the simplest patterns is a symbol, which simply binds the data to a variable::
 
-  -> a a
+  -> a b c
+    ...
 
-The above is a function that accepts a single argument, bound to ``a``, then returns ``a``
+The above is a function that accepts three arguments, bound to ``a``, ``b``, and ``c``
 
 Functions that accept only a fixed number of arguments are boring, so let's write a function that can accept any number of arguments::
 
-  -> @a a
+  -> @a
+    ...
 
 The above uses a ``splice`` pattern, which simply says "take all the arguments and put them into the symbol ``a``"
 
@@ -38,20 +40,13 @@ Nulan can also pattern match on dictionaries::
   -> [ foo a bar b ]
     ...
 
-This function accepts a *single argument*, which is expected to be a dictionary. It then binds the ``foo`` key of the dictionary to ``a`` and the ``bar`` key to ``b``.
-
-And of course all of these can be combined as much as you like::
-
-  -> {[ foo {a b c} ] @d} @{e f g}
-    ...
-
-The above is a function that accepts 4 arguments. The first argument is a list that has 1 or more elements, with the first element being a dictionary that has a ``foo`` key that is bound to a list of 3 elements.
+The above is a function that accepts a *single argument*, which is expected to be a dictionary. It then binds the ``foo`` key of the dictionary to ``a`` and the ``bar`` key to ``b``.
 
 ----
 
-There is also a special ``~`` pattern that matches anything::
+There is also a special ``_`` pattern that matches anything::
 
-  -> ~ a b ~
+  -> _ a b _
     ...
 
 The above is a function that accepts 4 arguments, and it doesn't care what the first and last arguments are.
@@ -67,14 +62,23 @@ The above is a function that accepts 3 arguments, and the first argument **must*
 
 ----
 
-Nulan also supports "optional arguments"::
+Nulan also supports setting the default of a pattern::
 
   -> a = 5
     ...
 
-The above is equivalent to this::
+The above is like "optional arguments" in other languages and is equivalent to this::
 
   -> a
     if a = ()
       a <= 5
     ...
+
+----
+
+And of course all of these can be combined as much as you like::
+
+  -> {[ foo {a "20" c = 5} ] @d} _ @{e f g}
+    ...
+
+The above is a function that accepts 5 arguments. The first argument is a list that has 1 or more elements, with the first element being a dictionary that has a ``foo`` key that is bound to a list of 2 or 3 elements, where the second element is ``"20"`` and the third element defaults to ``5`` if it doesn't exist.
