@@ -252,21 +252,16 @@ var NULAN = (function (n) {
     }
   }
 
-  // TODO: some code duplication with mac
   function $mac(a) {
-    if (Array.isArray(a)) {
-      return ["call", $mac(a[0]), a.slice(1).map($mac)]
-    } else {
-      if (typeof a === "number") {
-        return ["number", "" + a]
-      } else if (typeof a === "string") {
-        return ["string", a]
-      } else if (a instanceof n.Symbol) {
-        return ["name", a.value]
-      } else {
-        throw new n.Error("invalid expression: " + a)
-      }
+    var x = a[0]
+    if (x instanceof n.Symbol) {
+      x = ["name", x.value]
+    } else if (typeof x !== "string") {
+      throw new n.Error("invalid expression: " + x)
     }
+    return (a.length === 1
+             ? x
+             : [x].concat([].slice.call(a, 1).map(mac)))
   }
 
   // TODO: ugh I wish I could do this natively in JS
@@ -423,6 +418,10 @@ var NULAN = (function (n) {
   values["new"] = new Macro(function (x) {
     var args = [].slice.call(arguments, 1).map(mac)
     return ["new", mac(x), args]
+  })
+
+  values["while"] = new Macro(function (test, body) {
+    return ["while", mac(test), [mac(body)]]
   })
 
   values["var"] = new Macro(function (x) {
@@ -960,8 +959,8 @@ var NULAN = (function (n) {
     }
   })
 
-  values["&"] = new Macro(function (x) {
-    return $mac(x)
+  values["&"] = new Macro(function () {
+    return $mac(arguments)
   })
 
   values["&eval"] = new Macro(function (x) {
@@ -1027,22 +1026,6 @@ var NULAN = (function (n) {
     })
     return ["empty"]
   })
-
-
-  // Macros
-  /*
-  values["isnt"] = new Macro(function () {
-    if (arguments.length === 2) {
-      return ["!==", mac(arguments[0]), mac(arguments[1])]
-    } else {
-      return mac([values["not"], [values["is"]].concat([].slice.call(arguments))])
-    }
-  })
-*/
-/*
-  (def len -> x
-    (call-own x %len))
-*/
 
 
   // TODO: ew

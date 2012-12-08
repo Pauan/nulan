@@ -26,8 +26,28 @@ mac in -> @args
     | 'or ,@(r.map -> x '(is ,@x))
 |#
 mac isnt -> @args
-  # TODO: special case for 2-arguments
-  '~(is ,@args)
+  if args.length = 2
+    '& "!==" ,args.0 ,args.1
+    '~(is ,@args)
+#|
+mac uniqs -> @args
+  args.reduceRight -> x y
+    'let y = uniq()
+       x
+|#
+mac uniqs -> @args body
+  | var x = args.map -> x
+              'var x = uniq()
+  | x.unshift do
+  | x.push body
+  | x
+
+mac for -> init test incr body
+  '(| init)
+   | while test
+       | body
+       | incr
+
 #|
 [ foo -> 10
 | bar -> 20

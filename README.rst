@@ -20,10 +20,90 @@ Examples
   foo.qux <= 30
 
   def fn -> a
-    get foo a
+    let x = foo.a
+      foo.a <= 50
+      x
 
   fn "bar"
   fn "qux"
+
+::
+
+  mac w/complex -> x body
+    uniqs tmp u
+      'let tmp = x
+         let x = u
+           'let u = tmp
+              body
+
+  # {(id is) x y}
+  mac each -> x body
+    | var y = x.2
+    | x <= x.1
+    | uniqs i l u
+        let tmp = y
+          let y = u
+            'let u = tmp
+               let l = y.length
+                 for (var i = 0) (isnt i l) (++ i)
+                   let x = get y i
+                     body
+
+  (is (var foo) (bar (qux corge nou)))
+
+
+  x (sym "=") @y
+
+  syntax-precedence (+) 50
+
+  mac each -> x (sym "=") y body
+    uniqs i l
+      w/complex y
+        'let l = y.length
+           for (var i = 0) (i ~= l) (++ i)
+             let x = y.i
+               body
+
+  syntax-infix ~= 0
+  syntax-infix == 0
+  syntax-infix + 0
+  syntax-infix - 0
+  syntax-infix * 0
+  syntax-infix / 0
+
+  syntax-rule - 0 -> l s {y @r}
+    if l.length == 0
+      {{s y} @r2}
+      let {@l x} l
+        {@l {s x y} @r}
+
+
+  syntax-rule = 0 -> l s r
+    {@l s @(parse-line r)}
+
+  syntax-rule -> 0 -> l s {@args body}
+    {@l {s {list @args} body}}
+
+  &eval
+    w/namespace value
+      x + y
+
+  each x = {1 2 3}
+    | prn x
+    | prn x + 5
+
+  {1 2 3}.for-each -> x
+    prn x
+
+
+  mac loop -> body
+    'while %t
+       body
+
+  loop
+    | prn 1
+    | prn 2
+    | prn 3
 
 
 Features

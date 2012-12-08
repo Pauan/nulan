@@ -76,6 +76,7 @@ foo(["foo 123\n  bar 2 3)\n  corge 60 70\n\nqux 5 10\n",
      "#|foobar#|#1 + 5",
      "#|foobar#|quxcorge|#1 + 5",
      "#|foobar#|qux|#corge|#1 + 5",
+     "foo 1 2 3 <= bar 10 20",
      ])
 
 // ( foo 10 ( ( bar.qux 20 30 ) . corge 40 50 ) )

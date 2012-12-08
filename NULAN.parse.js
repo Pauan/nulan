@@ -47,6 +47,69 @@ var NULAN = (function (n) {
   }*/
 
 
+  var t = {
+    "*":  infix(90),
+    "/":  infix(80),
+
+    "+":  infix(70),
+    "-":  infix(70),
+
+    "<":  infix(60),
+    "=>": infix(60),
+    ">":  infix(60),
+    ">=": infix(60),
+
+    "==": infix(50),
+    "~=": infix(50),
+
+    "&&": infix(40),
+    "||": infix(30),
+
+    "<=": {
+      order: "right",
+      priority: 20,
+      action: function (l, s, r) {
+        r = parseLine(r)
+        return [[s, l.length === 1 ? l[0] : l, r[0]]].concat(r[1])
+      }
+    },
+    "->": {
+      action: function (l, s, r) {
+        var args = r.slice(0, -1)
+        args.unshift(new n.Bypass("list"))
+        l.push([new n.Bypass(s), args, r[r.length - 1]])
+        return l
+      }
+    },
+    "=": {
+      action: function (l, s, r) {
+        var x = l[l.length - 1]
+          , y = parseLine(r)
+        l = l.slice(0, -1)
+        l.push([s, x, y[0]])
+        l.push.apply(l, y[1])
+        return l
+      }
+    }
+/*
+    foo bar <= qux corge
+      nou
+
+    ((<= (foo bar) (qux corge))
+       nou)
+
+    foo bar = qux corge
+      nou
+
+    foo bar = qux corge
+      nou
+      foobar
+
+    (foo (= bar (qux corge))
+      nou)*/
+  }
+
+
   t.infix(".", 100, function (l, r) {
     if (r instanceof n.Symbol) {
       r = r.value
@@ -59,6 +122,7 @@ var NULAN = (function (n) {
   }
   //t.binary(".",   90, "get")
 
+  t.unary("~",    90, "not")
   t.unary("u-",   90, "sub")
 
   t.binary("*",   80, "mul")
@@ -100,7 +164,6 @@ var NULAN = (function (n) {
     }*/
   }
 
-  t.unary("~",     0, "not") // TODO: not sure if this should be 0 or 80 priority
   //t.unary("'",     0, "quote")
   t.unary(",",     0, "comma")
   t.unary("@",     0, "splice")
@@ -178,7 +241,7 @@ var NULAN = (function (n) {
 
   // NULAN.parse("{(id -foo)}")
 
-  var delimiters = /^[ \n()[\]{}',@~:;."|]$/
+  var delimiters = /^[ \n()[\]{}',@:;."|]$/
 
   function enrich(x, o) {
     x = Object.create(x)
@@ -198,20 +261,40 @@ var NULAN = (function (n) {
     return /^(?:\d+\.)?\d+$/.test(s)
   }
 
-  function tokenizeNumOrSym(o, a) {
+/*
+  r === "+"  || r === "*"  || r === "/"  ||
+        r === "->" || r === "="  || r === "~=" ||
+        r === "<"  || r === ">"  || r === "<=" ||
+        r === ">=" || r === "||" || r === "&&" ||
+        r === "=<"
+*/
+  function tokenizeNum(o, a) {
+    var s = store(o)
+      , r = []
+    while (o.has() && (o.peek() === "." || !delimiters.test(o.peek()))) {
+      r.push(o.read())
+    }
+    r = r.join("")
+    if (number(r)) {
+      a.push(enrich(t.literal(+r), s))
+    } else {
+      throw new PARSE.Error(s, "invalid number: " + r)
+    }
+  }
+
+  function tokenizeSym(o, a) {
     var s = store(o)
       , r = []
     while (o.has() && !delimiters.test(o.peek())) {
       r.push(o.read())
     }
     r = r.join("")
-    if (r === "+"  || r === "*"  || r === "/"  ||
-        r === "->" || r === "="  || r === "~=" || // TODO ~=
-        r === "<"  || r === ">"  || r === "<=" ||
-        r === ">=" || r === "||" || r === "&&" ||
-        r === "=<") {
+    if (t[r]) { // TODO
       a.push(enrich(t[r], s))
-    } else if (number(r)) {
+    } else {
+      a.push(enrich(t.literal(r), s))
+    }
+    /*} else if (number(r)) {
       a.push(enrich(t.literal(+r), s))
     } else {
       r = r.replace(/(.)\-([a-z])/g, function (s, s1, s2) {
@@ -226,7 +309,7 @@ var NULAN = (function (n) {
         })
       }
       a.push(enrich(t.literal(r), s))
-    }
+    }*/
   }
 
   function tokenizeString(o, a) {
@@ -388,6 +471,7 @@ var NULAN = (function (n) {
         } else if (c === "-") {
           o.read()
           // TODO: should enrich with a stored version of <o>
+          // TODO: this should call tokenizeSym
           r.push(enrich(t.literal(new n.Symbol("--")), o)) // TODO a bit hacky
         } else {
           r.push(enrich(t["u-"], o))
@@ -399,11 +483,21 @@ var NULAN = (function (n) {
         r.push(enrich(t[c], o))
         r.push(enrich(t["("], o))
         i.push(i[i.length - 1])*/
+      /*} else if (c === "~") {
+        o.read()
+        if (o.peek() === "=") {
+          o.read()
+          r.push(enrich(t["~="], o)) // TODO: this should call tokenizeSym
+        } else {
+          r.push(enrich(t[c], o))
+        }*/
       } else if (delimiters.test(c)) {
         o.read()
         r.push(enrich(t[c], o))
+      } else if (/\d/.test(c)) {
+        tokenizeNum(o, r)
       } else {
-        tokenizeNumOrSym(o, r)
+        tokenizeSym(o, r)
       }
     }
 
@@ -504,7 +598,7 @@ var NULAN = (function (n) {
   function quote(a) {
     if (Array.isArray(a)) {
       if (PARSE.is(a[0], t["'"])) {
-        a = a.slice(1)
+        a = quote(a.slice(1))
         return [new n.Bypass("quote"), a.length === 1 ? a[0] : a]
       } else {
         return a.map(quote)
@@ -615,8 +709,49 @@ var NULAN = (function (n) {
 
   //[ ['foobar', 'quxcorge', 'nou'] ]
 
-  n.tokenize = function (s) {
-    return tokenize(PARSE.stringBuffer(s))
+  // Modified Pratt Parser, designed for lists of symbols rather than tokens
+  function process(o, i) {
+    i = i || 0
+
+    var x, l = []
+
+    while (o.has()) {
+      x = o.peek()
+      if (x instanceof n.Symbol && t[x.value]) {
+        break
+      }
+      l.push(o.read())
+    }
+
+    // TODO: fold this into the above while loop somehow?
+    while (o.has()) {
+      x = o.peek()
+      if (x instanceof n.Symbol && (x = t[x.value]) && x.priority > i) {
+        l = x.action(l, o.read(), process(o, (x.order === "right"
+                                               ? x.priority - 1
+                                               : x.priority)))
+      } else {
+        break
+      }
+    }
+
+    return l.length === 1 ? l[0] : l
+  }
+
+  function parseLine(a) {
+    var x = a[0]
+      , l = [x]
+      , i = 1
+      , iLen = a.length
+    while (i < iLen) {
+      if (a[i].line === x.line || a[i].column > x.column) {
+        l.push(a[i])
+      } else {
+        break
+      }
+      ++i
+    }
+    return [l, a.slice(i)]
   }
 
   function indent(o) {
@@ -633,17 +768,26 @@ var NULAN = (function (n) {
         break
       }
     }
-    return a.length === 1 ? a[0] : a
+    return process(PARSE.iter(a))// a.length === 1 ? a[0] : a
   }
 
-  n.parse = function (s) {
-    var o = PARSE.iter(n.tokenize(s))
+  n.tokenize = function (s) {
+    return tokenize(PARSE.stringBuffer(s))
+  }
+
+  n.parseRaw = function (a) {
+    return indent(PARSE.iter(a))
+    /*var o = PARSE.iter(a)
       , r = []
       , x
     while (o.has()) {
       r.push(indent(o))
     }
-    return quote(rempipe(fn(pipe(r))))
+    return quote(rempipe(fn(pipe(r))))*/
+  }
+
+  n.parse = function (s) {
+    return n.parseRaw(n.tokenize(s))
   }
 
   return n

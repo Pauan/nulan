@@ -10,14 +10,14 @@ Functions that accept only a fixed number of arguments are boring, so let's writ
   -> @a
     ...
 
-The above uses a ``splice`` pattern, which simply says "take all the arguments and put them into the symbol ``a``"
+The above uses a ``splice`` pattern, which simply says "take all of the arguments and bind them to the variable ``a``"
 
 You can, of course, combine these two together::
 
   -> a b @c d
     ...
 
-The above is a function that accepts 3 or more arguments. The first two arguments are put into ``a`` and ``b``, the last argument is put into ``d``, and everything between the second and last arguments are put into ``c``.
+The above is a function that accepts 3 or more arguments. The first two arguments are put into ``a`` and ``b``, the last argument is put into ``d``, and everything between the second and last arguments are put into ``c``
 
 ----
 
@@ -29,18 +29,18 @@ Nulan also supports pattern matching on lists::
   -> {a @b c}
     ...
 
-The first function accepts a *single argument*, which is expected to be a list of three elements. It binds the elements in order to ``a``, ``b``, and ``c``.
+The first function accepts a *single argument*, which is expected to be a list of three elements. It binds the elements in order to ``a``, ``b``, and ``c``
 
 The second function demonstrates that ``splice`` works on lists as well.
 
 ----
 
-Nulan can also pattern match on dictionaries::
+Nulan also supports pattern matching on dictionaries::
 
   -> [ foo a bar b ]
     ...
 
-The above is a function that accepts a *single argument*, which is expected to be a dictionary. It then binds the ``foo`` key of the dictionary to ``a`` and the ``bar`` key to ``b``.
+The above is a function that accepts a *single argument*, which is expected to be a dictionary. It then binds the ``foo`` key to ``a`` and the ``bar`` key to ``b``
 
 ----
 
@@ -58,7 +58,7 @@ Literals match themself::
   -> 1 "2" 3
     ...
 
-The above is a function that accepts 3 arguments, and the first argument **must** be ``1``, the second argument **must** be ``"2"``, and the third argument **must** be ``3``.
+The above is a function that accepts 3 arguments, and the first argument **must** be ``1``, the second argument **must** be ``"2"``, and the third argument **must** be ``3``
 
 ----
 
@@ -67,12 +67,12 @@ Nulan also supports setting the default of a pattern::
   -> a = 5
     ...
 
-The above is like "optional arguments" in other languages and is equivalent to this::
+The above is similar to "optional arguments" in other languages and is equivalent to this::
 
   -> a
-    if a = ()
-      a <= 5
-    ...
+    | if a = ()
+        a <= 5
+    | ...
 
 ----
 
