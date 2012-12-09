@@ -31,6 +31,10 @@ var NULAN = (function (n) {
     return this.value
   }
 
+  n.Wrapper = function (value) {
+    this.value = value
+  }
+
   n.Error = function (s) {
     this.message = s
   }
@@ -229,25 +233,25 @@ var NULAN = (function (n) {
       } else {
         return splicingArgs(mac(a[0]), a.slice(1))
       }
+    } else if (a instanceof n.Wrapper) {
+      return mac(a.value) // TODO: check all the places that currently expect strings/numbers and won't work with a wrapper
+    } else if (typeof a === "number") {
+      return ["number", "" + a]
+    } else if (typeof a === "string") {
+      return ["string", a]
+    } else if (a === void 0) {
+      return ["void", ["number", "0"]]
     } else {
-      if (typeof a === "number") {
-        return ["number", "" + a]
-      } else if (typeof a === "string") {
-        return ["string", a]
-      } else if (a === void 0) {
-        return ["void", ["number", "0"]]
+      x = getUniq(a)
+      if (typeof x !== "string") {
+        throw new n.Error("invalid variable: " + x)
+      }
+                        // TODO
+      if (namespace && !locals[a.value]) {
+        return ["[]", ["name", namespace],
+                      ["string", x]] // (typeof x === "string" ? x : a)
       } else {
-        x = getUniq(a)
-        if (typeof x !== "string") {
-          throw new n.Error("invalid variable: " + x)
-        }
-                          // TODO
-        if (namespace && !locals[a.value]) {
-          return ["[]", ["name", namespace],
-                        ["string", x]] // (typeof x === "string" ? x : a)
-        } else {
-          return ["name", mangle(x)]
-        }
+        return ["name", mangle(x)]
       }
     }
   }

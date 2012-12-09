@@ -21,7 +21,7 @@ var util = require("util")
 function transform(x) {
   if (Array.isArray(x)) {
     return x.map(transform)
-  } else if (x instanceof NULAN.Symbol || x instanceof NULAN.Bypass) {
+  } else if (x instanceof NULAN.Symbol || x instanceof NULAN.Bypass || x instanceof NULAN.Wrapper) {
     return x.value
   } else if (typeof x === "string") {
     return "\"" + x + "\""
@@ -33,9 +33,10 @@ function transform(x) {
 function foo(a) {
   a.forEach(function (x) {
     try {
-      transform(NULAN.parse(x + "\n")).forEach(function (x) {
+      x = transform(NULAN.parse(x + "\n"))
+      //x.forEach(function (x) {
         console.log(util.inspect(x, false, null, true))
-      })
+      //})
     } catch (e) {
       console.error("" + e)
     }
@@ -62,7 +63,8 @@ foo(["foo 123\n  bar 2 3)\n  corge 60 70\n\nqux 5 10\n",
      "foo\n  .bar 1 2 3\n  .qux 5 10 20\n  .corge",
      "foo 10 20\nfoo\n  .bar 1 2 3\n  .qux 5 10 20\n  .corge",
      "foo 10\n  bar\n    .qux 20 30\n    .corge 40 50",
-     "| foo 1 2 3\n| bar 4 5 6\n| qux 7 8 9\n  | yes 10 12 12\n  | test 13 14 15",
+     "| foo 1 2 3\n| bar\n| qux 7 8 9\n  | yes 10 12 12\n  | test 13 14 15",
+     "foo 1 2 3\n  | bar\n  | qux 7 8 9\n    | yes 10 12 12\n    | test 13 14 15",
      "foo | bar | qux",
      "[ foo -> a a\n| bar -> b b ]",
      "{ foo | bar | qux }",
@@ -77,6 +79,20 @@ foo(["foo 123\n  bar 2 3)\n  corge 60 70\n\nqux 5 10\n",
      "#|foobar#|quxcorge|#1 + 5",
      "#|foobar#|qux|#corge|#1 + 5",
      "foo 1 2 3 <= bar 10 20",
+     "foo <= bar 10 20",
+     "foo <= bar",
+     "{(id -foo)}",
+     "[(bar 10 - 50) {1 + 2 bar}]",
+     "(1 - 5)",
+     "{1 - 5}",
+     "[1 - 5]",
+
+     "( foo",
+     "foo )",
+     "( ( foo )",
+     "( foo ) )",
+     "( foo [ ) ]",
+     "( ( foo ) bar ( qux ) )",
      ])
 
 // ( foo 10 ( ( bar.qux 20 30 ) . corge 40 50 ) )
