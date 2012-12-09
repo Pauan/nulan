@@ -21,8 +21,8 @@ Examples
 
   def fn -> a
     let x = foo.a
-      foo.a <= 50
-      x
+      | foo.a <= 50
+      | x
 
   fn "bar"
   fn "qux"
@@ -56,10 +56,10 @@ Examples
 
   syntax-precedence (+) 50
 
-  mac each -> x (sym "=") y body
+  mac each -> {x y} body
     uniqs i l
       w/complex y
-        'let l = y.length
+        'let l = y."length"
            for (var i = 0) (i ~= l) (++ i)
              let x = y.i
                body

@@ -155,6 +155,10 @@
 > foo bar <= qux corge
                nou
 
+> foo bar <= | qux corge
+             | nou
+    yesnou
+
 > foo bar = qux corge
             nou
     | foobar
@@ -168,3 +172,31 @@
 > foo bar = qux corge
     | nou
     | foobar
+
+> mac in -> @args
+    let r = {}
+      | args.reduce -> x y
+          | r.push {x y}
+          | x
+      | 'or ,@(r.map -> x '(is ,@x))
+
+> -> 'foo bar qux
+
+> ->
+    'foo bar qux
+
+> '''foo
+
+> -> -> 5
+
+
+> foo; bar
+
+> foo; bar: qux
+
+> foo;
+
+> foo
+
+
+> #|foobar#||#|#1 + 5

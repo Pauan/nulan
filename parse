@@ -33,7 +33,7 @@ function transform(x) {
 function foo(a) {
   a.forEach(function (x) {
     try {
-      x = transform(NULAN.parse(x + "\n"))
+      x = transform(NULAN.parse(x))
       //x.forEach(function (x) {
         console.log(util.inspect(x, false, null, true))
       //})

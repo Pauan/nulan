@@ -10,20 +10,20 @@ To explain further, I will need to go into details as to what "hygiene" is, why 
 
 I'm not a fan of text-book definitions, so instead I'll give an example to demonstrate what a *lack* of hygiene is, using the Arc language::
 
-  (mac foo (y)
+  (mac add10 (y)
     `(let x 10
        (+ x ,y)))
 
-  (foo 20)
+  (add10 20)
 
-The above creates a macro ``foo`` that replaces ``(foo y)`` with ``(let x 10 (+ x y))``
+The above creates a macro ``add10`` that adds ``10`` to its argument.
 
 We then call the macro, which will be expanded to ``(let x 10 (+ x 20))``.  This works just fine and returns ``30``
 
 But now consider this::
 
   (let x 50
-    (foo x))
+    (add10 x))
 
 The above will not return ``60`` as you might have expected, but instead returns ``20``. If we expand the macro, it becomes obvious why::
 
@@ -31,9 +31,9 @@ The above will not return ``60`` as you might have expected, but instead returns
     (let x 10
       (+ x x)))
 
-This unexpected behavior, which is called a "hygiene violation" can be solved through the use of a unique variable that is guaranteed to not conflict with any other variable. Using a unique variable, the macro ``foo`` can be rewritten to this::
+This unexpected behavior, which is called a "hygiene violation" can be solved through the use of a unique variable that is guaranteed to not conflict with any other variable. Using a unique variable, the macro ``add10`` can be rewritten to this::
 
-  (mac foo (y)
+  (mac add10 (y)
     (w/uniq x
       `(let ,x 10
          (+ ,x ,y))))
@@ -41,7 +41,7 @@ This unexpected behavior, which is called a "hygiene violation" can be solved th
 And now everything works correctly. But there is still a problem with the macro::
 
   (let + "a string"
-    (foo 20))
+    (add10 20))
 
 The above throws an error. Expanding it, we can see why::
 
@@ -71,13 +71,15 @@ Macros are really just functions that accept an S-expression and return an S-exp
 
 The problem is that macros are written using ``quote``, which returns an unevaluated expression. In particular, in the expression ```(let x 5 x)``, the symbols ``let`` and ``x`` are not evaluated. The macro is then expanded, and the symbols are evaluated in the environment where the macro is called.
 
-So, why don't we just use ``,`` to evaluate everything in the environment where the macro is defined? In other words, we would write ```(,let ,x ,5 ,x)``. So, that's it, right? We just don't use ``quote`` and we get lexical scope, right? Well, yes, with a few caveats:
+So, why don't we just use ``,`` to evaluate everything in the environment where the macro is defined? In other words, we would write ```(,let ,x ,5 ,x)``. As long as we do that, we get lexical scope, right? Well, yes, with a few caveats:
 
 - In Scheme, you can't access the *value* of a macro, so macros **must** be referred to with a symbol.
 
-  Arc, thankfully, doesn't have this problem, but the compiler assumes that macros are always symbols. However, it's *very very* easy to change the Arc compiler so it accepts macros as values.
+  Simply changing Scheme to allow access to macro values shouldn't be very difficult, but the whole point of this system is to create macros that are simpler than Scheme's macros, so you might as well overhaul the entire system while you're at it. But a lot of people are heavily invested in the existing Scheme macro system and do not like change. That social hurdle would need to be overcome.
 
-  It would also be easy to change Scheme so that it's possible to access the value of a macro.
+  Of course, that doesn't apply to new languages, which aren't held back by old baggage.
+
+  Arc, thankfully, doesn't have this problem, but the compiler *assumes* that macros are always symbols and barfs if given a macro value. However, it's only a couple lines to change the Arc compiler so it accepts macros as values.
 
 - With this new system, macros would be completely static. For instance, consider this macro::
 

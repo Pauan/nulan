@@ -23,7 +23,7 @@ NULAN.readFile = function (s) {
 NULAN.vars["prn"]     = "prn"
 NULAN.values["prn"]   = prn
 
-NULAN.import("NULAN.macros")
+//NULAN.import("NULAN.macros")
 
 
 var opts = {
@@ -92,6 +92,8 @@ function transform(a) {
     return a.map(transform)
   } else if (a instanceof NULAN.Symbol || a instanceof NULAN.Bypass) {
     return a.value
+  } else if (a instanceof NULAN.Wrapper) {
+    return transform(a.value)
   } else if (typeof a === "string") {
     return "\"" + a + "\"" // TODO replace " inside the string with \"
   } else {
@@ -120,7 +122,8 @@ rl.on("input", function (s) {
 
     x = NULAN.parseRaw(x)
     if (opts.debug.parse) {
-      print(["parse"].concat(transform(x).map(pretty)))
+      print(["parse", pretty(transform(x))])
+      //print(["parse"].concat(transform(x).map(pretty)))
       console.log()
     }
 

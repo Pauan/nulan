@@ -132,7 +132,7 @@ You, as a programmer, want to be able to use the same variable name for two diff
 
     lib1.bar()
 
-   This solves the problem of two libraries using the same prefix, because the prefix is assigned when the library is imported, rather than when it's defined. But it only helps a little with the problem of verbosity: ``lib1.foo`` is the same number of characters as ``lib1_foo``. The only benefit is that you can rename the library to something shorter, like ``a``, in which case you can say ``a.foo``.
+   This solves the problem of two libraries using the same prefix, because the prefix is assigned when the library is imported, rather than when it's defined. But it only helps a little with the problem of verbosity: ``lib1.foo`` is the same number of characters as ``lib1_foo``. The only benefit is that you can rename the library to something shorter, like ``a``, in which case you can say ``a.foo``
 
    Racket has multiple namespaces, but unlike Python and Node.js, it doesn't use any prefixes at all, and namespaces are not available at runtime. That is, namespaces in Racket are not first-class. The above would be written like this in Racket::
 
@@ -144,7 +144,7 @@ You, as a programmer, want to be able to use the same variable name for two diff
 
     (bar)
 
-   Notice that there is no ``lib1`` or ``lib2`` prefix. You simply use the variables normally, like as if they were in a single namespace. To resolve name conflicts, Racket lets you rename variables. In this case, we're renaming ``lib1``'s ``foo`` to ``foo1`` and ``lib2``'s ``foo`` to ``foo2``.
+   Notice that there is no ``lib1`` or ``lib2`` prefix. You simply use the variables normally, like as if they were in a single namespace. To resolve name conflicts, Racket lets you rename variables. In this case, we're renaming ``lib1``'s ``foo`` to ``foo1`` and ``lib2``'s ``foo`` to ``foo2``
 
    The problem that I have with Racket is that it's *very very* static, complicated, and in my opinion, bloated. I want a system that is as concise and easy to use as Racket's system, but is also easy to implement.
 
@@ -162,7 +162,7 @@ The basic idea is that at compile-time, all variables are replaced with boxes. T
 
   bar()
 
-Here we have created a global variable ``foo``, a function ``bar`` that returns ``foo``, another global variable ``foo``, and then we call the function ``bar``. According to hyper-static scope, variables are always resolved according to where they are defined, thus the call to ``bar`` returns ``5``.
+Here we have created a global variable ``foo``, a function ``bar`` that returns ``foo``, another global variable ``foo``, and then we call the function ``bar``. According to hyper-static scope, variables are always resolved according to where they are defined, thus the call to ``bar`` returns ``5``
 
 Using the idea of boxes, when the compiler encounters ``var foo = 5``, it creates a new box and binds it to the variable ``foo``. Inside the function ``bar``, it replaces the variable ``foo`` with the box.
 
