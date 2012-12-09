@@ -1,6 +1,90 @@
 var NULAN = (function (n) {
   "use strict";
 
+  // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Error#Custom_Error_Types
+  n.Error = function (o, s) {
+    var a  = [s]
+      , b1 = "line"   in o
+      , b2 = "column" in o
+    if (o.text || b1 || b2) {
+      a.push("\n")
+      if (o.text) {
+        a.push("  ", o.text.replace(/\n$/, ""))
+      }
+      if (b1 || b2) {
+        a.push("  (")
+        if (b1) {
+          a.push("line ", o.line)
+        }
+        if (b1 && b2) {
+          a.push(", ")
+        }
+        if (b2) {
+          a.push("column ", o.column)
+        }
+        a.push(")")
+      }
+      if (o.text && b2) {
+        a.push("\n ", new Array(o.column + 1).join(" "), "^")
+      }
+    }
+    this.message = a.join("")
+  }
+  n.Error.prototype = new Error()
+  n.Error.prototype.constructor = n.Error
+  n.Error.prototype.name = "NULAN.Error"
+
+  // Converts any array-like object into an iterator
+  function iter(s) {
+    var i = 0
+    return {
+      peek: function () {
+        return s[i]
+      },
+      read: function () {
+        // TODO: need more information on whether read should return the old or the new item
+        return s[i++]
+      },
+      has: function () {
+        return i < s.length
+      }
+    }
+  }
+
+  function reMatch(r, s) {
+    var x = r.exec(s)
+    return x ? x[0] : ""
+  }
+
+  // Buffers a string by line and keeps track of line and column information
+  // Returns an iterator that moves through the string one character at a time
+  // This is used for the error messages, and also significant whitespace parsing
+  function stringBuffer(s) {
+    var re = /^.*(\n|$)/gm
+    return {
+      line: 1,
+      column: 0,
+      text: reMatch(re, s),
+      peek: function () {
+        return this.text[this.column]
+      },
+      read: function () {
+        var x = this.text[this.column++]
+        // TODO: using read when the iterator is empty increases the line count
+        if (this.column >= this.text.length) {
+          this.text = reMatch(re, s)
+          this.column = 0
+          ++this.line
+        }
+        return x
+      },
+      has: function () {
+        return this.column < this.text.length
+      }
+    }
+  }
+
+
   function is(x, y) {
     return (x instanceof n.Symbol || x instanceof n.Bypass) && x.value === y
   }
@@ -195,7 +279,7 @@ var NULAN = (function (n) {
     if (number(r)) {
       a.push(enrich(new n.Wrapper(+r), s))
     } else {
-      throw new PARSE.Error(s, "invalid number: " + r)
+      throw new n.Error(s, "invalid number: " + r)
     }
   }
 
@@ -225,7 +309,7 @@ var NULAN = (function (n) {
   function tokenizeComment(o) {
     while (true) {
       if (!o.has()) {
-        throw new PARSE.Error(o, "expected |# but got <EOF>") // TODO this error should probably be in PARSE.js
+        throw new n.Error(o, "expected |# but got <EOF>")
       }
       o.read()
       if (o.peek() === "|") {
@@ -345,10 +429,10 @@ var NULAN = (function (n) {
       if (is(x, s)) {
         o.read()
       } else {
-        throw new PARSE.Error(x, "expected " + s + " but got " + x)
+        throw new n.Error(x, "expected " + s + " but got " + x)
       }
     } else {
-      throw new PARSE.Error(o, "expected " + s + " but got <EOF>")
+      throw new n.Error(o, "expected " + s + " but got <EOF>")
     }
   }
 
@@ -363,7 +447,7 @@ var NULAN = (function (n) {
       }
     }
     check(o, s)
-    return f(process(PARSE.iter(r), -1))
+    return f(process(iter(r), -1))
   }
 
   function braces(o) {
@@ -418,16 +502,16 @@ var NULAN = (function (n) {
         break
       }
     }
-    a = process(PARSE.iter(a), -1)
+    a = process(iter(a), -1)
     return a.length === 1 ? a[0] : a
   }
 
   n.tokenize = function (s) {
-    return tokenize(PARSE.stringBuffer(s))
+    return tokenize(stringBuffer(s))
   }
 
   n.parseRaw = function (a) {
-    a = PARSE.iter(a)
+    a = iter(a)
     return indent(a, a.peek())
   }
 

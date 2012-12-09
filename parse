@@ -10,8 +10,6 @@ function load(path, context) {
 }
 
 load("./NULAN.js")
-
-load("./lib/PARSE.js")
 load("./NULAN.parse.js")
 
 load("./lib/NUIT.parse.js")

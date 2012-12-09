@@ -12,8 +12,6 @@ function load(path, context) {
 load("./lib/NINO.compile.js")
 load("./lib/NINO.transform.js")
 load("./NULAN.js")
-
-load("./lib/PARSE.js")
 load("./NULAN.parse.js")
 
 load("./lib/NUIT.serialize.js")
