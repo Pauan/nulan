@@ -1,22 +1,15 @@
 mac str -> @args
-  'add "" ,@args
-
-mac let! -> x y body
-  let u = uniq()
-    'let u = x
-       | x <= y
-       | finally body
-                 x <= u
+  '(+) "" ,@args
 
 mac def -> n v
-  '(| var n) # TODO
+  '| var n
    | n <= v
 
 mac call -> x y @args
-  '(get x y).call ,@args
+  '((.) x y).call ,@args
 
 mac call-own -> x y @args
-  '(get x y) ,@args
+  '((.) x y) ,@args
 #|
 mac in -> @args
   let r = {}
@@ -28,7 +21,15 @@ mac in -> @args
 mac isnt -> @args
   if args.length = 2
     '& "!==" ,args.0 ,args.1
-    '~(is ,@args)
+    '~((==) ,@args)
+
+mac for -> init test incr body
+  '| init
+   | while test
+       | body
+       | incr
+
+
 #|
 mac uniqs -> @args
   args.reduceRight -> x y
@@ -42,11 +43,12 @@ mac uniqs -> @args body
   | x.push body
   | x
 
-mac for -> init test incr body
-  '(| init)
-   | while test
-       | body
-       | incr
+mac let! -> x y body
+  uniqs u
+    'let u = x
+       | x <= y
+       | finally body
+                 x <= u
 
 #|
 [ foo -> 10

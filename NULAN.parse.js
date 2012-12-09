@@ -1,6 +1,10 @@
 var NULAN = (function (n) {
   "use strict";
 
+  function is(x, y) {
+    return (x instanceof n.Symbol || x instanceof n.Bypass) && x.value === y
+  }
+
   function infix(i, f) {
     return {
       priority: i,
@@ -11,8 +15,21 @@ var NULAN = (function (n) {
         if (f) {
           l.push(f(x, s, y))
         } else {
-          l.push([new n.Bypass(s.value), x, y])
+          l.push([s, x, y])
         }
+        l.push.apply(l, r.slice(1))
+        return l
+      }
+    }
+  }
+
+  function unary(i) {
+    return {
+      order: "right",
+      priority: i,
+      action: function (l, s, r) {
+        var y = r[0]
+        l.push([s, y])
         l.push.apply(l, r.slice(1))
         return l
       }
@@ -24,9 +41,13 @@ var NULAN = (function (n) {
       , l = [x]
       , i = 1
       , iLen = a.length
+      , y
     while (i < iLen) {
-      if (a[i].line === x.line || a[i].column > x.column) {
-        l.push(a[i])
+      y = a[i]
+                                                      // TODO: check to see if this is the correct behavior
+                                                      // Array.isArray(y)
+      if (y.line === x.line || y.column > x.column) {
+        l.push(y)
       } else {
         break
       }
@@ -36,12 +57,15 @@ var NULAN = (function (n) {
   }
 
   var t = {
-    ".": infix(100, function (l, s, r) {
+    ".": infix(110, function (l, s, r) {
       if (r instanceof n.Symbol) {
         r = r.value
       }
-      return [new n.Bypass(s.value), l, r]
+      return [s, l, r]
     }),
+
+    "@":  unary(100),
+    ",":  unary(100),
 
     "*":  infix(90),
     "/":  infix(80),
@@ -67,9 +91,8 @@ var NULAN = (function (n) {
       action: function (l, s, r) {
         r = parseLine(r)
         var y = r[0]
-        l = [[new n.Bypass(s.value),
-               l.length === 1 ? l[0] : l,
-               y.length === 1 ? y[0] : y]]
+        l = [[s, l.length === 1 ? l[0] : l,
+                 y.length === 1 ? y[0] : y]]
         l.push.apply(l, r[1])
         return l
       }
@@ -80,7 +103,7 @@ var NULAN = (function (n) {
       action: function (l, s, r) {
         var args = r.slice(0, -1)
         args.unshift(new n.Bypass("list"))
-        l.push([new n.Bypass(s.value), args, r[r.length - 1]])
+        l.push([s, args, r[r.length - 1]])
         return l
       }
     },
@@ -90,7 +113,7 @@ var NULAN = (function (n) {
         var x = l[l.length - 1]
           , y = parseLine(r)
         l = l.slice(0, -1)
-        l.push([new n.Bypass(s.value), x, y[0]])
+        l.push([s, x, y[0]])
         l.push.apply(l, y[1])
         return l
       }
@@ -103,9 +126,33 @@ var NULAN = (function (n) {
         l.push.apply(l, y[1])
         return l
       }
-    }
+    },
 
+    /*"|": {
+      order: "right",
+      priority: 100,
+      action: function (l, s, r) {
+        var y = parseLine(r)
+        l.push([s].concat(y[0]))
+        l.push.apply(l, y[1])
+        return l
+      }
+    },
 
+    "'": {
+      //order: "right",
+      //priority: 9001,
+      action: function (l, s, r) {
+        var y = parseLine(r)
+        if (y[1].length) {
+          throw new Error("invalid indentation")
+        }
+        y = y[0]
+        //console.log(processPipe(y))
+        l.push([s, y.length === 1 ? y[0] : y])
+        return l
+      }
+    },*/
 /*
     foo bar <= qux corge
       nou
@@ -129,17 +176,6 @@ var NULAN = (function (n) {
 
   t["|"] = {
     name: "|",
-    prefix: function (o) {
-      return this
-    }
-  }
-
-  //t.unary("'",     0, "quote")
-  t.unary(",",     0, "comma")
-  t.unary("@",     0, "splice")
-
-  t["'"] = {
-    name: "'",
     prefix: function (o) {
       return this
     }
@@ -280,54 +316,6 @@ var NULAN = (function (n) {
     return r
   }
 
-  function rempipe(a) {
-    if (Array.isArray(a)) {
-      var r = []
-      a.forEach(function (x) {
-        if (!PARSE.is(x, t["|"])) {
-          r.push(rempipe(x))
-        }
-      })
-      return r
-    } else {
-      return a
-    }
-  }
-
-  function quote(a) {
-    if (Array.isArray(a)) {
-      if (PARSE.is(a[0], t["'"])) {
-        a = quote(a.slice(1))
-        return [new n.Bypass("quote"), a.length === 1 ? a[0] : a]
-      } else {
-        return a.map(quote)
-      }
-    } else {
-      return a
-    }
-  }
-
-  function processPipe(a) {
-    var r = []
-      , c = []
-    a.forEach(function (x) {
-      if (Array.isArray(x) && x[0] instanceof n.Symbol && x[0].value === "|") {
-        x = x.slice(1)
-        c.push(x.length === 1 ? x[0] : x)
-      } else {
-        if (c.length) {
-          r.push([new n.Bypass("|")].concat(c))
-          c = []
-        }
-        r.push(x)
-      }
-    })
-    if (c.length) {
-      r.push([new n.Bypass("|")].concat(c))
-    }
-    return r
-  }
-
   // Modified Pratt Parser, designed for lists of symbols rather than tokens
   function process(o, i) {
     var pri, x, y, r, l = []
@@ -350,10 +338,11 @@ var NULAN = (function (n) {
           r = process(o, (y.order === "right"
                            ? pri - 1
                            : pri))
+          // TODO: should this use n.Bypass or not?
           if (l.length === 0 && r.length === 0) {
-            return [x] // TODO: does this need to be wrapped in an array?
+            return [new n.Bypass(x.value)] // TODO: does this need to be wrapped in an array?
           } else {
-            l = y.action(l, x, r)
+            l = y.action(l, new n.Bypass(x.value), r)
           }
         } else {
           break
@@ -365,32 +354,11 @@ var NULAN = (function (n) {
     return l
   }
 
-  function indent(o) {
-    var x = o.peek()
-      , a = []
-      , y
-    while (o.has()) {
-      y = o.peek()
-      if (y.line === x.line) {
-        o.read()
-        a.push(y)
-        //a.push(PARSE.expression(o))
-      } else if (y.column > x.column) {
-        a.push(indent(o))
-      } else {
-        break
-      }
-    }
-    a = processPipe(a)
-    a = process(PARSE.iter(a), -1)
-    return a.length === 1 ? a[0] : a
-  }
-
   function check(o, s) {
     var x
     if (o.has()) {
       x = o.peek()
-      if (x instanceof n.Symbol && x.value === s) {
+      if (is(x, s)) {
         o.read()
       } else {
         throw new PARSE.Error(x, "expected " + s + " but got " + x)
@@ -401,59 +369,83 @@ var NULAN = (function (n) {
   }
 
   function until(o, s, f) {
-    o.read()
-    var y = braces(o, s)
-    check(o, s)
-    y = process(PARSE.iter(y), -1)
-    return f(y)
-  }
-
-  function braces(o, end) {
-    var x, y, r = []
+    var x, r = []
     while (o.has()) {
       x = o.peek()
-      if (x instanceof n.Symbol) {
-        if (end && x.value === end) {
-          break
-        } else if (x.value === "(") {
-          r.push(until(o, ")", function (x) {
-            return x.length === 1 ? x[0] : x
-          }))
-        } else if (x.value === "{") {
-          r.push(until(o, "}", function (x) {
-            x.unshift(new n.Bypass("list"))
-            return x
-          }))
-        } else if (x.value === "[") {
-          r.push(until(o, "]", function (x) {
-            x.unshift(new n.Bypass("dict"))
-            return x
-          }))
-        } else {
-          o.read()
-          r.push(x)
-        }
+      if (is(x, s)) {
+        break
       } else {
-        o.read()
-        r.push(x)
+        r.push(braces(o))
       }
     }
-    return r
+    check(o, s)
+    return f(process(PARSE.iter(r), -1))
   }
 
-/*
+  function braces(o) {
+    var x = o.read()
+    if (x instanceof n.Symbol) {
+      if (x.value === "(") {
+        return until(o, ")", function (x) {
+          return x.length === 1 ? x[0] : x
+        })
+      } else if (x.value === "{") {
+        return until(o, "}", function (x) {
+          x.unshift(new n.Bypass("list"))
+          return x
+        })
+      } else if (x.value === "[") {
+        return until(o, "]", function (x) {
+          x.unshift(new n.Bypass("dict"))
+          return x
+        })
+      } else {
+        return x
+      }
+    } else {
+      return x
+    }
+  }
 
-
-  [[foo], bar, [qux]]
-*/
+  function indent(o, x) {
+    var a = []
+      , y
+      , r
+    while (o.has()) {
+      y = o.peek()
+      if (y.line === x.line) {
+        if (is(y, "|")) {
+          r = []
+          while (o.has() && is(o.peek(), "|") && o.peek().column === y.column) {
+            o.read()
+            r.push(indent(o, o.peek()))
+          }
+          r.unshift(y)
+          a.push(r)
+        } else if (is(y, "'")) {
+          o.read()
+          a.push([y, indent(o, o.peek())])
+        } else {
+          a.push(braces(o))
+        }
+      } else if (y.column > x.column) {
+        a.push(indent(o, o.peek()))
+      } else {
+        break
+      }
+    }
+    a = process(PARSE.iter(a), -1)
+    return a.length === 1 ? a[0] : a
+  }
 
   n.tokenize = function (s) {
     return tokenize(PARSE.stringBuffer(s))
   }
 
   n.parseRaw = function (a) {
-    return indent(PARSE.iter(braces(PARSE.iter(a))))
-    // quote(rempipe(fn(pipe(r))))
+    a = PARSE.iter(a)
+    return indent(a, a.peek())
+    // rempipe(r)
   }
 
   n.parse = function (s) {
