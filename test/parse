@@ -1,0 +1,170 @@
+> foo 123
+    bar 2 3)
+    corge 60 70
+  qux 5 10
+
+> (foobar
+> foobar)
+> (foobar +
+> + 5
+> 1 + 2 3 + 4
+> foo 1 2 3 4 5
+
+> foo 1 2 3
+    bar 3 4 5
+
+> foo 1 2 3
+    bar 3 4 5
+    qux 10 20 30
+
+> foo 1 2 3
+    bar 3 4 5
+      qux 10 20 30
+    nou yes 10
+
+> foo 1 2 3
+  bar 1 2 3
+
+> foo 1 2 3
+    bar 1 2 3
+    qux 1 2 3
+  corge 1 2 3
+  yesnou
+
+> mac isnt -> @args
+    # TODO: special case for 2-arguments
+    '~(is ,@args)
+
+> mac str -> @args
+    '(+) "" ,@args
+
+> foo
+    .bar
+
+> foo
+    .bar 10 20
+    .qux 10 20
+    .corge 10 20
+
+> foo
+    .bar 1 2 3
+    .qux 5 10 20
+    .corge
+
+> foo 10 20
+  foo
+    .bar 1 2 3
+    .qux 5 10 20
+    .corge
+
+> foo 10
+    bar
+      .qux 20 30
+      .corge 40 50
+
+> | foo 1 2 3
+  | bar
+  | qux 7 8 9
+    | yes 10 12 12
+    | test 13 14 15
+
+> foo 1 2 3
+    | bar
+    | qux 7 8 9
+      | yes 10 12 12
+      | test 13 14 15
+
+> foo | bar | qux
+
+> [ foo -> a a
+  | bar -> b b ]
+
+> { foo | bar | qux }
+
+> { -> a a
+  | -> b b
+  | -> c c }
+
+> ( -> a a
+  | -> b b
+  | -> c c )
+
+> ( (-> a a) (-> b b) (-> c c) )
+
+> -> a
+    | a + 1
+    | a + 2
+
+> ->
+    -> a a
+
+> 'foo bar 'qux corge
+> #|foobar#quxcorge|#1 + 5
+> #|foobar#|#1 + 5
+> #|foobar#|quxcorge|#1 + 5
+> #|foobar#|qux|#corge|#1 + 5
+> foo 1 2 3 <= bar 10 20
+> foo <= bar 10 20
+> foo <= bar
+> {(id -foo)}
+> [(bar 10 - 50) {1 + 2 bar}]
+> (1 - 5)
+> {1 - 5}
+> [1 - 5]
+
+> ( foo
+> foo )
+> ( ( foo )
+> ( foo ) )
+> ( foo [ ) ]
+> ( ( foo ) bar ( qux ) )
+
+> '| foo
+   | bar
+   | qux
+
+> 'foo
+   bar
+   qux
+
+> 'foo
+    bar
+    qux
+
+> '| foo 1 2
+   | bar 3 4
+   | qux 5 6
+
+> 'foo 1 2
+   bar 3 4
+   qux 5 6
+
+> 'foo 1 2
+    bar 3 4
+    qux 5 6
+
+> 'foo 1 2 3
+> 'foo
+
+> foo bar <= qux corge
+    nou
+
+> foo bar <= qux corge
+             nou
+
+> foo bar <= qux corge
+               nou
+
+> foo bar = qux corge
+            nou
+    | foobar
+    | quxcorge
+
+> foo bar = qux corge
+              nou
+    | foobar
+    | quxcorge
+
+> foo bar = qux corge
+    | nou
+    | foobar

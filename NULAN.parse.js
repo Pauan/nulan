@@ -153,22 +153,6 @@ var NULAN = (function (n) {
         return l
       }
     },*/
-/*
-    foo bar <= qux corge
-      nou
-
-    ((<= (foo bar) (qux corge))
-       nou)
-
-    foo bar = qux corge
-      nou
-
-    foo bar = qux corge
-      nou
-      foobar
-
-    (foo (= bar (qux corge))
-      nou)*/
   }
 /*
   t.unary("~",    90, "not")
@@ -445,7 +429,6 @@ var NULAN = (function (n) {
   n.parseRaw = function (a) {
     a = PARSE.iter(a)
     return indent(a, a.peek())
-    // rempipe(r)
   }
 
   n.parse = function (s) {
