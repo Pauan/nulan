@@ -112,7 +112,7 @@ There are five phases to Nulan's syntax parsing:
 
      syntax-infix <> 70
 
-   ----
+----
 
    The ``\`` syntax is a bit trickier. It specifies that it's a delimiter, which means that it'll never be processed as part of a symbol. That means that ``foo\bar`` will be parsed as the three symbols ``foo``,  ``\``, and ``bar`` rather than the single symbol ``foo\bar``
 
@@ -131,7 +131,7 @@ There are five phases to Nulan's syntax parsing:
 
      {foo bar {\ corge qux} nou}
 
-   ----
+----
 
    Lastly, the ``^`` syntax. With this list::
 
@@ -153,7 +153,7 @@ There are five phases to Nulan's syntax parsing:
 
      {^ {a {^ {b}}} {+ a b}}
 
-   ----
+----
 
    One last thing. If the parser returns a list that only has a single item, then it unwraps the list, which means that these::
 
