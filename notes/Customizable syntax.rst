@@ -40,34 +40,34 @@ There are five phases to Nulan's syntax parsing:
 
 4) Nulan uses significant whitespace, and has very simple rules for how to handle it:
 
-     1) Everything on the same line is put into a list::
+   1) Everything on the same line is put into a list::
 
-          {def scroll-into-view -> n p}
+        {def scroll-into-view -> n p}
 
-     2) For all the lines that have greater indentation than the current line, put them into the list too::
+   2) For all the lines that have greater indentation than the current line, put them into the list too::
 
-          {def scroll-into-view -> n p
-            {let n = n . get-bounding-client-rect ;}}
+        {def scroll-into-view -> n p
+          {let n = n . get-bounding-client-rect ;}}
 
-     3) Repeat the above two processes recursively::
+   3) Repeat the above two processes recursively::
 
-          {def scroll-into-view -> n p
-            {let n = n . get-bounding-client-rect ;
-              {r = p . get-bounding-client-rect ;}
-              {| {if {n . top < r . top || n . bottom > r . bottom}
-                   {p . scroll-top <= n . top - r . height / 2}}
-                 {if {n . left < r . left || n . right > r . right}
-                   {p . scroll-left <= n . left - r . width / 2}}}}}
+        {def scroll-into-view -> n p
+          {let n = n . get-bounding-client-rect ;
+            {r = p . get-bounding-client-rect ;}
+            {| {if {n . top < r . top || n . bottom > r . bottom}
+                 {p . scroll-top <= n . top - r . height / 2}}
+               {if {n . left < r . left || n . right > r . right}
+                 {p . scroll-left <= n . left - r . width / 2}}}}}
 
-     4) Certain syntax like ``=`` and ``'`` will take everything that's indented further than the token and will put it into a list::
+   4) Certain syntax like ``=`` and ``'`` will take everything that's indented further than the token and will put it into a list::
 
-          {def scroll-into-view -> n p
-            {let n = {n . get-bounding-client-rect ;}
-              {r = {p . get-bounding-client-rect ;}}
-              {| {if {n . top < r . top || n . bottom > r . bottom}
-                   {p . scroll-top <= n . top - r . height / 2}}
-                 {if {n . left < r . left || n . right > r . right}
-                   {p . scroll-left <= n . left - r . width / 2}}}}}
+        {def scroll-into-view -> n p
+          {let n = {n . get-bounding-client-rect ;}
+            {r = {p . get-bounding-client-rect ;}}
+            {| {if {n . top < r . top || n . bottom > r . bottom}
+                 {p . scroll-top <= n . top - r . height / 2}}
+               {if {n . left < r . left || n . right > r . right}
+                 {p . scroll-left <= n . left - r . width / 2}}}}}
 
 5) Now we have a structured program, with lists nested within lists. But we're not done yet. There's a bunch of symbols like ``=``, ``.``, and ``<`` that have special meaning, but they haven't been parsed yet.
 
@@ -83,7 +83,7 @@ There are five phases to Nulan's syntax parsing:
        delimiter %t
        separator %t
        action -> l s {x @r}
-         `,@l (s x) ,@r
+         `,@l (s ,@x) ,@r
 
      syntax-rule ^
        delimiter %t
@@ -94,11 +94,11 @@ There are five phases to Nulan's syntax parsing:
 
    How this works is, each rule can have the following properties:
 
-     * If ``separator`` is true, the parser will take everything that's indented further than the symbol and will put it into a list
-     * If ``delimiter`` is true, the parser will treat the syntax as not being a part of symbols
-     * The rules with higher ``priority`` are run first. The default is ``0`` priority
-     * If a rule has ``order`` set to ``"right"`` then it will be right-associative, otherwise it's left-associative
-     * The ``action`` function receives three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol.
+   * If ``separator`` is true, the parser will take everything that's indented further than the symbol and will put it into a list
+   * If ``delimiter`` is true, the parser will treat the syntax as not being a part of symbols
+   * The rules with higher ``priority`` are run first. The default is ``0`` priority
+   * If a rule has ``order`` set to ``"right"`` then it will be right-associative, otherwise it's left-associative
+   * The ``action`` function receives three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol.
 
    So, looking at the above, the rule for ``<>`` is pretty simple: take the last argument of the left list and the first argument of the right list and mush them together. As an example, this::
 
@@ -112,7 +112,9 @@ There are five phases to Nulan's syntax parsing:
 
      syntax-infix <> 70
 
-   The ``\`` syntax is a bit trickier. It specifies that it's a delimiter, which means that it'll never be processed as part of a symbol. That means that ``foo\bar`` will be parsed as the three symbols ``foo`,  ``\``, and ``bar`` rather than the single symbol ``foo\bar``
+   ----
+
+   The ``\`` syntax is a bit trickier. It specifies that it's a delimiter, which means that it'll never be processed as part of a symbol. That means that ``foo\bar`` will be parsed as the three symbols ``foo``,  ``\``, and ``bar`` rather than the single symbol ``foo\bar``
 
    It also says that it's a separator. What this means is that, in the following Nulan program::
 
@@ -125,15 +127,17 @@ There are five phases to Nulan's syntax parsing:
      {foo bar \ {corge qux}
        nou}
 
-   That is, it took everything indented further than ``\`` and put it into a list. The action function then receives the arguments ``{foo bar}``, ``\``, and ``{{corge qux} nou}``. It then returns this::
+   That is, it took everything indented further than ``\`` and put it into a list. The action function then receives the arguments ``{foo bar}``, ``\``, and ``{{corge qux} nou}`` and returns this::
 
      {foo bar {\ corge qux} nou}
+
+   ----
 
    Lastly, the ``^`` syntax. With this list::
 
      {1 2 3 ^ a b c {+ a b c}}
 
-   It will pass the arguments ``{1 2 3}``, ``^``, and ``{a b c {+ a b c}}`` to the action function. It then returns this::
+   It will pass the arguments ``{1 2 3}``, ``^``, and ``{a b c {+ a b c}}`` to the action function, which then returns this::
 
      {1 2 3 {^ {a b c} {+ a b c}}}
 
@@ -148,6 +152,8 @@ There are five phases to Nulan's syntax parsing:
    Rather than this::
 
      {^ {a {^ {b}}} {+ a b}}
+
+   ----
 
    One last thing. If the parser returns a list that only has a single item, then it unwraps the list, which means that these::
 
