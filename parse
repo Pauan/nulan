@@ -33,12 +33,9 @@ function transform(x) {
 function foo(a) {
   a.forEach(function (x) {
     try {
-      x = transform(NULAN.parse(x + (Math.random() < 0.5
-                                      ? "\n"
-                                      : "")))
-      //x.forEach(function (x) {
-        console.log(util.inspect(x, false, null, true))
-      //})
+      NULAN.parse(x + (Math.random() < 0.5 ? "\n" : ""), function (x) {
+        console.log(util.inspect(transform(x), false, null, true))
+      })
     } catch (e) {
       console.error("" + e)
     }

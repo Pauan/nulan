@@ -20,12 +20,15 @@ Examples
   foo.qux <= 30
 
   def fn -> a
-    let x = foo.a
-      | foo.a <= 50
+    let x = foo[a]
+      | foo[a] <= 50
       | x
 
   fn "bar"
   fn "qux"
+
+  foo.bar
+  foo.qux
 
 ::
 
@@ -36,33 +39,24 @@ Examples
            'let u = tmp
               body
 
-  # {(id is) x y}
   mac each -> x body
-    | var y = x.2
-    | x <= x.1
-    | uniqs i l u
-        let tmp = y
-          let y = u
-            'let u = tmp
-               let l = y.length
-                 for (var i = 0) (isnt i l) (++ i)
-                   let x = get y i
-                     body
-
-  (is (var foo) (bar (qux corge nou)))
+    let y = x.1
+        x = x.0
+      let i   = uniq;
+          l   = uniq;
+          u   = uniq;
+          tmp = y
+        let y = u
+          'let u = tmp
+             let l = y."length"
+               for (var i = 0) (i ~= l) (++ i)
+                 let x = get y i
+                   body
 
 
   x (sym "=") @y
 
   syntax-precedence (+) 50
-
-  mac each -> {x y} body
-    uniqs i l
-      w/complex y
-        'let l = y."length"
-           for (var i = 0) (i ~= l) (++ i)
-             let x = y.i
-               body
 
   syntax-infix ~= 0
   syntax-infix == 0
@@ -88,12 +82,22 @@ Examples
     w/namespace value
       x + y
 
+
+  mac each -> {x y} body
+    uniqs i l
+      complex y
+        'let l = y.length
+           for (var i = 0) (i ~= l) (++ i)
+             let x = y[i]
+               body
+
   each x = {1 2 3}
     | prn x
     | prn x + 5
 
   {1 2 3}.for-each -> x
-    prn x
+    | prn x
+    | prn x + 5
 
 
   mac loop -> body
@@ -117,7 +121,7 @@ Features
 
 * `Hygienic macros <nulan/blob/javascript/notes/Hygienic%20macros.rst>`_ which are even easier to use than Arc/Common Lisp macros
 
-* Syntax to make common idioms shorter and easier to read
+* `Syntax <nulan/blob/javascript/notes/Syntax.rst>`_ to make common idioms shorter and easier to read
 
 * The compiler is written in JavaScript and is capable of running in a browser: you can incrementally compile/eval Nulan programs at runtime
 

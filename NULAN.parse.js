@@ -102,26 +102,16 @@ var NULAN = (function (n) {
     return x instanceof n.Symbol && x.value === y
   }
 
-  function infix(i, info) {
-    info = info || {}
-    info.priority = i
-
-    var f = info.action
-
-    info.action = function (l, s, r) {
-      var x = l[l.length - 1]
-        , y = r[0]
-      l = l.slice(0, -1)
-      if (f) {
-        l.push(f(x, s, y))
-      } else {
-        l.push([s, x, y])
+  function infix(i, b) {
+    return {
+      delimiter: b,
+      priority: i,
+      action: function (l, s, r) {
+        var x = l[l.length - 1]
+          , y = r[0]
+        return l.slice(0, -1).concat([[s, x, y]], r.slice(1))
       }
-      l.push.apply(l, r.slice(1))
-      return l
     }
-
-    return info
   }
 
   function unary(i, b) {
@@ -131,9 +121,7 @@ var NULAN = (function (n) {
       order: "right",
       action: function (l, s, r) {
         var y = r[0]
-        l.push([s, y])
-        l.push.apply(l, r.slice(1))
-        return l
+        return l.concat([[s, y]], r.slice(1))
       }
     }
   }
@@ -168,15 +156,7 @@ var NULAN = (function (n) {
       }
     },
 
-    ".": infix(110, {
-      delimiter: true,
-      action: function (l, s, r) {
-        if (r instanceof n.Symbol) {
-          r = r.value
-        }
-        return [s, l, r]
-      }
-    }),
+    ".":  infix(110, true),
 
     ",":  unary(100, true),
     "@":  unary(100, true),
@@ -257,7 +237,7 @@ var NULAN = (function (n) {
     },
 
     "|": {
-      delimiter: true,
+      //delimiter: true,
       action: function (l, s, r) {
         return l.concat(r)
       }
@@ -480,7 +460,7 @@ var NULAN = (function (n) {
         if (is(y, s)) {
           break
         } else if (separator(y)) {
-          r.push(y, until(o, s, f))
+          r.push(y, until(o, s, function (x) { return x }))
         } else {
           braces(o, r)
         }
@@ -558,13 +538,15 @@ var NULAN = (function (n) {
     return tokenize(stringBuffer(s))
   }
 
-  n.parseRaw = function (a) {
+  n.parseRaw = function (a, f) {
     a = iter(a)
-    return unwrap(indent(a, a.peek()))
+    while (a.has()) {
+      f(unwrap(indent(a, a.peek())))
+    }
   }
 
-  n.parse = function (s) {
-    return n.parseRaw(n.tokenize(s))
+  n.parse = function (s, f) {
+    n.parseRaw(n.tokenize(s), f)
   }
 
   return n

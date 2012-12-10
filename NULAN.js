@@ -445,13 +445,20 @@ var NULAN = (function (n) {
     }
   }
 
-  values["."] = new Macro(function (x, y) {
+  values["get"] = new Macro(function (x, y) {
     var s = validJS(y)
     if (s) {
       return [".", mac(x), s]
     } else {
       return ["[]", mac(x), mac(y)]
     }
+  })
+
+  values["."] = new Macro(function (x, y) {
+    if (y instanceof n.Symbol) {
+      y = y.value
+    }
+    return mac([values["get"], x, y])
   })
 
   values["'"] = new Macro(function loop(x) {
@@ -499,7 +506,7 @@ var NULAN = (function (n) {
       return anon([new n.Bypass("list"), [new n.Bypass("@"), args]], body)
     } else if (Array.isArray(args) && isValue(args[0], "list")) {
       var old = js_vars
-      js_vars = {}
+      js_vars = Object.create(js_vars)
       var r = withNewScope(function () {
 /*
         -> a b @c d @e
@@ -615,6 +622,7 @@ var NULAN = (function (n) {
 
   // Other
   vars["%t"] = "true"
+  values["true"] = new n.Symbol("true") // TODO
 
   values["num"] = unary("u+")
   values["mod"] = binary("%")
@@ -851,9 +859,15 @@ var NULAN = (function (n) {
     }, mac(body))
   })
 
-  /*values["let"] = new Macro(function (x, y, body) {
-    return mac([[values["->"], [values["list"], x], body], y])
-  })*/
+  values["let"] = new Macro(function () {
+    var args = [].slice.call(arguments, 0, -1)
+      , body = arguments[arguments.length - 1]
+
+    var x = args.map(function (x) { return x[0] })
+      , y = args.map(function (x) { return x[1] })
+
+    return mac([[values["->"], [values["list"]].concat(x), body]].concat(y))
+  })
 
   values["sym"] = function (x) {
     return new n.Symbol(x)

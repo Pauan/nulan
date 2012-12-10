@@ -6,18 +6,17 @@ mac def -> n v
    | n <= v
 
 mac call -> x y @args
-  'x.y."call" ,@args
+  'x.y.call ,@args
 
 mac call-own -> x y @args
   'x.y ,@args
-#|
+
 mac in -> @args
   let r = {}
     | args.reduce -> x y
         | r.push {x y}
         | x
-    | 'or ,@(r.map -> x '(is ,@x))
-|#
+    | '(||) ,@(r.map -> x '((==) ,@x))
 
 mac (~=) -> @args
   if args.length == 2
@@ -29,7 +28,6 @@ mac for -> init test incr body
    | while test
        | body
        | incr
-
 
 
 mac uniqs -> @args

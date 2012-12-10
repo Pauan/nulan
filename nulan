@@ -120,27 +120,28 @@ rl.on("input", function (s) {
       console.log()
     }
 
-    x = NULAN.parseRaw(x)
-    if (opts.debug.parse) {
-      print(["parse", pretty(transform(x))])
-      //print(["parse"].concat(transform(x).map(pretty)))
-      console.log()
-    }
+    NULAN.parseRaw(x, function (x) {
+      if (opts.debug.parse) {
+        print(["parse", pretty(transform(x))])
+        //print(["parse"].concat(transform(x).map(pretty)))
+        console.log()
+      }
 
-    x = NULAN.compile(x)
-    if (opts.debug.compile) {
-      print(["compile", x])
-      console.log()
-    }
+      x = NULAN.compile(x)
+      if (opts.debug.compile) {
+        print(["compile", x])
+        console.log()
+      }
 
-    //console.log("@compile\n" + x.replace(/^/gm, "  "))
+      //console.log("@compile\n" + x.replace(/^/gm, "  "))
 
-    x = vm.runInNewContext(x, globals)
-    if (opts.debug.eval) {
-      print(["eval", pretty(x)])
-    } else {
-      console.log(pretty(x))
-    }
+      x = vm.runInNewContext(x, globals)
+      if (opts.debug.eval) {
+        print(["eval", pretty(x)])
+      } else {
+        console.log(pretty(x))
+      }
+    })
     //console.log("@eval\n" + ("" + x).replace(/^/gm, "  "))
   } catch (e) {
     console.error("" + e)
