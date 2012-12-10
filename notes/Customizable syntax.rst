@@ -49,7 +49,7 @@ There are five phases to Nulan's syntax parsing:
           {def scroll-into-view -> n p
             {let n = n . get-bounding-client-rect ;}}
 
-     2) Repeat the above two processes recursively::
+     3) Repeat the above two processes recursively::
 
           {def scroll-into-view -> n p
             {let n = n . get-bounding-client-rect ;
@@ -59,7 +59,7 @@ There are five phases to Nulan's syntax parsing:
                  {if {n . left < r . left || n . right > r . right}
                    {p . scroll-left <= n . left - r . width / 2}}}}}
 
-     3) Certain syntax like ``=`` and ``'`` will take everything that's indented further than the token and will put it into a list::
+     4) Certain syntax like ``=`` and ``'`` will take everything that's indented further than the token and will put it into a list::
 
           {def scroll-into-view -> n p
             {let n = {n . get-bounding-client-rect ;}
@@ -69,98 +69,98 @@ There are five phases to Nulan's syntax parsing:
                  {if {n . left < r . left || n . right > r . right}
                    {p . scroll-left <= n . left - r . width / 2}}}}}
 
-5) Now we have a structured program, with lists nested within lists. But we're not done yet. There's a bunch of symbols like ``=``, ``.``, ``<`` that have special meaning, but they haven't been parsed yet.
+5) Now we have a structured program, with lists nested within lists. But we're not done yet. There's a bunch of symbols like ``=``, ``.``, and ``<`` that have special meaning, but they haven't been parsed yet.
 
-  Nulan has a macro called ``syntax-rule`` that lets you add new syntax. Here are some examples::
+   Nulan has a macro called ``syntax-rule`` that lets you add new syntax. Here are some examples::
 
-    syntax-rule <>
-      priority 70
-      action -> {@l x} s {y @r}
-        `,@l (s x y) ,@r
+     syntax-rule <>
+       priority 70
+       action -> {@l x} s {y @r}
+         `,@l (s x y) ,@r
 
-    syntax-rule \
-      priority  10
-      delimiter %t
-      separator %t
-      action -> l s {x @r}
-        `,@l (s x) ,@r
+     syntax-rule \
+       priority  10
+       delimiter %t
+       separator %t
+       action -> l s {x @r}
+         `,@l (s x) ,@r
 
-    syntax-rule ^
-      delimiter %t
-      priority 10
-      order "right"
-      action -> l s {@args body}
-        ',@l (s args body)
+     syntax-rule ^
+       delimiter %t
+       priority 10
+       order "right"
+       action -> l s {@args body}
+         ',@l (s args body)
 
-  How this works is, each rule can have the following properties:
+   How this works is, each rule can have the following properties:
 
-    * If ``separator`` is true, the parser will take everything that's indented further than the symbol and will put it into a list
-    * If ``delimiter`` is true, the parser will treat the syntax as not being a part of symbols
-    * The rules with higher ``priority`` are run first. The default is ``0`` priority
-    * If a rule has ``order`` set to ``"right"`` then it will be right-associative, otherwise it's left-associative
-    * The ``action`` function receives three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol.
+     * If ``separator`` is true, the parser will take everything that's indented further than the symbol and will put it into a list
+     * If ``delimiter`` is true, the parser will treat the syntax as not being a part of symbols
+     * The rules with higher ``priority`` are run first. The default is ``0`` priority
+     * If a rule has ``order`` set to ``"right"`` then it will be right-associative, otherwise it's left-associative
+     * The ``action`` function receives three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol.
 
-  So, looking at the above, the rule for ``<>`` is pretty simple: take the last argument of the left list and the first argument of the right list and mush them together. As an example, this::
+   So, looking at the above, the rule for ``<>`` is pretty simple: take the last argument of the left list and the first argument of the right list and mush them together. As an example, this::
 
-    {1 2 3 <> 4 5 6}
+     {1 2 3 <> 4 5 6}
 
-  Will pass the arguments ``{1 2 3}``, ``<>``, and ``{4 5 6}`` to the action function. The action function then returns this::
+   Will pass the arguments ``{1 2 3}``, ``<>``, and ``{4 5 6}`` to the action function. The action function then returns this::
 
-    {1 2 {<> 3 4} 5 6}
+     {1 2 {<> 3 4} 5 6}
 
-  Most infix operators work this way, and this is so common that there's a macro called ``syntax-infix`` which does this for you, which means that the ``<>`` syntax could be written like this instead::
+   Most infix operators work this way, and this is so common that there's a macro called ``syntax-infix`` which does this for you, which means that the ``<>`` syntax could be written like this instead::
 
-    syntax-infix <> 70
+     syntax-infix <> 70
 
-  The ``\`` syntax is a bit trickier. It specifies that it's a delimiter, which means that it'll never be processed as part of a symbol. That means that ``foo\bar`` will be parsed as the three symbols ``foo`,  ``\``, and ``bar`` rather than the single symbol ``foo\bar``
+   The ``\`` syntax is a bit trickier. It specifies that it's a delimiter, which means that it'll never be processed as part of a symbol. That means that ``foo\bar`` will be parsed as the three symbols ``foo`,  ``\``, and ``bar`` rather than the single symbol ``foo\bar``
 
-  It also says that it's a separator. What this means is that, in the following Nulan program::
+   It also says that it's a separator. What this means is that, in the following Nulan program::
 
-    foo bar\ corge
-               qux
-      nou
+     foo bar\ corge
+                qux
+       nou
 
-  It will be parsed like this::
+   It will be parsed like this::
 
-    {foo bar \ {corge qux}
-      nou}
+     {foo bar \ {corge qux}
+       nou}
 
-  That is, it took everything indented further than ``\`` and put it into a list. The action function then receives the arguments ``{foo bar}``, ``\``, and ``{{corge qux} nou}``. It then returns this::
+   That is, it took everything indented further than ``\`` and put it into a list. The action function then receives the arguments ``{foo bar}``, ``\``, and ``{{corge qux} nou}``. It then returns this::
 
-    {foo bar {\ corge qux} nou}
+     {foo bar {\ corge qux} nou}
 
-  Lastly, the ``^`` syntax. With this list::
+   Lastly, the ``^`` syntax. With this list::
 
-    {1 2 3 ^ a b c {+ a b c}}
+     {1 2 3 ^ a b c {+ a b c}}
 
-  It will pass the arguments ``{1 2 3}``, ``^``, and ``{a b c {+ a b c}}`` to the action function. It then returns this::
+   It will pass the arguments ``{1 2 3}``, ``^``, and ``{a b c {+ a b c}}`` to the action function. It then returns this::
 
-    {1 2 3 {^ {a b c} {+ a b c}}}
+     {1 2 3 {^ {a b c} {+ a b c}}}
 
-  And because it has ``order`` set to ``"right"``, that means that this::
+   And because it has ``order`` set to ``"right"``, that means that this::
 
-    {^ a ^ b {+ a b}}
+     {^ a ^ b {+ a b}}
 
-  Will parse as this::
+   Will parse as this::
 
-    {^ {a} {^ {b} {+ a b}}}
+     {^ {a} {^ {b} {+ a b}}}
 
-  Rather than this::
+   Rather than this::
 
-    {^ {a {^ {b}}} {+ a b}}
+     {^ {a {^ {b}}} {+ a b}}
 
-  One last thing. If the parser returns a list that only has a single item, then it unwraps the list, which means that these::
+   One last thing. If the parser returns a list that only has a single item, then it unwraps the list, which means that these::
 
-    1 + 2
+     1 + 2
 
-    (1 + 2)
+     (1 + 2)
 
-    (((1 + 2)))
+     (((1 + 2)))
 
-    (((((1 + 2)))))
+     (((((1 + 2)))))
 
-  Are all parsed into this::
+   Are all parsed into this::
 
-    {+ 1 2}
+     {+ 1 2}
 
 That describes basically the entire parser.
