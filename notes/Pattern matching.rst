@@ -70,7 +70,7 @@ Nulan also supports setting the default of a pattern::
 The above is similar to "optional arguments" in other languages and is equivalent to this::
 
   -> a
-    | if a = ()
+    | if: null? a
         a <= 5
     | ...
 

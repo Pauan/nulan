@@ -34,14 +34,14 @@ mac for -> init test incr body
 
 mac uniqs -> @args
   args.reduceRight -> x y
-    'let y = uniq()
+    'let y = uniq;
        x
 
 
 #|
 mac uniqs -> @args body
   '(|) ,@(args.map -> x
-           '(var x = uniq()))
+           '(var x = uniq;))
        body
 #|
   | var x =
@@ -56,7 +56,7 @@ mac let! -> x y body
     'let u = x
        | x <= y
        | finally body
-                 x <= u
+           x <= u
 
 #|
 [ foo -> 10

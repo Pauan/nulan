@@ -115,14 +115,18 @@ var NULAN = (function (n) {
   }
 
   function mangle(s) {
-    return s.replace(/(?:^[^$a-zA-Z])|[^$a-zA-Z0-9]/g, function (s) {
+    return s.replace(/([a-z])\-([a-z])/g, function (_, s1, s2) {
+      return s1 + s2.toLocaleUpperCase()
+    }).replace(/(?:^[^$a-zA-Z])|[^$a-zA-Z0-9]/g, function (s) {
       return s === "_" ? "__" : "_" + s.charCodeAt(0) + "_"
     })
   }
 
   // Not actually used, but still nice to have
   function unmangle(s) {
-    return s.replace(/_([^_]*)_/g, function (_, s) {
+    return s.replace(/([a-z])([A-Z])/g, function (_, s1, s2) {
+      return s1 + "-" + s2.toLocaleLowerCase()
+    }).replace(/_([^_]*)_/g, function (_, s) {
       return s === "" ? "_" : String.fromCharCode(s)
     })
   }
@@ -431,10 +435,20 @@ var NULAN = (function (n) {
     }
   })
 
+  function validJS(x) {
+    if (typeof x === "number") {
+      return x
+    } else if (typeof x === "string") {
+      if (/^[$_a-zA-Z](?:[a-z]\-[a-z]|[$_a-zA-Z0-9])*$/.test(x)) {
+        return mangle(x) // TODO mangle
+      }
+    }
+  }
+
   values["."] = new Macro(function (x, y) {
-    if ((typeof y === "string" || typeof y === "number") &&
-        /^[$_a-zA-Z][$_a-zA-Z0-9]*$/.test(y)) {
-      return [".", mac(x), y]
+    var s = validJS(y)
+    if (s) {
+      return [".", mac(x), s]
     } else {
       return ["[]", mac(x), mac(y)]
     }

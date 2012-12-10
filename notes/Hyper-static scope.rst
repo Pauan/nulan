@@ -160,7 +160,7 @@ The basic idea is that at compile-time, all variables are replaced with boxes. T
 
   var foo = 10
 
-  bar()
+  bar;
 
 Here we have created a global variable ``foo``, a function ``bar`` that returns ``foo``, another global variable ``foo``, and then we call the function ``bar``. According to hyper-static scope, variables are always resolved according to where they are defined, thus the call to ``bar`` returns ``5``
 
@@ -174,11 +174,11 @@ This completely solves the namespace problem. Consider two libraries that both d
 
   # library 1
   def foo -> 5
-  def bar -> foo()
+  def bar -> foo;
 
   # library 2
   def foo -> 10
-  def qux -> foo()
+  def qux -> foo;
 
 If you import both libraries, the functions ``bar`` and ``qux`` will refer to the correct version of ``foo``. That is, when one library defines a variable ``foo``, it doesn't clobber any already-existing uses of ``foo``, it simply shadows it.
 
@@ -190,9 +190,9 @@ Going back to the example of conflicting libraries, it could be written like thi
   import lib2
   var foo2 = foo
 
-  foo1()
-  foo2()
+  foo1;
+  foo2;
 
-  bar()
+  bar;
 
 As you can see, we're using a plain-old ``var`` to rename the conflicting variables. In languages which use dynamic scope for global variables, when importing the library ``lib2``, it would overwrite the variable ``foo``. But in Nulan, thanks to hyper-static scope, this works.

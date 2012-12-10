@@ -54,14 +54,16 @@ var NULAN = (function (n) {
 
   function reMatch(r, s) {
     var x = r.exec(s)
-    return x ? x[0] : ""
+    return (x && x[0] !== ""
+             ? x[1] + "\n"
+             : "")
   }
 
   // Buffers a string by line and keeps track of line and column information
   // Returns an iterator that moves through the string one character at a time
   // This is used for the error messages, and also significant whitespace parsing
   function stringBuffer(s) {
-    var re = /^.*(\n|$)/gm
+    var re = /([^\n]*)(?:\n|$)/g
     return {
       line: 1,
       column: 1,
@@ -71,10 +73,16 @@ var NULAN = (function (n) {
       },
       read: function () {
         var x = this.text[this.column - 1]
-        if (this.column > this.text.length) {
-          var s = reMatch(re, s)
-          if (s !== "") {
-            this.text = s
+        if (this.column >= this.text.length) {
+          var y = reMatch(re, s)
+          // TODO: a little bit hacky
+          if (y === "") {
+            ++this.column
+            this.read = function () {
+              return this.text[this.column - 1]
+            }
+          } else {
+            this.text = y
             this.column = 1
             ++this.line
           }
@@ -116,9 +124,9 @@ var NULAN = (function (n) {
     return info
   }
 
-  function unary(i) {
+  function unary(i, b) {
     return {
-      delimiter: true,
+      delimiter: b,
       priority: i,
       order: "right",
       action: function (l, s, r) {
@@ -136,11 +144,30 @@ var NULAN = (function (n) {
     })
   }
 
+  function inert(start, end) {
+    t[end] = {
+      delimiter: true,
+      action: function (l, s, r) {
+        throw new n.Error(s, "missing starting " + start)
+      }
+    }
+  }
+
   function unwrap(x) {
     return x.length === 1 ? x[0] : x
   }
 
   var t = {
+    ";": {
+      priority: 110,
+      delimiter: true,
+      action: function (l, s, r) {
+        l = [l]
+        l.push.apply(l, r)
+        return l
+      }
+    },
+
     ".": infix(110, {
       delimiter: true,
       action: function (l, s, r) {
@@ -151,8 +178,9 @@ var NULAN = (function (n) {
       }
     }),
 
-    ",":  unary(100),
-    "@":  unary(100),
+    ",":  unary(100, true),
+    "@":  unary(100, true),
+    "~":  unary(100, false),
 
     "*":  infix(90),
     "/":  infix(80),
@@ -184,6 +212,7 @@ var NULAN = (function (n) {
     },
 
     "'": {
+      priority: 10,
       delimiter: true,
       separator: true,
       action: function (l, s, r) {
@@ -194,6 +223,7 @@ var NULAN = (function (n) {
     },
 
     "->": {
+      priority: 10,
       order: "right",
       action: function (l, s, r) {
         var args = r.slice(0, -1)
@@ -204,6 +234,7 @@ var NULAN = (function (n) {
     },
 
     "=": {
+      priority: 10,
       separator: true,
       action: function (l, s, r) {
         var x = l[l.length - 1]
@@ -215,6 +246,7 @@ var NULAN = (function (n) {
     },
 
     ":": {
+      priority: 10,
       delimiter: true,
       separator: true,
       action: function (l, s, r) {
@@ -224,12 +256,10 @@ var NULAN = (function (n) {
       }
     },
 
-    ";": {
+    "|": {
       delimiter: true,
       action: function (l, s, r) {
-        l = [l]
-        l.push.apply(l, r)
-        return l
+        return l.concat(r)
       }
     },
 
@@ -245,10 +275,12 @@ var NULAN = (function (n) {
     },*/
   }
 
-  delimiters(" \n()[]{}\"|#")
-/*
-  t.unary("~",    90, "not")
-  t.unary("u-",   90, "sub")
+  delimiters(" \n([{\"#")
+  inert("(", ")")
+  inert("[", "]")
+  inert("{", "}")
+
+/*t.unary("u-",   90, "sub")
 
   t["|"] = {
     name: "|",
@@ -310,8 +342,13 @@ var NULAN = (function (n) {
       , q = o.peek()
       , r = []
     o.read()
-    while (o.has() && o.peek() !== q) {
-      r.push(o.read())
+    while (o.peek() !== q) {
+      if (o.has()) {
+        r.push(o.read())
+      } else {
+        s.length = 1
+        throw new n.Error(s, "missing ending \"")
+      }
     }
     o.read()
     r = r.join("")
@@ -324,7 +361,7 @@ var NULAN = (function (n) {
     s.length = 2
     while (true) {
       if (!o.has()) {
-        throw new n.Error(s, "expected |# but got <EOF>")
+        throw new n.Error(s, "missing ending |#")
       }
       o.read()
       if (o.peek() === "|") {
@@ -390,8 +427,8 @@ var NULAN = (function (n) {
     return r
   }
 
-  function Wrap(x) { this.value = x }
 
+  function Wrap(x) { this.value = x }
 
   // Modified Pratt Parser, designed for lists of symbols rather than tokens
   function process(o, i) {
@@ -429,6 +466,10 @@ var NULAN = (function (n) {
     return l
   }
 
+  function separator(x) {
+    return x instanceof n.Symbol && t[x.value] && t[x.value].separator
+  }
+
   function until(o, s, f) {
     var x = o.read()
       , y
@@ -437,42 +478,49 @@ var NULAN = (function (n) {
       if (o.has()) {
         y = o.peek()
         if (is(y, s)) {
-          o.read()
           break
+        } else if (separator(y)) {
+          r.push(y, until(o, s, f))
         } else {
-          r.push(braces(o))
+          braces(o, r)
         }
       } else {
-        throw new n.Error(x, "expected " + s + " but got <EOF>")
+        throw new n.Error(x, "missing ending " + s)
       }
     }
     return new Wrap(f(process(iter(r), -1)))
   }
 
-  function braces(o) {
+  function braces(o, a) {
     var x = o.peek()
     if (x instanceof n.Symbol) {
       if (x.value === "(") {
-        return until(o, ")", function (x) {
+        x = until(o, ")", function (x) {
           return unwrap(x)
         })
+        o.read()
+        a.push(x)
       } else if (x.value === "{") {
-        return until(o, "}", function (x) {
+        x = until(o, "}", function (x) {
           x.unshift(new n.Bypass("list"))
           return x
         })
+        o.read()
+        a.push(x)
       } else if (x.value === "[") {
-        return until(o, "]", function (x) {
+        x = until(o, "]", function (x) {
           x.unshift(new n.Bypass("dict"))
           return x
         })
+        o.read()
+        a.push(x)
       } else {
         o.read()
-        return x
+        a.push(x)
       }
     } else {
       o.read()
-      return x
+      a.push(x)
     }
   }
 
@@ -483,7 +531,7 @@ var NULAN = (function (n) {
     while (o.has()) {
       y = o.peek()
       if (y.line === x.line) {
-        if (is(y, "|")) {
+        if (is(y, "|") && y.column === x.column) {
           r = []
           while (o.has() && is(o.peek(), "|") && o.peek().column === y.column) {
             o.read()
@@ -491,15 +539,14 @@ var NULAN = (function (n) {
           }
           r.unshift(y)
           a.push(r)
-                                            // TODO: clean this up a bit
-        } else if (y instanceof n.Symbol && t[y.value] && t[y.value].separator) {
+        } else if (separator(y)) {
           o.read()
           a.push(y, indent(o, o.peek()))
         } else {
-          a.push(braces(o))
+          braces(o, a)
         }
       } else if (y.column > x.column) {
-        a.push(unwrap(indent(o, o.peek())))
+        a.push(new Wrap(unwrap(indent(o, o.peek()))))
       } else {
         break
       }

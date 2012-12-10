@@ -118,6 +118,8 @@
 > ( foo ) )
 > ( foo [ ) ]
 > ( ( foo ) bar ( qux ) )
+> foo }
+> foo ]
 
 > '| foo
    | bar
@@ -200,3 +202,31 @@
 
 
 > #|foobar#||#|#1 + 5
+
+
+> (var i = foo 5)
+
+>   (var foo:
+  bar qux corge)
+
+> (var foo; bar qux corge)
+
+> (foo | bar | qux)
+
+> "foobar
+
+
+> foo: bar | qux
+
+> foo: bar; qux
+
+> foo; bar: qux
+
+> foo
+    (->)
+    bar
+
+> foo = (->)
+          bar
+
+> foobar|#1 + 5
