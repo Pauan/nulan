@@ -15,17 +15,28 @@ There are five phases to Nulan's syntax parsing:
 
 1) Tokenization. This phase splits a string into tokens. The end result is a flat 1-dimensional list of numbers, symbols, and strings::
 
-    def scroll-into-view -> n p let n = n . get-bounding-client-rect ; r = p . get-bounding-client-rect ; | if ( n . top < r . top || n . bottom > r . bottom ) p . scroll-top <= n . top - r . height / 2 | if ( n . left < r . left || n . right > r . right ) p . scroll-left <= n . left - r . width / 2
+     def scroll-into-view -> n p let n = n . get-bounding-client-rect ; r = p . get-bounding-client-rect ; | if ( n . top < r . top || n . bottom > r . bottom ) p . scroll-top <= n . top - r . height / 2 | if ( n . left < r . left || n . right > r . right ) p . scroll-left <= n . left - r . width / 2
 
-  The list has no structure to it, but Nulan keeps track of the line and column where each token was found. This will be very important later on.
+   The list has no structure to it, but Nulan keeps track of the line and column where each token was found. This will be very important later on.
 
 2) Because braces ignore indentation, they need to be handled specially. So when Nulan encounters a ``(``, ``{``, or ``[`` token, it will parse until it finds an ending ``)``, ``}``, or ``]`` token::
 
-     def scroll-into-view -> n p let n = n . get-bounding-client-rect ; r = p . get-bounding-client-rect ; | if {n . top < r . top || n . bottom > r . bottom} p . scroll-top <= n . top - r . height / 2 | if {n . left < r . left || n . right > r . right} p . scroll-left <= n . left - r . width / 2
+     def scroll-into-view -> n p let n = n . get-bounding-client-rect ; r = p . get-bounding-client-rect ; | if
+       {n . top < r . top || n . bottom > r . bottom}
+       p . scroll-top <= n . top - r . height / 2 | if
+       {n . left < r . left || n . right > r . right}
+       p . scroll-left <= n . left - r . width / 2
 
 3) The ``|`` token is also handled specially. If it occurs at the start of the line, it will take all the lines that start with ``|`` at the same indentation and put them into a list::
 
-     def scroll-into-view -> n p let n = n . get-bounding-client-rect ; r = p . get-bounding-client-rect ; {| {if {n . top < r . top || n . bottom > r . bottom} p . scroll-top <= n . top - r . height / 2} {if {n . left < r . left || n . right > r . right} p . scroll-left <= n . left - r . width / 2}}
+     def scroll-into-view -> n p let n = n . get-bounding-client-rect ; r = p . get-bounding-client-rect ;
+       {|
+         {if
+           {n . top < r . top || n . bottom > r . bottom}
+           p . scroll-top <= n . top - r . height / 2}
+         {if
+           {n . left < r . left || n . right > r . right}
+           p . scroll-left <= n . left - r . width / 2}}
 
 4) Nulan uses significant whitespace, and has very simple rules for how to handle it:
 
@@ -34,6 +45,7 @@ There are five phases to Nulan's syntax parsing:
           {def scroll-into-view -> n p}
 
      2) For all the lines that have greater indentation than the current line, put them into the list too::
+
           {def scroll-into-view -> n p
             {let n = n . get-bounding-client-rect ;}}
 
