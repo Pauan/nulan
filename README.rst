@@ -121,7 +121,7 @@ Features
 
 * `Hygienic macros <nulan/blob/javascript/notes/Hygienic%20macros.rst>`_ which are even easier to use than Arc/Common Lisp macros
 
-* `Syntax <nulan/blob/javascript/notes/Syntax.rst>`_ to make common idioms shorter and easier to read
+* `Customizable syntax <nulan/blob/javascript/notes/Customizable syntax.rst>`_ to make common idioms shorter and easier to read
 
 * The compiler is written in JavaScript and is capable of running in a browser: you can incrementally compile/eval Nulan programs at runtime
 
