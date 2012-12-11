@@ -17,24 +17,11 @@ load("./lib/NUIT.parse.js")
 
 var util = require("util")
 
-// TODO: move into NULAN.js
-function transform(x) {
-  if (Array.isArray(x)) {
-    return x.map(transform)
-  } else if (x instanceof NULAN.Symbol || x instanceof NULAN.Bypass || x instanceof NULAN.Wrapper) {
-    return x.value
-  } else if (typeof x === "string") {
-    return "\"" + x + "\""
-  } else {
-    return x
-  }
-}
-
 function foo(a) {
   a.forEach(function (x) {
     try {
       NULAN.parse(x + (Math.random() < 0.5 ? "\n" : ""), function (x) {
-        console.log(util.inspect(transform(x), false, null, true))
+        console.log(util.inspect(NULAN.toJSON(x), false, null, true))
       })
     } catch (e) {
       console.error("" + e)
@@ -48,14 +35,3 @@ fs.readFile("test/parse", "utf8", function (err, s) {
 })
 
 // ( foo 10 ( ( bar.qux 20 30 ) . corge 40 50 ) )
-
-/*
-require("./lib/cli").create().on("input", function (s) {
-  try {
-    console.log(util.inspect(transform(NULAN.parse(s)), false, null, true))
-  } catch (e) {
-    console.error(e)
-  }
-
-  console.log()
-})*/

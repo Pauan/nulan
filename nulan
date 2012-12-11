@@ -50,10 +50,12 @@ var args = process.argv.slice(2).filter(function (x) {
   }
 })
 
-var globals = {/* require:    require
+var globals = { require:    require
               , prn:        prn
               , "_38_src":  process.argv[1]
-              , "_38_args": args */}
+              , "_38_args": args }
+
+NULAN.include("require", "prn", "&src", "&args")
 
 /*NULAN.vars["require"] = "require"
 NULAN.vars["&src"]    = "&src"
@@ -88,21 +90,6 @@ function pretty(x) {
   return util.inspect(x, false, null, false)
 }
 
-// TODO: move into NULAN.js
-function transform(a) {
-  if (Array.isArray(a)) {
-    return a.map(transform)
-  } else if (a instanceof NULAN.Box) {
-    return a.value
-  } else if (a instanceof NULAN.Wrapper) {
-    return transform(a.value)
-  } else if (typeof a === "string") {
-    return "\"" + a + "\"" // TODO replace " inside the string with \"
-  } else {
-    return a
-  }
-}
-
 function printTokens(a) {
   return a.map(function (x) {
     x = x.name
@@ -124,8 +111,8 @@ rl.on("input", function (s) {
 
     NULAN.parseRaw(x, function (x) {
       if (opts.debug.parse) {
-        print(["parse", pretty(transform(x))])
-        //print(["parse"].concat(transform(x).map(pretty)))
+        print(["parse", pretty(NULAN.toJSON(x))])
+        //print(["parse"].concat(NULAN.toJSON(x).map(pretty)))
         console.log()
       }
 

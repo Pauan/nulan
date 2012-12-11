@@ -1,4 +1,4 @@
-mac def -> n v
+$mac def -> n v
   '| var n
    | n <= v
 
@@ -24,36 +24,36 @@ w/def foo
 w/def foo ((|) bar 1 2 3)
 |#
 
-mac str -> @args
+$mac str -> @args
   '(+) "" ,@args
 
-mac call -> x y @args
+$mac call -> x y @args
   # TODO
   'x.y."call" ,@args
 
-mac call-own -> x y @args
+$mac call-own -> x y @args
   'x.y ,@args
 
-mac in -> @args
+$mac in -> @args
   w/var r = {}
     | args.reduce -> x y
         | r.push {x y}
         | x
     | '(||) ,@(r.map -> x '(==) ,@x)
 
-mac (~=) -> @args
+$mac (~=) -> @args
   if args.length == 2
     '& "!==" ,args.0 ,args.1
     '~ ((==) ,@args)
 
-mac for -> init test incr body
+$mac for -> init test incr body
   '| init
    | while test
        | body
        | incr
 
 
-mac w/uniq -> @args body
+$mac w/uniq -> @args body
   'w/var ,@(args.map -> x 'x = uniq;)
      body
 
@@ -64,7 +64,7 @@ mac uniqs -> @args body
    | body
 |#
 
-mac w/var! -> {x y} body
+$mac w/var! -> {('=) x y} body
   w/uniq u
     'w/var u = x
        | x <= y

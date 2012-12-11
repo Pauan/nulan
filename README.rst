@@ -53,7 +53,7 @@ Examples
            w/var x = get y i
              body
 
-  $mac w/each -> {(sym "=") x y} body
+  $mac w/each -> {'(=) x y} body
     w/uniq i l u
       w/var v = y
             y = u
@@ -81,7 +81,7 @@ Examples
       x + y
 
 
-  $mac w/each -> {(sym "=") x y} body
+  $mac w/each -> {'(=) x y} body
     w/uniq i l
       w/complex y
         'w/var l = y.length
