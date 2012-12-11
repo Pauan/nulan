@@ -3,30 +3,32 @@ var NULAN = (function (n) {
 
   // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Error#Custom_Error_Types
   n.Error = function (o, s) {
-    var a  = [s]
-      , b1 = "line"   in o
-      , b2 = "column" in o
-    if (o.text || b1 || b2) {
-      a.push("\n")
-      if (o.text) {
-        a.push("  ", o.text.replace(/\n$/, ""))
-      }
-      if (b1 || b2) {
-        a.push("  (")
-        if (b1) {
-          a.push("line ", o.line)
+    var a = [s]
+    if (o instanceof Object) {
+      var b1 = "line"   in o
+        , b2 = "column" in o
+      if (o.text || b1 || b2) {
+        a.push("\n")
+        if (o.text) {
+          a.push("  ", o.text.replace(/\n$/, ""))
         }
-        if (b1 && b2) {
-          a.push(", ")
+        if (b1 || b2) {
+          a.push("  (")
+          if (b1) {
+            a.push("line ", o.line)
+          }
+          if (b1 && b2) {
+            a.push(", ")
+          }
+          if (b2) {
+            a.push("column ", o.column)
+          }
+          a.push(")")
         }
-        if (b2) {
-          a.push("column ", o.column)
+        if (o.text && b2) {
+          a.push("\n ", new Array(o.column + 1).join(" "),
+                        new Array(o.length + 1).join("^"))
         }
-        a.push(")")
-      }
-      if (o.text && b2) {
-        a.push("\n ", new Array(o.column + 1).join(" "),
-                      new Array(o.length + 1).join("^"))
       }
     }
     this.message = a.join("")
@@ -180,17 +182,6 @@ var NULAN = (function (n) {
 
     "||": infix(30),
 
-    "<=": {
-      separator: true,
-      priority: 20,
-      order: "right",
-      action: function (l, s, r) {
-        l = [[s, unwrap(l), unwrap(r[0])]]
-        l.push.apply(l, r.slice(1))
-        return l
-      }
-    },
-
     "'": {
       priority: 10,
       delimiter: true,
@@ -207,7 +198,6 @@ var NULAN = (function (n) {
       order: "right",
       action: function (l, s, r) {
         var args = r.slice(0, -1)
-        args.unshift(new n.Bypass("list")) // TODO: enrich this somehow?
         l.push([s, args, r[r.length - 1]])
         return l
       }
@@ -219,7 +209,7 @@ var NULAN = (function (n) {
       action: function (l, s, r) {
         var x = l[l.length - 1]
         l = l.slice(0, -1)
-        l.push([x, unwrap(r[0])])
+        l.push([s, x, unwrap(r[0])])
         l.push.apply(l, r.slice(1))
         return l
       }
@@ -233,6 +223,13 @@ var NULAN = (function (n) {
         l.push(r[0])
         l.push.apply(l, r.slice(1))
         return l
+      }
+    },
+
+    "<=": {
+      order: "right",
+      action: function (l, s, r) {
+        return [s, unwrap(l), unwrap(r)]
       }
     },
 
@@ -533,6 +530,8 @@ var NULAN = (function (n) {
     }
     return process(iter(a), -1)
   }
+
+  n.syntaxRules = t
 
   n.tokenize = function (s) {
     return tokenize(stringBuffer(s))

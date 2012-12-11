@@ -1,9 +1,29 @@
-mac str -> @args
-  '(+) "" ,@args
-
 mac def -> n v
   '| var n
    | n <= v
+
+mac vars -> @args
+  '(|) ,@(args.map -> x 'var x)
+
+mac w/vars -> @args
+  args.reduceRight -> x y
+    'w/var y x
+
+#|
+mac w/def -> x '(| f @body)
+  'w/var x
+     (|) (x <= f) ,@body
+
+w/def foo
+  | -> a (a + 2)
+      foo
+  | foobar
+
+w/def foo ((|) bar 1 2 3)
+|#
+
+mac str -> @args
+  '(+) "" ,@args
 
 mac call -> x y @args
   'x.y.call ,@args
@@ -12,16 +32,16 @@ mac call-own -> x y @args
   'x.y ,@args
 
 mac in -> @args
-  let r = {}
+  w/var r = {}
     | args.reduce -> x y
         | r.push {x y}
         | x
-    | '(||) ,@(r.map -> x '((==) ,@x))
+    | '(||) ,@(r.map -> x '(==) ,@x)
 
 mac (~=) -> @args
   if args.length == 2
     '& "!==" ,args.0 ,args.1
-    '~((==) ,@args)
+    '~ ((==) ,@args)
 
 mac for -> init test incr body
   '| init
@@ -30,28 +50,20 @@ mac for -> init test incr body
        | incr
 
 
-mac uniqs -> @args
-  args.reduceRight -> x y
-    'let y = uniq;
-       x
+mac w/uniq -> @args body
+  'w/var ,@(args.map -> x 'x = uniq;)
+     body
 
 
 #|
 mac uniqs -> @args body
-  '(|) ,@(args.map -> x
-           '(var x = uniq;))
-       body
-#|
-  | var x =
-  | x.unshift do
-  | x.push body
-  | x
-|#
+  '| var ,@(args.map -> x 'x = uniq;)
+   | body
 |#
 
-mac let! -> x y body
-  uniqs u
-    'let u = x
+mac w/var! -> {x y} body
+  w/uniq u
+    'w/var u = x
        | x <= y
        | finally body
            x <= u

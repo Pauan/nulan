@@ -33,25 +33,38 @@ Examples
 ::
 
   mac w/complex -> x body
-    uniqs tmp u
+    w/uniq tmp u
       'let tmp = x
          let x = u
            'let u = tmp
               body
 
-  mac each -> x body
-    let y = x.1
-        x = x.0
-      let i   = uniq;
-          l   = uniq;
-          u   = uniq;
-          tmp = y
-        let y = u
-          'let u = tmp
-             let l = y."length"
-               for (var i = 0) (i ~= l) (++ i)
-                 let x = get y i
-                   body
+  mac w/each -> x body
+    w/var y = x.1
+          x = x.0
+      w/var i   = uniq;
+            l   = uniq;
+            u   = uniq;
+            tmp = y
+        w/var y = u
+          'w/vars u = tmp
+                  l = y."length"
+             for (var i = 0) (i ~= l) (++ i)
+               w/var x = get y i
+                 body
+
+
+  mac w/each -> x body
+    w/uniq i l u
+      w/vars y   = x.1
+             x   = x.0
+             tmp = y
+             y   = u
+        'w/vars u = tmp
+                l = y."length"
+           for (var i = 0) (i ~= l) (++ i)
+             w/var x = get y i
+               body
 
 
   x (sym "=") @y
@@ -83,15 +96,15 @@ Examples
       x + y
 
 
-  mac each -> {x y} body
-    uniqs i l
-      complex y
-        'let l = y.length
+  mac w/each -> {(sym "=") x y} body
+    w/uniq i l
+      w/complex y
+        'w/var l = y.length
            for (var i = 0) (i ~= l) (++ i)
-             let x = y[i]
+             w/var x = y[i]
                body
 
-  each x = {1 2 3}
+  w/each x = {1 2 3}
     | prn x
     | prn x + 5
 

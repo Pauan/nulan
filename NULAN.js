@@ -282,7 +282,7 @@ var NULAN = (function (n) {
   }
 
   // TODO: ugh I wish I could do this natively in JS
-  n.pair = function (a) {
+  function pair(a) {
     var r = []
     for (var i = 0, iLen = a.length - 1; i < iLen; i += 2) {
       r.push([a[i], a[i + 1]])
@@ -387,6 +387,47 @@ var NULAN = (function (n) {
     })
   }
 
+  function validJS(x) {
+    if (typeof x === "string") {
+      if (/^[$_a-zA-Z](?:[a-z]\-[a-z]|[$_a-zA-Z0-9])*$/.test(x)) {
+        return mangle(x) // TODO mangle
+      }
+    }
+  }
+
+  function withPartialScope(args, f) {
+    var saved = args.map(function (x) {
+      if (Array.isArray(x)) {
+        x = x[1]
+      }
+      var s = symToString(x)
+                  // TODO: better detection if vars is undefined
+        , r = [s, vars[s], locals[s]]
+      locals[s] = true // TODO
+      return r
+    })
+
+    var r = f()
+
+    saved.forEach(function (a) {
+      var s = a[0]
+      if (a[1]) {
+        vars[s] = a[1]
+      } else {
+        delete vars[s]
+      }
+      // TODO
+      if (a[2]) {
+        locals[s] = true
+      } else {
+        delete locals[s]
+      }
+    })
+
+    return r
+  }
+
+
   // Syntax stuff
   values["~"]  = unary("!")
   values["=="] = binand("===", ["boolean", "true"])
@@ -413,7 +454,7 @@ var NULAN = (function (n) {
   })
 
   values["dict"] = new Macro(function () {
-    var args = n.pair(arguments)
+    var args = pair(arguments)
       , a
       , u
     if (args.every(function (a) { return a[0] instanceof n.Symbol })) {
@@ -434,16 +475,6 @@ var NULAN = (function (n) {
       return mac([values["|"], [values["var"], [u, [values["dict"]]]]].concat(a))
     }
   })
-
-  function validJS(x) {
-    if (typeof x === "number") {
-      return x
-    } else if (typeof x === "string") {
-      if (/^[$_a-zA-Z](?:[a-z]\-[a-z]|[$_a-zA-Z0-9])*$/.test(x)) {
-        return mangle(x) // TODO mangle
-      }
-    }
-  }
 
   values["get"] = new Macro(function (x, y) {
     var s = validJS(y)
@@ -500,11 +531,88 @@ var NULAN = (function (n) {
     return mac(x)
   })
 
+
+  function destructureList(args, v, body) {
+    var index
+    args.forEach(function (x, i) {
+      if (Array.isArray(x) && isValue(x[0], "@")) {
+        index = i
+      }
+    })
+    return args.reduceRight(function (x, y, i, a) {
+      if (i === index) {
+        var r = [[values["get"],
+                  [values["get"], [values["list"]], "slice"],
+                   "call"],
+                 v]
+        var i2 = i - a.length + 1
+        if (i2 !== 0 || i !== 0) {
+          r.push(i)
+        }
+        if (i2 !== 0) {
+          r.push(i2)
+        }
+        return destructure1(y[1], r, x)
+      } else if (i > index) {
+        return destructure1(y, [values["get"], v,
+                                [values["-"],
+                                 [values["get"], v, "length"],
+                                 a.length - i]],
+                               x)
+      } else {
+        return destructure1(y, [values["get"], v, i], x)
+      }
+    }, body)
+  }
+
+  function destructureDict(args, v, body) {
+    return pair(args).reduceRight(function (x, y) {
+      return destructure1(y[1], [values["get"], v, y[0]], x)
+    }, body)
+  }
+
+  function destructure1(args, v, body) {
+    if (Array.isArray(args)) {
+      var u = new Uniq()
+                                           // TODO
+      return [values["|"], [values["var"], [new n.Bypass("="), u, v]], destructure(args, u, body)]
+    } else {
+      return destructure(args, v, body)
+    }
+  }
+
+  function destructure(args, v, body) {
+    if (args instanceof n.Symbol || args instanceof Uniq) {
+                                           // TODO
+      return [values["|"], [values["var"], [new n.Bypass("="), args, v]], body]
+    } else if (Array.isArray(args)) {
+      if (isValue(args[0], "list")) {
+        return destructureList(args.slice(1), v, body)
+      } else if (isValue(args[0], "dict")) {
+        return destructureDict(args.slice(1), v, body)
+      } else if (isValue(args[0], "=")) {
+        return destructure1(args[1], [values["if"], [values["null?"], v], args[2], v], body)
+      }
+    } else {
+      return [values["if"],
+               [values["=="], v, args],
+               body,
+               [values["error"], [values["+"], "expected " + args + " but got ", v]]]
+    }
+  }
+
+  function pretty(x) {
+    console.log(require("util").inspect(x, false, null, false))
+  }
+
+  //pretty(destructure(["dict", new n.Symbol("foo"), new n.Symbol("bar"), new n.Symbol("qux"), 30, new n.Symbol("corge"), ["=", new n.Symbol("uuuuuu"), new n.Symbol("bar")]], new n.Symbol("u"), "END"))
+
+  //pretty(destructure(["list", new n.Symbol("c"), ["@", new n.Symbol("a")], 20, new n.Symbol("b")], new n.Symbol("u"), ["list", new n.Symbol("a"), new n.Symbol("b")]))
+
+  //pretty(destructure(["list", new n.Symbol("a"), 20, ["@", new n.Symbol("HAHA")], new n.Symbol("b"), ["=", new n.Symbol("c"), new n.Symbol("b")]], new n.Symbol("u"), "END"))
+
   values["->"] = new Macro(function anon(args, body) {
-    if (args instanceof n.Symbol) {
-      // TODO
-      return anon([new n.Bypass("list"), [new n.Bypass("@"), args]], body)
-    } else if (Array.isArray(args) && isValue(args[0], "list")) {
+    if (Array.isArray(args)) {
       var old = js_vars
       js_vars = Object.create(js_vars)
       var r = withNewScope(function () {
@@ -560,7 +668,8 @@ var NULAN = (function (n) {
           return b
         }
 */
-        var s, x, r = [], a = args.slice(1)
+/*
+        var s, x, r = [], a = args
         var before = []
         for (var i = 0, iLen = a.length; i < iLen; ++i) {
           x = a[i]
@@ -608,9 +717,12 @@ var NULAN = (function (n) {
             r.push(mangle(symToString(s)))
           }
         }
-        body = before.concat([mac(body)])
-        body[body.length - 1] = ["return", body[body.length - 1]]
-        return ["function", "", r, body]
+        body = before.concat([mac(body)])*/
+
+        args.unshift(new n.Bypass("list"))
+
+        body = destructure(args, new n.Bypass("arguments"), body)
+        return ["function", "", [], [["return", mac(body)]]]
       })
       js_vars = old
       return r
@@ -644,40 +756,73 @@ var NULAN = (function (n) {
   })
 
   values["new"] = new Macro(function (x) {
-    var args = [].slice.call(arguments, 1).map(mac)
-    return ["new", mac(x), args]
+    var args = [].slice.call(arguments, 1)
+    return ["new", mac(x), args.map(mac)]
   })
 
   values["while"] = new Macro(function (test, body) {
     return ["while", mac(test), [mac(body)]]
   })
 
-  values["var"] = new Macro(function (x) {
-    function proc(x) {
-      if (Array.isArray(x)) {
-        var y = x[1]
-        x = x[0]
+  values["var"] = new Macro(function () {
+    var args = [].slice.call(arguments)
 
+    function before(x) {
+      if (Array.isArray(x)) {
+        if (!isValue(x[0], "=")) {
+          throw new n.Error(x[0], "expected = but got " + x[0])
+        }
         // TODO
-        if (namespace && !locals[x.value]) {
-          return ["=", ["[]", ["name", namespace], ["string", setUniq(x)]], mac(y)]
+        if (x[1] instanceof n.Symbol || x[1] instanceof Uniq) {
+          return [x[1], mac(x[2])]
         } else {
-          y = mac(y)
-          x = setUniq(x)
-          values[x] = new n.Symbol(x) // TODO
-          return ["var", [[mangle(x), y]]]
+          pretty(mac(destructure(x[1], x[2])))
         }
       } else {
-        x = setUniq(x)
-        values[x] = new n.Symbol(x) // TODO
-        return ["var", [[mangle(x)]]]
+        return [x, void 0]
       }
     }
 
-    return [].map.call(arguments, proc).reduce(function (x, y) {
+    function after(a) {
+      var x = a[0]
+        , y = a[1]
+      // TODO
+      if (namespace && !locals[x.value]) {
+        return ["=", ["[]", ["name", namespace], ["string", setUniq(x)]], y]
+      } else {
+        x = setUniq(x)
+        values[x] = new n.Symbol(x) // TODO
+        if (y === void 0) {
+          return ["var", [[mangle(x)]]]
+        } else {
+          return ["var", [[mangle(x), y]]]
+        }
+      }
+    }
+
+    return args.map(before).map(after).reduce(function (x, y) {
       return [",", x, y]
     })
   })
+
+  values["w/var"] = new Macro(function () {
+    var args = [].slice.call(arguments, 0, -1)
+      , body = arguments[arguments.length - 1]
+
+    return withPartialScope(args, function () {
+      return mac([values["|"], [values["var"]].concat(args), body])
+    })
+  })
+
+  /*values["w/var"] = new Macro(function () {
+    var args = [].slice.call(arguments, 0, -1)
+      , body = arguments[arguments.length - 1]
+
+    var x = args.map(function (x) { return x[0] })
+      , y = args.map(function (x) { return x[1] })
+
+    return mac([[values["->"], x, body]].concat(y))
+  })*/
 
   values["del"] = new Macro(function (x) {
     if (x instanceof n.Symbol) {
@@ -718,7 +863,7 @@ var NULAN = (function (n) {
     return ["string", mangle(setUniq("u_"))]
   })*/
 
-  values["w/newScope"] = new Macro(function (body) {
+  values["w/new-scope"] = new Macro(function (body) {
     return withNewScope(function () {
       return mac(body)
     })
@@ -819,56 +964,6 @@ var NULAN = (function (n) {
     return r
   })
 
-  values["let"] = new Macro(function (x, body) {
-    function proc(x) {
-      if (Array.isArray(x)) {
-        var y = x[1]
-        x = x[0]
-
-        var old
-          , s = symToString(x)
-          , b = (s in vars)
-
-        if (b) {
-          old = vars[s]
-        }
-        locals[s] = true // TODO
-
-        var r = mac([values["var"], [x, y]])
-
-        if (b) {
-          vars[s] = old
-        } else {
-          delete vars[s]
-        }
-        delete locals[s] // TODO
-
-        return r
-      } else {
-        x = setUniq(x)
-        values[x] = new n.Symbol(x) // TODO
-        return ["var", [[mangle(x)]]]
-      }
-    }
-
-    var args = [].slice.call(arguments, 0, -1)
-      , body = arguments[arguments.length - 1]
-
-    return args.map(proc).reduce(function (x, y) {
-      return [",", x, y]
-    }, mac(body))
-  })
-
-  values["let"] = new Macro(function () {
-    var args = [].slice.call(arguments, 0, -1)
-      , body = arguments[arguments.length - 1]
-
-    var x = args.map(function (x) { return x[0] })
-      , y = args.map(function (x) { return x[1] })
-
-    return mac([[values["->"], [values["list"]].concat(x), body]].concat(y))
-  })
-
   values["sym"] = function (x) {
     return new n.Symbol(x)
   }
@@ -903,9 +998,10 @@ var NULAN = (function (n) {
   (mac foo -> (let u (uniq) {let u 5 u}))
 */
   // Functions
-  values["uniq"] = function () {
-    return new Uniq()
-  }
+  values["uniq"] = new Macro(function () {
+    // TODO: make this accessible only to compile-time
+    return ["new", ["name", "Uniq"], []]
+  })
 
   /*
   values["&mac"] = function (f) {
@@ -1022,19 +1118,6 @@ var NULAN = (function (n) {
   values["error"] = new Macro(function (x) {
     return ["throw", ["new", ["name", "Error"], [mac(x)]]]
   })
-
-
-  function destructure(args, x, body) {
-
-  }
-
-  function destructureList(args, body) {
-
-  }
-
-  function destructureDict(args, body) {
-
-  }
 
   values["&"] = new Macro(function () {
     return $mac(arguments)

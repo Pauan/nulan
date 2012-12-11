@@ -9,6 +9,8 @@ function load(path, context) {
   vm.runInThisContext(data, path)
 }
 
+global.require = require // TODO: a bit hacky, but it seems to work
+
 load("./lib/NINO.compile.js")
 load("./lib/NINO.transform.js")
 load("./NULAN.js")
