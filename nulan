@@ -22,10 +22,10 @@ NULAN.readFile = function (s) {
   return fs.readFileSync(s, "utf8")
 }
 
-NULAN.vars["prn"]     = "prn"
-NULAN.values["prn"]   = prn
+/*NULAN.vars["prn"]     = "prn"
+NULAN.values["prn"]   = prn*/
 
-NULAN.import("NULAN.macros")
+//NULAN.import("NULAN.macros")
 
 
 var opts = {
@@ -50,14 +50,14 @@ var args = process.argv.slice(2).filter(function (x) {
   }
 })
 
-var globals = { require:    require
+var globals = {/* require:    require
               , prn:        prn
               , "_38_src":  process.argv[1]
-              , "_38_args": args }
+              , "_38_args": args */}
 
-NULAN.vars["require"] = "require"
+/*NULAN.vars["require"] = "require"
 NULAN.vars["&src"]    = "&src"
-NULAN.vars["&args"]   = "&args"
+NULAN.vars["&args"]   = "&args"*/
 
 
 var util = require("util")
@@ -92,7 +92,7 @@ function pretty(x) {
 function transform(a) {
   if (Array.isArray(a)) {
     return a.map(transform)
-  } else if (a instanceof NULAN.Symbol || a instanceof NULAN.Bypass) {
+  } else if (a instanceof NULAN.Box) {
     return a.value
   } else if (a instanceof NULAN.Wrapper) {
     return transform(a.value)
@@ -106,7 +106,7 @@ function transform(a) {
 function printTokens(a) {
   return a.map(function (x) {
     x = x.name
-    if (x instanceof NULAN.Symbol) {
+    if (x instanceof NULAN.Box) {
       return x.value
     } else {
       return x

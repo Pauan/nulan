@@ -99,11 +99,6 @@ var NULAN = (function (n) {
     }
   }
 
-
-  function is(x, y) {
-    return x instanceof n.Symbol && x.value === y
-  }
-
   function infix(i, b) {
     return {
       delimiter: b,
@@ -311,7 +306,7 @@ var NULAN = (function (n) {
       r.push(o.read())
     }
     r = r.join("")
-    a.push(enrich(new n.Symbol(r), s, o))
+    a.push(enrich(new n.Box(r), s, o))
   }
 
   function tokenizeString(o, a) {
@@ -384,7 +379,7 @@ var NULAN = (function (n) {
         } else if (c === "-") {
           o.read()
           // TODO: this should call tokenizeSym
-          r.push(enrich(t.literal(new n.Symbol("--")), s, o)) // TODO a bit hacky
+          r.push(enrich(t.literal(new n.Box("--")), s, o)) // TODO a bit hacky
         } else {
           r.push(enrich(t["u-"], s, o))
         }*/
@@ -393,7 +388,7 @@ var NULAN = (function (n) {
       } else if (t[c] && t[c].delimiter) {
         s = store(o)
         o.read()
-        r.push(enrich(new n.Symbol(c), s, o))
+        r.push(enrich(new n.Box(c), s, o))
       } else if (/\d/.test(c)) {
         tokenizeNum(o, r)
       } else {
@@ -415,7 +410,7 @@ var NULAN = (function (n) {
       x = o.peek()
       if (x instanceof Wrap) {
         x = x.value
-      } else if (x instanceof n.Symbol && t[x.value]) {
+      } else if (x instanceof n.Box && t[x.value]) {
         break
       }
       o.read()
@@ -423,18 +418,17 @@ var NULAN = (function (n) {
     }
 
     // TODO: fold this into the above while loop somehow?
-    while (o.has() && (x = o.peek()) && x instanceof n.Symbol && (y = t[x.value])) {
+    while (o.has() && (x = o.peek()) && x instanceof n.Box && (y = t[x.value])) {
       pri = y.priority || 0
       if (pri > i) {
         o.read()
         r = process(o, (y.order === "right"
                          ? pri - 1
                          : pri))
-        // TODO: should this use n.Bypass or not?
         if (l.length === 0 && r.length === 0) {
-          return [enrich(new n.Bypass(x.value), x)] // TODO: does this need to be wrapped in an array?
+          return [x]
         } else {
-          l = y.action(l, enrich(new n.Bypass(x.value), x), r)
+          l = y.action(l, x, r)
         }
       } else {
         break
@@ -444,7 +438,7 @@ var NULAN = (function (n) {
   }
 
   function separator(x) {
-    return x instanceof n.Symbol && t[x.value] && t[x.value].separator
+    return x instanceof n.Box && t[x.value] && t[x.value].separator
   }
 
   function until(o, s, f) {
@@ -454,7 +448,7 @@ var NULAN = (function (n) {
     while (true) {
       if (o.has()) {
         y = o.peek()
-        if (is(y, s)) {
+        if (n.isBox(y, s)) {
           break
         } else if (separator(y)) {
           r.push(y, until(o, s, function (x) { return x }))
@@ -470,7 +464,7 @@ var NULAN = (function (n) {
 
   function braces(o, a) {
     var x = o.peek()
-    if (x instanceof n.Symbol) {
+    if (x instanceof n.Box) {
       if (x.value === "(") {
         x = until(o, ")", function (x) {
           return unwrap(x)
@@ -479,14 +473,14 @@ var NULAN = (function (n) {
         a.push(x)
       } else if (x.value === "{") {
         x = until(o, "}", function (x) {
-          x.unshift(new n.Bypass("list"))
+          x.unshift(new n.Box("list"))
           return x
         })
         o.read()
         a.push(x)
       } else if (x.value === "[") {
         x = until(o, "]", function (x) {
-          x.unshift(new n.Bypass("dict"))
+          x.unshift(new n.Box("dict"))
           return x
         })
         o.read()
@@ -508,9 +502,9 @@ var NULAN = (function (n) {
     while (o.has()) {
       y = o.peek()
       if (y.line === x.line) {
-        if (is(y, "|") && y.column === x.column) {
+        if (n.isBox(y, "|") && y.column === x.column) {
           r = []
-          while (o.has() && is(o.peek(), "|") && o.peek().column === y.column) {
+          while (o.has() && n.isBox(o.peek(), "|") && o.peek().column === y.column) {
             o.read()
             r.push(unwrap(indent(o, o.peek())))
           }
