@@ -2,12 +2,14 @@ mac def -> n v
   '| var n
    | n <= v
 
+#|
 mac vars -> @args
   '(|) ,@(args.map -> x 'var x)
 
 mac w/vars -> @args
   args.reduceRight -> x y
     'w/var y x
+|#
 
 #|
 mac w/def -> x '(| f @body)
@@ -26,7 +28,8 @@ mac str -> @args
   '(+) "" ,@args
 
 mac call -> x y @args
-  'x.y.call ,@args
+  # TODO
+  'x.y."call" ,@args
 
 mac call-own -> x y @args
   'x.y ,@args
