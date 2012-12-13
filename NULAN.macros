@@ -1,38 +1,19 @@
+$mac prn -> @args
+  'console.log ,@args
+
 $mac def -> n v
   '| var n
    | n <= v
 
-#|
-mac vars -> @args
-  '(|) ,@(args.map -> x 'var x)
-
-mac w/vars -> @args
-  args.reduceRight -> x y
-    'w/var y x
-|#
-
-#|
-mac w/def -> x '(| f @body)
-  'w/var x
-     (|) (x <= f) ,@body
-
-w/def foo
-  | -> a (a + 2)
-      foo
-  | foobar
-
-w/def foo ((|) bar 1 2 3)
-|#
-
 $mac str -> @args
   '(+) "" ,@args
 
+# TODO: `call 1 2 3 4 5` doesn't work
 $mac call -> x y @args
-  # TODO
-  'x.y."call" ,@args
+  'x[y].call ,@args
 
 $mac call-own -> x y @args
-  'x.y ,@args
+  'x[y] ,@args
 
 $mac in -> @args
   w/var r = {}
@@ -52,17 +33,9 @@ $mac for -> init test incr body
        | body
        | incr
 
-
 $mac w/uniq -> @args body
   'w/var ,@(args.map -> x 'x = uniq;)
      body
-
-
-#|
-mac uniqs -> @args body
-  '| var ,@(args.map -> x 'x = uniq;)
-   | body
-|#
 
 $mac w/var! -> {('=) x y} body
   w/uniq u
@@ -70,6 +43,64 @@ $mac w/var! -> {('=) x y} body
        | x <= y
        | finally body
            x <= u
+
+$mac w/complex -> x body
+  w/uniq u v
+    'if: Array.isArray x
+       w/uniq u v
+         w/var v = x
+               x = u
+           'w/var u = v
+              # TODO: a little hacky, but it works; figure out a better way?
+              ,(',) body
+       body
+
+
+
+
+#|
+(mac complex (x body)
+  (w/uniq (u v)
+    `(if (isa ,x 'sym)
+         ,body
+         (w/uniq (,u ,v)
+           (withs (,v ,x
+                   ,x ,u)
+              `(let ,,u ,,v
+                 ,,body))))))
+
+mac uniqs -> @args body
+  '| var ,@(args.map -> x 'x = uniq;)
+   | body
+
+mac vars -> @args
+  '(|) ,@(args.map -> x 'var x)
+
+mac w/vars -> @args
+  args.reduceRight -> x y
+    'w/var y x
+
+mac w/def -> x '(| f @body)
+  'w/var x
+     (|) (x <= f) ,@body
+
+w/def foo
+  | -> a (a + 2)
+      foo
+  | foobar
+
+w/def foo ((|) bar 1 2 3)
+
+$eval
+  w/var y = {1 2 3}
+    w/complex y y
+
+w/uniq u v
+  w/var v = y
+        y = u
+    'w/var u = v
+      y
+|#
 
 #|
 [ foo -> 10

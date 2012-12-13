@@ -11,33 +11,121 @@ Examples
 
 ::
 
+  # This is a dictionary
   var foo = [ bar 5 qux 10 ]
 
+  # Key lookup
   foo.bar
   foo.qux
 
+  # Key assignment
   foo.bar <= 20
   foo.qux <= 30
 
-  def fn -> a
-    let x = foo[a]
-      | foo[a] <= 50
-      | x
+  # This is a function
+  def set -> a
+    | var x = foo[a]  # Lookup by expression
+    | foo[a] <= 50    # Assign by expression
+    | x
 
-  fn "bar"
-  fn "qux"
+  set "bar"
+  set "qux"
 
   foo.bar
   foo.qux
 
 ::
 
-  $mac w/complex -> x body
-    w/uniq tmp u
-      'let tmp = x
-         let x = u
-           'let u = tmp
-              body
+  # An example of an unhygienic macro
+  # Just like in Arc, it binds the variable `it` to the test condition
+  $mac aif -> test @rest
+    w/var it = sym "it"
+      'w/var it = test
+         if it ,@:if rest.length >= 2
+                    w/var {x @rest} = rest
+                      'x (aif ,@rest)
+                    rest
+
+  aif 1 + 2
+    it
+    it
+
+  aif %f
+    it
+    it
+
+::
+
+  # Simulating a `for` loop using a `while` loop
+  $mac for -> init test incr body
+    '| init
+     | while test
+         | body
+         | incr
+
+  for (var i = 0) (i < 10) (++ i)
+    prn i
+
+::
+
+  # Simulating a `do..while` loop using a `while` loop
+  $mac do -> body {('while) test}
+    'while %t
+       | body
+       | if ~ test
+           &break;
+
+  var i = 0
+  do
+    | prn i
+    | ++ i
+    while (i < 10)
+
+::
+
+  # Infinite loop; be careful, the only way to stop it is to shut down the terminal!
+  $mac 5ever -> body
+    'while %t
+       body
+
+  5ever
+    | prn 1
+    | prn 2
+    | prn 3
+    | prn 4
+    | prn "das mor den 4ever"
+
+::
+
+  # Macro to iterate over the elements of any list or string
+  $mac w/each -> {('=) x y} body
+    w/uniq i len
+      w/complex y
+        'w/var len = y.length
+           for (var i = 0) (i ~= len) (++ i)
+             w/var x = y[i]
+               body
+
+  w/each x = {1 2 3}
+    | prn x
+    | prn x + 5
+    | prn;
+
+::
+
+  # The built-in Array methods work very nicely with Nulan's -> syntax
+  {1 2 3}.for-each -> x
+    | prn x
+    | prn x + 5
+    | prn;
+
+  {1 2 3}.map -> x
+    x + 5
+
+  {1 2 3}.reduce -> x y
+    "(@x @y)"
+
+::
 
   $mac w/each -> x body
     w/var i   = uniq;
@@ -52,16 +140,6 @@ Examples
          for (var i = 0) (i ~= l) (++ i)
            w/var x = get y i
              body
-
-  $mac w/each -> {'(=) x y} body
-    w/uniq i l u
-      w/var v = y
-            y = u
-        'w/var u = v
-               l = y."length"
-           for (var i = 0) (i ~= l) (++ i)
-             w/var x = get y i
-               body
 
 
   syntax-rule - 0 -> l s {y @r}
@@ -79,33 +157,6 @@ Examples
   &eval
     w/namespace value
       x + y
-
-
-  $mac w/each -> {'(=) x y} body
-    w/uniq i l
-      w/complex y
-        'w/var l = y.length
-           for (var i = 0) (i ~= l) (++ i)
-             w/var x = y[i]
-               body
-
-  w/each x = {1 2 3}
-    | prn x
-    | prn x + 5
-
-  {1 2 3}.for-each -> x
-    | prn x
-    | prn x + 5
-
-
-  $mac loop -> body
-    'while %t
-       body
-
-  loop
-    | prn 1
-    | prn 2
-    | prn 3
 
 
 Features
@@ -129,7 +180,7 @@ Features
 FAQ
 ===
 
-* Q: Why doesn't this work?!
+* **Q:** Why doesn't this work?!
 
   ::
 
@@ -139,9 +190,9 @@ FAQ
     def bar -> x
       x + 5
 
-    bar 20
+    foo 20
 
-  A: Nulan uses hyper-static scope, so you need to rearrange it to be like this::
+  **A:** Nulan uses hyper-static scope, so you need to rearrange it to be like this::
 
     def bar -> x
       x + 5
@@ -149,9 +200,9 @@ FAQ
     def foo -> x
       bar x + 1
 
-    bar 20
+    foo 20
 
-* Q: Well, okay, but what about this?
+* **Q:** Well, okay, but what about this?
 
   ::
 
@@ -160,7 +211,7 @@ FAQ
 
     prn foo
 
-  A: Nulan has a strict separation between compile-time and run-time: variables defined at compile-time **cannot** be seen at run-time in any way, shape, or form. Certain macros like ``$mac`` are prefixed with a ``$`` which indicates that they are evaluated at compile-time.
+  **A:** Nulan has a strict separation between compile-time and run-time: variables defined at compile-time **cannot** be seen at run-time in any way, shape, or form. Certain macros like ``$mac`` are prefixed with ``$`` which indicates that they are evaluated at compile-time.
 
   To make the above example work, you have to evaluate the expression at compile-time by using ``$eval``::
 
@@ -170,7 +221,7 @@ FAQ
     $eval
       prn foo
 
-* Q: If there's such a strict separation between the two, why does this work?
+* **Q:** If there's such a strict separation between the two, why does this work?
 
   ::
 
@@ -178,14 +229,14 @@ FAQ
       x + 1
 
     $mac bar -> x
-      '(foo x)
+      'foo x
 
     bar 10
 
-  A: Variables defined at compile-time **absolutely cannot** be used at run-time, but run-time variables **can** be used at compile-time.
+  **A:** Variables defined at compile-time **absolutely cannot** be used at run-time, but run-time variables **can** be used at compile-time.
 
-  To be more specific, Nulan wraps every variable in a box. This box is available at compile-time, but the *value* of the box is **not** available. This is for the obvious reason that at compile-time, the expression has not been evaluated yet, so the box cannot have a value.
+  To be more specific, Nulan wraps *every* variable in a box. These boxes are available at compile-time, but the *values* of the boxes is **not** available. This is for the obvious reason that at compile-time, the expression has not been evaluated yet, so the boxes cannot have a value.
 
-  So, in the macro ``bar``, it expands to the *box* ``foo`` rather than the *value* ``foo``, so it all works out just fine.
+  So, in the macro ``bar``, it inserts the *box* ``foo`` rather than the *value* ``foo``, so it works.
 
-  As for ``bar 10``, if a macro is the first element of a list, it is evaluated at compile-time, so this works. But this would **not** work: ``prn bar 10`` because the macro ``bar`` isn't the first element of the list.
+  And if a macro is the first element of a list, it is evaluated at compile-time, which is why ``bar 10`` works. But ``prn bar 10`` would **not** work, because the macro ``bar`` isn't the first element of the list.

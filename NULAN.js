@@ -1,31 +1,59 @@
-var prn = console.log;
-
-function prn(x) {
-  if (typeof x === "function") {
-    console.log("#<fn>")
-  } else {
-    console.log(x.toString())
-  }
-}
-
-
-
 var NULAN = (function (nTop) {
   "use strict";
 
+  Object.prototype.tap = function () {
+    console.log(require("util").inspect(nTop.toJSON(this), false, null, false))
+    return this
+  }
+
   var n = {}
+
+  var local // TODO
+
+
+  ;(function () {
+    // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Reserved_Words
+    var reserved = ("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with" +
+                    " class enum export extends import super" +
+                    " implements interface let package private protected public static yield" +
+                    " arguments null true false undefined").split(" ").join("|")
+
+    var to = new RegExp("^(" + reserved + ")$|(^[0-9])|([a-z])\-([a-z])|[^$a-z0-9]", "g")
+
+    // mangle("50fooBar-qux")
+
+    n.mangle = function (s) {
+      return s.replace(to, function (s, s1, s2, s3, s4) {
+        // TODO: a teensy bit hacky
+        if (s1 || s2) {
+          return "_" + (s1 || s2)
+        } else if (s3) {
+          return s3 + s4.toLocaleUpperCase()
+        } else {
+          return s === "_" ? "__" : "_" + s.charCodeAt(0) + "_"
+        }
+      })
+    }
+
+    var from = new RegExp("_([0-9]*)_|^_(" + reserved + "|[0-9])|([a-z])([A-Z])", "g")
+
+    // Not actually used, but still nice to have
+    n.unmangle = function (s) {
+      return s.replace(from, function (_, s, s1, s2, s3) {
+        if (s1) {
+          return s1
+        } else if (s2) {
+          return s2 + "-" + s3.toLocaleLowerCase()
+        } else {
+          return s === "" ? "_" : String.fromCharCode(s)
+        }
+      })
+    }
+  })()
+
 
   ;(function () {
     var js_vars = {} // JS variables -> true (if variable exists)
-      , local
-
-    // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Reserved_Words
-    ("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with" +
-     " class enum export extends import super" +
-     " implements interface let package private protected public static yield" +
-     " arguments null true false undefined").split(" ").forEach(function (x) {
-      js_vars[x] = true
-    })
 
     function findUniq(sOld) {
       var s = sOld
@@ -53,17 +81,20 @@ var NULAN = (function (nTop) {
     }
 
     n.Box = function (s) {
-      this.name = this.value = s
+      this.name = this.value = n.mangle(s)
     }
     n.Box.prototype.uniqize = function () {
-      this.local = local
+      //this.local = local
+      //this.mode  = mode
       this.value = findUniq(this.name)
     }
 
     n.Uniq = function () {}
-    n.Uniq.prototype = new n.Box()
+    n.Uniq.prototype = new n.Box("_u")
     n.Uniq.prototype.uniqize = function () {
+      // TODO
       this.local = local
+      //this.mode  = mode
       this.value = getUniq()
     }
 
@@ -72,9 +103,12 @@ var NULAN = (function (nTop) {
         , old2 = local
       js_vars = Object.create(js_vars)
       local   = true
-      var x = f()
-      js_vars = old
-      local   = old2
+      try {
+        var x = f()
+      } finally {
+        js_vars = old
+        local   = old2
+      }
       return x
     }
   })()
@@ -100,23 +134,33 @@ var NULAN = (function (nTop) {
     n.vars = {} // Nulan variables -> Boxes
 
     n.vars["%t"] = new n.Box("true")
+    n.vars["%f"] = new n.Box("false")
 
     n.getBox = function (x) {
       if (x instanceof n.Box) {
         return x
       } else if (x instanceof n.Symbol) {
         var y = n.vars[x.value]
-        if (y) {
-          return y
+        // b && y.mode !== mode
+        if (!y || (mode === "run" && values[y.value]) ||
+                  (mode === "compile" && !values[y.value])) {
+          if (!y) {
+            throw new nTop.Error(x, "undefined variable: " + x)
+          } else {
+            throw new nTop.Error(x, "undefined variable (but it exists at " +
+                                      (mode === "compile" ? "run" : "compile") +
+                                      " time): " + x)
+          }
         } else {
-          throw new nTop.Error(x, "undefined variable: " + x)
+          return y
         }
       }
     }
 
-    n.setNewBox = function (x) {
+    n.setBox = function (x) {
       var y = new n.Box(x.value)
-      y.uniqize()
+      y.local = local
+      //y.mode  = mode
       n.vars[x.value] = y
       return y
     }
@@ -124,8 +168,11 @@ var NULAN = (function (nTop) {
     n.withNewScope = function (f) {
       var old = n.vars
       n.vars = Object.create(n.vars)
-      var x = f()
-      n.vars = old
+      try {
+        var x = f()
+      } finally {
+        n.vars = old
+      }
       return x
     }
 
@@ -139,15 +186,26 @@ var NULAN = (function (nTop) {
     }
 
     n.setBoxValue = function (x, y) {
-      n.vars[x.value] = x
+      //n.vars[x.value] = x
       values[x.value] = y
     }
 
     n.setValue = function (x, y) {
       var b = new n.Box(x)
-      //b.uniqize() // TODO: does this need to uniqize?
+      //b.mode = "compile" // TODO: a teensy bit hacky
+      b.uniqize() // TODO: does this need to uniqize?
       n.vars[x] = b
       values[b.value] = y
+    }
+
+    // This needs to be in here because `eval` needs access to `values`
+    n.compileEval = function (x) {
+      return withMode("compile", function () {
+        x = mac(x)
+        x = NINO.compile(NINO.transform([x]))
+        console.log(x)
+        return ["id", eval(x)]
+      })
     }
 
     n.setValue("del", function (x) {
@@ -169,18 +227,12 @@ var NULAN = (function (nTop) {
   function withMode(s, f) {
     var old = mode
     mode = s
-    var x = f()
-    mode = old
+    try {
+      var x = f()
+    } finally {
+      mode = old
+    }
     return x
-  }
-
-  function compileEval(x) {
-    return withMode("compile", function () {
-      x = mac(x)
-      x = NINO.compile(NINO.transform([x]))
-      console.log(x)
-      return ["id", eval(x)]
-    })
   }
 
 
@@ -200,19 +252,24 @@ var NULAN = (function (nTop) {
       return ["number", "" + a]
     } else if (typeof a === "string") {
       return ["string", a]
-    } else if (a === void 0) { // TODO
-      return ["void", ["number", "0"]]
+    /*} else if (a === void 0) { // TODO
+      return ["void", ["number", "0"]]*/
     } else if (a instanceof n.Symbol) {
-      return mac(n.getBox(a))
+      return mac(n.getBox(a, true))
     } else if (a instanceof n.Box) {
       x = a.value
 
       if (a.local || mode === "run") {
-        return ["name", mangle(x)]
+        return ["name", x]
       } else if (mode === "compile") {
+        // TODO: should this unmangle?
         return ["[]", ["name", "values"], ["string", x]]
       } else if (mode === "quote") {
-        return mac([box("box"), x])
+        // TODO: should this unmangle?
+        return ["call", ["name", "box"], [mac(x)]]
+        //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
+        //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
+        //return mac([box("&box"), x])
       } else {
         throw new nTop.Error(a, "invalid mode: " + mode) // TODO
       }
@@ -236,15 +293,15 @@ var NULAN = (function (nTop) {
   }
 
 
-  // TODO
   function box(s) {
-    var x = n.vars[s]
+    return new n.Box(s)
+    /*var x = n.vars[s]
     if (x) {
       return x
     } else {
       // TODO
       throw new Error("!!!!!!!Undefined variable: " + s)
-    }
+    }*/
   }
 
   function boxOrSym(x) {
@@ -269,28 +326,12 @@ var NULAN = (function (nTop) {
     return Array.isArray(x)
   }
 
-  function mangle(s) {
-    return s.replace(/([a-z])\-([a-z])/g, function (_, s1, s2) {
-      return s1 + s2.toLocaleUpperCase()
-    }).replace(/(?:^[^$a-zA-Z])|[^$a-zA-Z0-9]/g, function (s) {
-      return s === "_" ? "__" : "_" + s.charCodeAt(0) + "_"
-    })
-  }
-
-  // Not actually used, but still nice to have
-  function unmangle(s) {
-    return s.replace(/([a-z])([A-Z])/g, function (_, s1, s2) {
-      return s1 + "-" + s2.toLocaleLowerCase()
-    }).replace(/_([^_]*)_/g, function (_, s) {
-      return s === "" ? "_" : String.fromCharCode(s)
-    })
-  }
 
   function splicingArgsRest(x, i, iLen, a) {
     var r = [x]
     while (i < iLen) {
       x = a[i]
-      if (Array.isArray(x) && n.isBox(x[0], "@")) {
+      if (Array.isArray(x) && n.isBox(x[0], n.mangle("@"))) {
         r.push(mac(x[1]))
       } else {
         r.push(["array", [mac(x)]])
@@ -338,7 +379,7 @@ var NULAN = (function (nTop) {
 
   function splicingArgs(f, a) {
     return arraySplitter(a, function (x) {
-      if (Array.isArray(x) && n.isBox(x[0], "@")) {
+      if (Array.isArray(x) && n.isBox(x[0], n.mangle("@"))) {
         return x[1]
       }
     }, function (x) {
@@ -424,10 +465,6 @@ var NULAN = (function (nTop) {
     (let v (bar 2)
       (and (is u v) (is v 3) (is 3 4))))
 */
-  Object.prototype.tap = function () {
-    console.log(require("util").inspect(this, false, null, false))
-    return this
-  }
 
   function binand(s, i) {
     return function () {
@@ -468,7 +505,7 @@ var NULAN = (function (nTop) {
   function validJS(x) {
     if (typeof x === "string") {
       if (/^[$_a-zA-Z](?:[a-z]\-[a-z]|[$_a-zA-Z0-9])*$/.test(x)) {
-        return mangle(x) // TODO mangle
+        return n.mangle(x) // TODO mangle
       }
     }
   }
@@ -506,8 +543,8 @@ var NULAN = (function (nTop) {
   }*/
 
   function slicer(v, i, iLen) {
-    var r = [[box("get"),
-              [box("get"), [box("list")], "slice"],
+    var r = [[box("."),
+              [box("."), [box("list")], "slice"],
                "call"],
              v]
     var i2 = i - iLen + 1
@@ -524,7 +561,7 @@ var NULAN = (function (nTop) {
     "list": function (args, v, body) {
       var index
       args.forEach(function (x, i) {
-        if (Array.isArray(x) && n.isBox(x[0], "@")) {
+        if (Array.isArray(x) && n.isBox(x[0], n.mangle("@"))) {
           index = i
         }
       })
@@ -532,26 +569,32 @@ var NULAN = (function (nTop) {
         if (i === index) {
           return destructure1(y[1], slicer(v, i, a.length), x)
         } else if (i > index) {
-          return destructure1(y, [box("get"), v,
+          return destructure1(y, [box("."), v,
                                   [box("-"),
-                                   [box("get"), v, "length"],
+                                   [box("."), v, "length"],
                                    a.length - i]],
                                  x)
         } else {
-          return destructure1(y, [box("get"), v, i], x)
+          return destructure1(y, [box("."), v, i], x)
         }
       }, body)
     },
+
     "dict": function (args, v, body) {
       return pair(args).reduceRight(function (x, y) {
-        return destructure1(y[1], [box("get"), v, y[0]], x)
+        return destructure1(y[1], [box("."), v, y[0]], x)
       }, body)
     },
+
     "=": function (args, v, body) {
       return destructure1(args[0], [box("if"), [box("null?"), v], args[1], v], body)
     },
-    "box": function (args, v, body) {
-      return [box("if"), [box("box=="), v, args[0]], body]
+
+    "'": function (args, v, body) {
+      var x = n.getBox(args[0])
+      return [box("if"), [box("&box=="), v, x.value],
+                         body,
+                         [box("&error"), v, [box("+"), "expected " + args[0] + " but got ", v]]]
     }
   }
 
@@ -574,7 +617,8 @@ var NULAN = (function (nTop) {
                ? [box("|"), a, body]
                : a)
     } else if (Array.isArray(args)) {
-      if ((f = n.getBox(args[0])) && (f = patterns[f.value])) {
+                                 // TODO: test this
+      if ((f = n.getBox(args[0], true)) && (f = patterns[f.value])) {
         return f(args.slice(1), v, body)
       } else {
         throw new nTop.Error(args[0], "not a pattern")
@@ -612,8 +656,12 @@ var NULAN = (function (nTop) {
   n.setValue("|",           binreduce1(",", "|"))
   n.setValue("/",           binreduce1("/"))
 
+  n.setValue("&break", function () {
+    return ["break"]
+  })
+
   n.setValue("$eval", function (x) {
-    return compileEval(x)
+    return n.compileEval(x)
   })
 
   n.setValue("&", function () {
@@ -628,7 +676,7 @@ var NULAN = (function (nTop) {
     return ["array", [].map.call(arguments, mac)]
   })
 
-  n.setValue("get", function (x, y) {
+  n.setValue(".", function (x, y) {
     var s = validJS(y)
     if (s) {
       return [".", mac(x), s]
@@ -746,27 +794,22 @@ var NULAN = (function (nTop) {
       a = args.map(function (a) {
         var x = a[0]
           , y = a[1]
-                            // TODO
+        // TODO: make it work with boxes too?
+        if (x instanceof n.Symbol) {
+          x = x.value
+        }
         return [box("<="), [box("."), u, x], y]
       })
-      return mac([box("|"), [box("var"), [u, [box("dict")]]]].concat(a))
+      return mac([box("|"), [box("var"), [box("="), u, [box("dict")]]]].concat(a))
     }
-  })
-
-  n.setValue(".", function (x, y) {
-    // TODO: make it work with boxes too?
-    if (y instanceof n.Symbol) {
-      y = y.value
-    }
-    return mac([box("get"), x, y])
   })
 
   n.setValue("'", function loop(x) {
     // TODO: a little bit hacky, but it'll do for now
     if (Array.isArray(x)) {
       var s = x[0]
-      if (n.isBox(x[0], ",") && (x = x[1])) {
-        if (Array.isArray(x) && n.isBox(x[0], "@")) {
+      if (n.isBox(x[0], n.mangle(",")) && (x = x[1])) {
+        if (Array.isArray(x) && n.isBox(x[0], n.mangle("@"))) {
                             // TODO: use store somehow?
           throw new nTop.Error({ text:   s.text
                                , column: s.column - 1
@@ -775,10 +818,18 @@ var NULAN = (function (nTop) {
         } else {
           return mac(x)
         }
+      /*} else if (n.isBox(x[0], "'")) {
+        return loop(x[1])
+        //console.log("FOO")
+        // .concat()
+        x = loop(x[1])
+        x[1].unshift(["call", ["name", "box"], [["string", "list"]]])
+        console.log(x)
+        return x*/
       } else {
         return arraySplitter(x, function (x) {
-          if (Array.isArray(x) && n.isBox(x[0], ",") && (x = x[1]) &&
-              Array.isArray(x) && n.isBox(x[0], "@") && (x = x[1])) {
+          if (Array.isArray(x) && n.isBox(x[0], n.mangle(",")) && (x = x[1]) &&
+              Array.isArray(x) && n.isBox(x[0], n.mangle("@")) && (x = x[1])) {
             return x
           }
         }, function (x, b) {
@@ -804,19 +855,14 @@ var NULAN = (function (nTop) {
     }
   })
 
-  n.setValue("box==", function (x, y) {
+  n.setValue("&box==", function (x, y) {
     return ["call", [".", ["name", "n"], "isBox"], [mac(x), mac(y)]]
-  })
-
-  n.setValue("box", function (x) {
-    return ["call", ["name", "box"], [mac(x)]]
-    //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
-    //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
   })
 
   n.setValue("include", function () {
     [].forEach.call(arguments, function (x) {
-      n.setNewBox(x)
+      n.setBox(x)
+      //n.setNewBox(x)
                        // (&eval '(&list 1 2 3))
                        // (include &list)
                        // (&eval '(&list 1 2 3))
@@ -826,6 +872,10 @@ var NULAN = (function (nTop) {
 
   n.setValue("uniq", function () {
     return ["new", [".", ["name", "n"], "Uniq"], []]
+  })
+
+  n.setValue("sym", function (x) {
+    return ["new", [".", ["name", "n"], "Symbol"], [mac(x)]]
   })
 
   n.setValue("&error", function (x, y) {
@@ -856,35 +906,34 @@ var NULAN = (function (nTop) {
             // TODO: code duplication with box("var")
             if (boxOrSym(x)) {
               if (x instanceof n.Symbol) {
-                x = n.setNewBox(x)
-              } else if (x instanceof n.Box) {
-                x.uniqize()
+                x = n.setBox(x)
               }
-              r.push(mangle(x.value))
+              x.uniqize()
+              r.push(x.value)
 
-            } else if (Array.isArray(x) && n.isBox(x[0], "@")) {
+            } else if (Array.isArray(x) && n.isBox(x[0], n.mangle("@"))) {
               s = new n.Box("arguments")
               s.local = true // TODO: ew
 
-              u = (i === iLen - 1
-                    ? s
-                    : new n.Uniq())
+              u = (i !== iLen - 1
+                    ? new n.Uniq()
+                    : s)
 
               ;(function (i2) {
                 var x
                 while (i2 > i) {
                   x = args[i2]
                                         // TODO: code duplication with the list pattern
-                  body = destructure(x, [box("get"), u,
+                  body = destructure(x, [box("."), u,
                                           [box("-"),
-                                           [box("get"), u, "length"],
+                                           [box("."), u, "length"],
                                            args.length - i2]],
                                         body)
                   --i2
                 }
               })(iLen - 1)
 
-              body = destructure(x[1], slicer(u, i, args.length), body)
+              body = destructure(x[1], slicer(u, i, args.length), body).tap()
 
               if (i !== iLen - 1) {
                 body = destructure(u, s, body)
@@ -893,9 +942,9 @@ var NULAN = (function (nTop) {
 
             } else {
               u = new n.Uniq()
-              //u.uniqize()
+              u.uniqize()
               //n.setVar(u) // TODO: does this need to be added to vars?
-              r.push(mangle(u.value))
+              r.push(u.value)
               body = destructure(x, u, body)
             }
           }
@@ -925,31 +974,33 @@ var NULAN = (function (nTop) {
     }*/
 
     return args.map(function (x) {
-      var y, z
+      var y
       if (Array.isArray(x)) {
         // TODO: use isSym ?
-        if (!n.isBox(x[0], "=")) {
-          throw new nTop.Error(x[0], "expected = but got " + x[0])
+        if (!n.isBox(x[0], n.mangle("="))) {
+          throw new nTop.Error(x[0], "expected ('=) but got " + x[0])
         }
         y = x[2]
         x = x[1]
       }
       if (boxOrSym(x)) {
-        z = mac(y)
-
-        if (x instanceof n.Symbol) {
-          x = n.setNewBox(x)
-        } else if (x instanceof n.Box) {
-          x.uniqize()
+        if (y !== void 0) {
+          y = mac(y)
         }
 
+        if (x instanceof n.Symbol) {
+          x = n.setBox(x)
+        }
+        x.uniqize()
+
         if (!x.local && mode === "compile") {
-          return ["<=", ["[]", ["name", "values"], ["string", x.value]], z]
+                                                  // TODO: unmangle this?
+          return ["=", ["[]", ["name", "values"], ["string", x.value]], y]
         } else {
           if (y === void 0) {
-            return ["var", [[mangle(x.value)]]]
+            return ["var", [[x.value]]]
           } else {
-            return ["var", [[mangle(x.value), z]]]
+            return ["var", [[x.value, y]]]
           }
         }
       } else {
@@ -966,22 +1017,23 @@ var NULAN = (function (nTop) {
     })
   })
 
-  // TODO: what about recursive macros?
   n.setValue("$mac", function (s, v) {
-    var v = compileEval(v)[1]
-
-    // TODO: code duplication with box("var")
-    if (s instanceof n.Symbol) {
-      s = n.setNewBox(s)
-    } else if (s instanceof n.Box) {
+    return withMode("compile", function () {
+      // TODO: code duplication with box("var")
+      if (s instanceof n.Symbol) {
+        s = n.setBox(s)
+      }
       s.uniqize()
-    }
 
-    n.setBoxValue(s, function () {
-      return mac(v.apply(this, arguments))
+      v = n.compileEval(v)[1]
+
+      // TODO: unmangle this?
+      n.setBoxValue(s, function () {
+        return mac(v.apply(this, arguments))
+      })
+
+      return ["empty"]
     })
-
-    return ["empty"]
   })
 
 
@@ -1087,13 +1139,6 @@ var NULAN = (function (nTop) {
     js_vars   = old2
     return r
   })*/
-
-/*
-  // TODO: convert this into a macro
-  n.setValue("sym", function (x) {
-    return new n.Symbol(x) // TODO: should probably return n.Bypass
-  }*/
-
 
 /*
   (&eval (var mac (&mac -> n v
@@ -1205,9 +1250,6 @@ var NULAN = (function (nTop) {
   // {{list 1 2} @{3 4} {&splice 5}}
   // [["list", 1, 2]].concat([3, 4], [["@", 5]])
 
-  // TODO
-  n.setValue("test")
-
   nTop.vars    = n.vars
   nTop.Box     = n.Box
   nTop.Wrapper = n.Wrapper
@@ -1215,9 +1257,32 @@ var NULAN = (function (nTop) {
 
   nTop.include = function () {
     [].forEach.call(arguments, function (x) {
-      n.setNewBox(new n.Symbol(x))
+      n.setBox(new n.Symbol(x))
+      //n.setNewBox(new n.Symbol(x))
     })
   }
+
+  nTop.builtin = function (o) {
+    Object.keys(o).forEach(function (x) {
+      n.setValue(x, o[x])
+    })
+    /*[].forEach.call(arguments, function (x) {
+      x = new n.Symbol(x)
+      n.setBox(x)
+      //n.setNewBox(new n.Symbol(x))
+    })*/
+    /*var args = arguments
+    // TODO: get it to allow for the variable at both compile at runtime
+    withMode("compile", function () {
+      //n.withLocalScope(function () {
+      nTop.include.apply(null, args)
+      //})
+    })*/
+  }
+
+  // TODO: make it possible to have a variable at both runtime and compiletime
+  //nTop.include("console", "Array")
+  nTop.builtin({ "console": console, "Array": Array })
 
   nTop.import = function () {
     [].forEach.call(arguments, function (s) {
@@ -1230,9 +1295,11 @@ var NULAN = (function (nTop) {
   nTop.toJSON = function anon(a) {
     if (Array.isArray(a)) {
       return a.map(anon)
-    } else if (a instanceof n.Box || a instanceof n.Symbol) {
+    } else if (a instanceof n.Box) {
+      return n.unmangle(a.value)
+    } else if (a instanceof n.Symbol) {
       return a.value
-    } else if (a instanceof NULAN.Wrapper) {
+    } else if (a instanceof n.Wrapper) {
       return anon(a.value)
     } else if (typeof a === "string") {
       return "\"" + a + "\"" // TODO replace " inside the string with \"

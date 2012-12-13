@@ -50,12 +50,16 @@ var args = process.argv.slice(2).filter(function (x) {
   }
 })
 
-var globals = { require:    require
-              , prn:        prn
+var globals = { Array:      Array
+              , console:    console
+              /*, require:    require
               , "_38_src":  process.argv[1]
-              , "_38_args": args }
+              , "_38_args": args */}
 
-NULAN.include("require", "prn", "&src", "&args")
+// TODO
+NULAN.builtin({ "require": require
+              , "&src":    process.argv[1]
+              , "&args":   args })
 
 /*NULAN.vars["require"] = "require"
 NULAN.vars["&src"]    = "&src"

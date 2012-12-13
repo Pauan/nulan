@@ -101,14 +101,15 @@ var NULAN = (function (n) {
     }
   }
 
-  function infix(i, b) {
+  function infix(i, b, f) {
     return {
       delimiter: b,
       priority: i,
       action: function (l, s, r) {
         var x = l[l.length - 1]
           , y = r[0]
-        return l.slice(0, -1).concat([[s, x, y]], r.slice(1))
+
+        return l.slice(0, -1).concat([f ? f(x, s, y) : [s, x, y]], r.slice(1))
       }
     }
   }
@@ -125,12 +126,6 @@ var NULAN = (function (n) {
     }
   }
 
-  function delimiters(s) {
-    s.split("").forEach(function (x) {
-      t[x] = { delimiter: true }
-    })
-  }
-
   function inert(start, end) {
     t[end] = {
       delimiter: true,
@@ -144,8 +139,47 @@ var NULAN = (function (n) {
     return x.length === 1 ? x[0] : x
   }
 
-  // TODO: these all should expand to boxes rather than symbols
+  // TODO: make them into proper infix, so they behave correctly when only given a left or right side
   var t = {
+    // TODO: do these need to be priority 120?
+    "(": {
+      priority: 120,
+      delimiter: true,
+      endAt: ")",
+      action: function (l, s, r) {
+        l.push(unwrap(r[0]))
+        return l.concat(r.slice(1))
+      }
+    },
+
+    "{": {
+      priority: 120,
+      delimiter: true,
+      endAt: "}",
+      action: function (l, s, r) {
+        r[0].unshift(new n.Box("list"))
+        l.push(r[0])
+        return l.concat(r.slice(1))
+      }
+    },
+
+    "[": {
+      priority: 120,
+      delimiter: true,
+      endAt: "]",
+      action: function (l, s, r) {
+        if (s.whitespace) {
+          r[0].unshift(new n.Box("dict"))
+          l.push(r[0])
+        } else {
+          var x = l[l.length - 1]
+          l = l.slice(0, -1)
+          l.push([new n.Box("."), x, unwrap(r[0])])
+        }
+        return l.concat(r.slice(1))
+      }
+    },
+
     ";": {
       priority: 110,
       delimiter: true,
@@ -156,7 +190,32 @@ var NULAN = (function (n) {
       }
     },
 
-    ".":  infix(110, true),
+    ":": {
+      priority: 110,
+      delimiter: true,
+      separator: true,
+      action: function (l, s, r) {
+        l.push(r[0])
+        l.push.apply(l, r.slice(1))
+        return l
+      }
+    },
+
+    ".": infix(110, true, function (l, s, r) {
+      if (l instanceof n.Wrapper &&
+          r instanceof n.Wrapper &&
+          typeof l.value === "number" &&
+          typeof r.value === "number") {
+        var x = (l.value + "." + r.value)
+        x = enrich(new n.Wrapper(+x), l)
+        x.length = l.length + r.length + 1
+        return x
+      } else if (r instanceof n.Symbol) {
+        return [s, l, r.value]
+      } else {
+        return [s, l, r]
+      }
+    }),
 
     ",":  unary(100, true),
     "@":  unary(100, true),
@@ -213,17 +272,6 @@ var NULAN = (function (n) {
       }
     },
 
-    ":": {
-      priority: 10,
-      delimiter: true,
-      separator: true,
-      action: function (l, s, r) {
-        l.push(r[0])
-        l.push.apply(l, r.slice(1))
-        return l
-      }
-    },
-
     "<=": {
       order: "right",
       action: function (l, s, r) {
@@ -238,6 +286,10 @@ var NULAN = (function (n) {
       }
     },
 
+    "\n": { delimiter: true },
+    " ":  { delimiter: true },
+    "#":  { delimiter: true },
+
     /*"|": {
       order: "right",
       priority: 100,
@@ -250,7 +302,6 @@ var NULAN = (function (n) {
     },*/
   }
 
-  delimiters(" \n([{\"#")
   inert("(", ")")
   inert("[", "]")
   inert("{", "}")
@@ -283,36 +334,28 @@ var NULAN = (function (n) {
            , column: o.column }
   }
 
-  function number(s) {
-    return /^(?:\d+\.)?\d+$/.test(s)
+  function isDelimiter(o) {
+    return t[o.peek()] && t[o.peek()].delimiter
   }
 
-  function tokenizeNum(o, a) {
+  function tokenizeNumOrSym(o) {
     var s = store(o)
       , r = []
-    while (o.has() && /[\d.]/.test(o.peek())) {
+    while (o.has() && /\d/.test(o.peek())) {
       r.push(o.read())
     }
-    r = r.join("")
-    if (number(r)) {
-      a.push(enrich(new n.Wrapper(+r), s, o))
+    if (isDelimiter(o)) {
+      return enrich(new n.Wrapper(+r.join("")), s, o)
     } else {
-      throw new n.Error(enrich({}, s, o), "invalid number: " + r)
+      while (o.has() && !isDelimiter(o)) {
+        r.push(o.read())
+      }
+      r = r.join("")
+      return enrich(new n.Symbol(r), s, o)
     }
   }
 
-  function tokenizeSym(o, a) {
-    var s = store(o)
-      , r = []
-                      // TODO: cleanup
-    while (o.has() && !(t[o.peek()] && t[o.peek()].delimiter)) {
-      r.push(o.read())
-    }
-    r = r.join("")
-    a.push(enrich(new n.Symbol(r), s, o))
-  }
-
-  function tokenizeString(o, a) {
+  function tokenizeString(o) {
     var s = store(o)
       , q = o.peek()
       , r = []
@@ -327,11 +370,12 @@ var NULAN = (function (n) {
     }
     o.read()
     r = r.join("")
-    a.push(enrich(new n.Wrapper(r), s, o))
+    return enrich(new n.Wrapper(r), s, o)
   }
 
   function tokenizeComment(o) {
     var s = store(o)
+    // TODO: a teensy bit hacky
     --s.column
     s.length = 2
     while (true) {
@@ -356,13 +400,17 @@ var NULAN = (function (n) {
   function tokenize(o) {
     var c, s, r = []
 
+    var white = true
+
     while (o.has()) {
       c = o.peek()
       if (c === " " || c === "\n") {
+        white = true
         o.read()
       } else if (c === "#") {
         o.read()
         if (o.peek() === "|") {
+          white = true
           tokenizeComment(o)
           o.read()
         } else {
@@ -387,15 +435,18 @@ var NULAN = (function (n) {
           r.push(enrich(t["u-"], s, o))
         }*/
       } else if (c === "\"") {
-        tokenizeString(o, r)
+        white = false
+        r.push(tokenizeString(o))
       } else if (t[c] && t[c].delimiter) {
         s = store(o)
         o.read()
-        r.push(enrich(new n.Symbol(c), s, o))
-      } else if (/\d/.test(c)) {
-        tokenizeNum(o, r)
+        s = enrich(new n.Symbol(c), s, o)
+        s.whitespace = white
+        white = false
+        r.push(s)
       } else {
-        tokenizeSym(o, r)
+        white = false
+        r.push(tokenizeNumOrSym(o))
       }
     }
 
@@ -440,39 +491,48 @@ var NULAN = (function (n) {
     return l
   }
 
-  function separator(x) {
+  function isSeparator(x) {
     return x instanceof n.Symbol && t[x.value] && t[x.value].separator
+  }
+
+  function isEndAt(x) {
+    return x instanceof n.Symbol && t[x.value] && t[x.value].endAt
   }
 
   function isSym(x, y) {
     return x instanceof n.Symbol && x.value === y
   }
 
-  function until(o, s, f) {
+  function until(o, s) {
     var x = o.read()
       , y
+      , z
       , r = []
     while (true) {
       if (o.has()) {
         y = o.peek()
         if (isSym(y, s)) {
           break
-        } else if (separator(y)) {
+        } else if (isSeparator(y)) {
           //if (s === ")") { // TODO
-          r.push(y, until(o, s, function (x) { return x }))
+          z = until(o, s)
+          r.push(y)
+          if (z.value.length !== 0) {
+            r.push(z)
+          }
           /*} else {
             r.push(y)
             o.read()
             r.push(new Wrap(process(iter([braces(o)]), -1))) // TODO
           }*/
         } else {
-          r.push(braces(o))
+          braces(o, r)
         }
       } else {
         throw new n.Error(x, "missing ending " + s)
       }
     }
-    return new Wrap(f(process(iter(r), -1)))
+    return new Wrap(process(iter(r), -1))
   }
 
 /*
@@ -482,32 +542,14 @@ var NULAN = (function (n) {
       `,@l ,r
 */
 
-  function braces(o) {
+  function braces(o, a) {
     var x = o.peek()
-    if (x instanceof n.Symbol) {
-      // TODO: a bit hacky
-      if (t[x.value] && t[x.value].braces) {
-        x = until(o, t[x.value].braces, function (x) {
-          return x
-        })
-      } else if (x.value === "(") {
-        x = until(o, ")", function (x) {
-          return unwrap(x)
-        })
-      } else if (x.value === "{") {
-        x = until(o, "}", function (x) {
-          x.unshift(new n.Box("list")) // TODO
-          return x
-        })
-      } else if (x.value === "[") {
-        x = until(o, "]", function (x) {
-          x.unshift(new n.Box("dict")) // TODO
-          return x
-        })
-      }
+    if (isEndAt(x)) {
+      a.push(x)
+      x = until(o, t[x.value].endAt)
     }
     o.read()
-    return x
+    a.push(x)
   }
 
   function indent(o, x) {
@@ -517,6 +559,7 @@ var NULAN = (function (n) {
     while (o.has()) {
       y = o.peek()
       if (y.line === x.line) {
+        // TODO: figure out a way to generalize this
         if (isSym(y, "|") && y.column === x.column) {
           r = []
           while (o.has() && isSym(o.peek(), "|") && o.peek().column === y.column) {
@@ -525,11 +568,11 @@ var NULAN = (function (n) {
           }
           r.unshift(y) // TODO: this needs to insert a box
           a.push(r)
-        } else if (separator(y)) {
+        } else if (isSeparator(y)) {
           o.read()
           a.push(y, indent(o, o.peek()))
         } else {
-          a.push(braces(o))
+          braces(o, a)
         }
       } else if (y.column > x.column) {
         a.push(new Wrap(unwrap(indent(o, o.peek()))))
