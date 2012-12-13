@@ -90,7 +90,7 @@ var NULAN = (function (nTop) {
     }
 
     n.Uniq = function () {}
-    n.Uniq.prototype = new n.Box("_u")
+    n.Uniq.prototype = new n.Box("")
     n.Uniq.prototype.uniqize = function () {
       // TODO
       this.local = local
@@ -130,20 +130,38 @@ var NULAN = (function (nTop) {
   })()
 
 
+  function box(s) {
+    return new n.Box(s)
+    /*var x = n.vars[s]
+    if (x) {
+      return x
+    } else {
+      // TODO
+      throw new Error("!!!!!!!Undefined variable: " + s)
+    }*/
+  }
+
+  function keyword(x) {
+    var y = new n.Box("")
+    y.value = x
+    return y
+  }
+
+
   ;(function () {
     n.vars = {} // Nulan variables -> Boxes
 
-    n.vars["%t"] = new n.Box("true")
-    n.vars["%f"] = new n.Box("false")
+    n.vars["%t"] = keyword("true")
+    n.vars["%f"] = keyword("false")
 
-    n.getBox = function (x) {
+    n.getBox = function (x, b) {
       if (x instanceof n.Box) {
         return x
       } else if (x instanceof n.Symbol) {
         var y = n.vars[x.value]
         // b && y.mode !== mode
-        if (!y || (mode === "run" && values[y.value]) ||
-                  (mode === "compile" && !values[y.value])) {
+        if (!y || b && (mode === "run" && values[y.value]) ||
+                  b && (mode === "compile" && !values[y.value])) {
           if (!y) {
             throw new nTop.Error(x, "undefined variable: " + x)
           } else {
@@ -208,6 +226,13 @@ var NULAN = (function (nTop) {
       })
     }
 
+    // TODO: make it work at compile-time
+    // var foo = 5
+    // $eval
+    //   var foo = 10
+    // $eval
+    //   del foo
+    // foo
     n.setValue("del", function (x) {
       // TODO: make it work with boxes too?
       if (x instanceof n.Symbol) {
@@ -293,17 +318,6 @@ var NULAN = (function (nTop) {
   }
 
 
-  function box(s) {
-    return new n.Box(s)
-    /*var x = n.vars[s]
-    if (x) {
-      return x
-    } else {
-      // TODO
-      throw new Error("!!!!!!!Undefined variable: " + s)
-    }*/
-  }
-
   function boxOrSym(x) {
     return x instanceof n.Box || x instanceof n.Symbol
   }
@@ -316,10 +330,13 @@ var NULAN = (function (nTop) {
     }
   }*/
 
-  // TODO
-  n.isBox = function (x, s) {
+  function isBox(x, s) {
     x = n.getBox(x)
     return x instanceof n.Box && x.value === s
+  }
+
+  function isBoxM(x, s) {
+    return isBox(x, n.mangle(s))
   }
 
   function complex(x) {
@@ -331,7 +348,7 @@ var NULAN = (function (nTop) {
     var r = [x]
     while (i < iLen) {
       x = a[i]
-      if (Array.isArray(x) && n.isBox(x[0], n.mangle("@"))) {
+      if (Array.isArray(x) && isBoxM(x[0], "@")) {
         r.push(mac(x[1]))
       } else {
         r.push(["array", [mac(x)]])
@@ -379,7 +396,7 @@ var NULAN = (function (nTop) {
 
   function splicingArgs(f, a) {
     return arraySplitter(a, function (x) {
-      if (Array.isArray(x) && n.isBox(x[0], n.mangle("@"))) {
+      if (Array.isArray(x) && isBoxM(x[0], "@")) {
         return x[1]
       }
     }, function (x) {
@@ -561,7 +578,7 @@ var NULAN = (function (nTop) {
     "list": function (args, v, body) {
       var index
       args.forEach(function (x, i) {
-        if (Array.isArray(x) && n.isBox(x[0], n.mangle("@"))) {
+        if (Array.isArray(x) && isBoxM(x[0], "@")) {
           index = i
         }
       })
@@ -808,8 +825,8 @@ var NULAN = (function (nTop) {
     // TODO: a little bit hacky, but it'll do for now
     if (Array.isArray(x)) {
       var s = x[0]
-      if (n.isBox(x[0], n.mangle(",")) && (x = x[1])) {
-        if (Array.isArray(x) && n.isBox(x[0], n.mangle("@"))) {
+      if (isBox(x[0], n.mangle(",")) && (x = x[1])) {
+        if (Array.isArray(x) && isBoxM(x[0], "@")) {
                             // TODO: use store somehow?
           throw new nTop.Error({ text:   s.text
                                , column: s.column - 1
@@ -818,7 +835,7 @@ var NULAN = (function (nTop) {
         } else {
           return mac(x)
         }
-      /*} else if (n.isBox(x[0], "'")) {
+      /*} else if (isBoxM(x[0], "'")) {
         return loop(x[1])
         //console.log("FOO")
         // .concat()
@@ -828,8 +845,8 @@ var NULAN = (function (nTop) {
         return x*/
       } else {
         return arraySplitter(x, function (x) {
-          if (Array.isArray(x) && n.isBox(x[0], n.mangle(",")) && (x = x[1]) &&
-              Array.isArray(x) && n.isBox(x[0], n.mangle("@")) && (x = x[1])) {
+          if (Array.isArray(x) && isBoxM(x[0], ",") && (x = x[1]) &&
+              Array.isArray(x) && isBoxM(x[0], "@") && (x = x[1])) {
             return x
           }
         }, function (x, b) {
@@ -856,7 +873,7 @@ var NULAN = (function (nTop) {
   })
 
   n.setValue("&box==", function (x, y) {
-    return ["call", [".", ["name", "n"], "isBox"], [mac(x), mac(y)]]
+    return ["call", ["name", "isBox"], [mac(x), mac(y)]]
   })
 
   n.setValue("include", function () {
@@ -911,8 +928,8 @@ var NULAN = (function (nTop) {
               x.uniqize()
               r.push(x.value)
 
-            } else if (Array.isArray(x) && n.isBox(x[0], n.mangle("@"))) {
-              s = new n.Box("arguments")
+            } else if (Array.isArray(x) && isBoxM(x[0], "@")) {
+              s = keyword("arguments")
               s.local = true // TODO: ew
 
               u = (i !== iLen - 1
@@ -977,7 +994,7 @@ var NULAN = (function (nTop) {
       var y
       if (Array.isArray(x)) {
         // TODO: use isSym ?
-        if (!n.isBox(x[0], n.mangle("="))) {
+        if (!isBoxM(x[0], "=")) {
           throw new nTop.Error(x[0], "expected ('=) but got " + x[0])
         }
         y = x[2]
