@@ -157,7 +157,7 @@ var NULAN = (function (n) {
       delimiter: true,
       endAt: "}",
       action: function (l, s, r) {
-        r[0].unshift(new n.Box("list"))
+        r[0].unshift(new n.Box("list").mangle())
         l.push(r[0])
         return l.concat(r.slice(1))
       }
@@ -169,12 +169,12 @@ var NULAN = (function (n) {
       endAt: "]",
       action: function (l, s, r) {
         if (s.whitespace) {
-          r[0].unshift(new n.Box("dict"))
+          r[0].unshift(new n.Box("dict").mangle())
           l.push(r[0])
         } else {
           var x = l[l.length - 1]
           l = l.slice(0, -1)
-          l.push([new n.Box("."), x, unwrap(r[0])])
+          l.push([new n.Box(".").mangle(), x, unwrap(r[0])])
         }
         return l.concat(r.slice(1))
       }

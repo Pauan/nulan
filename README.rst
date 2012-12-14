@@ -213,12 +213,12 @@ FAQ
 
   **A:** Nulan has a strict separation between compile-time and run-time: variables defined at compile-time **cannot** be seen at run-time in any way, shape, or form. Certain macros like ``$mac`` are prefixed with ``$`` which indicates that they are evaluated at compile-time.
 
-  To make the above example work, you have to evaluate the expression at compile-time by using ``$eval``::
+  To make the above example work, you have to evaluate the expression at compile-time by using ``$run``::
 
     $mac foo ->
       '1 + 2
 
-    $eval
+    $run
       prn foo
 
 * **Q:** If there's such a strict separation between the two, why does this work?

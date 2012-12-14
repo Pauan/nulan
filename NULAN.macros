@@ -34,7 +34,7 @@ $mac for -> init test incr body
        | incr
 
 $mac w/uniq -> @args body
-  'w/var ,@(args.map -> x 'x = uniq;)
+  'w/var ,@(args.map -> x 'x = make-uniq;)
      body
 
 $mac w/var! -> {('=) x y} body
@@ -91,7 +91,7 @@ w/def foo
 
 w/def foo ((|) bar 1 2 3)
 
-$eval
+$run
   w/var y = {1 2 3}
     w/complex y y
 
