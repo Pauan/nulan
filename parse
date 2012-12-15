@@ -9,8 +9,8 @@ function load(path, context) {
   vm.runInThisContext(data, path)
 }
 
-load("./NULAN.js")
 load("./NULAN.parse.js")
+load("./NULAN.js")
 
 load("./lib/NUIT.parse.js")
 

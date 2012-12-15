@@ -1,6 +1,11 @@
 var NULAN = (function (n) {
   "use strict";
 
+  // TODO
+  n.box = function (x) {
+    return new n.Symbol(x)
+  }
+
   // TODO: maybe move this into NULAN.js?
   // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Error#Custom_Error_Types
   n.Error = function (o, s) {
@@ -37,6 +42,20 @@ var NULAN = (function (n) {
   n.Error.prototype = new Error()
   n.Error.prototype.constructor = n.Error
   n.Error.prototype.name = "NULAN.Error"
+
+
+  // TODO: make symbol inherit from wrapper?
+  n.Wrapper = function (value) {
+    this.value = value
+  }
+  n.Symbol = function (value) {
+    this.value = value
+  }
+
+  n.Wrapper.prototype.toString =
+  n.Symbol.prototype.toString = function () {
+    return this.value
+  }
 
 
   // Converts any array-like object into an iterator
@@ -157,7 +176,7 @@ var NULAN = (function (n) {
       delimiter: true,
       endAt: "}",
       action: function (l, s, r) {
-        r[0].unshift(new n.Box("list"))
+        r[0].unshift(n.box("list"))
         l.push(r[0])
         return l.concat(r.slice(1))
       }
@@ -169,13 +188,12 @@ var NULAN = (function (n) {
       endAt: "]",
       action: function (l, s, r) {
         if (s.whitespace) {
-          r[0].unshift(new n.Box("dict"))
+          r[0].unshift(n.box("dict"))
           l.push(r[0])
         } else {
           var x = l[l.length - 1]
           l = l.slice(0, -1)
-                  // TODO: this is "."
-          l.push([new n.Box("_46_"), x, unwrap(r[0])])
+          l.push([n.box("."), x, unwrap(r[0])])
         }
         return l.concat(r.slice(1))
       }
