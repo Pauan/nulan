@@ -7,7 +7,7 @@ var NULAN = (function (n) {
   }
 
 
-  var mode = "run" // Whether code is evaluated at run-time or compile-time
+  var mode = "compile" // Whether code is evaluated at run-time or compile-time
 
   function withMode(s, f) {
     var old = mode
@@ -47,155 +47,6 @@ var NULAN = (function (n) {
     return Array.isArray(x)
   }
 
-
-  var mangle, unmangle
-
-  ;(function () {
-    // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Reserved_Words
-    var reserved = ("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with" +
-                    " class enum export extends import super" +
-                    " implements interface let package private protected public static yield" +
-                    " arguments null true false undefined").split(" ").join("|")
-
-    var to = new RegExp("^(" + reserved + ")$|(^[0-9])|([a-z])\-([a-z])|[^$a-z0-9]", "g")
-
-    mangle = function (s) {
-      return s.replace(to, function (s, s1, s2, s3, s4) {
-        // TODO: a teensy bit hacky
-        if (s1 || s2) {
-          return "_" + (s1 || s2)
-        } else if (s3) {
-          return s3 + s4.toLocaleUpperCase()
-        } else {
-          return s === "_" ? "__" : "_" + s.charCodeAt(0) + "_"
-        }
-      })
-    }
-
-    // mangle("50fooBar-qux")
-
-    var from = new RegExp("_([0-9]*)_|^_(" + reserved + "|[0-9])|([a-z])([A-Z])", "g")
-
-    // Not actually used, but still nice to have
-    unmangle = function (s) {
-      return s.replace(from, function (_, s, s1, s2, s3) {
-        if (s1) {
-          return s1
-        } else if (s2) {
-          return s2 + "-" + s3.toLocaleLowerCase()
-        } else {
-          return s === "" ? "_" : String.fromCharCode(s)
-        }
-      })
-    }
-  })()
-
-
-  var local // TODO
-
-  var boxes = {}
-
-
-  ;(function () {
-    var js_vars = {} // JS variables -> true (if variable exists)
-
-    function findUniq(sOld) {
-      var s = sOld
-        , i = 2
-      while (js_vars[s]) {
-        s = sOld + i
-        ++i
-      }
-      js_vars[s] = true
-      return s
-    }
-
-    function getUniq() {
-      var s, i = 1
-      while (true) {
-        for (var a = "a".charCodeAt(0), b = "z".charCodeAt(0); a <= b; ++a) {
-          s = new Array(i + 1).join(String.fromCharCode(a))
-          if (!js_vars[s]) {
-            js_vars[s] = true
-            return s
-          }
-        }
-        ++i
-      }
-    }
-
-    n.Box = function (s) {
-      this.name = this.value = s
-    }
-    n.Box.prototype.uniqize = function () {
-      //this.local = local
-      //this.mode  = mode
-      this.value = findUniq(this.name)
-    }
-    n.Box.prototype.mangle = function () {
-      this.name = this.value = mangle(this.name)
-      return this
-    }
-    n.Box.prototype.toString = function () {
-      return unmangle(this.name) // TODO
-    }
-
-    Uniq = function () {}
-    Uniq.prototype = new n.Box("")
-    Uniq.prototype.uniqize = function () {
-      // TODO
-      this.local = local
-      //this.mode  = mode
-      this.value = getUniq()
-    }
-
-    withLocalScope = function (f) {
-      var old  = js_vars
-        , old2 = local
-      js_vars = Object.create(js_vars)
-      local   = true
-      try {
-        var x = f()
-      } finally {
-        js_vars = old
-        local   = old2
-      }
-      return x
-    }
-  })()
-
-
-  ;(function () {
-    n.Wrapper = function (value) {
-      this.value = value
-    }
-    n.Symbol = function (value) {
-      this.value = value
-    }
-
-    Uniq.prototype.toString =
-    n.Wrapper.prototype.toString =
-    n.Symbol.prototype.toString = function () {
-      return this.value
-    }
-  })()
-
-
-  function box(s) {
-    return new n.Box(s)
-    /*var x = n.vars[s]
-    if (x) {
-      return x
-    } else {
-      // TODO
-      throw new Error("!!!!!!!Undefined variable: " + s)
-    }*/
-  }
-
-  function boxM(s) {
-    return new n.Box(s).mangle()
-  }
-
   function boxOrSym(x) {
     return x instanceof n.Box || x instanceof n.Symbol
   }
@@ -204,197 +55,6 @@ var NULAN = (function (n) {
     return x instanceof n.Symbol && x.value === "_"
   }
 
-  /*function isSym(x, s) {
-    if (x instanceof n.Box) {
-      return x.name === s
-    } else {
-      return false
-    }
-  }*/
-
-  function isBox(x, s) {
-    x = getBox(x, true)
-    return x instanceof n.Box && x.value === s
-  }
-
-  function isBoxM(x, s) {
-    return isBox(x, mangle(s))
-  }
-
-
-  var getBox, setBox, withNewScope, isMacro, setBoxValue, setValue, compileEval
-
-  ;(function () {
-    n.vars = {} // Nulan variables -> Boxes
-
-    n.vars["%t"] = box("true")
-    n.vars["%f"] = box("false")
-
-    getBox = function (x, b) {
-      if (x instanceof n.Box) {
-        return x
-      } else if (x instanceof n.Symbol) {
-        var y = n.vars[x.value]
-        // b && y.mode !== mode
-        if (!y || !b && !y.local &&
-                    ((mode === "run"     &&   y.value in values) ||
-                     (mode === "compile" && !(y.value in values)))) {
-          if (!y) {
-            throw new n.Error(x, "undefined variable: " + x)
-          } else {
-            throw new n.Error(x, "undefined variable (but it exists at " +
-                                   (mode === "compile" ? "run" : "compile") +
-                                   " time): " + x)
-          }
-        } else {
-          return y
-        }
-      }
-    }
-
-    setBox = function (x) {
-      var y = boxM(x.value)
-      y.local = local
-      //y.mode  = mode
-      n.vars[x.value] = y
-      console.log(x.value, y.value)
-      return y
-    }
-
-    withNewScope = function (f) {
-      var old = n.vars
-      n.vars = Object.create(n.vars)
-      try {
-        var x = f()
-      } finally {
-        n.vars = old
-      }
-      return x
-    }
-
-
-    var values = {} // Boxes -> Compile-time values
-
-    isMacro = function (x) {
-      if ((x = getBox(x, true)) && (x = values[x.value]) instanceof Macro) {
-        return x.value
-      }
-    }
-
-    setBoxValue = function (x, y) {
-      //n.vars[x.value] = x
-      values[x.value] = y
-    }
-
-    setValue = function (x, y) {
-      var b = boxM(x)
-      //b.mode = "compile" // TODO: a teensy bit hacky
-      b.uniqize() // TODO: does this need to uniqize?
-      n.vars[x] = b
-      values[b.value] = y
-    }
-
-    // This needs to be in here because `eval` needs access to `values`
-    compileEval = function (x) {
-      return withMode("compile", function () {
-        x = mac(x)
-        x = NINO.compile(NINO.transform([x]))
-        console.log(x)
-        return ["id", eval(x)]
-      })
-    }
-
-    // TODO: make it work at compile-time
-    // var foo = 5
-    // $eval
-    //   var foo = 10
-    // $eval
-    //   del foo
-    // foo
-    setValue("del", macro(function (x) {
-      // TODO: make it work with boxes too?
-      if (x instanceof n.Symbol) {
-        var s = mac(x)
-        delete n.vars[x.value]
-        return s
-      } else {
-        // TODO: return the value that's being deleted
-        return ["delete", mac(x)]
-      }
-    }))
-  })()
-
-
-  function mac(a) {
-    var x
-    if (Array.isArray(a)) {
-      if ((x = isMacro(a[0]))) {
-        return x(a)
-      } else if (a.length === 0) { // TODO: this should probably be in splicingArgs
-        return ["empty"] // TODO: is this correct?
-        //return ["void", ["number", "0"]]
-      } else {
-        return splicingArgs(mac(a[0]), a.slice(1))
-      }
-    } else if (a instanceof n.Wrapper) {
-      return mac(a.value) // TODO: check all the places that currently expect strings/numbers and won't work with a wrapper
-    } else if (typeof a === "number") {
-      return ["number", "" + a]
-    } else if (typeof a === "string") {
-      return ["string", a]
-    /*} else if (a === void 0) { // TODO
-      return ["void", ["number", "0"]]*/
-    } else if (a instanceof n.Symbol) {
-      return mac(getBox(a))
-    } else if (a instanceof n.Box) {
-      x = a.value
-
-      if (a.local || mode === "run") {
-        return ["name", x]
-      } else if (mode === "compile") {
-        // TODO: should this unmangle?
-        return ["[]", ["name", "values"], ["string", x]]
-      } else if (mode === "quote") {
-        // TODO: should this unmangle?
-        return ["call", ["name", "box"], [mac(x)]]
-        //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
-        //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
-        //return mac([box("&box"), x])
-      } else {
-        throw new n.Error(a, "invalid mode: " + mode) // TODO
-      }
-    } else {
-      throw new n.Error(a, "invalid expression: " + a)
-    }
-  }
-
-  // TODO
-  function $mac(a) {
-    var x = a[0]
-    // TODO: make it work with boxes too
-    if (x instanceof n.Symbol) {
-      x = ["name", x.value]
-    } else if (typeof x !== "string") {
-      throw new n.Error(x, "invalid expression: " + x)
-    }
-    return (a.length === 1
-             ? x
-             : [x].concat([].slice.call(a, 1).map(mac)))
-  }
-
-/*  function splicingArgsRest(x, i, iLen, a) {
-    var r = [x]
-    while (i < iLen) {
-      x = a[i]
-      if (Array.isArray(x) && isBoxM(x[0], "@")) {
-        r.push(mac(x[1]))
-      } else {
-        r.push(["array", [mac(x)]])
-      }
-      ++i
-    }
-    return r
-  }*/
 
   function concater(l, r) {
     return l.length === 0
@@ -556,14 +216,6 @@ var NULAN = (function (n) {
     })
   }
 
-  function validJS(x) {
-    if (typeof x === "string") {
-      if (/^[$_a-zA-Z](?:[a-z]\-[a-z]|[$_a-zA-Z0-9])*$/.test(x)) {
-        return mangle(x) // TODO mangle
-      }
-    }
-  }
-
   /*function withPartialScope(args, f) {
     var saved = args.map(function (x) {
       if (Array.isArray(x)) {
@@ -612,6 +264,351 @@ var NULAN = (function (n) {
   }
 
 
+  var mangle, unmangle, validJS
+
+  ;(function () {
+    // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Reserved_Words
+    var reserved = ("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with" +
+                    " class enum export extends import super" +
+                    " implements interface let package private protected public static yield" +
+                    " arguments null true false undefined").split(" ").join("|")
+
+    var to = new RegExp("^(" + reserved + ")$|(^[0-9])|([a-z])\-([a-z])|[^$a-z0-9]", "g")
+
+    mangle = function (s) {
+      return s.replace(to, function (s, s1, s2, s3, s4) {
+        // TODO: a teensy bit hacky
+        if (s1 || s2) {
+          return "_" + (s1 || s2)
+        } else if (s3) {
+          return s3 + s4.toLocaleUpperCase()
+        } else {
+          return s === "_" ? "__" : "_" + s.charCodeAt(0) + "_"
+        }
+      })
+    }
+
+    // mangle("50fooBar-qux")
+
+    var from = new RegExp("_([0-9]*)_|^_(" + reserved + "|[0-9])|([a-z])([A-Z])", "g")
+
+    // Not actually used, but still nice to have
+    unmangle = function (s) {
+      return s.replace(from, function (_, s, s1, s2, s3) {
+        if (s1) {
+          return s1
+        } else if (s2) {
+          return s2 + "-" + s3.toLocaleLowerCase()
+        } else {
+          return s === "" ? "_" : String.fromCharCode(s)
+        }
+      })
+    }
+
+    validJS = function (x) {
+      if (typeof x === "string") {
+        // TODO: code duplication with mangle
+        x = x.replace(/([a-z])\-([a-z])/g, function (_, s1, s2) {
+          return s1 + s2.toLocaleUpperCase()
+        })
+        if (/^[$_a-zA-Z][$_a-zA-Z0-9]*$/.test(x)) {
+          return x
+        }
+      }
+    }
+  })()
+
+
+  n.vars    = {} // Nulan Variable -> JS Variable (guaranteed unique)
+  var boxes = {} // JS Variable    -> Box
+
+  var Uniq, setBuiltin, setSymToBox, withLocalScope
+
+  ;(function () {
+    var js_vars = {} // JS Variable -> true (if variable exists in JS)
+      , values  = {} // JS Variable -> compile time value
+      , local
+
+    function findUniq(sOld) {
+      var s = sOld
+        , i = 2
+      while (js_vars[s]) {
+        s = sOld + i
+        ++i
+      }
+      js_vars[s] = true
+      return s
+    }
+
+    function getUniq() {
+      var s, i = 1
+      while (true) {
+        for (var a = "a".charCodeAt(0), b = "z".charCodeAt(0); a <= b; ++a) {
+          s = new Array(i + 1).join(String.fromCharCode(a))
+          if (!js_vars[s]) {
+            js_vars[s] = true
+            return s
+          }
+        }
+        ++i
+      }
+    }
+
+    n.Box = function (s) {
+      this.name = this.value = s
+      this.mode = {}
+    }
+    /*n.Box.prototype.uniqize = function () {
+      //this.local = local
+      //this.mode  = mode
+      this.value = findUniq(this.name)
+    }
+    n.Box.prototype.mangle = function () {
+      this.value = mangle(this.name)
+      return this
+    }*/
+    n.Box.prototype.toString = function () {
+                        // TODO: should this use unmangle?
+      return "#|box " + unmangle(this.value) + "|#"
+    }
+
+    Uniq = function () {}
+    Uniq.prototype = new n.Box()
+    /*Uniq.prototype.uniqize = function () {
+      // TODO
+      this.local = local
+      //this.mode  = mode
+      this.value = getUniq()
+    }*/
+
+    setBuiltin = function (sN, sJS) {
+      var x = new n.Box(sJS)
+      // TODO: code duplication with setSymToBox
+      x.local = local
+      x.mode[mode] = true // TODO
+      n.vars[sN] = x.value
+      return x
+    }
+
+    setSymToBox = function (x) {
+      var s
+      if (x instanceof n.Symbol) {
+        s = x.value
+        x = setSymToBox(new n.Box(mangle(x.value)))
+        n.vars[s] = x.value
+        return x
+      } else if (x instanceof Uniq) {
+        x.value = getUniq() // TODO: assign this to boxes too?
+      } else if (x instanceof n.Box) {
+        x.value = findUniq(x.name)
+        boxes[x.value] = x
+      }
+      x.local = local
+      x.mode[mode] = true
+      return x
+    }
+
+    withLocalScope = function (f) {
+      var old  = js_vars
+        , old2 = boxes // TODO: does this need to save boxes too?
+        , old3 = local
+      js_vars = Object.create(js_vars)
+      boxes   = Object.create(boxes)
+      local   = true
+      try {
+        var x = f()
+      } finally {
+        js_vars = old
+        boxes   = old2
+        local   = old3
+      }
+      return x
+    }
+  })()
+
+
+  setBuiltin("%t", "true")
+  setBuiltin("%f", "false")
+
+
+  // TODO
+  ;(function () {
+    n.Wrapper = function (value) {
+      this.value = value
+    }
+    n.Symbol = function (value) {
+      this.value = value
+    }
+
+    Uniq.prototype.toString =
+    n.Wrapper.prototype.toString =
+    n.Symbol.prototype.toString = function () {
+      return this.value
+    }
+  })()
+
+
+  function withNewScope(f) {
+    var old = n.vars
+    n.vars = Object.create(n.vars)
+    try {
+      var x = f()
+    } finally {
+      n.vars = old
+    }
+    return x
+  }
+
+
+  var isMacro, setValue, compileEval
+
+  ;(function () {
+    var values = {} // Boxes -> Compile-time values
+
+    isMacro = function (x) {
+      if ((x = getBox(x)) && (x = values[x.value]) instanceof Macro) {
+        return x.value
+      }
+    }
+
+    setValue = function (x, y) {
+      x = setSymToBox(new n.Symbol(x))
+      //b.mode = "compile" // TODO: a teensy bit hacky
+      //b.uniqize() // TODO: does this need to uniqize?
+      //n.vars[x] = b
+      values[x.value] = y
+    }
+
+    // This needs to be in here because `eval` needs access to `values`
+    compileEval = function (x) {
+      return withMode("compile", function () {
+        x = mac(x)
+        x = NINO.compile(NINO.transform([x]))
+        console.log(x)
+        return ["id", eval(x)]
+      })
+    }
+  })()
+
+
+  function getBox(x) {
+    if (x instanceof n.Box) {
+      return x
+    } else if (x instanceof n.Symbol) {
+      var y = n.vars[x.value]
+      if (y) {
+        return y
+      } else {
+        throw new n.Error(x, "undefined variable: " + x)
+      }
+    }
+  }
+
+  function checkBox(x) {
+    // TODO: x.local ||
+    if (x.mode[mode]) {
+      return x
+    } else {
+      throw new n.Error(x, "undefined variable (but it exists at " +
+                             // TODO
+                             (mode === "compile" ? "run" : "compile") +
+                             " time): " + x)
+    }
+  }
+
+  function boxM(s) {
+    // TODO mangle
+    return boxes[mangle(s)]
+  }
+
+  /*function isSym(x, s) {
+    if (x instanceof n.Box) {
+      return x.name === s
+    } else {
+      return false
+    }
+  }*/
+
+  function isBox(x, s) {
+    x = getBox(x)
+    return x instanceof n.Box && x.value === s
+  }
+
+  function isBoxM(x, s) {
+    return isBox(x, mangle(s))
+  }
+
+
+  function mac(a) {
+    var x
+    if (Array.isArray(a)) {
+      if ((x = isMacro(a[0]))) {
+        return x(a)
+      } else if (a.length === 0) { // TODO: this should probably be in splicingArgs
+        return ["empty"] // TODO: is this correct?
+        //return ["void", ["number", "0"]]
+      } else {
+        return splicingArgs(mac(a[0]), a.slice(1))
+      }
+    } else if (a instanceof n.Wrapper) {
+      return mac(a.value) // TODO: check all the places that currently expect strings/numbers and won't work with a wrapper
+    } else if (typeof a === "number") {
+      return ["number", "" + a]
+    } else if (typeof a === "string") {
+      return ["string", a]
+    /*} else if (a === void 0) { // TODO
+      return ["void", ["number", "0"]]*/
+    } else if (a instanceof n.Symbol) {
+      return mac(checkBox(getBox(a)))
+    } else if (a instanceof n.Box) {
+      x = a.value
+
+      if (a.local || mode === "run") {
+        return ["name", x]
+      } else if (mode === "compile") {
+        return [".", ["name", "values"], x]
+      } else if (mode === "quote") {
+        return [".", "boxes", x]
+        //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
+        //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
+        //return mac([box("&box"), x])
+      } else {
+        throw new n.Error(a, "invalid mode: " + mode) // TODO
+      }
+    } else {
+      throw new n.Error(a, "invalid expression: " + a)
+    }
+  }
+
+  // TODO
+  function $mac(a) {
+    var x = a[0]
+    // TODO: make it work with boxes too
+    if (x instanceof n.Symbol) {
+      x = ["name", x.value]
+    } else if (typeof x !== "string") {
+      throw new n.Error(x, "invalid expression: " + x)
+    }
+    return (a.length === 1
+             ? x
+             : [x].concat([].slice.call(a, 1).map(mac)))
+  }
+
+/*  function splicingArgsRest(x, i, iLen, a) {
+    var r = [x]
+    while (i < iLen) {
+      x = a[i]
+      if (Array.isArray(x) && isBoxM(x[0], "@")) {
+        r.push(mac(x[1]))
+      } else {
+        r.push(["array", [mac(x)]])
+      }
+      ++i
+    }
+    return r
+  }*/
+
+
   var patterns = {}
 
   patterns[mangle("list")] = function (args, v, body) {
@@ -652,7 +649,7 @@ var NULAN = (function (n) {
   patterns[mangle("'")] = function (args, v, body) {
     compileOnlyError(args[0])
 
-    var x = getBox(args[1], true)
+    var x = getBox(args[1])
     return [boxM("if"), [boxM("&box=="), v, x.value],
                         body,
                         [boxM("&error"), v, [boxM("+"), "expected " + args[1] + " but got ", v]]]
@@ -662,7 +659,6 @@ var NULAN = (function (n) {
   function destructure1(args, v, body) {
     if (complex(args)) {
       var u = new Uniq()
-      //u.uniqize()
       return [boxM("|"), [boxM("var"), [boxM("="), u, v]], destructure(args, u, body)]
     } else {
       return destructure(args, v, body)
@@ -675,12 +671,12 @@ var NULAN = (function (n) {
       return body
     } else if (boxOrSym(args)) {
       a = [boxM("var"), [boxM("="), args, v]]
-              // TODO
+              // TODO better detection for if body is empty
       return (body
                ? [boxM("|"), a, body]
                : a)
     } else if (Array.isArray(args)) {
-      if ((f = getBox(args[0], true)) && (f = patterns[f.value])) {
+      if ((f = getBox(args[0])) && (f = patterns[f.value])) {
         return f(args, v, body)
       } else {
         throw new n.Error(args[0], args[0] + " is not a pattern")
@@ -836,6 +832,25 @@ var NULAN = (function (n) {
 
 
   // Medium complexity
+  // TODO: make it work at compile-time
+  // var foo = 5
+  // $eval
+  //   var foo = 10
+  // $eval
+  //   del foo
+  // foo
+  setValue("del", macro(function (x) {
+    // TODO: make it work with boxes too?
+    if (x instanceof n.Symbol) {
+      var s = mac(x)
+      delete n.vars[x.value]
+      return s
+    } else {
+      // TODO: return the value that's being deleted
+      return ["delete", mac(x)]
+    }
+  }))
+
   setValue("dict", macro(function () {
     var args = pair(arguments)
       , a
@@ -848,7 +863,6 @@ var NULAN = (function (n) {
       return ["object", a]
     } else {
       u = new Uniq()
-      //u.uniqize()
       a = args.map(function (a) {
         var x = a[0]
           , y = a[1]
@@ -924,7 +938,7 @@ var NULAN = (function (n) {
 
   setValue("include", macro(function () {
     [].forEach.call(arguments, function (x) {
-      setBox(x)
+      setSymToBox(x) // TODO: is this correct?
       //setNewBox(x)
                        // (&eval '(&list 1 2 3))
                        // (include &list)
@@ -934,7 +948,7 @@ var NULAN = (function (n) {
   }))
 
   setValue("make-uniq", compileOnly(function () {
-    return ["new", [".", ["name", "n"], "Uniq"], []]
+    return ["new", ["name", "Uniq"], []]
   }))
 
   setValue("sym", compileOnly(function (x) {
@@ -960,16 +974,12 @@ var NULAN = (function (n) {
           for (var i = 0, iLen = args.length; i < iLen; ++i) {
             x = args[i]
 
-            // TODO: code duplication with boxM("var")
             if (boxOrSym(x) && !wildcard(x)) {
-              if (x instanceof n.Symbol) {
-                x = setBox(x)
-              }
-              x.uniqize()
+              x = setSymToBox(x)
               r.push(x.value)
 
             } else if (Array.isArray(x) && isBoxM(x[0], "@")) {
-              s = box("arguments")
+              s = new n.Box("arguments") // TODO: ew
               s.local = true // TODO: ew
 
               u = (i !== iLen - 1
@@ -999,7 +1009,8 @@ var NULAN = (function (n) {
 
             } else {
               u = new Uniq()
-              u.uniqize()
+              u = setSymToBox(u) // TODO: this is called only for uniqize, is that correct?
+              //uniqize(u)
               //setVar(u) // TODO: does this need to be added to vars?
               r.push(u.value)
               body = destructure(x, u, body)
@@ -1014,7 +1025,6 @@ var NULAN = (function (n) {
     }
   }))
 
-  //setValue("true", new n.Symbol("true") // TODO
   setValue("var", macro(function () {
     var args = [].slice.call(arguments)
 
@@ -1047,25 +1057,10 @@ var NULAN = (function (n) {
           y = mac(y)
         }
 
-        if (x instanceof n.Symbol) {
-          x = setBox(x)
-        }
-        x.uniqize()
-
-        var foo = 5
-        values["bar"] = foo
-
-        w/var foo = 5
-          var bar = foo
-
-        w/new-scope
-          | var foo = 5
-          | var bar = foo
+        x = setSymToBox(x)
 
         if (!x.local && mode === "compile") {
-          console.log(x.value)
-                                                  // TODO: unmangle this?
-          return ["=", ["[]", ["name", "values"], ["string", x.value]], y]
+          return ["=", [".", ["name", "values"], x.value], y]
         } else {
           if (y === void 0) {
             return ["var", [[x.value]]]
@@ -1108,11 +1103,7 @@ var NULAN = (function (n) {
 /*
   setValue("$mac", macro(function (s, v) {
     return withMode("compile", function () {
-      // TODO: code duplication with boxM("var")
-      if (s instanceof n.Symbol) {
-        s = setBox(s)
-      }
-      s.uniqize()
+      s = setSymToBox(s)
 
       v = compileEval(v)[1]
 
@@ -1383,7 +1374,7 @@ function infix(i, b, f) {
 
   n.include = function () {
     [].forEach.call(arguments, function (x) {
-      setBox(new n.Symbol(x))
+      setSymToBox(new n.Symbol(x)) // TODO is this correct?
       //setNewBox(new n.Symbol(x))
     })
   }
@@ -1421,10 +1412,10 @@ function infix(i, b, f) {
   n.toJSON = function anon(a) {
     if (Array.isArray(a)) {
       return a.map(anon)
-    } else if (a instanceof n.Box) {
-      return unmangle(a.value)
-    } else if (a instanceof n.Symbol) {
-      return a.value
+    /*} else if (a instanceof n.Box) {
+      return unmangle(a.value)*/
+    } else if (a instanceof n.Symbol || a instanceof n.Box) {
+      return "" + a
     } else if (a instanceof n.Wrapper) {
       return anon(a.value)
     } else if (typeof a === "string") {
@@ -1435,8 +1426,10 @@ function infix(i, b, f) {
   }
 
   n.compile = function (a) {
-    // TODO: change NINO to accept a single argument
-    return NINO.compile(NINO.transform([mac(a)]))
+    return withMode("run", function () {
+      // TODO: change NINO to accept a single argument
+      return NINO.compile(NINO.transform([mac(a)]))
+    })
   }
 
   return n
