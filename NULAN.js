@@ -264,70 +264,110 @@ var NULAN = (function (n) {
   }
 
 
-  var mangle, unmangle, validJS
-
-  ;(function () {
-    // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Reserved_Words
-    var reserved = ("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with" +
-                    " class enum export extends import super" +
-                    " implements interface let package private protected public static yield" +
-                    " arguments null true false undefined").split(" ").join("|")
-
-    var to = new RegExp("^(" + reserved + ")$|(^[0-9])|([a-z])\-([a-z])|[^$a-z0-9]", "g")
-
-    mangle = function (s) {
-      return s.replace(to, function (s, s1, s2, s3, s4) {
-        // TODO: a teensy bit hacky
-        if (s1 || s2) {
-          return "_" + (s1 || s2)
-        } else if (s3) {
-          return s3 + s4.toLocaleUpperCase()
-        } else {
-          return s === "_" ? "__" : "_" + s.charCodeAt(0) + "_"
-        }
-      })
-    }
-
-    // mangle("50fooBar-qux")
-
-    var from = new RegExp("_([0-9]*)_|^_(" + reserved + "|[0-9])|([a-z])([A-Z])", "g")
-
-    // Not actually used, but still nice to have
-    unmangle = function (s) {
-      return s.replace(from, function (_, s, s1, s2, s3) {
-        if (s1) {
-          return s1
-        } else if (s2) {
-          return s2 + "-" + s3.toLocaleLowerCase()
-        } else {
-          return s === "" ? "_" : String.fromCharCode(s)
-        }
-      })
-    }
-
-    validJS = function (x) {
-      if (typeof x === "string") {
-        // TODO: code duplication with mangle
-        x = x.replace(/([a-z])\-([a-z])/g, function (_, s1, s2) {
-          return s1 + s2.toLocaleUpperCase()
-        })
-        if (/^[$_a-zA-Z][$_a-zA-Z0-9]*$/.test(x)) {
-          return x
-        }
-      }
-    }
-  })()
-
-
   n.vars = {} // Nulan Variable -> JS Variable (guaranteed unique)
+
+  var mangle, unmangle, validJS
 
   var Uniq, setBuiltin, setSymToBox, getBox, withLocalScope
 
   var isMacro, setValue, compileEval
 
+/*
+  var boxes = 5
+
+  ->
+    var boxes = 5
+
+  $eval
+    | var boxes = 5
+    | ()
+
+  $eval
+    | ->
+        var boxes = 5
+    | ()
+
+
+  var enum = 5
+
+  ->
+    var enum = 5
+
+  $eval
+    | var enum = 5
+    | ()
+
+  $eval
+    | ->
+        var enum = 5
+    | ()
+*/
+
   ;(function () {
     var boxes = {} // JS Variable -> Box
     var local
+
+
+    ;(function () {
+      var reserved = {}
+
+      // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Reserved_Words
+      ;("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with" +
+        " class enum export extends import super" +
+        " implements interface let package private protected public static yield" +
+        " null true false undefined" +
+        " arguments").split(" ").forEach(function (s) {
+        reserved[s] = true
+      })
+
+      var to = new RegExp("^([0-9])|([a-z])\-([a-z])|[^$a-z0-9]", "g")
+
+      mangle = function (s) {
+        // ((local || mode === "run") && )
+        if (reserved[s] || (local && mode === "compile" && (s === "boxes" || s === "values"))) {
+          return "_" + s
+        } else {
+          return s.replace(to, function (s, s1, s2, s3) {
+            if (s1) {
+              return "_" + s1
+            } else if (s2) {
+              return s2 + s3.toLocaleUpperCase()
+            } else {
+              return s === "_" ? "__" : "_" + s.charCodeAt(0) + "_"
+            }
+          })
+        }
+      }
+
+      // mangle("50fooBar-qux")
+
+      var from = new RegExp("_([0-9]*)_|^_([a-z0-9])|([a-z])([A-Z])", "g")
+
+      unmangle = function (s) {
+        return s.replace(from, function (_, s, s1, s2, s3) {
+          if (s1) {
+            return s1
+          } else if (s2) {
+            return s2 + "-" + s3.toLocaleLowerCase()
+          } else {
+            return s === "" ? "_" : String.fromCharCode(s)
+          }
+        })
+      }
+
+      validJS = function (x) {
+        if (typeof x === "string") {
+          // TODO: code duplication with mangle
+          x = x.replace(/([a-z])\-([a-z])/g, function (_, s1, s2) {
+            return s1 + s2.toLocaleUpperCase()
+          })
+          if (/^[$_a-zA-Z][$_a-zA-Z0-9]*$/.test(x)) {
+            return x
+          }
+        }
+      }
+    })()
+
 
     function findUniq(sOld) {
       var s = sOld
@@ -375,8 +415,12 @@ var NULAN = (function (n) {
     Uniq = function () {}
     Uniq.prototype = new n.Box()
     Uniq.prototype.toString = function () {
-             // TODO: should this use unmangle?
-      return "#<uniq " + unmangle(this.value) + ">"
+      if (this.value) {
+               // TODO: should this use unmangle?
+        return "#<uniq " + unmangle(this.value) + ">"
+      } else {
+        return "#<uniq>"
+      }
     }
     /*Uniq.prototype.uniqize = function () {
       // TODO
@@ -426,9 +470,28 @@ var NULAN = (function (n) {
     }
 
     n.box = function (s) {
-      // TODO mangle
+      /*
+      // TODO
+      return withMode("compile", function () {
+        return withGlobalScope(function () {
+          //console.log(mode, local)
+
+        })
+      })*/
+      // TODO does this need to call mangle?
       return boxes[mangle(s)]
     }
+/*
+    function withGlobalScope(f) {
+      var old2 = local
+      local = false
+      try {
+        var x = f()
+      } finally {
+        local = old2
+      }
+      return x
+    }*/
 
     withLocalScope = function (f) {
       var old  = boxes
@@ -474,6 +537,15 @@ var NULAN = (function (n) {
     })()
   })()
 
+  function isBox(x, s) {
+    x = getBox(x)
+    return x instanceof n.Box && x.value === s
+  }
+
+  n.isBox = function (x, s) {
+    return isBox(x, mangle(s))
+  }
+
 
   setBuiltin("%t", "true")
   setBuiltin("%f", "false")
@@ -492,16 +564,26 @@ var NULAN = (function (n) {
     return x
   }
 
+  function formatMode(a) {
+    switch (a.length) {
+    case 0:
+      return "<no>"
+    case 1:
+      return a[0]
+    case 2:
+      return a[0] + " and " + a[1]
+    default:
+      return a.slice(0, -1).join(", ") + ", and " + a[a.length - 1]
+    }
+  }
+
   function checkBox(x, y) {
     // TODO: x.local ||
     if (mode === "quote" || y.mode[mode]) {
       return y
     } else {
-      console.log(mode, y.mode)
-      throw new n.Error(x, "undefined variable (but it exists at " +
-                             // TODO
-                             (mode === "compile" ? "run" : "compile") +
-                             " time): " + x)
+      y = formatMode(Object.keys(y.mode))
+      throw new n.Error(x, "undefined variable (but it exists at " + y + " time): " + x)
     }
   }
 
@@ -512,16 +594,6 @@ var NULAN = (function (n) {
       return false
     }
   }*/
-
-  function isBox(x, s) {
-    x = getBox(x)
-    return x instanceof n.Box && x.value === s
-  }
-
-  n.isBox = function (x, s) {
-    return isBox(x, mangle(s))
-  }
-
 
   function mac(a) {
     var x
@@ -595,6 +667,7 @@ var NULAN = (function (n) {
 
   var patterns = {}
 
+  // TODO: mangle
   patterns[mangle("list")] = function (args, v, body) {
     args = args.slice(1)
     var index

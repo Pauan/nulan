@@ -23,7 +23,7 @@ $run
                &compile '$run
                            var n = make-macro-wrapper f
 
-
+#|
 $run
   w/var u    = make-uniq;
         args = make-uniq;
@@ -37,6 +37,7 @@ $run
                              var n = w/var u = f
                                        make-macro -> {_ @args}
                                          &compile (u @args)
+|#
 
 
 
@@ -66,6 +67,7 @@ $mac in -> @args
 
 $mac (~=) -> @args
   if args.length == 2
+    # TODO
     '& "!==" ,args.0 ,args.1
     '~ ((==) ,@args)
 
@@ -105,7 +107,8 @@ $mac $syntax-rule -> s o
 
 $mac $syntax-helper -> n f
   w/uniq s i o
-    '$mac n -> s i (o = '[])
+                        # TODO
+    '$mac n -> s i (o = ' [])
        w/complex o
          '| o.priority <= i
           | o.action <= f

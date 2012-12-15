@@ -211,9 +211,9 @@ FAQ
 
     prn foo
 
-  **A:** Nulan has a strict separation between compile-time and run-time: variables defined at compile-time **cannot** be seen at run-time in any way, shape, or form. Certain macros like ``$mac`` are prefixed with ``$`` which indicates that they are evaluated at compile-time.
+  **A:** Nulan has a *very* strict separation between compile-time and run-time: variables defined at compile-time **cannot** be used at run-time in any way, shape, or form. And vice versa: variables defined at run-time cannot be used at compile-time.
 
-  To make the above example work, you have to evaluate the expression at compile-time by using ``$run``::
+  Certain macros like ``$mac`` are prefixed with ``$`` which indicates that they are evaluated at compile-time. To make the above example work, you have to evaluate the expression at compile-time by using ``$run``::
 
     $mac foo ->
       '1 + 2
@@ -233,10 +233,17 @@ FAQ
 
     bar 10
 
-  **A:** Variables defined at compile-time **absolutely cannot** be used at run-time, but run-time variables **can** be used at compile-time.
+  **A:** Nulan wraps *every* variable in a box. The *value* of the variable ``foo`` is not available, but the *box* is.
 
-  To be more specific, Nulan wraps *every* variable in a box. These boxes are available at compile-time, but the *values* of the boxes is **not** available. This is for the obvious reason that at compile-time, the expression has not been evaluated yet, so the boxes cannot have a value.
+  The ``'`` macro returns boxes, which means that the ``bar`` macro returns the *box* for ``foo``, not the *value* for ``foo``. This is the **only** way that you can use run-time variables at compile-time.
 
-  So, in the macro ``bar``, it inserts the *box* ``foo`` rather than the *value* ``foo``, so it works.
+  However, this would not work...
 
-  And if a macro is the first element of a list, it is evaluated at compile-time, which is why ``bar 10`` works. But ``prn bar 10`` would **not** work, because the macro ``bar`` isn't the first element of the list.
+  ::
+
+    $mac bar -> x
+      foo x
+
+  ...because it's trying to use the *value* of the ``foo`` variable, which doesn't exist at compile-time.
+
+  In addition, if a *macro* is the first element of a list, it is evaluated at compile-time, which is why ``bar 10`` works. But ``prn bar 10`` would **not** work, because the macro ``bar`` isn't the first element of the list.
