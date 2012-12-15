@@ -12,11 +12,10 @@ $run
                             | var ,@args
                             | body
 
-$eval
-  | w/var u    = make-uniq;
-          args = make-uniq;
-      console.log u args
-  | ()
+$run
+  w/var u    = make-uniq;
+        args = make-uniq;
+    console.log u args
 
 $run
   var $mac = make-macro -> {_ n f}

@@ -368,8 +368,8 @@ var NULAN = (function (n) {
       return this
     }*/
     n.Box.prototype.toString = function () {
-                        // TODO: should this use unmangle?
-      return "#|box " + unmangle(this.value) + "|#"
+             // TODO: should this use unmangle?
+      return unmangle(this.value)
     }
 
     Uniq = function () {}
@@ -497,18 +497,19 @@ var NULAN = (function (n) {
     } else if (x instanceof n.Symbol) {
       var y = n.vars[x.value]
       if (y) {
-        return y
+        return boxes[y]
       } else {
         throw new n.Error(x, "undefined variable: " + x)
       }
     }
   }
 
-  function checkBox(x) {
+  function checkBox(x, y) {
     // TODO: x.local ||
-    if (x.mode[mode]) {
-      return x
+    if (mode === "quote" || y.mode[mode]) {
+      return y
     } else {
+      console.log(mode, y.mode)
       throw new n.Error(x, "undefined variable (but it exists at " +
                              // TODO
                              (mode === "compile" ? "run" : "compile") +
@@ -559,7 +560,7 @@ var NULAN = (function (n) {
     /*} else if (a === void 0) { // TODO
       return ["void", ["number", "0"]]*/
     } else if (a instanceof n.Symbol) {
-      return mac(checkBox(getBox(a)))
+      return mac(checkBox(a, getBox(a)))
     } else if (a instanceof n.Box) {
       x = a.value
 
@@ -568,7 +569,7 @@ var NULAN = (function (n) {
       } else if (mode === "compile") {
         return [".", ["name", "values"], x]
       } else if (mode === "quote") {
-        return [".", "boxes", x]
+        return [".", ["name", "boxes"], x]
         //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
         //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
         //return mac([box("&box"), x])
@@ -932,6 +933,10 @@ var NULAN = (function (n) {
     return loop(a[1])
   }))
 
+  setValue("&box==", function (x, y) {
+    return isBox(x, y)
+  })
+
   setValue("&box==", compileOnly(function (x, y) {
     return ["call", ["name", "isBox"], [mac(x), mac(y)]]
   }))
@@ -1092,13 +1097,13 @@ var NULAN = (function (n) {
   setValue("$run", macro(function (x) {
     return mac([boxM("$eval"), [boxM("|"), x, []]])
   }))
-*/
+
   setValue("w/var", macro(function () {
     var args = [].slice.call(arguments, 0, -1)
       , body = arguments[arguments.length - 1]
 
     return mac([boxM("w/new-scope"), [boxM("|"), [boxM("var")].concat(args), body]])
-  }))
+  }))*/
 
 /*
   setValue("$mac", macro(function (s, v) {
