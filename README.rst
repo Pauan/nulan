@@ -6,6 +6,24 @@ Make sure you have Node.js installed (I've only tested with version 0.8.5)
 Then just use ``./nulan`` to get to a REPL
 
 
+Features
+========
+
+* A full-blown Lisp, which means programs are parsed as S-expressions, and there's a very heavy emphasis on "code is data is code"
+
+* `Pattern matching <nulan/blob/javascript/notes/Pattern%20matching.rst>`_ for variable binding
+
+* `Hyper-static scope <nulan/blob/javascript/notes/Hyper-static%20scope.rst>`_ at both the global and function level
+
+* `Hygienic macros <nulan/blob/javascript/notes/Hygienic%20macros.rst>`_ which are even easier to use than Arc/Common Lisp macros
+
+* `Customizable syntax <nulan/blob/javascript/notes/Customizable%20syntax.rst>`_ to make common idioms shorter and easier to read
+
+* The compiler is written in JavaScript and is capable of running in a browser: you can incrementally compile/eval Nulan programs at runtime
+
+* Compiles ahead-of-time to extremely fast JavaScript: it should be just as fast or faster than handwritten JS code
+
+
 Examples
 ========
 
@@ -157,24 +175,6 @@ Examples
   &eval
     w/namespace value
       x + y
-
-
-Features
-========
-
-* A full-blown Lisp, which means programs are parsed as S-expressions, and there's a very heavy emphasis on "code is data is code"
-
-* `Pattern matching <nulan/blob/javascript/notes/Pattern%20matching.rst>`_ for function/macro arguments
-
-* `Hyper-static scope <nulan/blob/javascript/notes/Hyper-static%20scope.rst>`_ at both the global and function level
-
-* `Hygienic macros <nulan/blob/javascript/notes/Hygienic%20macros.rst>`_ which are even easier to use than Arc/Common Lisp macros
-
-* `Customizable syntax <nulan/blob/javascript/notes/Customizable%20syntax.rst>`_ to make common idioms shorter and easier to read
-
-* The compiler is written in JavaScript and is capable of running in a browser: you can incrementally compile/eval Nulan programs at runtime
-
-* Compiles ahead-of-time to extremely fast JavaScript: it should be just as fast or faster than handwritten JS code
 
 
 FAQ
