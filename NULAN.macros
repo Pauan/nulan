@@ -13,23 +13,25 @@ $run
                             | body
 
 $run
-  w/var u    = make-uniq;
-        args = make-uniq;
-    console.log u args
-
-$run
-  var make-macro-wrapper = -> f
-    make-macro -> {_ @args}
-      &compile (f @args)
+  var make-macro-wrapper =
+    -> f
+      make-macro -> {_ @args}
+        &compile (f @args)
 
 $run
   var $mac = make-macro -> {_ n f}
                &compile '$run
                            var n = make-macro-wrapper f
 
+
+$run
+  w/var u    = make-uniq;
+        args = make-uniq;
+    console.log u args
+
 $run
   var $mac = make-macro -> {_ n f}
-               w/war u    = make-uniq;
+               w/var u    = make-uniq;
                      args = make-uniq;
                  &compile '$run
                              var n = w/var u = f
