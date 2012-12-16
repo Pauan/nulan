@@ -15,6 +15,7 @@ load("./NULAN.parse.js")
 
 load("./lib/NINO.compile.js")
 load("./lib/NINO.transform.js")
+load("./lib/NINO.partial.js")
 
 load("./NULAN.js")
 

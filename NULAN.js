@@ -8,6 +8,13 @@ var NULAN = (function (n) {
   }
 
 
+  function compile(a) {
+    // TODO: change NINO to accept a single argument
+    // TODO: should partial or transform come first?
+    return NINO.compile(NINO.partial(NINO.transform([mac(a)])))
+  }
+
+
   var mode = "compile" // Whether code is evaluated at run-time or compile-time
 
   function withMode(s, f) {
@@ -540,8 +547,7 @@ var NULAN = (function (n) {
           return mac(x)
         } else {
           return withMode("compile", function () {
-            x = mac(x)
-            x = NINO.compile(NINO.transform([x]))
+            x = compile(x)
             console.log(x)
             console.log()
             return ["id", eval(x)]
@@ -813,6 +819,8 @@ var NULAN = (function (n) {
   setValue("|",           binreduce1(","))
   setValue("/",           binreduce1("/"))
 
+// TODO: make , and @ into make-macro-error macros
+// TODO: change if so it only accepts 0-3 arguments
 /*
   var i = 0
 
@@ -1518,9 +1526,13 @@ function infix(i, b, f) {
 
   n.import = function () {
     [].forEach.call(arguments, function (s) {
-      n.parse(n.readFile(s), function (x) {
-        n.compile(x)
-      })
+      n.eval(n.readFile(s))
+    })
+  }
+
+  n.eval = function (s) {
+    return n.parse(s, function (x) {
+      return n.compile(x)
     })
   }
 
@@ -1542,8 +1554,7 @@ function infix(i, b, f) {
 
   n.compile = function (a) {
     return withMode("run", function () {
-      // TODO: change NINO to accept a single argument
-      return NINO.compile(NINO.transform([mac(a)]))
+      return compile(a)
     })
   }
 

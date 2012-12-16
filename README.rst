@@ -152,7 +152,7 @@ Examples
 
   1 foo 2    # Custom infix syntax
 
-  (foo) 1 2  # Can disable syntax by wrapping in parens
+  (foo) 1 2  # Wrapping in parens disables syntax
 
 ::
 

@@ -56,7 +56,6 @@ $mac def -> n v
 $mac str -> @args
   '(+) "" ,@args
 
-# TODO: `call 1 2 3 4 5` doesn't work
 $mac call -> x y @args
   'x[y].call ,@args
 
@@ -104,8 +103,9 @@ $mac w/dict! -> args body
      body
 
 $mac $syntax-protect -> body
-  'w/dict! syntax-rules
-     body
+  '$run
+     w/dict! syntax-rules
+       body
 
 $mac w/complex -> x body
   w/uniq u v
@@ -219,6 +219,22 @@ let u {}
 { -> a b c | -> a b c | -> a b c }
 
 
+foo bar @qux
+
+'foo bar @qux
+
+''foo bar @qux
+
+'''foo bar @qux
+
+
+'foo ,bar ,@qux
+
+''foo ,bar ,@qux
+
+''foo ,,bar ,,@qux
+
+
 if qux corge
   | a
   | b
@@ -229,4 +245,15 @@ if qux corge
       | f
       | g
       h
+
+if qux corge
+  | a
+  | b
+  foo bar
+  | d
+  | e
+  nou yesno
+  | f
+  | g
+  h
 |#
