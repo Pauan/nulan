@@ -609,19 +609,6 @@ var NULAN = (function (n) {
     }
   }*/
 
-  var types = true
-
-  function withTypes(b, f) {
-    var old = types
-    types = b
-    try {
-      var x = f()
-    } finally {
-      types = old
-    }
-    return x
-  }
-
   function mac(a) {
     var x
     if (Array.isArray(a)) {
@@ -644,23 +631,19 @@ var NULAN = (function (n) {
     } else if (a instanceof n.Symbol) {
       return mac(checkBox(a, getBox(a)))
     } else if (a instanceof n.Box) {
-      if (("typeValue" in a) && types) {
-        return a.typeValue
-      } else {
-        x = a.value
+      x = a.value
 
-        if (a.local || mode === "run") {
-          return ["name", x]
-        } else if (mode === "compile") {
-          return [".", ["name", "values"], x]
-        } else if (mode === "quote") {
-          return [".", ["name", "boxes"], x]
-          //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
-          //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
-          //return mac([box("&box"), x])
-        } else {
-          throw new n.Error(a, "invalid mode: " + mode) // TODO
-        }
+      if (a.local || mode === "run") {
+        return ["name", x]
+      } else if (mode === "compile") {
+        return [".", ["name", "values"], x]
+      } else if (mode === "quote") {
+        return [".", ["name", "boxes"], x]
+        //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
+        //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
+        //return mac([box("&box"), x])
+      } else {
+        throw new n.Error(a, "invalid mode: " + mode) // TODO
       }
     } else {
       throw new n.Error(a, "invalid expression: " + a)
@@ -813,6 +796,7 @@ var NULAN = (function (n) {
   setValue("&in",         binary("in"))
   setValue("&instanceof", binary("instanceof"))
   setValue("mod",         binary("%"))
+  setValue("<=",          binary("="))
 
   setValue("==",          binand("===", ["boolean", "true"]))
   setValue("<",           binand("<",   ["boolean", "true"]))
@@ -829,25 +813,6 @@ var NULAN = (function (n) {
   setValue("|",           binreduce1(","))
   setValue("/",           binreduce1("/"))
 
-  // TODO: need to do this for ++ and -- too
-  setValue("<=", macro(function (x, y) {
-    if (boxOrSym(x)) {
-      x = getBox(x)
-      if ("typeValue" in x) {
-        // TODO: shouldn't it do mac and *then* check if it's complex?
-        if (!types || complex(y)) {
-          delete x.typeValue
-        } else {
-          y = mac(y)
-          x.typeValue = y
-          return y
-        }
-      }
-    }
-    return ["=", mac(x), mac(y)]
-  }))
-
-// TODO: move constant propagation into the NINO transformer
 /*
   var i = 0
 
@@ -934,9 +899,7 @@ var NULAN = (function (n) {
   }))
 
   setValue("while", macro(function (test, body) {
-    return withTypes(false, function () {
-      return ["while", mac(test), [mac(body)]]
-    })
+    return ["while", mac(test), [mac(body)]]
   }))
 
   setValue("w/new-scope", macro(function (body) {
@@ -957,12 +920,8 @@ var NULAN = (function (n) {
       return ["if", mac(a[0]), [mac(a[1])], []]
     case 3:
       return ["if", mac(a[0]),
-               [withTypes(false, function () {
-                  return withNewScope(function () { return mac(a[1]) })
-                })],
-               [withTypes(false, function () {
-                  return withNewScope(function () { return mac(a[2]) })
-                })]]
+               [withNewScope(function () { return mac(a[1]) })],
+               [withNewScope(function () { return mac(a[2]) })]]
     // TODO: maybe simplify this a bit?
     default:
       return ["if", mac(a[0]), [mac(a[1])],
@@ -1225,7 +1184,7 @@ var NULAN = (function (n) {
     }*/
 
     return args.map(function (x) {
-      var y, z
+      var y
       if (Array.isArray(x)) {
         // TODO: use isSym ?
         if (!n.isBox(x[0], "=")) {
@@ -1238,26 +1197,22 @@ var NULAN = (function (n) {
         return mac(y)
       } else if (boxOrSym(x)) {
         if (y !== void 0) {
-          z = mac(y)
+          y = mac(y)
         }
 
         x = setSymToBox(x)
-
-        if (y !== void 0 && !complex(y)) {
-          x.typeValue = z
-        }
 
         if (!x.local && mode === "compile") {
           if (y === void 0) {
             return ["empty"] // TODO
           } else {
-            return ["=", [".", ["name", "values"], x.value], z]
+            return ["=", [".", ["name", "values"], x.value], y]
           }
         } else {
           if (y === void 0) {
             return ["var", [[x.value]]]
           } else {
-            return ["var", [[x.value, z]]]
+            return ["var", [[x.value, y]]]
           }
         }
       } else {

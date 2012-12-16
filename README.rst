@@ -156,48 +156,6 @@ Examples
 
 ::
 
-(with (body '(foo bar)
-       x    'qux)
-  (w/uniq (u v)
-    `(if (isa ,x 'sym)
-         ,body
-         (w/uniq (,u ,v)
-           (withs (,v ,x
-                   ,x ,u)
-              `(let ,,u ,,v
-                 ,,body))))))
-
-(let a 20
-  `(1 2 3
-     `(4 5 6 ,a)))
-
-$run
-  w/var a = 20
-    '1 2 3 ,a a
-       '4 5 6
-          ,a
-          ,(',) a
-          ,,a
-          ,, ,a
-
-$run
-  ',@1
-
-$run
-  '1 2 3 ,@4 ,5
-     ',@5 6 ,5 ,,5 7 ,@(8 + 5) ,,@(9 + 5)
-
-
-$run
-  '1 2 3 ,(+) (+)
-     '4 5 6
-        ,(+)
-        ,,(+)
-
-$run
-  '1 2 ('3 ,(4 + 10)) ,5
-
-
   # Array comprehensions
   var in
 
@@ -212,6 +170,49 @@ $run
   $syntax-infix in  [ order "right" ]
 
   (x + 2) for x in {1 2 3}
+
+::
+
+  (with (body '(foo bar)
+         x    'qux)
+    (w/uniq (u v)
+      `(if (isa ,x 'sym)
+           ,body
+           (w/uniq (,u ,v)
+             (withs (,v ,x
+                     ,x ,u)
+                `(let ,,u ,,v
+                   ,,body))))))
+
+  (let a 20
+    `(1 2 3
+       `(4 5 6 ,a)))
+
+  $run
+    w/var a = 20
+      '1 2 3 ,a a
+         '4 5 6
+            ,a
+            ,(',) a
+            ,,a
+            ,, ,a
+
+  $run
+    ',@1
+
+  $run
+    '1 2 3 ,@4 ,5
+       ',@5 6 ,5 ,,5 7 ,@(8 + 5) ,,@(9 + 5)
+
+
+  $run
+    '1 2 3 ,(+) (+)
+       '4 5 6
+          ,(+)
+          ,,(+)
+
+  $run
+    '1 2 ('3 ,(4 + 10)) ,5
 
   (x + y) for x in {1 2 3} for y in {4 5 6}
 

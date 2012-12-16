@@ -117,6 +117,14 @@ $mac w/complex -> x body
               ,body
        body
 
+$mac w/each -> {('=) x y} body
+  w/uniq i len
+    w/complex y
+      'w/var len = y.length
+         for (var i = 0) (i ~= len) (++ i)
+           w/var x = y[i]
+             body
+
 
 $mac $syntax-rule -> s o
   '$run
