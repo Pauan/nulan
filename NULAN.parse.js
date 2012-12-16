@@ -14,9 +14,15 @@ var NULAN = (function (n) {
       var b1 = "line"   in o
         , b2 = "column" in o
       if (o.text || b1 || b2) {
+        var iOffset = 0
         a.push("\n")
         if (o.text) {
-          a.push("  ", o.text.replace(/\n$/, ""))
+          a.push("  ", o.text.replace(/^( +)|\n$/g, function (_, s1) {
+            if (s1) {
+              iOffset = s1.length
+            }
+            return ""
+          }))
         }
         if (b1 || b2) {
           a.push("  (")
@@ -32,7 +38,7 @@ var NULAN = (function (n) {
           a.push(")")
         }
         if (o.text && b2) {
-          a.push("\n ", new Array(o.column + 1).join(" "),
+          a.push("\n ", new Array(o.column - iOffset + 1).join(" "),
                         new Array(o.length + 1).join("^"))
         }
       }
@@ -260,6 +266,7 @@ var NULAN = (function (n) {
 
     "'": {
       priority: 10,
+      whitespace: true,
       delimiter: true,
       separator: true,
       action: function (l, s, r) {
@@ -378,10 +385,33 @@ var NULAN = (function (n) {
     var s = store(o)
       , q = o.peek()
       , r = []
+      , c
     o.read()
     while (o.peek() !== q) {
       if (o.has()) {
-        r.push(o.read())
+        c = o.peek()
+        if (c === "\\") {
+          o.read()
+          c = o.read()
+          if (c === "n") {
+            r.push("\n")
+          } else if (c === "t") {
+            r.push("\t")
+          } else if (c === "\"" || c === "@" || c === "\\") {
+            r.push(c)
+          } else {
+            // TODO: a little hacky
+            o.length = 2
+            o.column -= 2
+            throw new n.Error(o, "expected \\n \\t \\\" \\@ \\\\ but got \\" + c)
+          }
+        // TODO
+        } else if (c === "@") {
+          o.read()
+          console.log(tokenize(o, true))
+        } else {
+          r.push(o.read())
+        }
       } else {
         s.length = 1
         throw new n.Error(s, "missing ending \"")
@@ -416,7 +446,7 @@ var NULAN = (function (n) {
     }
   }
 
-  function tokenize(o) {
+  function tokenize(o, once) {
     var c, s, r = []
 
     var white = true
@@ -456,16 +486,23 @@ var NULAN = (function (n) {
       } else if (c === "\"") {
         white = false
         r.push(tokenizeString(o))
+        if (once) {
+          break
+        }
       } else if (t[c] && t[c].delimiter) {
         s = store(o)
         o.read()
         s = enrich(new n.Symbol(c), s, o)
         s.whitespace = white
-        white = false
+        white = !!t[c].whitespace
         r.push(s)
       } else {
+        // TODO: should use the whitespace property of the token
         white = false
         r.push(tokenizeNumOrSym(o))
+        if (once) {
+          break
+        }
       }
     }
 

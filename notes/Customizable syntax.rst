@@ -94,6 +94,7 @@ There are five phases to Nulan's syntax parsing:
 
    How this works is, each rule can have the following properties:
 
+   * If ``whitespace`` is true, the symbol will be treated as whitespace
    * If ``separator`` is true, the parser will take everything that's indented further than the symbol and will put it into a list
    * If ``delimiter`` is true, the parser will treat the syntax as not being a part of symbols
    * The rules with higher ``priority`` are run first. The default is ``0`` priority

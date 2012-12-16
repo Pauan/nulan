@@ -145,36 +145,110 @@ Examples
 
 ::
 
-  $mac w/each -> x body
-    w/var i   = uniq;
-          l   = uniq;
-          u   = uniq;
-          y   = x.1
-          x   = x.0
-          tmp = y
-          y   = u
-      'w/var u = tmp
-             l = y."length"
-         for (var i = 0) (i ~= l) (++ i)
-           w/var x = get y i
-             body
+  def foo -> x y
+    x + y
+
+  $syntax-infix foo
+
+  1 foo 2    # Custom infix syntax
+
+  (foo) 1 2  # Can disable syntax by wrapping in parens
+
+::
+
+(with (body '(foo bar)
+       x    'qux)
+  (w/uniq (u v)
+    `(if (isa ,x 'sym)
+         ,body
+         (w/uniq (,u ,v)
+           (withs (,v ,x
+                   ,x ,u)
+              `(let ,,u ,,v
+                 ,,body))))))
+
+(let a 20
+  `(1 2 3
+     `(4 5 6 ,a)))
+
+$run
+  w/var a = 20
+    '1 2 3 ,a a
+       '4 5 6
+          ,a
+          ,(',) a
+          ,,a
+          ,, ,a
+
+$run
+  ',@1
+
+$run
+  '1 2 3 ,@4 ,5
+     ',@5 6 ,5 ,,5 7 ,@(8 + 5) ,,@(9 + 5)
 
 
-  syntax-rule - 0 -> l s {y @r}
-    if l.length == 0
-      {{s y} @r2}
-      let {@l x} l
-        {@l {s x y} @r}
+$run
+  '1 2 3 ,(+) (+)
+     '4 5 6
+        ,(+)
+        ,,(+)
 
-  syntax-rule = 0 -> l s r
-    {@l s @(parse-line r)}
+$run
+  '1 2 ('3 ,(4 + 10)) ,5
 
-  syntax-rule -> 0 -> l s {@args body}
-    {@l {s {list @args} body}}
 
-  &eval
-    w/namespace value
-      x + y
+  # Array comprehensions
+  var in
+
+  $mac for -> x {('in) n y}
+    w/uniq u
+      'w/var u = {}
+         | w/each n = y
+             u.push x
+         | u
+
+  $syntax-infix for [ order "right" ]
+  $syntax-infix in  [ order "right" ]
+
+  (x + 2) for x in {1 2 3}
+
+  (x + y) for x in {1 2 3} for y in {4 5 6}
+
+  ((x + y) for x in {1 2 3}) for y in {4 5 6}
+
+  (x + y) for {x y} in {{1 2 3} {4 5 6}}
+
+  (for
+    (for
+      (x + y)
+      (in x {1 2 3}))
+    (in y {4 5 6}))
+
+  w/var u = {}
+    | w/each y = {4 5 6}
+        u.push
+          w/var u = {}
+            | w/each x = {1 2 3}
+                u.push (x + y)
+            | u
+    | u
+
+
+  for (x + 2)
+    in x {1 2 3}
+
+  $syntax-rule (for) [
+    order "right"
+    action -> {@l x} s {y @r}
+      ',@l (s x y) ,@r
+  ]
+
+  $syntax-rule (in) [
+    order "right"
+    action -> {@l x} s {y @r}
+      ',@l (s x y) ,@r
+  ]
 
 
 FAQ
@@ -192,7 +266,7 @@ FAQ
 
     foo 20
 
-  **A:** Nulan uses hyper-static scope, so you need to rearrange it to be like this::
+  **A:** Nulan uses hyper-static scope, so you need to rearrange it so ``foo`` is defined after ``bar``::
 
     def bar -> x
       x + 5
@@ -246,4 +320,4 @@ FAQ
 
   ...because it's trying to use the *value* of the ``foo`` variable, which doesn't exist at compile-time.
 
-  In addition, if a *macro* is the first element of a list, it is evaluated at compile-time, which is why ``bar 10`` works. But ``prn bar 10`` would **not** work, because the macro ``bar`` isn't the first element of the list.
+  In addition, if a *macro* is the first element of a list, it is evaluated at compile-time, which is why ``bar 10`` works. But ``prn bar 10`` would **not** work, because the macro ``bar`` isn't the first element of the list

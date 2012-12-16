@@ -1,6 +1,7 @@
 var NULAN = (function (n) {
   "use strict";
 
+
   Object.prototype.tap = function () {
     console.log(require("util").inspect(n.toJSON(this), false, null, false))
     return this
@@ -158,11 +159,10 @@ var NULAN = (function (n) {
       case 1:
         throw new n.Error(a[0], a[0] + " cannot be called with 0 arguments")
       case 2:
-        if (typeof i === "function") {
-          return i(mac(a[1]))
-        } else {
-          return mac(a[1])
-        }
+        a = mac(a[1])
+        return (typeof i === "function"
+                 ? i(a)
+                 : a)
       default:
         return binr(s, a.slice(1).map(mac))
       }
@@ -311,12 +311,21 @@ var NULAN = (function (n) {
     ;(function () {
       var reserved = {}
 
+      /*
+      Object.getOwnPropertyNames(window).forEach(function (s) {
+        if (!Object.getOwnPropertyDescriptor(window, s).writable) {
+          console.log(s)
+        }
+      })
+      */
+
       // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Reserved_Words
-      ;("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with" +
-        " class enum export extends import super" +
-        " implements interface let package private protected public static yield" +
-        " null true false undefined" +
-        " arguments").split(" ").forEach(function (s) {
+      ;("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with " +
+        "class enum export extends import super " +
+        "implements interface let package private protected public static yield " +
+        "null true false " +
+        "undefined NaN Infinity " + // TODO: document isn't writable either, but should probably be handled in a different way
+        "arguments").split(" ").forEach(function (s) {
         reserved[s] = true
       })
 
@@ -527,12 +536,17 @@ var NULAN = (function (n) {
 
       // This needs to be in here because `eval` needs access to `values` and `boxes`
       compileEval = function (x) {
-        return withMode("compile", function () {
-          x = mac(x)
-          x = NINO.compile(NINO.transform([x]))
-          console.log(x)
-          return ["id", eval(x)]
-        })
+        if (mode === "compile") {
+          return mac(x)
+        } else {
+          return withMode("compile", function () {
+            x = mac(x)
+            x = NINO.compile(NINO.transform([x]))
+            console.log(x)
+            console.log()
+            return ["id", eval(x)]
+          })
+        }
       }
     })()
   })()
@@ -550,7 +564,7 @@ var NULAN = (function (n) {
   setBuiltin("%t", "true")
   setBuiltin("%f", "false")
 
-  setValue("$syntax-rules", n.syntaxRules)
+  setValue("syntax-rules", n.syntaxRules)
 
 
   function withNewScope(f) {
@@ -595,6 +609,19 @@ var NULAN = (function (n) {
     }
   }*/
 
+  var types = true
+
+  function withTypes(b, f) {
+    var old = types
+    types = b
+    try {
+      var x = f()
+    } finally {
+      types = old
+    }
+    return x
+  }
+
   function mac(a) {
     var x
     if (Array.isArray(a)) {
@@ -617,19 +644,23 @@ var NULAN = (function (n) {
     } else if (a instanceof n.Symbol) {
       return mac(checkBox(a, getBox(a)))
     } else if (a instanceof n.Box) {
-      x = a.value
-
-      if (a.local || mode === "run") {
-        return ["name", x]
-      } else if (mode === "compile") {
-        return [".", ["name", "values"], x]
-      } else if (mode === "quote") {
-        return [".", ["name", "boxes"], x]
-        //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
-        //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
-        //return mac([box("&box"), x])
+      if (("typeValue" in a) && types) {
+        return a.typeValue
       } else {
-        throw new n.Error(a, "invalid mode: " + mode) // TODO
+        x = a.value
+
+        if (a.local || mode === "run") {
+          return ["name", x]
+        } else if (mode === "compile") {
+          return [".", ["name", "values"], x]
+        } else if (mode === "quote") {
+          return [".", ["name", "boxes"], x]
+          //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
+          //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
+          //return mac([box("&box"), x])
+        } else {
+          throw new n.Error(a, "invalid mode: " + mode) // TODO
+        }
       }
     } else {
       throw new n.Error(a, "invalid expression: " + a)
@@ -798,6 +829,37 @@ var NULAN = (function (n) {
   setValue("|",           binreduce1(","))
   setValue("/",           binreduce1("/"))
 
+  // TODO: need to do this for ++ and -- too
+  setValue("<=", macro(function (x, y) {
+    if (boxOrSym(x)) {
+      x = getBox(x)
+      if ("typeValue" in x) {
+        // TODO: shouldn't it do mac and *then* check if it's complex?
+        if (!types || complex(y)) {
+          delete x.typeValue
+        } else {
+          y = mac(y)
+          x.typeValue = y
+          return y
+        }
+      }
+    }
+    return ["=", mac(x), mac(y)]
+  }))
+
+// TODO: move constant propagation into the NINO transformer
+/*
+  var i = 0
+
+  prn i
+
+  if 1
+    i <= 20
+    i <= 30
+
+  prn i
+*/
+
   setValue("&break", macro(function () {
     return ["break"]
   }))
@@ -809,10 +871,6 @@ var NULAN = (function (n) {
   // TODO: maybe I can make this into a function instead?
   setValue("&", macro(function () {
     return $mac(arguments)
-  }))
-
-  setValue("<=", macro(function (x, y) {
-    return ["=", mac(x), mac(y)]
   }))
 
   setValue("list", macro(function () {
@@ -876,7 +934,9 @@ var NULAN = (function (n) {
   }))
 
   setValue("while", macro(function (test, body) {
-    return ["while", mac(test), [mac(body)]]
+    return withTypes(false, function () {
+      return ["while", mac(test), [mac(body)]]
+    })
   }))
 
   setValue("w/new-scope", macro(function (body) {
@@ -889,15 +949,20 @@ var NULAN = (function (n) {
     var a = arguments
     switch (a.length) {
     case 0:
-      return ["void", ["number", "0"]]
+             // TODO
+      return ["empty"] //["void", ["number", "0"]]
     case 1:
       return mac(a[0])
     case 2:
       return ["if", mac(a[0]), [mac(a[1])], []]
     case 3:
       return ["if", mac(a[0]),
-               [withNewScope(function () { return mac(a[1]) })],
-               [withNewScope(function () { return mac(a[2]) })]]
+               [withTypes(false, function () {
+                  return withNewScope(function () { return mac(a[1]) })
+                })],
+               [withTypes(false, function () {
+                  return withNewScope(function () { return mac(a[2]) })
+                })]]
     // TODO: maybe simplify this a bit?
     default:
       return ["if", mac(a[0]), [mac(a[1])],
@@ -964,42 +1029,90 @@ var NULAN = (function (n) {
 
   setValue("'", new Macro(function (a) {
     var s = a[0]
+      , i = 1
+
+    // TODO: move these both outside of ' ?
+    function findCommas(x, f) {
+      var i2 = i
+      while (Array.isArray(x) && n.isBox(x[0], ",") && i2 > 0) {
+        x = x[1]
+        --i2
+      }
+      return f(x, i2)
+    }
+
+    function withQuote(x, f) {
+      if (n.isBox(x[0], "'")) {
+        ++i
+        try {
+          x = f()
+        } finally {
+          --i
+        }
+        return x
+      } else {
+        return f()
+      }
+    }
 
     function loop(x) {
-      // TODO: a little bit hacky, but it'll do for now
       if (Array.isArray(x)) {
-        if (n.isBox(x[0], ",") && (x = x[1])) {
-          if (Array.isArray(x) && n.isBox(x[0], "@")) {
-                                 // TODO: a teensy bit hacky
-            throw new n.Error({ text:   s.text
-                              , column: s.column
-                              , line:   s.line
-                              , length: x[0].column - s.column + 1 }, "',@ is invalid")
-          } else {
-            return mac(x)
-          }
-        /*} else if (n.isBox(x[0], "'")) {
-          return loop(x[1])
-          //console.log("FOO")
-          // .concat()
-          x = loop(x[1])
-          x[1].unshift(["call", ["name", "box"], [["string", "list"]]])
-          console.log(x)
-          return x*/
-        } else {
-          return arraySplitter(x, function (x) {
-            if (Array.isArray(x) && n.isBox(x[0], ",") && (x = x[1]) &&
-                Array.isArray(x) && n.isBox(x[0], "@") && (x = x[1])) {
-              return x
+        if (n.isBox(x[0], ",")) {
+          return findCommas(x, function (y, i) {
+            if (i === 0) {
+              if (Array.isArray(y) && n.isBox(y[0], "@")) {
+                                     // TODO: a teensy bit hacky
+                throw new n.Error({ text:   s.text
+                                  , column: s.column
+                                  , line:   s.line
+                                  , length: y[0].column - s.column + 1 }, "',@ is invalid")
+              } else {
+                y = mac(y)
+              }
+            } else {
+              y = loop(y)
             }
-          }, function (x, b) {
-            if (b) {
-              return mac(x)
+
+            var b = loop(x[0])
+            while (i > 0) {
+              y = ["array", [b, y]]
+              --i
+            }
+            return y
+          })
+        } else {
+          /*return ["array", x.map(function (x) {
+            if (Array.isArray(x) && n.isBox(x[0], ",")) {
+              return findCommas(x, function (x, i) {
+                var y
+                if (Array.isArray(x) && n.isBox(x[0], "@")) {
+
+                } else {
+
+                }
+                console.log(x, i)
+              })
             } else {
               return loop(x)
             }
-          }, function (x, b) {
-            return b ? x : ["array", x]
+          })]*/
+          return withQuote(x, function () {
+            // TODO: a little bit hacky, but I don't really know of a better alternative
+            return arraySplitter(x, function (x) {
+              return findCommas(x, function (x, i) {
+                if (i === 0 && Array.isArray(x) && n.isBox(x[0], "@")) {
+                  return x[1]
+                }
+              })
+            }, function (x, b) {
+              if (b) {
+                return mac(x)
+              } else {
+                return loop(x)
+              }
+            }, function (x, b) {
+              return b ? x : ["array", x]
+            })
           })
         }
       } else if (wildcard(x)) {
@@ -1010,6 +1123,7 @@ var NULAN = (function (n) {
           return mac(x)
         })
       } else {
+        // TODO
         return mac(x)
       }
     }
@@ -1070,7 +1184,7 @@ var NULAN = (function (n) {
                 }
               })(iLen - 1)
 
-              body = destructure(x[1], slicer(u, i, args.length), body).tap()
+              body = destructure(x[1], slicer(u, i, args.length), body)
 
               if (i !== iLen - 1) {
                 body = destructure(u, s, body)
@@ -1111,7 +1225,7 @@ var NULAN = (function (n) {
     }*/
 
     return args.map(function (x) {
-      var y
+      var y, z
       if (Array.isArray(x)) {
         // TODO: use isSym ?
         if (!n.isBox(x[0], "=")) {
@@ -1124,18 +1238,26 @@ var NULAN = (function (n) {
         return mac(y)
       } else if (boxOrSym(x)) {
         if (y !== void 0) {
-          y = mac(y)
+          z = mac(y)
         }
 
         x = setSymToBox(x)
 
+        if (y !== void 0 && !complex(y)) {
+          x.typeValue = z
+        }
+
         if (!x.local && mode === "compile") {
-          return ["=", [".", ["name", "values"], x.value], y]
+          if (y === void 0) {
+            return ["empty"] // TODO
+          } else {
+            return ["=", [".", ["name", "values"], x.value], z]
+          }
         } else {
           if (y === void 0) {
             return ["var", [[x.value]]]
           } else {
-            return ["var", [[x.value, y]]]
+            return ["var", [[x.value, z]]]
           }
         }
       } else {
@@ -1183,22 +1305,6 @@ var NULAN = (function (n) {
 */
 
 /*
-
-$mac foo -> 10
-
-foo;
-
-
-
-
-
-def foo -> x y
-  x + y
-
-$syntax-infix foo 9001
-
-1 foo 2
-
 
 function infix(i, b, f) {
     return {
@@ -1453,7 +1559,7 @@ function infix(i, b, f) {
 
   // TODO: make it possible to have a variable at both runtime and compiletime
   //n.include("console", "Array")
-  n.builtin({ "console": console, "Array": Array })
+  n.builtin({ "console": console, "Array": Array, "Object": Object })
 
   n.import = function () {
     [].forEach.call(arguments, function (s) {

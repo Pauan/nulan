@@ -27,7 +27,11 @@ NULAN.readFile = function (s) {
 /*NULAN.vars["prn"]     = "prn"
 NULAN.values["prn"]   = prn*/
 
-//NULAN.import("NULAN.macros")
+try {
+  NULAN.import("NULAN.macros")
+} catch (e) {
+  console.error("" + e)
+}
 
 
 var opts = {
