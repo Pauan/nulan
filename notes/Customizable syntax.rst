@@ -171,3 +171,115 @@ There are five phases to Nulan's syntax parsing:
      foo
 
 That describes basically the entire parser.
+
+::
+
+  # priority 110, delimiter, endAt ")"
+  (foo)          <>  foo
+  (foo bar qux)  <>  (foo bar qux)
+
+::
+
+  # priority 110, delimiter, endAt "}"
+  {foo}          <>  (list foo)
+  {foo bar qux}  <>  (list foo bar qux)
+
+::
+
+  # priority 110, delimiter, endAt "]"
+  foo[bar]               <>  (. foo bar)
+  foo[bar qux]           <>  (. foo (bar qux))
+  [ foo bar qux corge ]  <>  (dict foo bar qux corge)
+
+::
+
+  # priority 100, delimiter
+  foo;                <>  (foo)
+  foo bar; qux corge  <>  ((foo bar) qux corge)
+
+::
+
+  # priority 100, delimiter, separator
+  :foo                <>  (foo)
+  foo bar: qux corge  <>  (foo bar (qux corge))
+
+::
+
+  # priority 100, delimiter
+  1.5            <>  1.5
+  foo.bar        <>  (. foo "bar")
+  foo.(bar qux)  <>  (. foo (bar qux))
+
+::
+
+  # priority 90, delimiter
+  foo ,bar  <>  (foo (, bar))
+  foo @bar  <>  (foo (@ bar))
+
+::
+
+  # priority 90
+  foo ~ bar  <>  (foo (~ bar))
+
+::
+
+  # priority 80
+  foo * bar  <>  (* foo bar)
+  foo / bar  <>  (/ foo bar)
+
+::
+
+  # priority 70
+  foo + bar  <>  (+ foo bar)
+  foo - bar  <>  (- foo bar)
+
+::
+
+  # priority 60
+  foo < bar   <>  (< foo bar)
+  foo > bar   <>  (> foo bar)
+  foo =< bar  <>  (=< foo bar)
+  foo >= bar  <>  (>= foo bar)
+
+::
+
+  # priority 50
+  foo == bar  <>  (~= foo bar)
+  foo ~= bar  <>  (~= foo bar)
+  foo |= bar  <>  (|= foo bar)
+
+::
+
+  # priority 40
+  foo && bar  <>  (&& foo bar)
+
+::
+
+  # priority 30
+  foo || bar  <>  (|| foo bar)
+
+::
+
+  # priority 10, whitespace, delimiter, separator
+  'foo          <>  (' foo)
+  'foo bar qux  <>  (' (foo bar qux))
+  '[]           <>  (' (dict))
+
+::
+
+  # priority 10, order "right"
+  -> foo                <>  (-> foo)
+  -> foo bar qux        <>  (-> (foo bar) qux)
+  foo bar qux -> corge  <>  (foo bar qux (-> corge))
+
+::
+
+  # priority 10, separator
+  foo = bar            <>  (= foo bar)
+  foo = bar qux corge  <>  (= foo (bar qux corge))
+
+::
+
+  # priority 0, order "right"
+  foo <= bar            <>  (<= foo bar)
+  foo bar <= qux corge  <>  (<= (foo bar) (qux corge))

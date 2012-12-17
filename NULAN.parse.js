@@ -168,7 +168,7 @@ var NULAN = (function (n) {
   var t = {
     // TODO: do these need to be priority 120?
     "(": {
-      priority: 120,
+      priority: 110,
       delimiter: true,
       endAt: ")",
       action: function (l, s, r) {
@@ -178,7 +178,7 @@ var NULAN = (function (n) {
     },
 
     "{": {
-      priority: 120,
+      priority: 110,
       delimiter: true,
       endAt: "}",
       action: function (l, s, r) {
@@ -189,7 +189,7 @@ var NULAN = (function (n) {
     },
 
     "[": {
-      priority: 120,
+      priority: 110,
       delimiter: true,
       endAt: "]",
       action: function (l, s, r) {
@@ -206,7 +206,7 @@ var NULAN = (function (n) {
     },
 
     ";": {
-      priority: 110,
+      priority: 100,
       delimiter: true,
       action: function (l, s, r) {
         l = [l]
@@ -216,7 +216,7 @@ var NULAN = (function (n) {
     },
 
     ":": {
-      priority: 110,
+      priority: 100,
       delimiter: true,
       separator: true,
       action: function (l, s, r) {
@@ -226,7 +226,7 @@ var NULAN = (function (n) {
       }
     },
 
-    ".": infix(110, true, function (l, s, r) {
+    ".": infix(100, true, function (l, s, r) {
       if (l instanceof n.Wrapper &&
           r instanceof n.Wrapper &&
           typeof l.value === "number" &&
@@ -242,11 +242,12 @@ var NULAN = (function (n) {
       }
     }),
 
-    ",":  unary(100, true),
-    "@":  unary(100, true),
-    "~":  unary(100, false),
+                    // TODO
+    ",":  unary(90, true),
+    "@":  unary(90, true),
+    //"~":  unary(90, false),
 
-    "*":  infix(90),
+    /*"*":  infix(80),
     "/":  infix(80),
 
     "+":  infix(70),
@@ -255,14 +256,14 @@ var NULAN = (function (n) {
     "<":  infix(60),
     "=<": infix(60),
     ">":  infix(60),
-    ">=": infix(60),
+    ">=": infix(60),*/
 
-    "==": infix(50),
-    "~=": infix(50),
+    //"==": infix(50),
+    //"~=": infix(50),
 
-    "&&": infix(40),
+    /*"&&": infix(40),
 
-    "||": infix(30),
+    "||": infix(30),*/
 
     "'": {
       priority: 10,

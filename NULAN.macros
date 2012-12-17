@@ -44,47 +44,26 @@ $run
 |#
 
 
-
-###  Macros
-$mac prn -> @args
-  'console.log ,@args
-
-$mac def -> n v
-  '| var n
-   | n <= v
-
-$mac str -> @args
-  '(+) "" ,@args
-
-$mac call -> x y @args
-  'x[y].call ,@args
-
-$mac call-own -> x y @args
-  'x[y] ,@args
-
-$mac in -> @args
-  w/var r = {}
-    | args.reduce -> x y
-        | r.push {x y}
-        | x
-    | '(||) ,@(r.map -> x '(==) ,@x)
-
-$mac (~=) -> @args
-  if args.length == 2
-    # TODO
-    '& "!==" ,args.0 ,args.1
-    '~ ((==) ,@args)
-
-$mac for -> init test incr body
-  '| init
-   | while test
-       | body
-       | incr
-
-
+###  Macro utilities
 $mac w/uniq -> @args body
   'w/var ,@(args.map -> x 'x = make-uniq;)
      body
+
+$mac w/complex -> x body
+  w/uniq u v
+    'if: Array.isArray x
+       w/uniq u v
+         w/var v = x
+               x = u
+           'w/var u = v
+              ,body
+       body
+
+
+###  Variable binding
+$mac def -> n v
+  '| var n
+   | n <= v
 
 # Dynamic variable binding. Usage:
 #   var foo = 5
@@ -102,20 +81,42 @@ $mac w/dict! -> args body
   'w/var! args = Object.create args
      body
 
-$mac $syntax-protect -> body
-  '$run
-     w/dict! syntax-rules
-       body
 
-$mac w/complex -> x body
-  w/uniq u v
-    'if: Array.isArray x
-       w/uniq u v
-         w/var v = x
-               x = u
-           'w/var u = v
-              ,body
-       body
+###  Miscellaneous
+$mac prn -> @args
+  'console.log ,@args
+
+$mac str -> @args
+  '(+) "" ,@args
+
+#|
+$mac call -> x y @args
+  'x[y].call ,@args
+
+$mac call-own -> x y @args
+  'x[y] ,@args
+|#
+
+$mac |= -> @args
+  w/var r = {}
+    | args.reduce -> x y
+        | r.push {x y}
+        | x
+    | '|| ,@(r.map -> x '== ,@x)
+
+$mac ~= -> @args
+  if args.length == 2
+    # TODO
+    '& "!==" ,args.0 ,args.1
+    '~ (== ,@args)
+
+
+###  Loops
+$mac for -> init test incr body
+  '| init
+   | while test
+       | body
+       | incr
 
 $mac w/each -> {('=) x y} body
   w/uniq i len
@@ -125,6 +126,20 @@ $mac w/each -> {('=) x y} body
            w/var x = y[i]
              body
 
+$mac w/each-rev -> {('=) x y} body
+  w/uniq i
+    w/complex y
+      'w/var i = y.length
+         while i
+           w/var x = y[-- i]
+             body
+
+
+###  Syntax
+$mac $syntax-protect -> body
+  '$run
+     w/dict! syntax-rules
+       body
 
 $mac $syntax-rule -> s o
   '$run
@@ -151,6 +166,27 @@ $syntax-helper $syntax-unary
     '-> l s {y @r}
        ',@l (s y) ,@r
 |#
+
+$syntax-unary ~  90
+
+$syntax-infix *  80
+$syntax-infix /  80
+
+$syntax-infix +  70
+$syntax-infix -  70
+
+$syntax-infix <  60
+$syntax-infix =< 60
+$syntax-infix >  60
+$syntax-infix >= 60
+
+$syntax-infix == 50
+$syntax-infix |= 50
+$syntax-infix ~= 50
+
+$syntax-infix && 40
+
+$syntax-infix || 30
 
 #|
 (mac complex (x body)

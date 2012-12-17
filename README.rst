@@ -54,26 +54,6 @@ Examples
 
 ::
 
-  # An example of an unhygienic macro
-  # Just like in Arc, it binds the variable `it` to the test condition
-  $mac aif -> test @rest
-    w/var it = sym "it"
-      'w/var it = test
-         if it ,@:if rest.length >= 2
-                    w/var {x @rest} = rest
-                      'x (aif ,@rest)
-                    rest
-
-  aif 1 + 2
-    it
-    it
-
-  aif %f
-    it
-    it
-
-::
-
   # Simulating a `for` loop using a `while` loop
   $mac for -> init test incr body
     '| init
@@ -115,8 +95,23 @@ Examples
 
 ::
 
-  # Macro to iterate over the elements of any list or string
-  $mac w/each -> {('=) x y} body
+  # Macro to iterate over the elements of any *dense* list or string
+  $mac w/each -> {'(=) x y} body
+    w/uniq i
+      w/complex y
+        'w/var x
+           for (var i = 0) ((x <= y[i]) ~= ()) (++ i)
+             body
+
+  w/each x = {1 2 3}
+    | prn x
+    | prn x + 5
+    | prn;
+
+::
+
+  # Macro to iterate over the elements of any *sparse* list or string
+  $mac w/each-sparse -> {('=) x y} body
     w/uniq i len
       w/complex y
         'w/var len = y.length
@@ -124,7 +119,23 @@ Examples
              w/var x = y[i]
                body
 
-  w/each x = {1 2 3}
+  w/each-sparse x = {1 2 3}
+    | prn x
+    | prn x + 5
+    | prn;
+
+::
+
+  # Macro to iterate over the elements of any list or string in reverse order
+  $mac w/each-rev -> {('=) x y} body
+    w/uniq i
+      w/complex y
+        'w/var i = y.length
+           while i
+             w/var x = y[-- i]
+               body
+
+  w/each-rev x = {1 2 3}
     | prn x
     | prn x + 5
     | prn;
@@ -142,6 +153,26 @@ Examples
 
   {1 2 3}.reduce -> x y
     "(@x @y)"
+
+::
+
+  # An example of an unhygienic macro
+  # Just like in Arc, it binds the variable `it` to the test condition
+  $mac aif -> test @rest
+    w/var it = sym "it"
+      'w/var it = test
+         if it ,@:if rest.length >= 2
+                    w/var {x @rest} = rest
+                      'x (aif ,@rest)
+                    rest
+
+  aif 1 + 2
+    it
+    it
+
+  aif %f
+    it
+    it
 
 ::
 
@@ -322,3 +353,5 @@ FAQ
   ...because it's trying to use the *value* of the ``foo`` variable, which doesn't exist at compile-time.
 
   In addition, if a *macro* is the first element of a list, it is evaluated at compile-time, which is why ``bar 10`` works. But ``prn bar 10`` would **not** work, because the macro ``bar`` isn't the first element of the list
+
+* **Q:**

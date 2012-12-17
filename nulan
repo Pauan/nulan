@@ -35,6 +35,11 @@ try {
 }
 
 
+//NULAN.from("Node.js").to("browser")
+//NULAN.from("Node.js").to("Chrome Extension")
+NULAN.from("Node.js").to("Node.js")
+
+
 var opts = {
   debug: {
     tokenize: false,

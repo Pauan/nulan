@@ -1522,7 +1522,61 @@ function infix(i, b, f) {
 
   // TODO: make it possible to have a variable at both runtime and compiletime
   //n.include("console", "Array")
-  n.builtin({ "console": console, "Array": Array, "Object": Object })
+  //n.builtin({ "console": console, "Array": Array, "Object": Object })
+
+  // Object.getOwnPropertyNames(global)
+  var n = {
+    builtin: function () {
+      console.log([].filter.call(arguments, function (x) {
+        return (x in window)
+      }))
+      console.log([].filter.call(arguments, function (x) {
+        return !(x in window)
+      }))
+    }
+  }
+
+  // Globals that exist in all environments
+  n.builtin("Number", "Math", "Boolean", "TypeError", "String",
+            "Int16Array", "Float32Array", "isFinite", "Array", "DataView",
+            "Float64Array", "ReferenceError", "SyntaxError", "Int32Array",
+            "Uint16Array", "clearTimeout", "decodeURIComponent",
+            "Uint32Array", "setTimeout", "eval", "console", "URIError",
+            "unescape", "Date", "escape", "encodeURI", "Error",
+            "Int8Array", "EvalError", "RangeError", "NaN", "isNaN",
+            "parseInt", "undefined", "Object", "Uint8ClampedArray",
+            "parseFloat", "Uint8Array", "clearInterval", "Infinity",
+            "JSON", "Function", "setInterval", "encodeURIComponent",
+            "decodeURI", "ArrayBuffer", "RegExp")
+
+  // Modes for a specific environment
+  n.modes = {
+    "Node.js": function (f) {
+      f("Buffer", "global", "GLOBAL", "process", "root", "require", "module")
+    },
+    "browser": function (f) {
+      f("window", "document")
+    },
+    "Chrome Extension": function (f) {
+      n.modes["browser"](f)
+      f("chrome")
+    }
+  }
+
+  n.from = function (from) {
+    return {
+      to: function (to) {
+        if (from === to) {
+          n.modes[from](n.builtin)
+        } else {
+          n.modes[from](n.include)
+          withMode("run", function () {
+            n.modes[to](n.include)
+          })
+        }
+      }
+    }
+  }
 
   n.import = function () {
     [].forEach.call(arguments, function (s) {
