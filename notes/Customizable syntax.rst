@@ -11,7 +11,7 @@ To demonstrate how the system works, let's parse this Nulan program::
       | if (n.left < r.left || n.right > r.right)
           p.scroll-left <= n.left - r.width / 2
 
-There are five phases to Nulan's syntax parsing:
+There are four phases to Nulan's syntax parsing:
 
 1) Tokenization. This phase splits a string into tokens. The end result is a flat 1-dimensional list of numbers, symbols, and strings::
 
@@ -19,26 +19,13 @@ There are five phases to Nulan's syntax parsing:
 
    The list has no structure to it, but Nulan keeps track of the line and column where each token was found. This will be very important later on.
 
-2) Because braces ignore indentation, they need to be handled specially. So when Nulan encounters a ``(``, ``{``, or ``[`` token, it will parse until it finds an ending ``)``, ``}``, or ``]`` token::
-
-     def scroll-into-view -> n p w/var n = n . get-bounding-client-rect ; r = p . get-bounding-client-rect ; | if
-       {n . top < r . top || n . bottom > r . bottom}
-       p . scroll-top <= n . top - r . height / 2 | if
-       {n . left < r . left || n . right > r . right}
-       p . scroll-left <= n . left - r . width / 2
-
-3) The ``|`` token is also handled specially. If it occurs at the start of the line, it will take all the lines that start with ``|`` at the same indentation and put them into a list::
+2) The ``|`` token is handled specially. If it occurs at the start of the line, it will take all the lines that start with ``|`` at the same indentation and put them into a list::
 
      def scroll-into-view -> n p w/var n = n . get-bounding-client-rect ; r = p . get-bounding-client-rect ;
-       {|
-         {if
-           {n . top < r . top || n . bottom > r . bottom}
-           p . scroll-top <= n . top - r . height / 2}
-         {if
-           {n . left < r . left || n . right > r . right}
-           p . scroll-left <= n . left - r . width / 2}}
+       {| {if ( n . top < r . top || n . bottom > r . bottom ) p . scroll-top <= n . top - r . height / 2}
+          {if ( n . left < r . left || n . right > r . right ) p . scroll-left <= n . left - r . width / 2}}
 
-4) Nulan uses significant whitespace, and has very simple rules for how to handle it:
+3) Nulan uses significant whitespace, and has very simple rules for how to handle it:
 
    1) Everything on the same line is put into a list::
 
@@ -54,232 +41,300 @@ There are five phases to Nulan's syntax parsing:
         {def scroll-into-view -> n p
           {w/var n = n . get-bounding-client-rect ;
             {r = p . get-bounding-client-rect ;}
-            {| {if {n . top < r . top || n . bottom > r . bottom}
+            {| {if ( n . top < r . top || n . bottom > r . bottom )
                  {p . scroll-top <= n . top - r . height / 2}}
-               {if {n . left < r . left || n . right > r . right}
+               {if ( n . left < r . left || n . right > r . right )
                  {p . scroll-left <= n . left - r . width / 2}}}}}
 
-   4) Certain syntax like ``=`` and ``'`` will take everything that's indented further than the token and will put it into a list::
+   4) If the list only contains a single item, unwrap it::
 
-        {def scroll-into-view -> n p
-          {w/var n = {n . get-bounding-client-rect ;}
-            {r = {p . get-bounding-client-rect ;}}
-            {| {if {n . top < r . top || n . bottom > r . bottom}
-                 {p . scroll-top <= n . top - r . height / 2}}
-               {if {n . left < r . left || n . right > r . right}
-                 {p . scroll-left <= n . left - r . width / 2}}}}}
+        # This...
+        foo bar
+          qux
+          corge
 
-5) Now we have a structured program, with lists nested within lists. But we're not done yet. There's a bunch of symbols like ``=``, ``.``, and ``<`` that have special meaning, but they haven't been parsed yet.
+        # ...is parsed into this
+        (foo bar
+          (qux)
+          (corge))
 
-   Nulan has a macro called ``syntax-rule`` that lets you add new syntax. Here are some examples::
+        # ...which is then unwrapped to this
+        (foo bar
+          qux
+          corge)
 
-     syntax-rule <>
-       priority 70
-       action -> {@l x} s {y @r}
-         `,@l (s x y) ,@r
+4) Now we have a structured program, with lists nested within lists. But we're not done yet. There's a bunch of symbols like ``=``, ``.``, and ``<`` that have special meaning, but they haven't been parsed yet.
 
-     syntax-rule \
-       priority  10
+   Nulan has an object called ``syntax-rules`` which contains information on how to parse the remaining syntax. To create new syntax, you can use the ``$syntax-rule`` macro::
+
+     $syntax-rule ^ [
+       ...
+     ]
+
+   The above creates a new rule for the ``^`` symbol. What can this rule do?
+
+   * If ``whitespace`` is true, the symbol will be treated as whitespace
+   * If ``separator`` is true, the parser will take everything that's indented further than the symbol and will put it into a list
+   * If ``delimiter`` is true, the parser will not treat the syntax as being a part of symbols
+   * The rules with higher ``priority`` are run first. The default is ``0`` priority
+   * If a rule has ``order`` set to ``"right"`` then it will be right-associative, otherwise it's left-associative
+   * The ``action`` function receives three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol
+
+   Woah that's a lotta stuff. Let's go through it one at a time.
+
+   * If ``whitespace`` is true, then the symbol will be treated as whitespace::
+
+       $syntaxs-rule ^ [
+         whitespace %t
+       ]
+
+     Currently, the only thing this changes is whether ``^[foo]`` will parse as ``(. ^ foo)`` or ``(^ (dict foo))``
+
+   * If ``delimiter`` is true, the parser will not treat the syntax as being a part of symbols::
+
+       $syntax-rule ^ [
+         delimiter %t
+       ]
+
+     This means that ``foo^bar`` will be parsed as ``(foo ^ bar)`` rather than the single symbol ``foo^bar``
+
+   * If ``separator`` is true, the parser will take everything that's indented to the right of the the symbol and will put it into a list::
+
+       $syntax-rule ^ [
+         separator %t
+       ]
+
+     What this means is that this...
+
+     ::
+
+       foo ^ bar qux
+               corge
+         yes
+
+     ...will be parsed as this::
+
+       (foo ^ (bar qux
+                corge)
+         yes)
+
+   * If ``endAt`` exists, it should be a string. The parser will search for a symbol that matches the string and will put everything between it and the original symbol into a list::
+
+       $syntax-rule ^ [
+         endAt "/"
+       ]
+
+     What the above means is that the following program...
+
+     ::
+
+       foo bar ^ qux corge / nou yes
+
+     ...will be parsed as this::
+
+       (foo bar ^ (qux corge) nou yes)
+
+     In other words, it took everything between ``^`` and ``/`` and put it into a list. This is used for the ``()``, ``{}``, and ``[]`` braces.
+
+   * If ``order`` is ``"right"``, the syntax will be right-associative, otherwise it's left-associative::
+
+       $syntax-rule ^ [
+         order "right"
+       ]
+
+     Left-associative (the default) means that ``foo ^ bar ^ qux`` is parsed as ``((foo ^ bar) ^ qux)`` and right-associative means that it's parsed as ``(foo ^ (bar ^ qux))``
+
+   * The ``action`` property is a function that accepts three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol::
+
+       $syntax-rule ^ [
+         action -> l s r
+           ...
+       ]
+
+     This is the unique part of Nulan's parser. It's what makes it so easy to define new syntax, while still being very powerful. Consider this program::
+
+       foo bar ^ qux corge
+
+     When Nulan encounters ``^``, it will pass the arguments ``{foo bar}``, ``^``, and ``{qux corge}`` to the ``action`` function. Whatever the function returns is used as the final result.
+
+     A typical infix operator is easy to define, it simply takes the last argument of the left list and the first argument of the right list and mushes them together::
+
+       $syntax-rule ^ [
+         action -> {@l x} s {y @r}
+           ',@l (s x y) ,@r
+       ]
+
+    And now the above program will be parsed as ``(foo (^ bar qux) corge)``. This is common enough that Nulan provides a macro ``$syntax-infix``::
+
+      $syntax-infix ^
+
+    Using the same system, unary is also easy::
+
+      $syntax-rule ^ [
+        action -> l s {y @r}
+          ',@l (s y) ,@r
+      ]
+
+    And now the program is parsed as ``(foo bar (^ qux) corge)``. Just like with infix, you can use ``$syntax-unary`` to do the same thing::
+
+      $syntax-unary ^
+
+    But you aren't limited to using only a single symbol. For instance, consider the ``->`` syntax::
+
+      foo bar -> a b c
+        qux corge
+
+    Here's how you would write a rule for ``->``::
+
+      $syntax-rule -> [
+        order "right"
+        action -> l s {@args body}
+          ',@l (s args body)
+      ]
+
+    And now the program will parse as ``(foo bar (-> (a b c) (qux corge)))``
+
+    Or consider the ``<=`` syntax::
+
+      foo bar <= qux corge
+
+    You can write a rule for it like this::
+
+      $syntax-rule <= [
+        order "right"
+        action -> l s r
+          's ,(unwrap l) ,(unwrap r)
+      ]
+
+    And now it will be parsed as ``(<= (foo bar) (qux corge))``
+
+    The reason for ``unwrap`` is so that ``foo <= bar`` is parsed as ``(<= foo bar)`` rather than ``(<= (foo) (bar))``
+
+   Here is a list of all the built-in syntax::
+
+     $syntax-rule "(" [
+       priority 110
+       delimiter %t
+       endAt ")"
+       action -> l s {x @r}
+         ',@l ,(unwrap x) ,@r
+     ]
+
+     $syntax-rule "{" [
+       priority 110
+       delimiter %t
+       endAt "}"
+       action -> l s {x @r}
+         ',@l (list ,@x) ,@r
+     ]
+
+     $syntax-rule "[" [
+       priority 110
+       delimiter %t
+       endAt "]"
+       action -> l s {x @r}
+         ',@l (dict ,@x) ,@r
+     ]
+
+     $syntax-rule ";" [
+       priority 100
+       delimiter %t
+       action -> l s r
+         'l ,@r
+     ]
+
+     $syntax-rule ":" [
+       priority 100
        delimiter %t
        separator %t
        action -> l s {x @r}
-         `,@l (s ,@x) ,@r
+         ',@l x ,@r
+     ]
 
-     syntax-rule ^
+     $syntax-rule "." [
+       priority 100
        delimiter %t
+       action -> {@l x} s {y @r}
+         if (num? x) && (num? y)
+           ',@l ,(num: x + "." + y) ,@r
+           if (sym? y)
+             ',@l (s x y.value) ,@r
+             ',@l (s x y) ,@r
+     ]
+
+     $syntax-unary "," 90 [ delimiter %t ]
+     $syntax-unary "@" 90 [ delimiter %t ]
+     $syntax-unary "~" 90
+
+     $syntax-infix "*" 80
+     $syntax-infix "/" 80
+
+     $syntax-infix "+" 70
+     $syntax-infix "-" 70
+
+     $syntax-infix "<"  60
+     $syntax-infix ">"  60
+     $syntax-infix "=<" 60
+     $syntax-infix ">=" 60
+
+     $syntax-infix "==" 50
+     $syntax-infix "~=" 50
+     $syntax-infix "|=" 50
+
+     $syntax-infix "&&" 40
+
+     $syntax-infix "||" 40
+
+     $syntax-rule "'" [
+       priority 10
+       whitespace %t
+       delimiter %t
+       separator %t
+       action -> l s {x @r}
+         ',@l (s ,(unwrap x)) ,@r
+     ]
+
+     $syntax-rule "->" [
        priority 10
        order "right"
        action -> l s {@args body}
          ',@l (s args body)
-
-   How this works is, each rule can have the following properties:
-
-   * If ``whitespace`` is true, the symbol will be treated as whitespace
-   * If ``separator`` is true, the parser will take everything that's indented further than the symbol and will put it into a list
-   * If ``delimiter`` is true, the parser will treat the syntax as not being a part of symbols
-   * The rules with higher ``priority`` are run first. The default is ``0`` priority
-   * If a rule has ``order`` set to ``"right"`` then it will be right-associative, otherwise it's left-associative
-   * The ``action`` function receives three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol.
-
-   So, looking at the above, the rule for ``<>`` is pretty simple: take the last argument of the left list and the first argument of the right list and mush them together. As an example, this::
-
-     {1 2 3 <> 4 5 6}
-
-   Will pass the arguments ``{1 2 3}``, ``<>``, and ``{4 5 6}`` to the action function. The action function then returns this::
-
-     {1 2 {<> 3 4} 5 6}
-
-   Most infix operators work this way, and this is so common that there's a macro called ``syntax-infix`` which does this for you, which means that the ``<>`` syntax could be written like this instead::
-
-     syntax-infix <> 70
-
-   ---
-
-   The ``\`` syntax is a bit trickier. It specifies that it's a delimiter, which means that it'll never be processed as part of a symbol. That means that ``foo\bar`` will be parsed as the three symbols ``foo``,  ``\``, and ``bar`` rather than the single symbol ``foo\bar``
-
-   It also says that it's a separator. What this means is that, in the following Nulan program::
-
-     foo bar\ corge
-                qux
-       nou
-
-   It will be parsed like this::
-
-     {foo bar \ {corge qux}
-       nou}
-
-   That is, it took everything indented further than ``\`` and put it into a list. The action function then receives the arguments ``{foo bar}``, ``\``, and ``{{corge qux} nou}`` and returns this::
-
-     {foo bar {\ corge qux} nou}
-
-   ---
-
-   Lastly, the ``^`` syntax. With this list::
-
-     {1 2 3 ^ a b c {+ a b c}}
-
-   It will pass the arguments ``{1 2 3}``, ``^``, and ``{a b c {+ a b c}}`` to the action function, which then returns this::
-
-     {1 2 3 {^ {a b c} {+ a b c}}}
-
-   And because it has ``order`` set to ``"right"``, that means that this::
-
-     {^ a ^ b {+ a b}}
-
-   Will parse as this::
-
-     {^ {a} {^ {b} {+ a b}}}
-
-   Rather than this::
-
-     {^ {a {^ {b}}} {+ a b}}
-
-   ---
-
-   One last thing. If the parser returns a list that only has a single item, then it unwraps the list, which means that these::
-
-     foo
-
-     (foo)
-
-     (((foo)))
-
-     (((((foo)))))
-
-   Are all parsed into this::
-
-     foo
-
-That describes basically the entire parser.
-
-::
-
-  # priority 110, delimiter, endAt ")"
-  (foo)          <>  foo
-  (foo bar qux)  <>  (foo bar qux)
-
-::
-
-  # priority 110, delimiter, endAt "}"
-  {foo}          <>  (list foo)
-  {foo bar qux}  <>  (list foo bar qux)
-
-::
-
-  # priority 110, delimiter, endAt "]"
-  foo[bar]               <>  (. foo bar)
-  foo[bar qux]           <>  (. foo (bar qux))
-  [ foo bar qux corge ]  <>  (dict foo bar qux corge)
-
-::
-
-  # priority 100, delimiter
-  foo;                <>  (foo)
-  foo bar; qux corge  <>  ((foo bar) qux corge)
-
-::
-
-  # priority 100, delimiter, separator
-  :foo                <>  (foo)
-  foo bar: qux corge  <>  (foo bar (qux corge))
-
-::
-
-  # priority 100, delimiter
-  1.5            <>  1.5
-  foo.bar        <>  (. foo "bar")
-  foo.(bar qux)  <>  (. foo (bar qux))
-
-::
-
-  # priority 90, delimiter
-  foo ,bar  <>  (foo (, bar))
-  foo @bar  <>  (foo (@ bar))
-
-::
-
-  # priority 90
-  foo ~ bar  <>  (foo (~ bar))
-
-::
-
-  # priority 80
-  foo * bar  <>  (* foo bar)
-  foo / bar  <>  (/ foo bar)
-
-::
-
-  # priority 70
-  foo + bar  <>  (+ foo bar)
-  foo - bar  <>  (- foo bar)
-
-::
-
-  # priority 60
-  foo < bar   <>  (< foo bar)
-  foo > bar   <>  (> foo bar)
-  foo =< bar  <>  (=< foo bar)
-  foo >= bar  <>  (>= foo bar)
-
-::
-
-  # priority 50
-  foo == bar  <>  (~= foo bar)
-  foo ~= bar  <>  (~= foo bar)
-  foo |= bar  <>  (|= foo bar)
-
-::
-
-  # priority 40
-  foo && bar  <>  (&& foo bar)
-
-::
-
-  # priority 30
-  foo || bar  <>  (|| foo bar)
-
-::
-
-  # priority 10, whitespace, delimiter, separator
-  'foo          <>  (' foo)
-  'foo bar qux  <>  (' (foo bar qux))
-  '[]           <>  (' (dict))
-
-::
-
-  # priority 10, order "right"
-  -> foo                <>  (-> foo)
-  -> foo bar qux        <>  (-> (foo bar) qux)
-  foo bar qux -> corge  <>  (foo bar qux (-> corge))
-
-::
-
-  # priority 10, separator
-  foo = bar            <>  (= foo bar)
-  foo = bar qux corge  <>  (= foo (bar qux corge))
-
-::
-
-  # priority 0, order "right"
-  foo <= bar            <>  (<= foo bar)
-  foo bar <= qux corge  <>  (<= (foo bar) (qux corge))
+     ]
+
+     $syntax-rule "=" [
+       priority 10
+       separator %t
+       action -> {@l x} s {y @r}
+         ',@l (s x ,(unwrap y)) ,@r
+     ]
+
+     $syntax-rule "<=" [
+       priority 0
+       order "right"
+       action -> l s r
+         's ,(unwrap l) ,(unwrap r)
+     ]
+
+   Okay! Going back to our program from before::
+
+     {def scroll-into-view -> n p
+       {w/var n = n . get-bounding-client-rect ;
+         {r = p . get-bounding-client-rect ;}
+         {| {if ( n . top < r . top || n . bottom > r . bottom )
+              {p . scroll-top <= n . top - r . height / 2}}
+            {if ( n . left < r . left || n . right > r . right )
+              {p . scroll-left <= n . left - r . width / 2}}}}}
+
+   Let's use the built-in syntax to parse this::
+
+     {def scroll-into-view
+       {-> {n p}
+         {w/var
+           {= n {{. n get-bounding-client-rect}}}
+           {= r {{. pget-bounding-client-rect}}}
+           {| {if {|| {< {. n top} {. r top}} {> {. n bottom} {. r bottom}}}
+                {<= {. p scroll-top} {- {. n top} {/ {. r height} 2}}}}
+              {if {|| {< {. n left} {. r left}} {> {. n right} {. r right}}}
+                {<= {. p scroll-left} {- {. n left} {/ {. r width} 2}}}}}}}}
+
+   And now the program is fully parsed and ready to be compiled and executed.
