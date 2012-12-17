@@ -67,7 +67,7 @@ There are four phases to Nulan's syntax parsing:
 
    Nulan has an object called ``syntax-rules`` which contains information on how to parse the remaining syntax. To create new syntax, you can use the ``$syntax-rule`` macro::
 
-     $syntax-rule ^ [
+     $syntax-rule "^" [
        ...
      ]
 
@@ -84,7 +84,7 @@ There are four phases to Nulan's syntax parsing:
 
    * If ``whitespace`` is true, then the symbol will be treated as whitespace::
 
-       $syntaxs-rule ^ [
+       $syntaxs-rule "^" [
          whitespace %t
        ]
 
@@ -92,7 +92,7 @@ There are four phases to Nulan's syntax parsing:
 
    * If ``delimiter`` is true, the parser will not treat the syntax as being a part of symbols::
 
-       $syntax-rule ^ [
+       $syntax-rule "^" [
          delimiter %t
        ]
 
@@ -100,7 +100,7 @@ There are four phases to Nulan's syntax parsing:
 
    * If ``separator`` is true, the parser will take everything that's indented to the right of the the symbol and will put it into a list::
 
-       $syntax-rule ^ [
+       $syntax-rule "^" [
          separator %t
        ]
 
@@ -120,7 +120,7 @@ There are four phases to Nulan's syntax parsing:
 
    * If ``endAt`` exists, it should be a string. The parser will search for a symbol that matches the string and will put everything between it and the original symbol into a list::
 
-       $syntax-rule ^ [
+       $syntax-rule "^" [
          endAt "/"
        ]
 
@@ -138,7 +138,7 @@ There are four phases to Nulan's syntax parsing:
 
    * If ``order`` is ``"right"``, the syntax will be right-associative, otherwise it's left-associative::
 
-       $syntax-rule ^ [
+       $syntax-rule "^" [
          order "right"
        ]
 
@@ -146,7 +146,7 @@ There are four phases to Nulan's syntax parsing:
 
    * The ``action`` property is a function that accepts three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol::
 
-       $syntax-rule ^ [
+       $syntax-rule "^" [
          action -> l s r
            ...
        ]
@@ -159,25 +159,25 @@ There are four phases to Nulan's syntax parsing:
 
      A typical infix operator is easy to define, it simply takes the last argument of the left list and the first argument of the right list and mushes them together::
 
-       $syntax-rule ^ [
+       $syntax-rule "^" [
          action -> {@l x} s {y @r}
            ',@l (s x y) ,@r
        ]
 
     And now the above program will be parsed as ``(foo (^ bar qux) corge)``. This is common enough that Nulan provides a macro ``$syntax-infix``::
 
-      $syntax-infix ^
+      $syntax-infix "^"
 
     Using the same system, unary is also easy::
 
-      $syntax-rule ^ [
+      $syntax-rule "^" [
         action -> l s {y @r}
           ',@l (s y) ,@r
       ]
 
     And now the program is parsed as ``(foo bar (^ qux) corge)``. Just like with infix, you can use ``$syntax-unary`` to do the same thing::
 
-      $syntax-unary ^
+      $syntax-unary "^"
 
     But you aren't limited to using only a single symbol. For instance, consider the ``->`` syntax::
 
@@ -186,7 +186,7 @@ There are four phases to Nulan's syntax parsing:
 
     Here's how you would write a rule for ``->``::
 
-      $syntax-rule -> [
+      $syntax-rule "->" [
         order "right"
         action -> l s {@args body}
           ',@l (s args body)
@@ -200,7 +200,7 @@ There are four phases to Nulan's syntax parsing:
 
     You can write a rule for it like this::
 
-      $syntax-rule <= [
+      $syntax-rule "<=" [
         order "right"
         action -> l s r
           's ,(unwrap l) ,(unwrap r)
