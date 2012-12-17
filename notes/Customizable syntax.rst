@@ -54,14 +54,14 @@ There are four phases to Nulan's syntax parsing:
           corge
 
         # ...is parsed into this
-        (foo bar
-          (qux)
-          (corge))
+        {foo bar
+          {qux}
+          {corge}}
 
         # ...which is then unwrapped to this
-        (foo bar
+        {foo bar
           qux
-          corge)
+          corge}
 
 4) Now we have a structured program, with lists nested within lists. But we're not done yet. There's a bunch of symbols like ``=``, ``.``, and ``<`` that have special meaning, but they haven't been parsed yet.
 
@@ -73,22 +73,13 @@ There are four phases to Nulan's syntax parsing:
 
    The above creates a new rule for the ``^`` symbol. What can this rule do?
 
-   * If ``whitespace`` is true, the symbol will be treated as whitespace
-   * If ``separator`` is true, the parser will take everything that's indented further than the symbol and will put it into a list
-   * If ``delimiter`` is true, the parser will not treat the syntax as being a part of symbols
-   * The rules with higher ``priority`` are run first. The default is ``0`` priority
-   * If a rule has ``order`` set to ``"right"`` then it will be right-associative, otherwise it's left-associative
-   * The ``action`` function receives three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol
-
-   Woah that's a lotta stuff. Let's go through it one at a time.
-
    * If ``whitespace`` is true, then the symbol will be treated as whitespace::
 
        $syntaxs-rule "^" [
          whitespace %t
        ]
 
-     Currently, the only thing this changes is whether ``^[foo]`` will parse as ``(. ^ foo)`` or ``(^ (dict foo))``
+     Currently, the only thing this changes is whether ``^[foo]`` will parse as ``{. ^ foo}`` or ``{^ {dict foo}}``
 
    * If ``delimiter`` is true, the parser will not treat the syntax as being a part of symbols::
 
@@ -96,7 +87,7 @@ There are four phases to Nulan's syntax parsing:
          delimiter %t
        ]
 
-     This means that ``foo^bar`` will be parsed as ``(foo ^ bar)`` rather than the single symbol ``foo^bar``
+     This means that ``foo^bar`` will be parsed as ``{foo ^ bar}`` rather than the single symbol ``foo^bar``
 
    * If ``separator`` is true, the parser will take everything that's indented to the right of the the symbol and will put it into a list::
 
@@ -114,9 +105,9 @@ There are four phases to Nulan's syntax parsing:
 
      ...will be parsed as this::
 
-       (foo ^ (bar qux
-                corge)
-         yes)
+       {foo ^ {bar qux
+                corge}
+         yes}
 
    * If ``endAt`` exists, it should be a string. The parser will search for a symbol that matches the string and will put everything between it and the original symbol into a list::
 
@@ -132,7 +123,7 @@ There are four phases to Nulan's syntax parsing:
 
      ...will be parsed as this::
 
-       (foo bar ^ (qux corge) nou yes)
+       {foo bar ^ {qux corge} nou yes}
 
      In other words, it took everything between ``^`` and ``/`` and put it into a list. This is used for the ``()``, ``{}``, and ``[]`` braces.
 
@@ -142,7 +133,7 @@ There are four phases to Nulan's syntax parsing:
          order "right"
        ]
 
-     Left-associative (the default) means that ``foo ^ bar ^ qux`` is parsed as ``((foo ^ bar) ^ qux)`` and right-associative means that it's parsed as ``(foo ^ (bar ^ qux))``
+     Left-associative (the default) means that ``foo ^ bar ^ qux`` is parsed as ``{{foo ^ bar} ^ qux}`` and right-associative means that it's parsed as ``{foo ^ {bar ^ qux}}``
 
    * The ``action`` property is a function that accepts three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol::
 
@@ -164,7 +155,7 @@ There are four phases to Nulan's syntax parsing:
            ',@l (s x y) ,@r
        ]
 
-    And now the above program will be parsed as ``(foo (^ bar qux) corge)``. This is common enough that Nulan provides a macro ``$syntax-infix``::
+    And now the above program will be parsed as ``{foo {^ bar qux} corge}``. This is common enough that Nulan provides a macro ``$syntax-infix``::
 
       $syntax-infix "^"
 
@@ -175,7 +166,7 @@ There are four phases to Nulan's syntax parsing:
           ',@l (s y) ,@r
       ]
 
-    And now the program is parsed as ``(foo bar (^ qux) corge)``. Just like with infix, you can use ``$syntax-unary`` to do the same thing::
+    And now the program is parsed as ``{foo bar {^ qux} corge}``. Just like with infix, you can use ``$syntax-unary`` to do the same thing::
 
       $syntax-unary "^"
 
@@ -192,7 +183,7 @@ There are four phases to Nulan's syntax parsing:
           ',@l (s args body)
       ]
 
-    And now the program will parse as ``(foo bar (-> (a b c) (qux corge)))``
+    And now the program will parse as ``{foo bar {-> {a b c} {qux corge}}}``
 
     Or consider the ``<=`` syntax::
 
@@ -206,9 +197,9 @@ There are four phases to Nulan's syntax parsing:
           's ,(unwrap l) ,(unwrap r)
       ]
 
-    And now it will be parsed as ``(<= (foo bar) (qux corge))``
+    And now it will be parsed as ``{<= {foo bar} {qux corge}}``
 
-    The reason for ``unwrap`` is so that ``foo <= bar`` is parsed as ``(<= foo bar)`` rather than ``(<= (foo) (bar))``
+    The reason for ``unwrap`` is so that ``foo <= bar`` is parsed as ``{<= foo bar}`` rather than ``{<= {foo} {bar}}``
 
    Here is a list of all the built-in syntax::
 
