@@ -161,156 +161,158 @@ There are four phases to Nulan's syntax parsing:
            ',@l (s x y) ,@r
        ]
 
-    And now the above program will be parsed as ``{foo {^ bar qux} corge}``. This is common enough that Nulan provides a macro ``$syntax-infix``::
+     And now the above program will be parsed as ``{foo {^ bar qux} corge}``. This is common enough that Nulan provides a macro ``$syntax-infix``::
 
-      $syntax-infix "^"
+       $syntax-infix "^"
 
-    Using the same system, unary is also easy::
+     Using the same system, unary is also easy::
 
-      $syntax-rule "^" [
-        action -> l s {y @r}
-          ',@l (s y) ,@r
+       $syntax-rule "^" [
+         action -> l s {y @r}
+           ',@l (s y) ,@r
+       ]
+
+     And now the program is parsed as ``{foo bar {^ qux} corge}``. Just like with infix, you can use ``$syntax-unary`` to do the same thing::
+
+       $syntax-unary "^"
+
+     But you aren't limited to using only a single symbol. For instance, consider the ``->`` syntax::
+
+       foo bar -> a b c
+         qux corge
+
+     Here's how you would write a rule for ``->``::
+
+       $syntax-rule "->" [
+         order "right"
+         action -> l s {@args body}
+           ',@l (s args body)
+       ]
+
+     And now the program will parse as ``{foo bar {-> {a b c} {qux corge}}}``
+
+     Or consider the ``<=`` syntax::
+
+       foo bar <= qux corge
+
+     You can write a rule for it like this::
+
+       $syntax-rule "<=" [
+         order "right"
+         action -> l s r
+           's ,(unwrap l) ,(unwrap r)
+       ]
+
+     And now it will be parsed as ``{<= {foo bar} {qux corge}}``
+
+     The reason for ``unwrap`` is so that ``foo <= bar`` is parsed as ``{<= foo bar}`` rather than ``{<= {foo} {bar}}``
+
+    Here is a list of all the built-in syntax::
+
+      $syntax-rule "(" [
+        priority 110
+        delimiter %t
+        endAt ")"
+        action -> l s {x @r}
+          ',@l ,(unwrap x) ,@r
       ]
 
-    And now the program is parsed as ``{foo bar {^ qux} corge}``. Just like with infix, you can use ``$syntax-unary`` to do the same thing::
+      $syntax-rule "{" [
+        priority 110
+        delimiter %t
+        endAt "}"
+        action -> l s {x @r}
+          ',@l (list ,@x) ,@r
+      ]
 
-      $syntax-unary "^"
+      $syntax-rule "[" [
+        priority 110
+        delimiter %t
+        endAt "]"
+        action -> {@l x} s {y @r}
+          if s.whitespace
+            ',@l x (dict ,@y) ,@r
+            ',@l (. x ,(unwrap y)) ,@r
+      ]
 
-    But you aren't limited to using only a single symbol. For instance, consider the ``->`` syntax::
+      $syntax-rule ";" [
+        priority 100
+        delimiter %t
+        action -> l s r
+          'l ,@r
+      ]
 
-      foo bar -> a b c
-        qux corge
+      $syntax-rule ":" [
+        priority 100
+        delimiter %t
+        separator %t
+        action -> l s {x @r}
+          ',@l x ,@r
+      ]
 
-    Here's how you would write a rule for ``->``::
+      $syntax-rule "." [
+        priority 100
+        delimiter %t
+        action -> {@l x} s {y @r}
+          if (num? x) && (num? y)
+            ',@l ,(num: x + "." + y) ,@r
+            if (sym? y)
+              ',@l (s x y.value) ,@r
+              ',@l (s x y) ,@r
+      ]
+
+      $syntax-unary "," 90 [ delimiter %t ]
+      $syntax-unary "@" 90 [ delimiter %t ]
+      $syntax-unary "~" 90
+
+      $syntax-infix "*" 80
+      $syntax-infix "/" 80
+
+      $syntax-infix "+" 70
+      $syntax-infix "-" 70
+
+      $syntax-infix "<"  60
+      $syntax-infix ">"  60
+      $syntax-infix "=<" 60
+      $syntax-infix ">=" 60
+
+      $syntax-infix "==" 50
+      $syntax-infix "~=" 50
+      $syntax-infix "|=" 50
+
+      $syntax-infix "&&" 40
+
+      $syntax-infix "||" 40
+
+      $syntax-rule "'" [
+        priority 10
+        whitespace %t
+        delimiter %t
+        separator %t
+        action -> l s {x @r}
+          ',@l (s ,(unwrap x)) ,@r
+      ]
 
       $syntax-rule "->" [
+        priority 10
         order "right"
         action -> l s {@args body}
           ',@l (s args body)
       ]
 
-    And now the program will parse as ``{foo bar {-> {a b c} {qux corge}}}``
-
-    Or consider the ``<=`` syntax::
-
-      foo bar <= qux corge
-
-    You can write a rule for it like this::
+      $syntax-rule "=" [
+        priority 10
+        separator %t
+        action -> {@l x} s {y @r}
+          ',@l (s x ,(unwrap y)) ,@r
+      ]
 
       $syntax-rule "<=" [
+        priority 0
         order "right"
         action -> l s r
           's ,(unwrap l) ,(unwrap r)
       ]
-
-    And now it will be parsed as ``{<= {foo bar} {qux corge}}``
-
-    The reason for ``unwrap`` is so that ``foo <= bar`` is parsed as ``{<= foo bar}`` rather than ``{<= {foo} {bar}}``
-
-   Here is a list of all the built-in syntax::
-
-     $syntax-rule "(" [
-       priority 110
-       delimiter %t
-       endAt ")"
-       action -> l s {x @r}
-         ',@l ,(unwrap x) ,@r
-     ]
-
-     $syntax-rule "{" [
-       priority 110
-       delimiter %t
-       endAt "}"
-       action -> l s {x @r}
-         ',@l (list ,@x) ,@r
-     ]
-
-     $syntax-rule "[" [
-       priority 110
-       delimiter %t
-       endAt "]"
-       action -> l s {x @r}
-         ',@l (dict ,@x) ,@r
-     ]
-
-     $syntax-rule ";" [
-       priority 100
-       delimiter %t
-       action -> l s r
-         'l ,@r
-     ]
-
-     $syntax-rule ":" [
-       priority 100
-       delimiter %t
-       separator %t
-       action -> l s {x @r}
-         ',@l x ,@r
-     ]
-
-     $syntax-rule "." [
-       priority 100
-       delimiter %t
-       action -> {@l x} s {y @r}
-         if (num? x) && (num? y)
-           ',@l ,(num: x + "." + y) ,@r
-           if (sym? y)
-             ',@l (s x y.value) ,@r
-             ',@l (s x y) ,@r
-     ]
-
-     $syntax-unary "," 90 [ delimiter %t ]
-     $syntax-unary "@" 90 [ delimiter %t ]
-     $syntax-unary "~" 90
-
-     $syntax-infix "*" 80
-     $syntax-infix "/" 80
-
-     $syntax-infix "+" 70
-     $syntax-infix "-" 70
-
-     $syntax-infix "<"  60
-     $syntax-infix ">"  60
-     $syntax-infix "=<" 60
-     $syntax-infix ">=" 60
-
-     $syntax-infix "==" 50
-     $syntax-infix "~=" 50
-     $syntax-infix "|=" 50
-
-     $syntax-infix "&&" 40
-
-     $syntax-infix "||" 40
-
-     $syntax-rule "'" [
-       priority 10
-       whitespace %t
-       delimiter %t
-       separator %t
-       action -> l s {x @r}
-         ',@l (s ,(unwrap x)) ,@r
-     ]
-
-     $syntax-rule "->" [
-       priority 10
-       order "right"
-       action -> l s {@args body}
-         ',@l (s args body)
-     ]
-
-     $syntax-rule "=" [
-       priority 10
-       separator %t
-       action -> {@l x} s {y @r}
-         ',@l (s x ,(unwrap y)) ,@r
-     ]
-
-     $syntax-rule "<=" [
-       priority 0
-       order "right"
-       action -> l s r
-         's ,(unwrap l) ,(unwrap r)
-     ]
 
    Okay! Going back to our program from before::
 
