@@ -36,17 +36,7 @@ There are four phases to Nulan's syntax parsing:
         {def scroll-into-view -> n p
           {w/var n = n . get-bounding-client-rect ;}}
 
-   3) Repeat the above two processes recursively::
-
-        {def scroll-into-view -> n p
-          {w/var n = n . get-bounding-client-rect ;
-            {r = p . get-bounding-client-rect ;}
-            {| {if ( n . top < r . top || n . bottom > r . bottom )
-                 {p . scroll-top <= n . top - r . height / 2}}
-               {if ( n . left < r . left || n . right > r . right )
-                 {p . scroll-left <= n . left - r . width / 2}}}}}
-
-   4) If the list only contains a single item, unwrap it::
+   3) If the list only contains a single item, unwrap it::
 
         # This...
         foo bar
@@ -63,6 +53,16 @@ There are four phases to Nulan's syntax parsing:
           qux
           corge}
 
+   4) Repeat the above three processes recursively::
+
+        {def scroll-into-view -> n p
+          {w/var n = n . get-bounding-client-rect ;
+            {r = p . get-bounding-client-rect ;}
+            {| {if ( n . top < r . top || n . bottom > r . bottom )
+                 {p . scroll-top <= n . top - r . height / 2}}
+               {if ( n . left < r . left || n . right > r . right )
+                 {p . scroll-left <= n . left - r . width / 2}}}}}
+
 4) Now we have a structured program, with lists nested within lists. But we're not done yet. There's a bunch of symbols like ``=``, ``.``, and ``<`` that have special meaning, but they haven't been parsed yet.
 
    Nulan has an object called ``syntax-rules`` which contains information on how to parse the remaining syntax. To create new syntax, you can use the ``$syntax-rule`` macro::
@@ -73,9 +73,15 @@ There are four phases to Nulan's syntax parsing:
 
    The above creates a new rule for the ``^`` symbol. What can this rule do?
 
+   * Syntax rules with higher ``priority`` are run first (the default is ``0``)::
+
+       $syntax-rule "^" [
+         priority 50
+       ]
+
    * If ``whitespace`` is true, then the symbol will be treated as whitespace::
 
-       $syntaxs-rule "^" [
+       $syntax-rule "^" [
          whitespace %t
        ]
 
