@@ -130,7 +130,7 @@ var NULAN = (function (n) {
     return {
       delimiter: b,
       priority: i,
-      action: function (l, s, r) {
+      parse: function (l, s, r) {
         var x = l[l.length - 1]
           , y = r[0]
 
@@ -144,7 +144,7 @@ var NULAN = (function (n) {
       delimiter: b,
       priority: i,
       order: "right",
-      action: function (l, s, r) {
+      parse: function (l, s, r) {
         var y = r[0]
         return l.concat([[s, y]], r.slice(1))
       }
@@ -154,7 +154,7 @@ var NULAN = (function (n) {
   function inert(start, end) {
     t[end] = {
       delimiter: true,
-      action: function (l, s, r) {
+      parse: function (l, s, r) {
         throw new n.Error(s, "missing starting " + start)
       }
     }
@@ -164,169 +164,250 @@ var NULAN = (function (n) {
     return x.length === 1 ? x[0] : x
   }
 
+
   // TODO: make them into proper infix, so they behave correctly when only given a left or right side
-  var t = {
-    // TODO: do these need to be priority 120?
-    "(": {
-      priority: 110,
-      delimiter: true,
-      endAt: ")",
-      action: function (l, s, r) {
-        l.push(unwrap(r[0]))
-        return l.concat(r.slice(1))
-      }
-    },
+  var t = {}
 
-    "{": {
-      priority: 110,
-      delimiter: true,
-      endAt: "}",
-      action: function (l, s, r) {
-        r[0].unshift(n.box("list"))
+  // TODO: do these need to be priority 120?
+  t["("] = {
+    priority: 110,
+    delimiter: true,
+    endAt: ")",
+    parse: function (l, s, r) {
+      l.push(unwrap(r[0]))
+      return l.concat(r.slice(1))
+    }
+  }
+
+  t["{"] = {
+    priority: 110,
+    delimiter: true,
+    endAt: "}",
+    parse: function (l, s, r) {
+      r[0].unshift(n.box("list"))
+      l.push(r[0])
+      return l.concat(r.slice(1))
+    }
+  }
+
+  t["["] = {
+    priority: 110,
+    delimiter: true,
+    endAt: "]",
+    parse: function (l, s, r) {
+      if (s.whitespace) {
+        r[0].unshift(n.box("dict"))
         l.push(r[0])
-        return l.concat(r.slice(1))
-      }
-    },
-
-    "[": {
-      priority: 110,
-      delimiter: true,
-      endAt: "]",
-      action: function (l, s, r) {
-        if (s.whitespace) {
-          r[0].unshift(n.box("dict"))
-          l.push(r[0])
-        } else {
-          var x = l[l.length - 1]
-          l = l.slice(0, -1)
-          l.push([n.box("."), x, unwrap(r[0])])
-        }
-        return l.concat(r.slice(1))
-      }
-    },
-
-    ";": {
-      priority: 100,
-      delimiter: true,
-      action: function (l, s, r) {
-        l = [l]
-        l.push.apply(l, r)
-        return l
-      }
-    },
-
-    ":": {
-      priority: 100,
-      delimiter: true,
-      separator: true,
-      action: function (l, s, r) {
-        l.push(r[0])
-        l.push.apply(l, r.slice(1))
-        return l
-      }
-    },
-
-    ".": infix(100, true, function (l, s, r) {
-      if (l instanceof n.Wrapper &&
-          r instanceof n.Wrapper &&
-          typeof l.value === "number" &&
-          typeof r.value === "number") {
-        var x = (l.value + "." + r.value)
-        x = enrich(new n.Wrapper(+x), l)
-        x.length = l.length + r.length + 1
-        return x
-      } else if (r instanceof n.Symbol) {
-        return [s, l, r.value]
       } else {
-        return [s, l, r]
-      }
-    }),
-
-                    // TODO
-    ",":  unary(90, true),
-    "@":  unary(90, true),
-    //"~":  unary(90, false),
-
-    /*"*":  infix(80),
-    "/":  infix(80),
-
-    "+":  infix(70),
-    "-":  infix(70),
-
-    "<":  infix(60),
-    "=<": infix(60),
-    ">":  infix(60),
-    ">=": infix(60),*/
-
-    //"==": infix(50),
-    //"~=": infix(50),
-
-    /*"&&": infix(40),
-
-    "||": infix(30),*/
-
-    "'": {
-      priority: 10,
-      whitespace: true,
-      delimiter: true,
-      separator: true,
-      action: function (l, s, r) {
-        l.push([s, unwrap(r[0])])
-        l.push.apply(l, r.slice(1))
-        return l
-      }
-    },
-
-    "->": {
-      priority: 10,
-      order: "right",
-      action: function (l, s, r) {
-        var args = r.slice(0, -1)
-        l.push([s, args, r[r.length - 1]])
-        return l
-      }
-    },
-
-    "=": {
-      priority: 10,
-      separator: true,
-      action: function (l, s, r) {
         var x = l[l.length - 1]
         l = l.slice(0, -1)
-        l.push([s, x, unwrap(r[0])])
-        l.push.apply(l, r.slice(1))
-        return l
+        l.push([n.box("."), x, unwrap(r[0])])
       }
-    },
+      return l.concat(r.slice(1))
+    }
+  }
 
-    "<=": {
-      order: "right",
-      action: function (l, s, r) {
-        return [s, unwrap(l), unwrap(r)]
+  t[";"] = {
+    priority: 100,
+    delimiter: true,
+    parse: function (l, s, r) {
+      l.push([l.pop()])
+      l.push.apply(l, r)
+      return l
+    }
+  }
+
+  t[":"] = {
+    priority: 100,
+    delimiter: true,
+    separator: true,
+    parse: function (l, s, r) {
+      l.push(r[0])
+      l.push.apply(l, r.slice(1))
+      return l
+    }
+  }
+
+  t["."] = infix(100, true, function (l, s, r) {
+    if (l instanceof n.Wrapper &&
+        r instanceof n.Wrapper &&
+        typeof l.value === "number" &&
+        typeof r.value === "number") {
+      var x = (l.value + "." + r.value)
+      x = enrich(new n.Wrapper(+x), l)
+      x.length = l.length + r.length + 1
+      return x
+    } else if (r instanceof n.Symbol) {
+      return [s, l, r.value]
+    } else {
+      return [s, l, r]
+    }
+  })
+
+                      // TODO
+  t[","] =  unary(90, true)
+  t["@"] =  unary(90, true)
+  //t["~"] =  unary(90, false),
+
+  /*t["*"] =  infix(80),
+  t["/"] =  infix(80),
+
+  t["+"] =  infix(70),
+  t["-"] =  infix(70),
+
+  t["<"] =  infix(60),
+  t["=<"] = infix(60),
+  t[">"] =  infix(60),
+  t[">="] = infix(60),*/
+
+  //t["=="] = infix(50),
+  //t["~="] = infix(50),
+
+  /*t["&&"] = infix(40),
+
+  t["||"] = infix(30),*/
+
+  t["'"] = {
+    priority: 10,
+    whitespace: true,
+    delimiter: true,
+    separator: true,
+    parse: function (l, s, r) {
+      l.push([s, unwrap(r[0])])
+      l.push.apply(l, r.slice(1))
+      return l
+    }
+  }
+
+  t["->"] = {
+    priority: 10,
+    order: "right",
+    parse: function (l, s, r) {
+      var args = r.slice(0, -1)
+      l.push([s, args, r[r.length - 1]])
+      return l
+    }
+  }
+
+  t["="] = {
+    priority: 10,
+    separator: true,
+    parse: function (l, s, r) {
+      var x = l[l.length - 1]
+      l = l.slice(0, -1)
+      l.push([s, x, unwrap(r[0])])
+      l.push.apply(l, r.slice(1))
+      return l
+    }
+  }
+
+  t["<="] = {
+    order: "right",
+    parse: function (l, s, r) {
+      return [s, unwrap(l), unwrap(r)]
+    }
+  }
+
+  t["|"] = {
+    separator: true,
+    vertical: true,
+    parse: function (l, s, r) {
+      l.push([s].concat(r[0].map(unwrap)))
+      l.push.apply(l, r.slice(1))
+      return l
+    }
+  }
+
+  // TODO: add in whitespace, comments, and strings to "Customizable syntax.rst"
+  t[" "] = t["\n"] = {
+    delimiter: true,
+    whitespace: true,
+    tokenize: function (c, o, push) {
+      o.read()
+    }
+  }
+
+  function tokenizeComment(o) {
+    var s = store(o)
+    // TODO: a teensy bit hacky
+    --s.column
+    s.length = 2
+    while (true) {
+      if (!o.has()) {
+        throw new n.Error(s, "missing ending |#")
       }
-    },
-
-    "|": {
-      //delimiter: true,
-      action: function (l, s, r) {
-        return l.concat(r)
+      o.read()
+      if (o.peek() === "|") {
+        o.read()
+        if (o.peek() === "#") {
+          break
+        }
+      } else if (o.peek() === "#") {
+        o.read()
+        if (o.peek() === "|") {
+          tokenizeComment(o)
+        }
       }
-    },
+    }
+  }
 
-    "\n": { delimiter: true },
-    " ":  { delimiter: true },
-    "#":  { delimiter: true },
-
-    /*"|": {
-      order: "right",
-      priority: 100,
-      action: function (l, s, r) {
-        var y = parseLine(r)
-        l.push([s].concat(y[0]))
-        l.push.apply(l, y[1])
-        return l
+  t["#"] = {
+    delimiter: true,
+    whitespace: true,
+    tokenize: function (c, o, push) {
+      o.read()
+      if (o.peek() === "|") {
+        tokenizeComment(o)
+        o.read()
+      } else {
+        while (o.has() && o.peek() !== "\n") {
+          o.read()
+        }
       }
-    },*/
+    }
+  }
+
+  t["\""] = {
+    delimiter: true,
+    tokenize: function (q, o, push) {
+      var r = []
+        , c
+      o.read()
+      while (o.peek() !== q) {
+        if (o.has()) {
+          c = o.peek()
+          if (c === "\\") {
+            o.read()
+            c = o.read()
+            if (c === "n") {
+              r.push("\n")
+            } else if (c === "t") {
+              r.push("\t")
+            } else if (c === "\"" || c === "@" || c === "\\") {
+              r.push(c)
+            } else {
+              // TODO: a little hacky
+              o.length = 2
+              o.column -= 2
+              throw new n.Error(o, "expected \\n \\t \\\" \\@ \\\\ but got \\" + c)
+            }
+          // TODO
+          } else if (c === "@") {
+            o.read()
+            console.log(tokenize(o))
+          } else {
+            r.push(o.read())
+          }
+        } else {
+          // TODO
+          s.length = 1
+          throw new n.Error(s, "missing ending \"")
+        }
+      }
+      o.read()
+      r = r.join("")
+      push(new n.Wrapper(r))
+    }
   }
 
   inert("(", ")")
@@ -368,6 +449,7 @@ var NULAN = (function (n) {
   function tokenizeNumOrSym(o) {
     var s = store(o)
       , r = []
+      , b
     while (o.has() && /\d/.test(o.peek())) {
       r.push(o.read())
     }
@@ -378,96 +460,22 @@ var NULAN = (function (n) {
         r.push(o.read())
       }
       r = r.join("")
-      return enrich(new n.Symbol(r), s, o)
+      b = t[r]
+      r = enrich(new n.Symbol(r), s, o)
+      // TODO make this work
+      //r.whitespace = white
+      //white = (b ? !!b.whitespace : false)
+      return r
     }
   }
 
-  function tokenizeString(o) {
-    var s = store(o)
-      , q = o.peek()
-      , r = []
-      , c
-    o.read()
-    while (o.peek() !== q) {
-      if (o.has()) {
-        c = o.peek()
-        if (c === "\\") {
-          o.read()
-          c = o.read()
-          if (c === "n") {
-            r.push("\n")
-          } else if (c === "t") {
-            r.push("\t")
-          } else if (c === "\"" || c === "@" || c === "\\") {
-            r.push(c)
-          } else {
-            // TODO: a little hacky
-            o.length = 2
-            o.column -= 2
-            throw new n.Error(o, "expected \\n \\t \\\" \\@ \\\\ but got \\" + c)
-          }
-        // TODO
-        } else if (c === "@") {
-          o.read()
-          console.log(tokenize(o, true))
-        } else {
-          r.push(o.read())
-        }
-      } else {
-        s.length = 1
-        throw new n.Error(s, "missing ending \"")
-      }
-    }
-    o.read()
-    r = r.join("")
-    return enrich(new n.Wrapper(r), s, o)
-  }
-
-  function tokenizeComment(o) {
-    var s = store(o)
-    // TODO: a teensy bit hacky
-    --s.column
-    s.length = 2
-    while (true) {
-      if (!o.has()) {
-        throw new n.Error(s, "missing ending |#")
-      }
-      o.read()
-      if (o.peek() === "|") {
-        o.read()
-        if (o.peek() === "#") {
-          break
-        }
-      } else if (o.peek() === "#") {
-        o.read()
-        if (o.peek() === "|") {
-          tokenizeComment(o)
-        }
-      }
-    }
-  }
-
-  function tokenize(o, once) {
+  function tokenize(o) {
     var c, s, r = []
 
     var white = true
 
     while (o.has()) {
       c = o.peek()
-      if (c === " " || c === "\n") {
-        white = true
-        o.read()
-      } else if (c === "#") {
-        o.read()
-        if (o.peek() === "|") {
-          white = true
-          tokenizeComment(o)
-          o.read()
-        } else {
-          while (o.has() && o.peek() !== "\n") {
-            o.read()
-          }
-        }
       /*} else if (c === "-") {
         s = store(o)
         o.read()
@@ -484,26 +492,29 @@ var NULAN = (function (n) {
         } else {
           r.push(enrich(t["u-"], s, o))
         }*/
-      } else if (c === "\"") {
-        white = false
-        r.push(tokenizeString(o))
-        if (once) {
-          break
-        }
+      // TODO: multi-character tokenize and delimiter
+      if (t[c] && t[c].tokenize) {
+        // TODO: should probably pass in store somehow
+        s = store(o)
+        t[c].tokenize(c, o, function (x) {
+          r.push(enrich(x, s, o))
+        })
+
+        white = !!t[c].whitespace
       } else if (t[c] && t[c].delimiter) {
+        // TODO: some small code duplication with tokenizeNumOrSym
         s = store(o)
         o.read()
         s = enrich(new n.Symbol(c), s, o)
         s.whitespace = white
-        white = !!t[c].whitespace
         r.push(s)
+
+        white = !!t[c].whitespace
       } else {
-        // TODO: should use the whitespace property of the token
-        white = false
-        r.push(tokenizeNumOrSym(o))
-        if (once) {
-          break
-        }
+        s = tokenizeNumOrSym(o)
+        s.whitespace = white // TODO: remove this
+        r.push(s)
+        white = false // TODO: remove this
       }
     }
 
@@ -539,7 +550,7 @@ var NULAN = (function (n) {
         if (l.length === 0 && r.length === 0) {
           return [x]
         } else {
-          l = y.action(l, x, r)
+          l = y.parse(l, x, r)
         }
       } else {
         break
@@ -550,6 +561,10 @@ var NULAN = (function (n) {
 
   function isSeparator(x) {
     return x instanceof n.Symbol && t[x.value] && t[x.value].separator
+  }
+
+  function isVertical(x) {
+    return x instanceof n.Symbol && t[x.value] && t[x.value].vertical
   }
 
   function isEndAt(x) {
@@ -595,7 +610,7 @@ var NULAN = (function (n) {
 /*
   syntax-rule (
     braces ")"
-    action -> l s r
+    parse -> l s r
       `,@l ,r
 */
 
@@ -612,20 +627,24 @@ var NULAN = (function (n) {
   function indent(o, x) {
     var a = []
       , y
+      , b
       , r
     while (o.has()) {
       y = o.peek()
       if (y.line === x.line) {
-        // TODO: figure out a way to generalize this
-        if (isSym(y, "|") && y.column === x.column) {
+        b = isSeparator(y)
+        if (isVertical(y)) {
           r = []
-          while (o.has() && isSym(o.peek(), "|") && o.peek().column === y.column) {
-            o.read()
-            r.push(unwrap(indent(o, o.peek())))
+          while (o.has() && isSym(o.peek(), y.value) && o.peek().column === y.column) {
+            if (b) {
+              o.read()
+              r.push(indent(o, o.peek()))
+            } else {
+              r.push.apply(r, indent(o, o.read()))
+            }
           }
-          r.unshift(y) // TODO: this needs to insert a box
-          a.push(r)
-        } else if (isSeparator(y)) {
+          a.push(y, r)
+        } else if (b) {
           o.read()
           a.push(y, indent(o, o.peek()))
         } else {

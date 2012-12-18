@@ -153,7 +153,7 @@ $mac $syntax-helper -> n f
                          # TODO
               'w/var v = ,f
                  | u.priority <= i
-                 | u.action <= v
+                 | u.parse <= v
                  | $syntax-rule s u
 
 $syntax-helper $syntax-infix

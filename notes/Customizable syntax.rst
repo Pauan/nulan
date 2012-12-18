@@ -11,7 +11,7 @@ To demonstrate how the system works, let's parse this Nulan program::
       | if (n.left < r.left || n.right > r.right)
           p.scroll-left <= n.left - r.width / 2
 
-There are four phases to Nulan's syntax parsing:
+There are three phases to Nulan's syntax parsing:
 
 1) Tokenization. This phase splits a string into tokens. The end result is a flat 1-dimensional list of numbers, symbols, and strings::
 
@@ -19,13 +19,7 @@ There are four phases to Nulan's syntax parsing:
 
    The list has no structure to it, but Nulan keeps track of the line and column where each token was found. This will be very important later on.
 
-2) The ``|`` token is handled specially. If it occurs at the start of the line, it will take all the lines that start with ``|`` at the same indentation and put them into a list::
-
-     def scroll-into-view -> n p w/var n = n . get-bounding-client-rect ; r = p . get-bounding-client-rect ;
-       {| {if ( n . top < r . top || n . bottom > r . bottom ) p . scroll-top <= n . top - r . height / 2}
-          {if ( n . left < r . left || n . right > r . right ) p . scroll-left <= n . left - r . width / 2}}
-
-3) Nulan uses significant whitespace, and has very simple rules for how to handle it:
+2) Nulan uses significant whitespace, and has very simple rules for how to handle it:
 
    1) Everything on the same line is put into a list::
 
@@ -58,12 +52,12 @@ There are four phases to Nulan's syntax parsing:
         {def scroll-into-view -> n p
           {w/var n = n . get-bounding-client-rect ;
             {r = p . get-bounding-client-rect ;}
-            {| {if ( n . top < r . top || n . bottom > r . bottom )
-                 {p . scroll-top <= n . top - r . height / 2}}
-               {if ( n . left < r . left || n . right > r . right )
-                 {p . scroll-left <= n . left - r . width / 2}}}}}
+            {| if ( n . top < r . top || n . bottom > r . bottom )
+              {p . scroll-top <= n . top - r . height / 2}}
+            {| if ( n . left < r . left || n . right > r . right )
+              {p . scroll-left <= n . left - r . width / 2}}}}
 
-4) Now we have a structured program, with lists nested within lists. But we're not done yet. There's a bunch of symbols like ``=``, ``.``, and ``<`` that have special meaning, but they haven't been parsed yet.
+3) Now we have a structured program, with lists nested within lists. But we're not done yet. There's a bunch of symbols like ``=``, ``.``, and ``<`` that have special meaning, but they haven't been parsed yet.
 
    Nulan has an object called ``syntax-rules`` which contains information on how to parse the remaining syntax. To create new syntax, you can use the ``$syntax-rule`` macro::
 
@@ -115,6 +109,37 @@ There are four phases to Nulan's syntax parsing:
                 corge}
          yes}
 
+   * If ``vertical`` is true, the parser will scan vertically for the same symbol and will mush it into a single list::
+
+       $syntax-rule "^" [
+         vertical %t
+       ]
+
+     What this means is that this...
+
+     ::
+
+       foo ^ 1 2 3
+           ^ 4 5 6
+           ^ 7 8 9
+         bar qux
+
+     ...will be parsed into this::
+
+       {foo ^ {1 2 3
+               4 5 6
+               7 8 9}
+         {bar qux}}
+
+     You will usually want to use ``separator`` at the same time, in which case it would be parsed like this::
+
+       {foo ^ {{1 2 3}
+               {4 5 6}
+               {7 8 9}}
+         {bar qux}}
+
+     This is used for the ``|`` syntax.
+
    * If ``endAt`` exists, it should be a string. The parser will search for a symbol that matches the string and will put everything between it and the original symbol into a list::
 
        $syntax-rule "^" [
@@ -141,10 +166,42 @@ There are four phases to Nulan's syntax parsing:
 
      Left-associative (the default) means that ``foo ^ bar ^ qux`` is parsed as ``{{foo ^ bar} ^ qux}`` and right-associative means that it's parsed as ``{foo ^ {bar ^ qux}}``
 
-   * The ``action`` property is a function that accepts three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol::
+   * The ``tokenize`` property is a function::
 
        $syntax-rule "^" [
-         action -> l s r
+         tokenize -> s o push
+           ...
+       ]
+
+     When the tokenizer encounters "^" it will call the ``tokenize`` function with three arguments:
+
+     1) The first argument is the string "^"
+
+     2) The second argument is an iterator that contains all the characters remaining after the "^" character. Because this is handled by the tokenizer, it's just raw characters, there's no structure yet. It has the following methods:
+
+        * ``has`` returns true if the iterator has any items remaining, otherwise false
+        * ``peek`` returns the next character in the iterator, but doesn't consume anything
+        * ``read`` returns the next character in the iterator, and consumes it
+
+     3) The third argument is a function that you can call to return a result. Here's an example of a rule that when given the string "^foo" will return "bar"::
+
+          $syntax-rule "^" [
+            tokenize -> s o push
+              if o.peek; == "f"
+                | o.read;
+                | if o.peek; == "o"
+                    | o.read;
+                    | if o.peek; == "o"
+                        | o.read;
+                        | push "bar"
+          ]
+
+        The tokenize function is used for parsing whitespace, comments, and strings.
+
+   * The ``parse`` property is a function that accepts three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol::
+
+       $syntax-rule "^" [
+         parse -> l s r
            ...
        ]
 
@@ -152,12 +209,12 @@ There are four phases to Nulan's syntax parsing:
 
        foo bar ^ qux corge
 
-     When Nulan encounters ``^``, it will pass the arguments ``{foo bar}``, ``^``, and ``{qux corge}`` to the ``action`` function. Whatever the function returns is used as the final result.
+     When Nulan encounters ``^``, it will pass the arguments ``{foo bar}``, ``^``, and ``{qux corge}`` to the ``parse`` function. Whatever the function returns is used as the final result.
 
-     A typical infix operator is easy to define, it simply takes the last argument of the left list and the first argument of the right list and mushes them together::
+     A typical infix operator is easy to define, it simply takes the last element of the left list and the first element of the right list and mushes them together::
 
        $syntax-rule "^" [
-         action -> {@l x} s {y @r}
+         parse -> {@l x} s {y @r}
            ',@l (s x y) ,@r
        ]
 
@@ -168,7 +225,7 @@ There are four phases to Nulan's syntax parsing:
      Using the same system, unary is also easy::
 
        $syntax-rule "^" [
-         action -> l s {y @r}
+         parse -> l s {y @r}
            ',@l (s y) ,@r
        ]
 
@@ -185,7 +242,7 @@ There are four phases to Nulan's syntax parsing:
 
        $syntax-rule "->" [
          order "right"
-         action -> l s {@args body}
+         parse -> l s {@args body}
            ',@l (s args body)
        ]
 
@@ -199,7 +256,7 @@ There are four phases to Nulan's syntax parsing:
 
        $syntax-rule "<=" [
          order "right"
-         action -> l s r
+         parse -> l s r
            's ,(unwrap l) ,(unwrap r)
        ]
 
@@ -213,7 +270,7 @@ There are four phases to Nulan's syntax parsing:
        priority 110
        delimiter %t
        endAt ")"
-       action -> l s {x @r}
+       parse -> l s {x @r}
          ',@l ,(unwrap x) ,@r
      ]
 
@@ -221,7 +278,7 @@ There are four phases to Nulan's syntax parsing:
        priority 110
        delimiter %t
        endAt "}"
-       action -> l s {x @r}
+       parse -> l s {x @r}
          ',@l (list ,@x) ,@r
      ]
 
@@ -229,7 +286,7 @@ There are four phases to Nulan's syntax parsing:
        priority 110
        delimiter %t
        endAt "]"
-       action -> {@l x} s {y @r}
+       parse -> {@l x} s {y @r}
          if s.whitespace
            ',@l x (dict ,@y) ,@r
            ',@l (. x ,(unwrap y)) ,@r
@@ -238,22 +295,22 @@ There are four phases to Nulan's syntax parsing:
      $syntax-rule ";" [
        priority 100
        delimiter %t
-       action -> l s r
-         'l ,@r
+       parse -> {@l x} s r
+         ',@l (x) ,@r
      ]
 
      $syntax-rule ":" [
        priority 100
        delimiter %t
        separator %t
-       action -> l s {x @r}
+       parse -> l s {x @r}
          ',@l x ,@r
      ]
 
      $syntax-rule "." [
        priority 100
        delimiter %t
-       action -> {@l x} s {y @r}
+       parse -> {@l x} s {y @r}
          if (num? x) && (num? y)
            ',@l ,(num: x + "." + y) ,@r
            if (sym? y)
@@ -289,28 +346,28 @@ There are four phases to Nulan's syntax parsing:
        whitespace %t
        delimiter %t
        separator %t
-       action -> l s {x @r}
+       parse -> l s {x @r}
          ',@l (s ,(unwrap x)) ,@r
      ]
 
      $syntax-rule "->" [
        priority 10
        order "right"
-       action -> l s {@args body}
+       parse -> l s {@args body}
          ',@l (s args body)
      ]
 
      $syntax-rule "=" [
        priority 10
        separator %t
-       action -> {@l x} s {y @r}
+       parse -> {@l x} s {y @r}
          ',@l (s x ,(unwrap y)) ,@r
      ]
 
      $syntax-rule "<=" [
        priority 0
        order "right"
-       action -> l s r
+       parse -> l s r
          's ,(unwrap l) ,(unwrap r)
      ]
 
@@ -319,18 +376,67 @@ There are four phases to Nulan's syntax parsing:
      {def scroll-into-view -> n p
        {w/var n = n . get-bounding-client-rect ;
          {r = p . get-bounding-client-rect ;}
-         {| {if ( n . top < r . top || n . bottom > r . bottom )
-              {p . scroll-top <= n . top - r . height / 2}}
-            {if ( n . left < r . left || n . right > r . right )
-              {p . scroll-left <= n . left - r . width / 2}}}}}
+         {| if ( n . top < r . top || n . bottom > r . bottom )
+           {p . scroll-top <= n . top - r . height / 2}}
+         {| if ( n . left < r . left || n . right > r . right )
+           {p . scroll-left <= n . left - r . width / 2}}}}
 
-   Let's use the built-in syntax to parse this::
+   Let's use the built-in syntax to parse this. Firstly, let's run the ``parse`` function for ``->``::
 
      {def scroll-into-view
        {-> {n p}
-         {w/var
-           {= n {{. n get-bounding-client-rect}}}
-           {= r {{. p get-bounding-client-rect}}}
+         {w/var n = n . get-bounding-client-rect ;
+           {r = p . get-bounding-client-rect ;}
+           {| if ( n . top < r . top || n . bottom > r . bottom )
+             {p . scroll-top <= n . top - r . height / 2}}
+           {| if ( n . left < r . left || n . right > r . right )
+             {p . scroll-left <= n . left - r . width / 2}}}}}
+
+   Now the function for ``=``...
+
+   ::
+
+     {def scroll-into-view
+       {-> {n p}
+         {w/var {= n {n . get-bounding-client-rect ;}}
+           {r = p . get-bounding-client-rect ;}
+           {| if ( n . top < r . top || n . bottom > r . bottom )
+             {p . scroll-top <= n . top - r . height / 2}}
+           {| if ( n . left < r . left || n . right > r . right )
+             {p . scroll-left <= n . left - r . width / 2}}}}}
+
+   Now the function for ``.``...
+
+   ::
+
+     {def scroll-into-view
+       {-> {n p}
+         {w/var {= n {{. n get-bounding-client-rect} ;}}
+           {r = p . get-bounding-client-rect ;}
+           {| if ( n . top < r . top || n . bottom > r . bottom )
+             {p . scroll-top <= n . top - r . height / 2}}
+           {| if ( n . left < r . left || n . right > r . right )
+             {p . scroll-left <= n . left - r . width / 2}}}}}
+
+   Now the function for ``;``...
+
+   ::
+
+     {def scroll-into-view
+       {-> {n p}
+         {w/var {= n {{. n get-bounding-client-rect}}}
+           {r = p . get-bounding-client-rect ;}
+           {| if ( n . top < r . top || n . bottom > r . bottom )
+             {p . scroll-top <= n . top - r . height / 2}}
+           {| if ( n . left < r . left || n . right > r . right )
+             {p . scroll-left <= n . left - r . width / 2}}}}}
+
+   And such forth and so on. After all the syntax rule functions have been run, the end result is this::
+
+     {def scroll-into-view
+       {-> {n p}
+         {w/var {= n {{. n get-bounding-client-rect}}}
+                {= r {{. p get-bounding-client-rect}}}
            {| {if {|| {< {. n top} {. r top}} {> {. n bottom} {. r bottom}}}
                 {<= {. p scroll-top} {- {. n top} {/ {. r height} 2}}}}
               {if {|| {< {. n left} {. r left}} {> {. n right} {. r right}}}
