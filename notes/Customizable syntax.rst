@@ -282,7 +282,7 @@ There are four phases to Nulan's syntax parsing:
 
      $syntax-infix "&&" 40
 
-     $syntax-infix "||" 40
+     $syntax-infix "||" 30
 
      $syntax-rule "'" [
        priority 10
@@ -330,7 +330,7 @@ There are four phases to Nulan's syntax parsing:
        {-> {n p}
          {w/var
            {= n {{. n get-bounding-client-rect}}}
-           {= r {{. pget-bounding-client-rect}}}
+           {= r {{. p get-bounding-client-rect}}}
            {| {if {|| {< {. n top} {. r top}} {> {. n bottom} {. r bottom}}}
                 {<= {. p scroll-top} {- {. n top} {/ {. r height} 2}}}}
               {if {|| {< {. n left} {. r left}} {> {. n right} {. r right}}}
