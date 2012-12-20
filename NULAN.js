@@ -553,8 +553,11 @@ var NULAN = (function (n) {
         } else {
           return withMode("compile", function () {
             x = compile(x)
-            console.log("$eval", x)
-            console.log()
+            if (n.options.debug) {
+              // TODO
+              console.log("$eval", x)
+              console.log()
+            }
             return ["id", eval(x)]
           })
         }
@@ -1647,6 +1650,8 @@ function infix(i, b, f) {
       return compile(a)
     })
   }
+
+  n.options = { debug: false }
 
   return n
 })(NULAN || {})

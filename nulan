@@ -28,39 +28,36 @@ NULAN.readFile = function (s) {
 /*NULAN.vars["prn"]     = "prn"
 NULAN.values["prn"]   = prn*/
 
-try {
-  NULAN.import("NULAN.macros")
-} catch (e) {
-  console.error("" + e)
-}
-
 
 //NULAN.from("Node.js").to("browser")
 //NULAN.from("Node.js").to("Chrome Extension")
 NULAN.from("Node.js").to("Node.js")
 
 
-var opts = {
-  debug: {
-    tokenize: false,
-    parse: false,
-    compile: false,
-    eval: false
-  }
+var args = require("optimist").argv
+
+if (args.d) {
+  NULAN.options.debug = true
 }
 
+/*
 var args = process.argv.slice(2).filter(function (x) {
   // TODO: better cli parsing
   if (x === "-d") {
-    //opts.debug.tokenize = true
-    opts.debug.parse = true
-    opts.debug.compile = true
-    opts.debug.eval = true
+    NULAN.options.debug = true
     return false
   } else {
     return true
   }
-})
+})*/
+
+
+try {
+  NULAN.import("NULAN.macros")
+} catch (e) {
+  console.error("" + e)
+}
+
 
 var globals = { Array:      Array
               , console:    console
@@ -120,20 +117,21 @@ function printTokens(a) {
 rl.on("input", function (s) {
   try {
     var x = NULAN.tokenize(s)
-    if (opts.debug.tokenize) {
+       // TODO
+    if (false) {
       print(["tokenize", printTokens(x)])
       console.log()
     }
 
     NULAN.parseRaw(x, function (x) {
-      if (opts.debug.parse) {
+      if (NULAN.options.debug) {
         print(["parse", pretty(NULAN.toJSON(x))])
         //print(["parse"].concat(NULAN.toJSON(x).map(pretty)))
         console.log()
       }
 
       x = NULAN.compile(x)
-      if (opts.debug.compile) {
+      if (NULAN.options.debug) {
         print(["compile", x])
         console.log()
       }
@@ -141,7 +139,7 @@ rl.on("input", function (s) {
       //console.log("@compile\n" + x.replace(/^/gm, "  "))
 
       x = vm.runInNewContext(x, globals)
-      if (opts.debug.eval) {
+      if (NULAN.options.debug) {
         print(["eval", pretty(x)])
       } else {
         console.log(pretty(x))
