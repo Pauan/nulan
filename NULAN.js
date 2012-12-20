@@ -548,7 +548,7 @@ var NULAN = (function (n) {
         } else {
           return withMode("compile", function () {
             x = compile(x)
-            console.log(x)
+            console.log("$eval", x)
             console.log()
             return ["id", eval(x)]
           })
