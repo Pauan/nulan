@@ -1502,10 +1502,13 @@ function infix(i, b, f) {
     })
   }
 
-  n.builtin = function (o) {
-    Object.keys(o).forEach(function (x) {
-      setValue(x, o[x])
+  n.builtin = function () {
+    [].forEach.call(arguments, function (x) {
+      setValue(x)
     })
+    /*Object.keys(o).forEach(function (x) {
+      setValue(x, o[x])
+    })*/
     /*[].forEach.call(arguments, function (x) {
       x = new n.Symbol(x)
       setBox(x)
@@ -1525,7 +1528,7 @@ function infix(i, b, f) {
   //n.builtin({ "console": console, "Array": Array, "Object": Object })
 
   // Object.getOwnPropertyNames(global)
-  var n = {
+  /*var n = {
     builtin: function () {
       console.log([].filter.call(arguments, function (x) {
         return (x in window)
@@ -1534,7 +1537,7 @@ function infix(i, b, f) {
         return !(x in window)
       }))
     }
-  }
+  }*/
 
   // Globals that exist in all environments
   n.builtin("Number", "Math", "Boolean", "TypeError", "String",

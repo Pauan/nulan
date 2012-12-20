@@ -173,17 +173,17 @@ There are three phases to Nulan's syntax parsing:
            ...
        ]
 
-     When the tokenizer encounters "^" it will call the ``tokenize`` function with three arguments:
+     When the tokenizer encounters ``"^"`` it will call the ``tokenize`` function with three arguments:
 
-     1) The first argument is the string "^"
+     1) The first argument is the string ``"^"``
 
-     2) The second argument is an iterator that contains all the characters remaining after the "^" character. Because this is handled by the tokenizer, it's just raw characters, there's no structure yet. It has the following methods:
+     2) The second argument is an iterator that contains all the characters remaining after the ``"^"`` character. Because this is handled by the tokenizer, it's just raw characters, there's no structure yet. It has the following methods:
 
         * ``has`` returns true if the iterator has any items remaining, otherwise false
         * ``peek`` returns the next character in the iterator, but doesn't consume anything
         * ``read`` returns the next character in the iterator, and consumes it
 
-     3) The third argument is a function that you can call to return a result. Here's an example of a rule that when given the string "^foo" will return "bar"::
+     3) The third argument is a function that you can call to return a result. Here's an example of a rule that when given the string ``"^foo"`` will return ``"bar"``::
 
           $syntax-rule "^" [
             tokenize -> s o push
@@ -196,7 +196,7 @@ There are three phases to Nulan's syntax parsing:
                         | push "bar"
           ]
 
-        The tokenize function is used for parsing whitespace, comments, and strings.
+     The tokenize function is used for parsing whitespace, comments, and strings.
 
    * The ``parse`` property is a function that accepts three arguments: a list of everything to the left of the symbol, the symbol, and a list of everything to the right of the symbol::
 
@@ -296,6 +296,8 @@ There are three phases to Nulan's syntax parsing:
        priority 100
        delimiter %t
        parse -> {@l x} s r
+         # TODO: test which one of these is correct
+         ',@l ,{x} ,@r
          ',@l (x) ,@r
      ]
 
@@ -318,15 +320,15 @@ There are three phases to Nulan's syntax parsing:
              ',@l (s x y) ,@r
      ]
 
-     $syntax-unary "," 90 [ delimiter %t ]
-     $syntax-unary "@" 90 [ delimiter %t ]
-     $syntax-unary "~" 90
+     $syntax-unary ","  90 [ delimiter %t ]
+     $syntax-unary "@"  90 [ delimiter %t ]
+     $syntax-unary "~"  90
 
-     $syntax-infix "*" 80
-     $syntax-infix "/" 80
+     $syntax-infix "*"  80
+     $syntax-infix "/"  80
 
-     $syntax-infix "+" 70
-     $syntax-infix "-" 70
+     $syntax-infix "+"  70
+     $syntax-infix "-"  70
 
      $syntax-infix "<"  60
      $syntax-infix ">"  60
@@ -392,9 +394,7 @@ There are three phases to Nulan's syntax parsing:
            {| if ( n . left < r . left || n . right > r . right )
              {p . scroll-left <= n . left - r . width / 2}}}}}
 
-   Now the function for ``=``...
-
-   ::
+   Now the function for ``=``::
 
      {def scroll-into-view
        {-> {n p}
@@ -405,9 +405,7 @@ There are three phases to Nulan's syntax parsing:
            {| if ( n . left < r . left || n . right > r . right )
              {p . scroll-left <= n . left - r . width / 2}}}}}
 
-   Now the function for ``.``...
-
-   ::
+   Now the function for ``.``::
 
      {def scroll-into-view
        {-> {n p}
@@ -418,9 +416,7 @@ There are three phases to Nulan's syntax parsing:
            {| if ( n . left < r . left || n . right > r . right )
              {p . scroll-left <= n . left - r . width / 2}}}}}
 
-   Now the function for ``;``...
-
-   ::
+   Now the function for ``;``::
 
      {def scroll-into-view
        {-> {n p}

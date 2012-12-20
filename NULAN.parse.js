@@ -367,12 +367,16 @@ var NULAN = (function (n) {
     }
   }
 
+  // TODO: change it so tokenize receives a symbol rather than a string?
   t["\""] = {
     delimiter: true,
+    endAt: "\"",
+    // TODO: enrich
     tokenize: function (q, o, push) {
-      var r = []
+      var a = []
         , c
       o.read()
+      push(enrich(new n.Symbol(q), o))
       while (o.peek() !== q) {
         if (o.has()) {
           c = o.peek()
@@ -380,11 +384,11 @@ var NULAN = (function (n) {
             o.read()
             c = o.read()
             if (c === "n") {
-              r.push("\n")
+              a.push("\n")
             } else if (c === "t") {
-              r.push("\t")
+              a.push("\t")
             } else if (c === "\"" || c === "@" || c === "\\") {
-              r.push(c)
+              a.push(c)
             } else {
               // TODO: a little hacky
               o.length = 2
@@ -394,9 +398,15 @@ var NULAN = (function (n) {
           // TODO
           } else if (c === "@") {
             o.read()
-            console.log(tokenize(o))
+            if (a.length) {
+              push(enrich(new n.Wrapper(a.join("")), o))
+            }
+            a = []
+            // TODO: should either make "foobar@"testing"" work or throw an error
+            tokenize(o, push, q) // TODO q
+            //"foo@((bar qux) corge)"
           } else {
-            r.push(o.read())
+            a.push(o.read())
           }
         } else {
           // TODO
@@ -405,8 +415,14 @@ var NULAN = (function (n) {
         }
       }
       o.read()
-      r = r.join("")
-      push(new n.Wrapper(r))
+      if (a.length) {
+        push(enrich(new n.Wrapper(a.join("")), o))
+      }
+      push(enrich(new n.Symbol(q), o))
+    },
+    parse: function (l, s, r) {
+      l.push([s].concat(r[0]))
+      return l.concat(r.slice(1))
     }
   }
 
@@ -443,8 +459,15 @@ var NULAN = (function (n) {
   }
 
   function isDelimiter(o) {
-    return t[o.peek()] && t[o.peek()].delimiter
+    if (o.has()) {
+      var c = o.peek()
+      return t[c] && t[c].delimiter
+    } else {
+      return true
+    }
   }
+
+  var white
 
   function tokenizeNumOrSym(o) {
     var s = store(o)
@@ -462,17 +485,16 @@ var NULAN = (function (n) {
       r = r.join("")
       b = t[r]
       r = enrich(new n.Symbol(r), s, o)
-      // TODO make this work
-      //r.whitespace = white
-      //white = (b ? !!b.whitespace : false)
+      r.whitespace = white
+      white = (b ? !!b.whitespace : false)
       return r
     }
   }
 
-  function tokenize(o) {
-    var c, s, r = []
+  function tokenize(o, push, end) {
+    var c, s
 
-    var white = true
+    white = true
 
     while (o.has()) {
       c = o.peek()
@@ -492,13 +514,18 @@ var NULAN = (function (n) {
         } else {
           r.push(enrich(t["u-"], s, o))
         }*/
+      if (c === end) {
+        break
       // TODO: multi-character tokenize and delimiter
-      if (t[c] && t[c].tokenize) {
+      } else if (t[c] && t[c].tokenize) {
         // TODO: should probably pass in store somehow
+        /*
         s = store(o)
-        t[c].tokenize(c, o, function (x) {
-          r.push(enrich(x, s, o))
-        })
+        function (x) {
+          push(enrich(x, s, o))
+        }
+        */
+        t[c].tokenize(c, o, push)
 
         white = !!t[c].whitespace
       } else if (t[c] && t[c].delimiter) {
@@ -507,18 +534,13 @@ var NULAN = (function (n) {
         o.read()
         s = enrich(new n.Symbol(c), s, o)
         s.whitespace = white
-        r.push(s)
+        push(s)
 
         white = !!t[c].whitespace
       } else {
-        s = tokenizeNumOrSym(o)
-        s.whitespace = white // TODO: remove this
-        r.push(s)
-        white = false // TODO: remove this
+        push(tokenizeNumOrSym(o))
       }
     }
-
-    return r
   }
 
 
@@ -662,7 +684,11 @@ var NULAN = (function (n) {
   n.syntaxRules = t
 
   n.tokenize = function (s) {
-    return tokenize(stringBuffer(s))
+    var r = []
+    tokenize(stringBuffer(s), function (x) {
+      r.push(x)
+    })
+    return r
   }
 
   n.parseRaw = function (a, f) {
