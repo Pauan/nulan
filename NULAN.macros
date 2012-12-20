@@ -139,7 +139,7 @@ $mac w/each -> {('=) x y} body
   w/uniq i len
     w/complex y
       'w/var len = y.length
-         for (var i = 0) (i ~= len) (++ i)
+         for (var i = 0) (~= i len) (++ i)
            w/var x = y[i]
              body
 
@@ -150,6 +150,13 @@ $mac w/each-rev -> {('=) x y} body
          while i
            w/var x = y[-- i]
              body
+
+$mac w/map -> {('=) x y} body
+  w/uniq u
+    'w/var u = {}
+       | w/each x = y
+           u.push body
+       | u
 
 
 ###  Syntax

@@ -56,10 +56,11 @@ Examples
 
   # Simulating a `for` loop using a `while` loop
   $mac for -> init test incr body
-    '| init
-     | while test
-         | body
-         | incr
+    'w/new-scope
+       | init
+       | while test
+           | body
+           | incr
 
   for (var i = 0) (i < 10) (++ i)
     prn i
@@ -95,23 +96,8 @@ Examples
 
 ::
 
-  # Macro to iterate over the elements of any *dense* list or string
-  $mac w/each -> {'(=) x y} body
-    w/uniq i
-      w/complex y
-        'w/var x
-           for (var i = 0) ((x <= y[i]) ~= ()) (++ i)
-             body
-
-  w/each x = {1 2 3}
-    | prn x
-    | prn x + 5
-    | prn;
-
-::
-
-  # Macro to iterate over the elements of any *sparse* list or string
-  $mac w/each-sparse -> {('=) x y} body
+  # Macro to iterate over the elements of any list or string
+  $mac w/each -> {('=) x y} body
     w/uniq i len
       w/complex y
         'w/var len = y.length
@@ -119,7 +105,7 @@ Examples
              w/var x = y[i]
                body
 
-  w/each-sparse x = {1 2 3}
+  w/each x = {1 2 3}
     | prn x
     | prn x + 5
     | prn;
@@ -191,14 +177,10 @@ Examples
   var in
 
   $mac for -> x {('in) n y}
-    w/uniq u
-      'w/var u = {}
-         | w/each n = y
-             u.push x
-         | u
+    'y.map -> n x
 
-  $syntax-infix for [ order "right" ]
-  $syntax-infix in  [ order "right" ]
+  $syntax-infix for 0 [ order "right" ]
+  $syntax-infix in  0 [ order "right" ]
 
   (x + 2) for x in {1 2 3}
 

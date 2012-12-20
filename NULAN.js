@@ -453,7 +453,8 @@ var NULAN = (function (n) {
       boxes[x.value] = x
       x.scope = "builtin"
       //x.local = local // TODO: local
-      x.mode[mode] = true
+      x.mode["compile"] = true
+      x.mode["run"] = true
       return x
     }
 
@@ -663,16 +664,19 @@ var NULAN = (function (n) {
 
   // TODO
   function $mac(a) {
-    var x = a[0]
+    a = [].map.call(a, mac)
+    /*
     // TODO: make it work with boxes too
     if (x instanceof n.Symbol) {
-      x = ["name", x.value]
+      x = x.value
+      //x = ["name", x.value]
     } else if (typeof x !== "string") {
       throw new n.Error(x, "invalid expression: " + x)
-    }
+    }*/
+    //return [n.box("list"), x].concat([].slice.call(a, 1))
     return (a.length === 1
-             ? x
-             : [x].concat([].slice.call(a, 1).map(mac)))
+             ? a[0]
+             : [a[0]].concat(a.slice(1)))
   }
 
 /*  function splicingArgsRest(x, i, iLen, a) {
@@ -867,7 +871,12 @@ var NULAN = (function (n) {
   // TODO: can't be defined in NULAN.macros because it's the primitive for the " syntax
   setValue("str", macro(function () {
     var a = [].slice.call(arguments)
-    return mac([n.box("+"), ""].concat(a))
+                          // TODO: why isn't this a wrapper?
+    if (a.length === 1 && typeof a[0] === "string") {
+      return a[0]
+    } else {
+      return mac([n.box("+"), ""].concat(a))
+    }
   }))
 
   // TODO
