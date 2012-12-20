@@ -236,3 +236,25 @@
     '(qux nou)
 
 > var foo = 5 = 10 20
+
+
+> $mac defs -> @body
+    '| var ,@(body.map -> {x} x)
+     | ,@(body.map -> {x y} 'x <= y)
+
+> $mac $syntax-helper -> n f
+    w/uniq s i o
+      '$mac n -> s (i = 0) (o = '[])
+         '$run
+            ,:w/complex o
+                '| o.priority <= i
+                 | o.parse <= ,f
+                 | $syntax-rule s o
+
+> $run
+    '1 2 3
+       ,'4 5 6
+           ,'8 9 10
+
+> $mac str -> @args
+    '(") ,@args

@@ -268,7 +268,7 @@ var NULAN = (function (n) {
   t["||"] = infix(30),*/
 
   t["'"] = {
-    priority: 10,
+    priority: 90, // TODO: 10
     whitespace: true,
     delimiter: true,
     separator: true,
@@ -377,42 +377,41 @@ var NULAN = (function (n) {
         , c
       o.read()
       push(enrich(new n.Symbol(q), o))
-      while (o.peek() !== q) {
-        if (o.has()) {
-          c = o.peek()
-          if (c === "\\") {
-            o.read()
-            c = o.read()
-            if (c === "n") {
-              a.push("\n")
-            } else if (c === "t") {
-              a.push("\t")
-            } else if (c === "\"" || c === "@" || c === "\\") {
-              a.push(c)
-            } else {
-              // TODO: a little hacky
-              o.length = 2
-              o.column -= 2
-              throw new n.Error(o, "expected \\n \\t \\\" \\@ \\\\ but got \\" + c)
-            }
-          // TODO
-          } else if (c === "@") {
-            o.read()
-            if (a.length) {
-              push(enrich(new n.Wrapper(a.join("")), o))
-            }
-            a = []
-            // TODO: should either make "foobar@"testing"" work or throw an error
-            tokenize(o, push, q) // TODO q
-            //"foo@((bar qux) corge)"
+      while (o.has() && o.peek() !== q) {
+        c = o.peek()
+        if (c === "\\") {
+          o.read()
+          c = o.read()
+          if (c === "n") {
+            a.push("\n")
+          } else if (c === "t") {
+            a.push("\t")
+          } else if (c === "\"" || c === "@" || c === "\\") {
+            a.push(c)
           } else {
-            a.push(o.read())
+            // TODO: a little hacky
+            o.length = 2
+            o.column -= 2
+            throw new n.Error(o, "expected \\n \\t \\\" \\@ \\\\ but got \\" + c)
           }
+        // TODO
+        } else if (c === "@") {
+          o.read()
+          if (a.length) {
+            push(enrich(new n.Wrapper(a.join("")), o))
+          }
+          a = []
+          // TODO: should either make "foobar@"testing"" work or throw an error
+          tokenize(o, push, q) // TODO q
+          //"foo@((bar qux) corge)"
         } else {
+          a.push(o.read())
+        }
+        /* else {
           // TODO
           s.length = 1
           throw new n.Error(s, "missing ending \"")
-        }
+        }*/
       }
       o.read()
       if (a.length) {
@@ -421,7 +420,8 @@ var NULAN = (function (n) {
       push(enrich(new n.Symbol(q), o))
     },
     parse: function (l, s, r) {
-      l.push([s].concat(r[0]))
+             // TODO: s
+      l.push([n.box("str")].concat(r[0]))
       return l.concat(r.slice(1))
     }
   }
@@ -532,6 +532,13 @@ var NULAN = (function (n) {
         // TODO: some small code duplication with tokenizeNumOrSym
         s = store(o)
         o.read()
+        /*if (t[c].endAt) {
+          // TODO
+          if (o.has() && t[o.peek()].endAt) {
+            push(new n.Symbol(o.peek()))
+            push(new n.Symbol(o.read()))
+          }
+        }*/
         s = enrich(new n.Symbol(c), s, o)
         s.whitespace = white
         push(s)

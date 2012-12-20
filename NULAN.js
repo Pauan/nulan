@@ -448,9 +448,12 @@ var NULAN = (function (n) {
     setBuiltin = function (sN, sJS) {
       var x = new n.Box(sJS)
       // TODO: code duplication with setSymToBox
-      x.local = local
-      x.mode[mode] = true // TODO
       n.vars[sN] = x.value
+
+      boxes[x.value] = x
+      x.scope = "builtin"
+      //x.local = local // TODO: local
+      x.mode[mode] = true
       return x
     }
 
@@ -467,7 +470,8 @@ var NULAN = (function (n) {
         x.value = findUniq(x.name)
       }
       boxes[x.value] = x
-      x.local = local
+      x.scope = local ? "local" : "global"
+      //x.local = local
       x.mode[mode] = true
       return x
     }
@@ -616,6 +620,7 @@ var NULAN = (function (n) {
   }*/
 
   function mac(a) {
+    //console.log(a)
     var x
     if (Array.isArray(a)) {
       if ((x = isMacro(a[0]))) {
@@ -639,7 +644,7 @@ var NULAN = (function (n) {
     } else if (a instanceof n.Box) {
       x = a.value
 
-      if (a.local || mode === "run") {
+      if (a.scope === "local" || mode === "run" || (mode !== "quote" && a.scope === "builtin")) {
         return ["name", x]
       } else if (mode === "compile") {
         return [".", ["name", "values"], x]
@@ -859,6 +864,12 @@ var NULAN = (function (n) {
     }
   }))
 
+  // TODO: can't be defined in NULAN.macros because it's the primitive for the " syntax
+  setValue("str", macro(function () {
+    var a = [].slice.call(arguments)
+    return mac([n.box("+"), ""].concat(a))
+  }))
+
   // TODO
   setValue(",")
   setValue("@")
@@ -907,7 +918,9 @@ var NULAN = (function (n) {
   }))
 
   setValue("while", macro(function (test, body) {
-    return ["while", mac(test), [mac(body)]]
+    return withNewScope(function () {
+      return ["while", mac(test), [mac(body)]]
+    })
   }))
 
   setValue("w/new-scope", macro(function (body) {
@@ -916,25 +929,32 @@ var NULAN = (function (n) {
     })
   }))
 
-  setValue("if", macro(function anon() {
-    var a = arguments
-    switch (a.length) {
-    case 0:
-             // TODO
-      return ["empty"] //["void", ["number", "0"]]
-    case 1:
-      return mac(a[0])
-    case 2:
-      return ["if", mac(a[0]), [mac(a[1])], []]
-    case 3:
-      return ["if", mac(a[0]),
-               [withNewScope(function () { return mac(a[1]) })],
-               [withNewScope(function () { return mac(a[2]) })]]
-    // TODO: maybe simplify this a bit?
-    default:
-      return ["if", mac(a[0]), [mac(a[1])],
-                    [anon.apply(this, [].slice.call(a, 2))]]
+  setValue("if", macro(function () {
+    // TODO: I'm not sure whether the then/else branches should get their own withNewScope or not
+    function loop(a) {
+      switch (a.length) {
+      case 0:
+               // TODO
+        return ["empty"] //["void", ["number", "0"]]
+      case 1:
+        return mac(a[0])
+      case 2:
+        return ["if", mac(a[0]), [withNewScope(function () { return mac(a[1]) })], []]
+      case 3:
+        return ["if", mac(a[0]),
+                 [withNewScope(function () { return mac(a[1]) })],
+                 [withNewScope(function () { return mac(a[2]) })]]
+      // TODO: maybe simplify this a bit?
+      default:
+        return ["if", mac(a[0]),
+                 [withNewScope(function () { return mac(a[1]) })],
+                 [loop.apply(this, a.slice(2))]]
+      }
     }
+    var a = [].slice.call(arguments)
+    return withNewScope(function () {
+      return loop(a)
+    })
   }))
 
   // TODO: is this needed?
@@ -1099,6 +1119,7 @@ var NULAN = (function (n) {
     return loop(a[1])
   }))
 
+  // TODO: name collision with the macro which imports only specific variables
   setValue("include", macro(function () {
     [].forEach.call(arguments, function (x) {
       setSymToBox(x) // TODO: is this correct?
@@ -1131,7 +1152,8 @@ var NULAN = (function (n) {
 
             } else if (Array.isArray(x) && n.isBox(x[0], "@")) {
               s = new n.Box("arguments") // TODO: ew
-              s.local = true // TODO: ew
+              s.scope = "local" // TODO: ew
+              //s.local = true // TODO: ew
 
               u = (i !== iLen - 1
                     ? new Uniq()
@@ -1210,7 +1232,8 @@ var NULAN = (function (n) {
 
         x = setSymToBox(x)
 
-        if (!x.local && mode === "compile") {
+            // TODO: !x.local
+        if (x.scope !== "local" && mode === "compile") {
           if (y === void 0) {
             return ["empty"] // TODO
           } else {
@@ -1504,7 +1527,8 @@ function infix(i, b, f) {
 
   n.builtin = function () {
     [].forEach.call(arguments, function (x) {
-      setValue(x)
+      setBuiltin(x, x)
+      //setValue(x)
     })
     /*Object.keys(o).forEach(function (x) {
       setValue(x, o[x])

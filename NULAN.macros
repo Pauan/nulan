@@ -43,7 +43,6 @@ $run
                                             &compile (u @args)
 |#
 
-
 ###  Macro utilities
 $mac w/uniq -> @args body
   'w/var ,@(args.map -> x 'x = make-uniq;)
@@ -57,13 +56,25 @@ $mac w/complex -> x body
                x = u
            'w/var u = v
               ,body
-       body
+       w/new-scope
+         body
 
 
 ###  Variable binding
+#$mac w/include -> @args body
+
+$mac defs -> @body
+  '| var ,@(body.map -> {x} x)
+   | ,@(body.map -> {x y} 'x <= y)
+
+#|
+# TODO: define def in terms of defs?
 $mac def -> n v
   '| var n
-   | n <= v
+   | n <= v|#
+
+$mac def -> n v
+  'defs: n v
 
 # Dynamic variable binding. Usage:
 #   var foo = 5
@@ -74,6 +85,7 @@ $mac w/var! -> {('=) x y} body
   w/uniq u
     'w/var u = x
        | x <= y
+         # TODO: should finally use w/new-scope?
        | finally body
            x <= u
 
@@ -86,8 +98,10 @@ $mac w/dict! -> args body
 $mac prn -> @args
   'console.log ,@args
 
+#|
 $mac str -> @args
   '(+) "" ,@args
+|#
 
 #|
 $mac call -> x y @args
@@ -105,18 +119,21 @@ $mac |= -> @args
     | '|| ,@(r.map -> x '== ,@x)
 
 $mac ~= -> @args
-  if args.length == 2
+     # TODO
+  if (== args.length 2)
     # TODO
     '& "!==" ,args.0 ,args.1
+       # TODO
     '~ (== ,@args)
 
 
 ###  Loops
 $mac for -> init test incr body
-  '| init
-   | while test
-       | body
-       | incr
+  'w/new-scope
+     | init
+     | while test
+         | body
+         | incr
 
 $mac w/each -> {('=) x y} body
   w/uniq i len
@@ -144,28 +161,32 @@ $mac $syntax-protect -> body
 $mac $syntax-rule -> s o
   '$run
      syntax-rules[,(str s)] <= o
-#|
+
 $mac $syntax-helper -> n f
-  w/uniq s i o u v
+  w/uniq s i o u
     '$mac n -> s (i = 0) (o = '[])
        '$run
-          ,:w/complex o
-                         # TODO
-              'w/var v = ,f
-                 | u.priority <= i
-                 | u.parse <= v
-                 | $syntax-rule s u
+          # TODO: make it work with w/complex somehow?
+          w/var u = o
+            | u.priority <= i
+            | u.parse <= f
+            | $syntax-rule s u
 
-$syntax-helper $syntax-infix
-  w/uniq l x s y r
-    '-> {@l x} s {y @r}
-       ',@l (s x y) ,@r
-
-$syntax-helper $syntax-unary
-  w/uniq l s y r
-    '-> l s {y @r}
-       ',@l (s y) ,@r
+#| TODO: Fix this
+| [].foo <= 10
+| [].bar <= 20
 |#
+
+$run
+  | def syntax-infix -> {@l x} s {y @r}
+      ',@l (s x y) ,@r
+  | $syntax-helper $syntax-infix syntax-infix
+
+$run
+  | def syntax-unary -> l s {y @r}
+      ',@l (s y) ,@r
+  | $syntax-helper $syntax-unary syntax-unary
+
 
 $syntax-unary ~  90
 
@@ -187,6 +208,8 @@ $syntax-infix ~= 50
 $syntax-infix && 40
 
 $syntax-infix || 30
+
+
 
 #|
 (mac complex (x body)
