@@ -275,7 +275,7 @@ var NULAN = (function (n) {
 
   var mangle, unmangle, validJS
 
-  var Uniq, setBuiltin, setSymToBox, getBox, withLocalScope
+  var Uniq, setBuiltin, setSymInclude, setSymToBox, getBox, withLocalScope
 
   var isMacro, setValue, compileEval
 
@@ -455,6 +455,18 @@ var NULAN = (function (n) {
       //x.local = local // TODO: local
       x.mode["compile"] = true
       x.mode["run"] = true
+      return x
+    }
+
+    setSymInclude = function (s) {
+      // TODO: code duplication with setSymToBox
+      var x = new n.Box(s.value)
+      n.vars[s.value] = x.value
+
+      boxes[x.value] = x
+      x.scope = local ? "local" : "global"
+      x.mode[mode] = true
+
       return x
     }
 
@@ -639,6 +651,7 @@ var NULAN = (function (n) {
       return mac(a.value) // TODO: check all the places that currently expect strings/numbers and won't work with a wrapper
     } else if (typeof a === "number") {
       return ["number", "" + a]
+    // TODO: find all places that unwrap to strings but don't call mac
     } else if (typeof a === "string") {
       return ["string", a]
     /*} else if (a === void 0) { // TODO
@@ -875,8 +888,8 @@ var NULAN = (function (n) {
   setValue("str", macro(function () {
     var a = [].slice.call(arguments)
                           // TODO: why isn't this a wrapper?
-    if (a.length === 1 && typeof a[0] === "string") {
-      return a[0]
+    if (a.length === 1 && a[0] instanceof n.Wrapper && typeof a[0].value === "string") {
+      return mac(a[0])
     } else {
       return mac([n.box("+"), ""].concat(a))
     }
@@ -1134,7 +1147,8 @@ var NULAN = (function (n) {
   // TODO: name collision with the macro which imports only specific variables
   setValue("include", macro(function () {
     [].forEach.call(arguments, function (x) {
-      setSymToBox(x) // TODO: is this correct?
+      setSymInclude(x)
+      //setSymToBox(x) // TODO: is this correct?
       //setNewBox(x)
                        // (&eval '(&list 1 2 3))
                        // (include &list)
@@ -1532,7 +1546,8 @@ function infix(i, b, f) {
 
   n.include = function () {
     [].forEach.call(arguments, function (x) {
-      setSymToBox(new n.Symbol(x)) // TODO is this correct?
+      setSymInclude(new n.Symbol(x))
+      //setSymToBox(new n.Symbol(x)) // TODO is this correct?
       //setNewBox(new n.Symbol(x))
     })
   }
@@ -1623,9 +1638,12 @@ function infix(i, b, f) {
     })
   }
 
-  n.eval = function (s) {
-    return n.parse(s, function (x) {
-      return n.compile(x)
+  n.eval = function (s, f) {
+    n.parse(s, function (x) {
+      x = n.compile(x)
+      if (f) {
+        f(x)
+      }
     })
   }
 

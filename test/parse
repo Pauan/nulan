@@ -256,5 +256,17 @@
        ,'4 5 6
            ,'8 9 10
 
+> var args = opts
+               .usage "Usage: $0 input [output=\".\"]"
+
+               .alias "v" "version"
+               .alias "h" "help"
+
+               .boolean "version"
+               .boolean "help"
+
+               .demand 1
+               .argv
+
 > $mac str -> @args
     '(") ,@args

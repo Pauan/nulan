@@ -126,7 +126,7 @@ var NULAN = (function (n) {
     }
   }
 
-  function infix(i, b, f) {
+  function infix(i, b) {
     return {
       delimiter: b,
       priority: i,
@@ -134,7 +134,7 @@ var NULAN = (function (n) {
         var x = l[l.length - 1]
           , y = r[0]
 
-        return l.slice(0, -1).concat([f ? f(x, s, y) : [s, x, y]], r.slice(1))
+        return l.slice(0, -1).concat([[s, x, y]], r.slice(1))
       }
     }
   }
@@ -228,21 +228,33 @@ var NULAN = (function (n) {
     }
   }
 
-  t["."] = infix(100, true, function (l, s, r) {
-    if (l instanceof n.Wrapper &&
-        r instanceof n.Wrapper &&
-        typeof l.value === "number" &&
-        typeof r.value === "number") {
-      var x = (l.value + "." + r.value)
-      x = enrich(new n.Wrapper(+x), l)
-      x.length = l.length + r.length + 1
-      return x
-    } else if (r instanceof n.Symbol) {
-      return [s, l, r.value]
-    } else {
-      return [s, l, r]
+  // TODO: update "Customizable syntax.rst" with the new definition of "."
+  t["."] = {
+    priority: 100,
+    delimiter: true,
+    parse: function (l, s, r) {
+      function parse(x, y) {
+        //console.log(l, y)
+        if (x instanceof n.Wrapper &&
+            y instanceof n.Wrapper &&
+            typeof x.value === "number" &&
+            typeof y.value === "number") {
+          var i = (x.value + "." + y.value)
+          i = enrich(new n.Wrapper(+i), x)
+          i.length = x.length + y.length + 1
+          return i
+        } else if (y instanceof n.Symbol) {
+          return [s, x, y.value]
+        } else if (x === void 0) {
+
+        } else {
+          return [s, x, y]
+        }
+      }
+
+      return l.slice(0, -1).concat([parse(l[l.length - 1], r[0])], r.slice(1))
     }
-  })
+  }
 
                       // TODO
   t[","] =  unary(90, true)
@@ -382,7 +394,9 @@ var NULAN = (function (n) {
         if (c === "\\") {
           o.read()
           c = o.read()
-          if (c === "n") {
+          if (c === "r") {
+            a.push("\r")
+          } else if (c === "n") {
             a.push("\n")
           } else if (c === "t") {
             a.push("\t")
@@ -392,7 +406,7 @@ var NULAN = (function (n) {
             // TODO: a little hacky
             o.length = 2
             o.column -= 2
-            throw new n.Error(o, "expected \\n \\t \\\" \\@ \\\\ but got \\" + c)
+            throw new n.Error(o, "expected \\r \\n \\t \\\" \\@ \\\\ but got \\" + c)
           }
         // TODO
         } else if (c === "@") {

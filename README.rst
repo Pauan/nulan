@@ -184,6 +184,20 @@ Examples
 
   (x + 2) for x in {1 2 3}
 
+::
+
+  #! /usr/bin/env nulan
+
+  # A shell script that creates a simple HTTP server
+  # Taken from http://nodejs.org/
+  var net = require "net"
+
+  var server = net.create-server -> o
+                 | o.write "Echo server\r\n"
+                 | o.pipe o
+
+  server.listen 1337 "127.0.0.1"
+
 
 FAQ
 ===

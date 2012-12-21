@@ -9,7 +9,7 @@ function load(path, context) {
   vm.runInThisContext(data, path)
 }
 
-global.require = require // TODO: a bit hacky, but it seems to work
+//global.require = require // TODO: a bit hacky, but it seems to work
 
 load("./NULAN.parse.js")
 
@@ -31,10 +31,10 @@ NULAN.values["prn"]   = prn*/
 
 //NULAN.from("Node.js").to("browser")
 //NULAN.from("Node.js").to("Chrome Extension")
-NULAN.from("Node.js").to("Node.js")
 
 
-var args = require("optimist").argv
+var opt  = require("optimist")
+  , args = opt.argv
 
 if (args.d) {
   NULAN.options.debug = true
@@ -52,6 +52,8 @@ var args = process.argv.slice(2).filter(function (x) {
 })*/
 
 
+NULAN.from("Node.js").to("Node.js")
+
 try {
   NULAN.import("NULAN.macros")
 } catch (e) {
@@ -59,41 +61,11 @@ try {
 }
 
 
-var globals = { Array:      Array
-              , console:    console
-              /*, require:    require
-              , "_38_src":  process.argv[1]
-              , "_38_args": args */}
-
-// TODO
-NULAN.builtin({ "require": require
-              , "&src":    process.argv[1]
-              , "&args":   args })
+//var globals = {}
 
 /*NULAN.vars["require"] = "require"
 NULAN.vars["&src"]    = "&src"
 NULAN.vars["&args"]   = "&args"*/
-
-
-var util = require("util")
-
-var rl = require("./lib/cli").create({
-  completer: function (s) {
-    var a = Object.keys(NULAN.vars).filter(function (s2) {
-      return s2.indexOf(s) === 0
-    }).sort(function (l, r) {
-      if (l[0] === "&" && r[0] !== "&") {
-        return 1
-      } else if (l[0] !== "&" && r[0] === "&") {
-        return -1
-      } else {
-        return l.localeCompare(r)
-        //return l < r ? -1 : l > r ? 1 : 0
-      }
-    })
-    return [a, s]
-  }
-})
 
 function print(a) {
   console.log(NUIT.serialize([a], { multiline: true }))
@@ -114,117 +86,103 @@ function printTokens(a) {
   }).join(" ")
 }
 
-rl.on("input", function (s) {
+
+// https://github.com/joyent/node/blob/master/lib/repl.js#L
+// TODO: include NULAN, NINO, and NUIT, or get rid of them in the context
+function newContext() {
+  var x = vm.createContext()
+  for (var s in global) {
+    x[s] = global[s]
+  }
+  x.global = x
+  x.global.global = x
+
+  x.console = console //new Console(this.outputStream)
+  x.module  = module
+  x.require = require
+  return x
+}
+
+function evalFile(s, o) {
+  NULAN.eval(fs.readFileSync(s, "utf8"), function (x) {
+    vm.runInContext(x, o)
+  })
+}
+
+
+var o = newContext()
+
+// TODO: "nulan playlist -d 1 2 3" should not consume -d
+if (args._.length) {
+  var x = args._[0]
+  // TODO: include the script's name
+  process.argv = args._.slice(1).map(function (x) { return "" + x }) // TODO: a little hacky
+
   try {
-    var x = NULAN.tokenize(s)
-       // TODO
-    if (false) {
-      print(["tokenize", printTokens(x)])
-      console.log()
-    }
-
-    NULAN.parseRaw(x, function (x) {
-      if (NULAN.options.debug) {
-        print(["parse", pretty(NULAN.toJSON(x))])
-        //print(["parse"].concat(NULAN.toJSON(x).map(pretty)))
-        console.log()
-      }
-
-      x = NULAN.compile(x)
-      if (NULAN.options.debug) {
-        print(["compile", x])
-        console.log()
-      }
-
-      //console.log("@compile\n" + x.replace(/^/gm, "  "))
-
-      x = vm.runInNewContext(x, globals)
-      if (NULAN.options.debug) {
-        print(["eval", pretty(x)])
-      } else {
-        console.log(pretty(x))
-      }
-    })
-    //console.log("@eval\n" + ("" + x).replace(/^/gm, "  "))
+    evalFile(x, o)
   } catch (e) {
     console.error("" + e)
   }
+  /*args._.forEach(function (x) {
+    evalFile(x, o)
+  })*/
+} else {
+  var util = require("util")
 
-  console.log()
-})
+  var rl = require("./lib/cli").create({
+    completer: function (s) {
+      var a = Object.keys(NULAN.vars).filter(function (s2) {
+        return s2.indexOf(s) === 0
+      }).sort(function (l, r) {
+        if (l[0] === "&" && r[0] !== "&") {
+          return 1
+        } else if (l[0] !== "&" && r[0] === "&") {
+          return -1
+        } else {
+          return l.localeCompare(r)
+          //return l < r ? -1 : l > r ? 1 : 0
+        }
+      })
+      return [a, s]
+    }
+  })
 
-/*
-var stdin = process.openStdin()
+  rl.on("input", function (s) {
+    try {
+      var x = NULAN.tokenize(s)
+         // TODO
+      if (false) {
+        print(["tokenize", printTokens(x)])
+        console.log()
+      }
 
-process.stdout.write("> ")
+      NULAN.parseRaw(x, function (x) {
+        if (NULAN.options.debug) {
+          print(["parse", pretty(NULAN.toJSON(x))])
+          //print(["parse"].concat(NULAN.toJSON(x).map(pretty)))
+          console.log()
+        }
 
-stdin.addListener("data", function (s) {
-  //process.stdout.write("\u001B[J")
+        x = NULAN.compile(x)
+        if (NULAN.options.debug) {
+          print(["compile", x])
+          console.log()
+        }
 
-  s = ("" + s).replace(/\n$/, "")
-  //var lines = s.split(/\n/).length
-  try {
-    var x = NULAN.compile(s)
-    //lines += x.split(/\n/).length
-    console.log(x)
+        //console.log("@compile\n" + x.replace(/^/gm, "  "))
 
-    x = "" + vm.runInNewContext(x, globals)
-    //lines += x.split(/\n/).length
-    console.log(x)
-  } catch (e) {
-    console.error(e)
-    //++lines
-  } finally {
+        x = vm.runInContext(x, o)
+        if (NULAN.options.debug) {
+          print(["eval", pretty(x)])
+        } else {
+          console.log(pretty(x))
+        }
+      })
+      //console.log("@eval\n" + ("" + x).replace(/^/gm, "  "))
+    } catch (e) {
+      console.error("" + e)
+    }
+
     console.log()
-    //process.stdout.write("\u001B[" + lines + "A")
-    //process.stdout.write("\u001B[2K")
-    process.stdout.write("> ")
-  }
-})
-
-stdin.addListener("end", function () {
-  //process.stdout.write("\u001B[" + 1 + "A")
-  //process.stdout.write("\u001B[2K")
-  console.log()
-})
-*/
-
-/*
-;[ "(var foo 1)",
-  "(+ foo 2)",
-  "(var foo 2)",
-  "(+ foo 3)",
-  "(&eval (+ 3 5))",
-  "(&eval +)",
-  "(set! foo 5)",
-  "(&eval (var + (fn)))",
-  "(&eval +)",
-  "(&eval (var foo (fn)))",
-  "(&eval foo)",
-  "+",
-  "(& +)",
-  "(& (+ 1 2))",
-
-  "(namespace bar)",
-  "(var foo 5)",
-  "(+ foo 10)",
-  "(var foo 10)",
-  "(+ foo 20)",
-  "(w/namespace bar (var foo 20) (+ foo 30) (var foo 30) (+ foo 40))",
-  "(+ foo 20)",
-  "(let foo 30)",
-  "(+ foo 20)",
-  "(var foo 30)",
-  "(let! foo 50)",
-  // "(prn +)",
-].forEach(function (s) {
-  console.log()
-
-  var x = NULAN.compile(s)
-  console.log(x)
-
-  //console.log(NULAN.eval(x))
-})
-
-console.log()
-*/
+  })
+}
