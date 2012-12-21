@@ -275,7 +275,7 @@ var NULAN = (function (n) {
 
   var mangle, unmangle, validJS
 
-  var Uniq, setBuiltin, setSymInclude, setSymToBox, getBox, withLocalScope
+  var Uniq, setBuiltin, setSymExternal, setSymToBox, getBox, withLocalScope
 
   var isMacro, setValue, compileEval
 
@@ -458,7 +458,7 @@ var NULAN = (function (n) {
       return x
     }
 
-    setSymInclude = function (s) {
+    setSymExternal = function (s) {
       // TODO: code duplication with setSymToBox
       var x = new n.Box(s.value)
       n.vars[s.value] = x.value
@@ -818,6 +818,10 @@ var NULAN = (function (n) {
     return mac(x)
   })
 
+  setValue("bound?", function (x) {
+    return x.value in n.vars
+  })
+
 
   // Simple complexity
   setValue("num",         unary("u+"))
@@ -1145,9 +1149,9 @@ var NULAN = (function (n) {
   }))
 
   // TODO: name collision with the macro which imports only specific variables
-  setValue("include", macro(function () {
+  setValue("external", macro(function () {
     [].forEach.call(arguments, function (x) {
-      setSymInclude(x)
+      setSymExternal(x)
       //setSymToBox(x) // TODO: is this correct?
       //setNewBox(x)
                        // (&eval '(&list 1 2 3))
@@ -1552,19 +1556,16 @@ function infix(i, b, f) {
   // {{list 1 2} @{3 4} {&splice 5}}
   // [["list", 1, 2]].concat([3, 4], [["@", 5]])
 
-  n.include = function () {
+  n.external = function () {
     [].forEach.call(arguments, function (x) {
-      setSymInclude(new n.Symbol(x))
+      setSymExternal(new n.Symbol(x))
       //setSymToBox(new n.Symbol(x)) // TODO is this correct?
       //setNewBox(new n.Symbol(x))
     })
   }
 
-  n.builtin = function () {
-    [].forEach.call(arguments, function (x) {
-      setBuiltin(x, x)
-      //setValue(x)
-    })
+  n.builtin = function (x, y) {
+    setBuiltin(x, y)
     /*Object.keys(o).forEach(function (x) {
       setValue(x, o[x])
     })*/
@@ -1580,6 +1581,12 @@ function infix(i, b, f) {
       n.include.apply(null, args)
       //})
     })*/
+  }
+
+  n.builtins = function () {
+    [].forEach.call(arguments, function (x) {
+      n.builtin(x, x)
+    })
   }
 
   // TODO: make it possible to have a variable at both runtime and compiletime
@@ -1599,17 +1606,17 @@ function infix(i, b, f) {
   }*/
 
   // Globals that exist in all environments
-  n.builtin("Number", "Math", "Boolean", "TypeError", "String",
-            "Int16Array", "Float32Array", "isFinite", "Array", "DataView",
-            "Float64Array", "ReferenceError", "SyntaxError", "Int32Array",
-            "Uint16Array", "clearTimeout", "decodeURIComponent",
-            "Uint32Array", "setTimeout", "eval", "console", "URIError",
-            "unescape", "Date", "escape", "encodeURI", "Error",
-            "Int8Array", "EvalError", "RangeError", "NaN", "isNaN",
-            "parseInt", "undefined", "Object", "Uint8ClampedArray",
-            "parseFloat", "Uint8Array", "clearInterval", "Infinity",
-            "JSON", "Function", "setInterval", "encodeURIComponent",
-            "decodeURI", "ArrayBuffer", "RegExp")
+  n.builtins("Number", "Math", "Boolean", "TypeError", "String",
+             "Int16Array", "Float32Array", "isFinite", "Array", "DataView",
+             "Float64Array", "ReferenceError", "SyntaxError", "Int32Array",
+             "Uint16Array", "clearTimeout", "decodeURIComponent",
+             "Uint32Array", "setTimeout", "eval", "console", "URIError",
+             "unescape", "Date", "escape", "encodeURI", "Error",
+             "Int8Array", "EvalError", "RangeError", "NaN", "isNaN",
+             "parseInt", "undefined", "Object", "Uint8ClampedArray",
+             "parseFloat", "Uint8Array", "clearInterval", "Infinity",
+             "JSON", "Function", "setInterval", "encodeURIComponent",
+             "decodeURI", "ArrayBuffer", "RegExp")
 
   // Modes for a specific environment
   n.modes = {
@@ -1629,30 +1636,38 @@ function infix(i, b, f) {
     return {
       to: function (to) {
         if (from === to) {
-          n.modes[from](n.builtin)
+          n.modes[from](n.builtins)
         } else {
-          n.modes[from](n.include)
+          n.modes[from](n.external)
           withMode("run", function () {
-            n.modes[to](n.include)
+            n.modes[to](n.external)
           })
         }
       }
     }
   }
-
+/*
   n.import = function () {
     [].forEach.call(arguments, function (s) {
       n.eval(n.readFile(s))
     })
-  }
+  }*/
 
   n.eval = function (s, f) {
+    var r = []
     n.parse(s, function (x) {
-      x = n.compile(x)
-      if (f) {
-        f(x)
-      }
+      r.push(n.compile(x))
     })
+    r = r.join(";\n")
+    if (f) {
+      f(r)
+    } else {
+      // TODO: should be global eval, maybe?
+      //       or at least it should have access to values and boxes, right?
+      //       or does it need access to those things?
+      eval(r)
+      //require("vm").runInNewContext(r, global)
+    }
   }
 
   n.toJSON = function anon(a) {

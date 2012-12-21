@@ -1,31 +1,46 @@
 #! /usr/bin/env node
 "use strict";
 
-//global.require = require
-
 // http://stackoverflow.com/a/8808162/449477
 var vm = require("vm")
 var fs = require("fs")
 function load(path, context) {
   var data = fs.readFileSync(path, "utf8")
-  vm.runInThisContext(data, path)
+  vm.runInContext(data, context, path)
 }
 
-//global.require = require // TODO: a bit hacky, but it seems to work
+// https://github.com/joyent/node/blob/master/lib/repl.js#L
+// TODO: include NULAN, NINO, and NUIT, or get rid of them in the context
+var o = (function () {
+  var x = vm.createContext()
 
-load("./NULAN.parse.js")
+  for (var s in global) {
+    x[s] = global[s]
+  }
+  x.global = x
+  x.global.global = x
 
-load("./lib/NINO.compile.js")
-load("./lib/NINO.transform.js")
-load("./lib/NINO.partial.js")
+  x.console = console //new Console(this.outputStream)
+  x.module  = module
+  x.require = require
 
-load("./NULAN.js")
+  //if (f) f(x)
+  return x
+})()
 
-load("./lib/NUIT.serialize.js")
+load("./NULAN.parse.js", o)
 
+load("./lib/NINO.compile.js", o)
+load("./lib/NINO.transform.js", o)
+load("./lib/NINO.partial.js", o)
+
+load("./NULAN.js", o)
+
+load("./lib/NUIT.serialize.js", o)
+/*
 NULAN.readFile = function (s) {
   return fs.readFileSync(s, "utf8")
-}
+}*/
 
 /*NULAN.vars["prn"]     = "prn"
 NULAN.values["prn"]   = prn*/
@@ -39,7 +54,7 @@ var opt  = require("optimist")
   , args = opt.argv
 
 if (args.d) {
-  NULAN.options.debug = true
+  o.NULAN.options.debug = true
 }
 
 /*
@@ -54,16 +69,6 @@ var args = process.argv.slice(2).filter(function (x) {
 })*/
 
 
-NULAN.from("Node.js").to("Node.js")
-
-try {
-  NULAN.import("NULAN.macros")
-  NULAN.import("modes/Node.js")
-} catch (e) {
-  console.error("" + e)
-}
-
-
 //var globals = {}
 
 /*NULAN.vars["require"] = "require"
@@ -71,7 +76,7 @@ NULAN.vars["&src"]    = "&src"
 NULAN.vars["&args"]   = "&args"*/
 
 function print(a) {
-  console.log(NUIT.serialize([a], { multiline: true }))
+  console.log(o.NUIT.serialize([a], { multiline: true }))
 }
 
 function pretty(x) {
@@ -81,7 +86,7 @@ function pretty(x) {
 function printTokens(a) {
   return a.map(function (x) {
     x = x.name
-    if (x instanceof NULAN.Box) {
+    if (x instanceof o.NULAN.Box) {
       return x.value
     } else {
       return x
@@ -90,30 +95,29 @@ function printTokens(a) {
 }
 
 
-// https://github.com/joyent/node/blob/master/lib/repl.js#L
-// TODO: include NULAN, NINO, and NUIT, or get rid of them in the context
-function newContext() {
-  var x = vm.createContext()
-  for (var s in global) {
-    x[s] = global[s]
-  }
-  x.global = x
-  x.global.global = x
-
-  x.console = console //new Console(this.outputStream)
-  x.module  = module
-  x.require = require
-  return x
-}
-
 function evalFile(s, o) {
-  NULAN.eval(fs.readFileSync(s, "utf8"), function (x) {
-    vm.runInContext(x, o)
+  o.NULAN.eval(fs.readFileSync(s, "utf8"), function (x) {
+    vm.runInContext(x, o, s)
   })
 }
 
+/*function (o) {
+  NULAN.builtin("load-file", "loadFile")
+  o.loadFile = function (x) {
+    vm.runInContext(fs.readFileSync(x, "utf8"), o)
+  }
+}*/
 
-var o = newContext()
+o.NULAN.from("Node.js").to("Node.js")
+
+try {
+  load("./NULAN.macros.js", o)
+  load("./modes/Node.js", o)
+  //evalFile("NULAN.macros", o)
+  //evalFile("modes/Node.js", o)
+} catch (e) {
+  console.error("" + e)
+}
 
 // TODO: "nulan playlist -d 1 2 3" should not consume -d
 if (args._.length) {
@@ -134,7 +138,7 @@ if (args._.length) {
 
   var rl = require("./lib/cli").create({
     completer: function (s) {
-      var a = Object.keys(NULAN.vars).filter(function (s2) {
+      var a = Object.keys(o.NULAN.vars).filter(function (s2) {
         return s2.indexOf(s) === 0
       }).sort(function (l, r) {
         if (l[0] === "&" && r[0] !== "&") {
@@ -152,22 +156,21 @@ if (args._.length) {
 
   rl.on("input", function (s) {
     try {
-      var x = NULAN.tokenize(s)
-         // TODO
-      if (false) {
+      var x = o.NULAN.tokenize(s)
+      if (o.NULAN.options.debug) {
         print(["tokenize", printTokens(x)])
         console.log()
       }
 
-      NULAN.parseRaw(x, function (x) {
-        if (NULAN.options.debug) {
-          print(["parse", pretty(NULAN.toJSON(x))])
+      o.NULAN.parseRaw(x, function (x) {
+        if (o.NULAN.options.debug) {
+          print(["parse", pretty(o.NULAN.toJSON(x))])
           //print(["parse"].concat(NULAN.toJSON(x).map(pretty)))
           console.log()
         }
 
-        x = NULAN.compile(x)
-        if (NULAN.options.debug) {
+        x = o.NULAN.compile(x)
+        if (o.NULAN.options.debug) {
           print(["compile", x])
           console.log()
         }
@@ -175,7 +178,7 @@ if (args._.length) {
         //console.log("@compile\n" + x.replace(/^/gm, "  "))
 
         x = vm.runInContext(x, o)
-        if (NULAN.options.debug) {
+        if (o.NULAN.options.debug) {
           print(["eval", pretty(x)])
         } else {
           console.log(pretty(x))
@@ -183,7 +186,7 @@ if (args._.length) {
       })
       //console.log("@eval\n" + ("" + x).replace(/^/gm, "  "))
     } catch (e) {
-      if (NULAN.options.debug) {
+      if (o.NULAN.options.debug) {
         console.trace(e)
       } else {
         console.error("" + e)
