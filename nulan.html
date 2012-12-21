@@ -39,45 +39,59 @@
     <pre id="output"></pre>
 
     <script>
-      var i = document.getElementById("input")
-        , o = document.getElementById("output")
+      ;(function () {
+        var i = document.getElementById("input")
+          , o = document.getElementById("output")
 
-      function pretty(x) {
-        return NUIT.serialize(x, { multiline: true })
-      }
-/*
-      function format(r) {
-        return r.map(function (x) { return x + ";" }).join("\n\n")
-      }*/
+        function pretty(x) {
+          return NUIT.serialize(x, { multiline: true })
+        }
 
-      var myEval = eval
+        var myEval = eval
 
-      i.addEventListener("keyup", function () {
-        var s = this.value
-        NULAN.withNewScope(function () {
-          var a = []
-            , b = []
-            , c = []
-          try {
-            NULAN.parse(s, function (x) {
-              a.push(x)
-              b.push(NULAN.compile(x))
-            })
-            o.textContent = pretty([//["parse"].concat(a.map(NULAN.toJSON)),
-                                    ["compile"].concat(b),
-                                    ["eval"].concat(b.map(function (x) {
-                                      try {
-                                        return myEval(x)
-                                      } catch (e) {
-                                        a.push("" + e)
-                                      }
-                                    })), //.join("\n\n")]
-                                    ["error"].concat(c)])
-          } catch (e) {
-            o.textContent = pretty(["" + e])
-          }
+        var obs = {}
+
+        console.log = function () {
+          obs.print.push([].slice.call(arguments).join(" "))
+        }
+        /*
+        NULAN.options.debug = function (x) {
+          obs.$eval.push(x)
+        }*/
+
+        i.addEventListener("keyup", function () {
+          var s = this.value
+          NULAN.withNewContext(function () {
+            obs.parse   = []
+            obs.$eval   = []
+            obs.compile = []
+            obs.eval    = []
+            obs.print   = []
+            obs.error   = []
+            try {
+              NULAN.parse(s, function (x) {
+                obs.parse.push(x)
+                obs.compile.push(NULAN.compile(x))
+              })
+              obs.compile.forEach(function (x) {
+                try {
+                  obs.eval.push(myEval(x)) // indirect eval
+                } catch (e) {
+                  obs.error.push("" + e)
+                }
+              })
+              o.textContent = pretty([//["parse"].concat(a.map(NULAN.toJSON)),
+                                      //["compile-eval"].concat(obs.$eval),
+                                      ["compile"].concat(obs.compile),
+                                      ["eval"].concat(obs.eval),
+                                      ["print"].concat(obs.print),
+                                      ["error"].concat(obs.error)])
+            } catch (e) {
+              o.textContent = pretty(["" + e])
+            }
+          })
         })
-      })
+      })()
     </script>
   </body>
 </html>

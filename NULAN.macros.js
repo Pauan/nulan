@@ -188,6 +188,7 @@ $mac w/exclude -> @args body                                               \n\
        | ()                                                                \n\
                                                                            \n\
 ###  Syntax                                                                \n\
+# TODO                                                                     \n\
 $mac $syntax-protect -> body                                               \n\
   '$run                                                                    \n\
      w/dict! syntax-rules                                                  \n\
@@ -195,7 +196,7 @@ $mac $syntax-protect -> body                                               \n\
                                                                            \n\
 $mac $syntax-rule -> s o                                                   \n\
   '$run                                                                    \n\
-     syntax-rules[,(str s)] <= o                                           \n\
+     (syntax-rules;)[,(str s)] <= o                                        \n\
                                                                            \n\
 $mac $syntax-helper -> n f                                                 \n\
   w/uniq s i o u                                                           \n\

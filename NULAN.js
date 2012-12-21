@@ -526,18 +526,6 @@ var NULAN = (function (n) {
       return x
     }*/
 
-    // TODO: not the best of names
-    n.withNewScope = function (f) {
-      var old = boxes
-      boxes = Object.create(boxes)
-      try {
-        var x = f()
-      } finally {
-        boxes = old
-      }
-      return x
-    }
-
     withLocalScope = function (f) {
       var old  = boxes
         , old2 = local
@@ -555,6 +543,26 @@ var NULAN = (function (n) {
 
     ;(function () {
       var values = {} // JS Variable -> compile time value
+
+      n.withNewContext = function (f) {
+        var old  = n.vars
+          , old2 = boxes
+          , old3 = values
+          , old4 = n.syntaxRules
+        n.vars        = Object.create(n.vars)
+        boxes         = Object.create(boxes)
+        values        = Object.create(values)
+        n.syntaxRules = Object.create(n.syntaxRules)
+        try {
+          var x = f()
+        } finally {
+          n.vars        = old
+          boxes         = old2
+          values        = old3
+          n.syntaxRules = old4
+        }
+        return x
+      }
 
       isMacro = function (x) {
         if ((x = getBox(x)) && (x = values[x.value]) instanceof Macro) {
@@ -578,9 +586,7 @@ var NULAN = (function (n) {
           return withMode("compile", function () {
             x = compile(x)
             if (n.options.debug) {
-              // TODO
-              console.log("$eval", x)
-              console.log()
+              n.options.debug(x)
             }
             return ["id", eval(x)]
           })
@@ -602,7 +608,16 @@ var NULAN = (function (n) {
   setBuiltin("%t", "true")
   setBuiltin("%f", "false")
 
-  setValue("syntax-rules", n.syntaxRules)
+  // TODO: `syntax-rules <= [ ... ]`
+  //       `w/dict! syntax-rules ...
+  setValue("syntax-rules", function () {
+    return n.syntaxRules
+  })
+  /*setValue("syntax-rules", new Alias(function () {
+    return n.syntaxRules
+  }, function (x) {
+    n.syntaxRules = x
+  }))*/
 
 
   function withNewScope(f) {
@@ -648,7 +663,6 @@ var NULAN = (function (n) {
   }*/
 
   function mac(a) {
-    //console.log(a)
     var x
     if (Array.isArray(a)) {
       if ((x = isMacro(a[0]))) {
@@ -831,7 +845,8 @@ var NULAN = (function (n) {
   })
 
   setValue("bound?", function (x) {
-    return x.value in n.vars
+    // TODO x.value in n.vars
+    return !!n.vars[x.value]
   })
 
 

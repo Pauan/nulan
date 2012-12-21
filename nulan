@@ -54,7 +54,10 @@ var opt  = require("optimist")
   , args = opt.argv
 
 if (args.d) {
-  o.NULAN.options.debug = true
+  o.NULAN.options.debug = function (x) {
+    print(["compile-eval", x])
+    console.log()
+  }
 }
 
 /*
