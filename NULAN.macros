@@ -99,26 +99,9 @@ $mac prn -> @args
   'console.log ,@args
 
 
-$mac delay -> body
-  'process.nextTick -> body
-
 $mac w/expression -> x y
   '| x
    | y
-
-$mac cwd -> x
-  if: null? x
-    'process.cwd;
-    'w/expression
-       process.chdir x
-       cwd;
-
-$mac w/cwd! -> x body
-  w/uniq u
-    'w/var u = cwd;
-       | cwd x
-       | finally body
-           cwd u
 
 #|
 $mac str -> @args

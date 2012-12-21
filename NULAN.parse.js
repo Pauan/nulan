@@ -415,8 +415,9 @@ var NULAN = (function (n) {
             push(enrich(new n.Wrapper(a.join("")), o))
           }
           a = []
+          push(tokenizeNumOrSym(o))
           // TODO: should either make "foobar@"testing"" work or throw an error
-          tokenize(o, push, q) // TODO q
+          //tokenize(o, push, q) // TODO q
           //"foo@((bar qux) corge)"
         } else {
           a.push(o.read())

@@ -692,7 +692,7 @@ var NULAN = (function (n) {
     //return [n.box("list"), x].concat([].slice.call(a, 1))
     return (a.length === 1
              ? a[0]
-             : [a[0]].concat(a.slice(1)))
+             : [a[0][1]].concat(a.slice(1)))
   }
 
 /*  function splicingArgsRest(x, i, iLen, a) {
@@ -887,8 +887,8 @@ var NULAN = (function (n) {
   // TODO: can't be defined in NULAN.macros because it's the primitive for the " syntax
   setValue("str", macro(function () {
     var a = [].slice.call(arguments)
-                          // TODO: why isn't this a wrapper?
-    if (a.length === 1 && a[0] instanceof n.Wrapper && typeof a[0].value === "string") {
+                          // TODO: why is this needed for ~= ?
+    if (a.length === 1 && (typeof a[0] === "string" || a[0] instanceof n.Wrapper && typeof a[0].value === "string")) {
       return mac(a[0])
     } else {
       return mac([n.box("+"), ""].concat(a))
@@ -1153,6 +1153,14 @@ var NULAN = (function (n) {
                        // (&eval '(&list 1 2 3))
                        // (include &list)
                        // (&eval '(&list 1 2 3))
+    })
+    return ["empty"]
+  }))
+
+  setValue("builtin", macro(function () {
+    [].forEach.call(arguments, function (x) {
+      // TODO: meh
+      setBuiltin(x.value, x.value)
     })
     return ["empty"]
   }))

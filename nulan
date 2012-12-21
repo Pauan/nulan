@@ -1,6 +1,8 @@
 #! /usr/bin/env node
 "use strict";
 
+//global.require = require
+
 // http://stackoverflow.com/a/8808162/449477
 var vm = require("vm")
 var fs = require("fs")
@@ -56,6 +58,7 @@ NULAN.from("Node.js").to("Node.js")
 
 try {
   NULAN.import("NULAN.macros")
+  NULAN.import("modes/Node.js")
 } catch (e) {
   console.error("" + e)
 }
@@ -180,7 +183,11 @@ if (args._.length) {
       })
       //console.log("@eval\n" + ("" + x).replace(/^/gm, "  "))
     } catch (e) {
-      console.error("" + e)
+      if (NULAN.options.debug) {
+        console.trace(e)
+      } else {
+        console.error("" + e)
+      }
     }
 
     console.log()
