@@ -59,8 +59,7 @@
           obs.$eval.push(x)
         }*/
 
-        i.addEventListener("keyup", function () {
-          var s = this.value
+        function output(s) {
           NULAN.withNewContext(function () {
             obs.parse   = []
             obs.$eval   = []
@@ -90,6 +89,16 @@
               o.textContent = pretty(["" + e])
             }
           })
+        }
+
+        if (localStorage["saved"]) {
+          i.value = localStorage["saved"]
+          output(i.value)
+        }
+
+        i.addEventListener("keyup", function () {
+          localStorage["saved"] = this.value
+          output(this.value)
         })
       })()
     </script>
