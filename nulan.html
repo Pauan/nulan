@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style type="text/css">
+      html, body {
+        margin: 0px;
+        height: 100%;
+      }
+      #input, #output {
+        float: left;
+        width: 47%;
+        height: 94%;
+        padding: 10px;
+      }
+      #input {
+        font-family: monospace;
+      }
+      #output {
+        margin: 0px;
+        border: 1px solid black;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="NULAN.parse.js"></script>
+
+    <script src="lib/NINO.compile.js"></script>
+    <script src="lib/NINO.transform.js"></script>
+    <script src="lib/NINO.partial.js"></script>
+
+    <script src="NULAN.js"></script>
+
+    <script src="NULAN.macros.js"></script>
+    <script src="modes/browser.js"></script>
+
+    <script src="lib/NUIT.serialize.js"></script>
+
+    <textarea autofocus id="input"></textarea>
+    <pre id="output"></pre>
+
+    <script>
+      var i = document.getElementById("input")
+        , o = document.getElementById("output")
+
+      function pretty(x) {
+        return NUIT.serialize(x, { multiline: true })
+      }
+/*
+      function format(r) {
+        return r.map(function (x) { return x + ";" }).join("\n\n")
+      }*/
+
+      var myEval = eval
+
+      i.addEventListener("keyup", function () {
+        var s = this.value
+        NULAN.withNewScope(function () {
+          var a = []
+            , b = []
+            , c = []
+          try {
+            NULAN.parse(s, function (x) {
+              a.push(x)
+              b.push(NULAN.compile(x))
+            })
+            o.textContent = pretty([//["parse"].concat(a.map(NULAN.toJSON)),
+                                    ["compile"].concat(b),
+                                    ["eval"].concat(b.map(function (x) {
+                                      try {
+                                        return myEval(x)
+                                      } catch (e) {
+                                        a.push("" + e)
+                                      }
+                                    })), //.join("\n\n")]
+                                    ["error"].concat(c)])
+          } catch (e) {
+            o.textContent = pretty(["" + e])
+          }
+        })
+      })
+    </script>
+  </body>
+</html>

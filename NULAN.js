@@ -526,6 +526,18 @@ var NULAN = (function (n) {
       return x
     }*/
 
+    // TODO: not the best of names
+    n.withNewScope = function (f) {
+      var old = boxes
+      boxes = Object.create(boxes)
+      try {
+        var x = f()
+      } finally {
+        boxes = old
+      }
+      return x
+    }
+
     withLocalScope = function (f) {
       var old  = boxes
         , old2 = local
@@ -1658,14 +1670,14 @@ function infix(i, b, f) {
     n.parse(s, function (x) {
       r.push(n.compile(x))
     })
-    r = r.join(";\n")
+    //r = r.join(";\n")
     if (f) {
       f(r)
     } else {
       // TODO: should be global eval, maybe?
       //       or at least it should have access to values and boxes, right?
       //       or does it need access to those things?
-      eval(r)
+      eval(r.join(";\n"))
       //require("vm").runInNewContext(r, global)
     }
   }

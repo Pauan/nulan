@@ -5,6 +5,8 @@ Make sure you have Node.js installed (I've only tested with version 0.8.5)
 
 Then just use ``./nulan`` to get to a REPL
 
+Alternatively, load ``nulan.html`` in a modern web browser (I've only tested with Google Chrome 23)
+
 
 Features
 ========
