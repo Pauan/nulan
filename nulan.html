@@ -2,23 +2,48 @@
 <html>
   <head>
     <style type="text/css">
-      html, body {
+      textarea {
+        resize: none;
+      }
+
+      html, body, #table, #input, #output, #sandbox {
+        box-sizing: border-box;
+        -moz-box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+
+        padding: 0px;
         margin: 0px;
+        border: none;
+        width: 100%;
         height: 100%;
       }
-      #input, #output {
-        float: left;
-        width: 47%;
-        height: 94%;
-        padding: 10px;
+
+      td {
+        border: 1px solid black;
+        vertical-align: top;
       }
+
+      #input, #output, #sandbox {
+        overflow: auto;
+        padding: 5px;
+      }
+
       #input {
         font-family: monospace;
+        outline: none;
       }
-      #output {
+
+      /*#input, #output, #sandbox {
+        float: left;
+        width: 47%;
+        padding: 10px;
+      }
+      #output, #sandbox {
+        height: 47%;
         margin: 0px;
         border: 1px solid black;
-      }
+        overflow: auto;
+      }*/
     </style>
   </head>
   <body>
@@ -39,66 +64,229 @@
     <pre id="output"></pre>
 
     <script>
+      var forms
+
       ;(function () {
         var i = document.getElementById("input")
           , o = document.getElementById("output")
+          , sandbox
+          , sandboxParent
 
-        function pretty(x) {
+        document.body.appendChild(function (tab) {
+          tab.id = "table"
+
+          var y
+
+          ;(function (x) {
+            y = x.insertCell(-1)
+            y.width = "50%"
+            y.appendChild(i)
+            y.setAttribute("rowspan", "2")
+
+            sandboxParent = y = x.insertCell(-1)
+            y.width = "50%"
+            y.height = "50%"
+          })(tab.insertRow(-1))
+
+          ;(function (x) {
+            y = x.insertCell(-1)
+            y.width = "50%"
+            y.height = "50%"
+            y.appendChild(o)
+          })(tab.insertRow(-1))
+
+          return tab
+        }(document.createElement("table")))
+
+        function output(i, o) {
+          var output = {
+            error:        [],
+            parse:        [],
+            compileEvals: [],
+            compile:      [],
+            eval:         [],
+            prints:       []
+          }
+
+          forms.forEach(function (x) {
+            if ("error" in x) {
+              output.error.push(x.error)
+            }
+            if (x.start <= i.selectionEnd && x.end >= i.selectionStart) {
+              if ("parse" in x) {
+                output.parse.push(x.parse)
+              }
+              output.compileEvals.push.apply(output.compileEvals, x.compileEvals)
+              if ("compile" in x) {
+                output.compile.push(x.compile)
+              }
+              if ("eval" in x) {
+                output.eval.push(x.eval)
+              }
+              output.prints.push.apply(output.prints, x.prints)
+            }
+          })
+
+          var r = []
+
+          if (output.error.length) {
+            r.push(["error"].concat(output.error))
+          }
+          if (output.prints.length) {
+            r.push(["print"].concat(output.print))
+          }
+          if (output.eval.length) {
+            r.push(["eval"].concat(output.eval.map(pretty)))
+          }
+          if (output.compile.length) {
+            r.push(["compile"].concat(output.compile))
+          }
+          if (output.compileEvals.length) {
+            r.push(["compile-eval"].concat(output.compileEvals))
+          }
+          if (output.parse.length) {
+            r.push(["parse"].concat(output.parse.map(function (x) {
+              return pretty(NULAN.toJSON(x))
+            })))
+          }
+
+          o.textContent = print(r)
+        }
+
+        function coords() {
+          output(this, o)
+        }
+
+        // TODO: onselectstart onselectionchange
+        i.addEventListener("select", coords, true)
+        // TODO: keydown and mousedown fire before selection changes, ugh
+        i.addEventListener("keyup", coords, true)
+        i.addEventListener("mouseup", coords, true)
+
+        //var myEval = eval
+
+        function print(x) {
           return NUIT.serialize(x, { multiline: true })
         }
 
-        var myEval = eval
+        var indent = 0
 
-        var obs = {}
-
-        console.log = function () {
-          obs.print.push([].slice.call(arguments).join(" "))
+        function withIndent(f) {
+          var old = indent
+          indent += 2
+          try {
+            var x = f()
+          } finally {
+            indent = old
+          }
+          return x
         }
-        /*
-        NULAN.options.debug = function (x) {
-          obs.$eval.push(x)
-        }*/
 
-        function output(s) {
+        function spaces() {
+          return new Array(indent + 1).join(" ")
+        }
+
+        function prop(x) {
+          if (/^[$_a-zA-Z][$_a-zA-Z0-9]*$/.test(x)) {
+            return x
+          } else {
+            return pretty(x)
+          }
+        }
+
+        function pretty(x) {
+          if (Array.isArray(x)) {
+            return "[" + withIndent(function () {
+                           return x.map(function (x) {
+                                 // TODO
+                             if (Array.isArray(x)) {
+                               return "\n" + spaces() + pretty(x)
+                             } else {
+                               return pretty(x)
+                             }
+                           }).join(", ")
+                         }) + "]"
+          /*} else if (x instanceof Object && typeof x !== "function") {
+            return "{\n" + withIndent(function () {
+                             return Object.getOwnPropertyNames(x).map(function (s) {
+                               return spaces() + prop(s) + ": " +
+                                        (x[s] === x
+                                          ? "[Circular]"
+                                          : pretty(x[s]))
+                             }).join(",\n")
+                           }) + "\n" + spaces() + "}"*/
+          } else if (typeof x === "string") {
+            // TODO
+            return "\"" + x + "\""
+          } else {
+            return "" + x
+          }
+        }
+
+        function process(s) {
+          if (sandbox) {
+            sandboxParent.removeChild(sandbox)
+          }
+          sandbox = document.createElement("iframe")
+          sandbox.id = "sandbox"
+          sandboxParent.appendChild(sandbox)
+
+          var myEval = sandbox.contentWindow.eval
+
           NULAN.withNewContext(function () {
-            obs.parse   = []
-            obs.$eval   = []
-            obs.compile = []
-            obs.eval    = []
-            obs.print   = []
-            obs.error   = []
-            try {
-              NULAN.parse(s, function (x) {
-                obs.parse.push(x)
-                obs.compile.push(NULAN.compile(x))
-              })
-              obs.compile.forEach(function (x) {
+            forms = []
+
+            NULAN.parse(s, function (x, start, end) {
+              var o = {
+                compileEvals: [],
+                prints:       [],
+                parse:        x,
+                start:        start,
+                end:          end
+              }
+
+              NULAN.options.debug = function (x) {
+                o.compileEvals.push(x)
+              }
+
+              sandbox.contentWindow.console.log = function () {
+                o.prints.push([].slice.call(arguments).join(" "))
+              }
+
+              try {
+                o.compile = NULAN.compile(x)
+              } catch (e) {
+                o.error = "" + e
+                //o.textContent = print(["" + e])
+              }
+
+              forms.push(o)
+            })
+
+            forms.forEach(function (o) {
+              if ("compile" in o) {
                 try {
-                  obs.eval.push(myEval(x)) // indirect eval
+                  o.eval = myEval(o.compile) // indirect eval
                 } catch (e) {
-                  obs.error.push("" + e)
+                  o.error = "" + e
                 }
-              })
-              o.textContent = pretty([//["parse"].concat(a.map(NULAN.toJSON)),
-                                      //["compile-eval"].concat(obs.$eval),
-                                      ["compile"].concat(obs.compile),
-                                      ["eval"].concat(obs.eval),
-                                      ["print"].concat(obs.print),
-                                      ["error"].concat(obs.error)])
-            } catch (e) {
-              o.textContent = pretty(["" + e])
-            }
+              }
+            })
+
+            output(i, o)
           })
         }
 
         if (localStorage["saved"]) {
           i.value = localStorage["saved"]
-          output(i.value)
+          process(i.value)
         }
 
-        i.addEventListener("keyup", function () {
+        i.addEventListener("input", function () {
+          //if (this.value !== localStorage["saved"]) {
           localStorage["saved"] = this.value
-          output(this.value)
+          process(this.value)
+          //}
         })
       })()
     </script>

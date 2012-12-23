@@ -706,7 +706,7 @@ var NULAN = (function (n) {
 
   // TODO
   function $mac(a) {
-    a = [].map.call(a, mac)
+    a = a.map(mac)
     /*
     // TODO: make it work with boxes too
     if (x instanceof n.Symbol) {
@@ -783,6 +783,14 @@ var NULAN = (function (n) {
                          [n.box("&error"), v, [n.box("+"), "expected " + args[1] + " but got ", v]]]
   }
 
+  patterns[mangle("sym")] = function (args, v, body) {
+    compileOnlyError(args[0])
+
+    return [n.box("if"), [n.box("sym=="), v, args[1]],
+                         body,
+                         [n.box("&error"), v, [n.box("+"), "expected " + args[1] + "but got ", v]]]
+  }
+
 
   function destructure1(args, v, body) {
     if (complex(args)) {
@@ -822,6 +830,10 @@ var NULAN = (function (n) {
   // TODO: rename?
   setValue("&box==", function (x, y) {
     return isBox(x, y)
+  })
+
+  setValue("sym==", function (x, y) {
+    return x instanceof n.Symbol && x.value === y
   })
 
   setValue("make-uniq", function () {
@@ -899,7 +911,7 @@ var NULAN = (function (n) {
 
   // TODO: maybe I can make this into a function instead?
   setValue("&", macro(function () {
-    return $mac(arguments)
+    return $mac([].slice.call(arguments))
   }))
 
   setValue("list", macro(function () {

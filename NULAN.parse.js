@@ -91,9 +91,10 @@ var NULAN = (function (n) {
   // Buffers a string by line and keeps track of line and column information
   // Returns an iterator that moves through the string one character at a time
   // This is used for the error messages, and also significant whitespace parsing
-  function stringBuffer(s) {
+  n.stringBuffer = function (s) {
     var re = /([^\n]*)(?:\n|$)/g
     return {
+      position: 0,
       line: 1,
       column: 1,
       text: reMatch(re, s),
@@ -107,6 +108,7 @@ var NULAN = (function (n) {
           // TODO: a little bit hacky
           if (y === "") {
             ++this.column
+            ++this.position
             this.read = function () {
               return this.text[this.column - 1]
             }
@@ -114,9 +116,11 @@ var NULAN = (function (n) {
             this.text = y
             this.column = 1
             ++this.line
+            ++this.position
           }
         } else {
           ++this.column
+          ++this.position
         }
         return x
       },
@@ -459,6 +463,7 @@ var NULAN = (function (n) {
     x.text = start.text
     x.line = start.line
     x.column = start.column
+    x.position = start.position
     x.length = (end
                  ? (end.line === start.line
                      ? end.column - start.column
@@ -470,7 +475,8 @@ var NULAN = (function (n) {
   function store(o) {
     return { text: o.text
            , line: o.line
-           , column: o.column }
+           , column: o.column
+           , position: o.position }
   }
 
   function isDelimiter(o) {
@@ -704,18 +710,42 @@ var NULAN = (function (n) {
     return process(iter(a), -1)
   }
 
-  n.tokenize = function (s) {
+  n.tokenizeRaw = function (o) {
     var r = []
-    tokenize(stringBuffer(s), function (x) {
+    tokenize(o, function (x) {
       r.push(x)
     })
+    r.position = o.position // TODO: really hacky
     return r
   }
 
-  n.parseRaw = function (a, f) {
-    a = iter(a)
+  n.tokenize = function (s) {
+    return n.tokenizeRaw(n.stringBuffer(s))
+  }
+
+  function lastIter(o) {
+    var x = iter(o)
+    return {
+      last: x.peek(),
+      peek: x.peek,
+      read: function () {
+        this.last = x.read()
+        return this.last
+      },
+      has: x.has
+    }
+  }
+
+  n.parseRaw = function (o, f) {
+    var a = lastIter(o)
+      , x
     while (a.has()) {
-      f(unwrap(indent(a, a.peek())))
+      x = a.peek()
+      f(unwrap(indent(a, a.peek())),
+        x.position,
+        a.last.position + a.last.length
+        //(a.has() ? a.peek().position - 1 : o.position)
+        )
     }
   }
 
