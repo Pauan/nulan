@@ -736,14 +736,15 @@ var NULAN = (function (n) {
     }
   }
 
+  // TODO: get rid of "position" property? probably, since I'm using CodeMirror rather than a textarea
   n.parseRaw = function (o, f) {
     var a = lastIter(o)
       , x
     while (a.has()) {
       x = a.peek()
       f(unwrap(indent(a, a.peek())),
-        x.position,
-        a.last.position + a.last.length
+        x.line,
+        a.last.line
         //(a.has() ? a.peek().position - 1 : o.position)
         )
     }

@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <link rel="stylesheet" href="lib/codemirror-3.0/lib/codemirror.css">
+
     <style type="text/css">
       textarea {
         resize: none;
       }
 
-      html, body, #table, #input, #output, #sandbox {
+      html, body, #table, #output, #sandbox {
         box-sizing: border-box;
         -moz-box-sizing: border-box;
         -webkit-box-sizing: border-box;
@@ -23,7 +25,11 @@
         vertical-align: top;
       }
 
-      #input, #output, #sandbox {
+      .CodeMirror {
+        height: 100%;
+      }
+
+      #output, #sandbox {
         overflow: auto;
         padding: 5px;
       }
@@ -32,14 +38,17 @@
         white-space: pre-wrap;
         word-wrap: break-word;
       }
-
+/*
       #input {
         font-family: monospace;
         outline: none;
-      }
+      }*/
     </style>
   </head>
   <body>
+    <script src="lib/codemirror-3.0/lib/codemirror.js"></script>
+    <!--<script src="lib/codemirror-3.0/mode/javascript/javascript.js"></script>-->
+
     <script src="NULAN.parse.js"></script>
 
     <script src="lib/NINO.compile.js"></script>
@@ -53,70 +62,70 @@
 
     <script src="lib/NUIT.serialize.js"></script>
 
-    <textarea autofocus id="input"></textarea>
-    <pre id="output"></pre>
-
     <script>
       var forms
 
       ;(function () {
-        var i = document.getElementById("input")
-          , o = document.getElementById("output")
+        var i// = document.createElement("textarea")
+          , o = document.createElement("pre")
           , sandbox
           , sandboxParent
+/*
+        i.id = "input"
+        i.setAttribute("autofocus", "") // TODO
+*/
+        o.id = "output"
 
-        document.body.appendChild(function (tab) {
-          tab.id = "table"
+        function editor(x) {
+          x = CodeMirror(x, {
+            value: localStorage["saved"],
+            lineWrapping: true,
+            lineNumbers: true,
+            autofocus: true
+          })
 
-          var y
+          x.on("change", function (x, o) {
+            var s = x.getValue()
+            localStorage["saved"] = s
+            process(x, s)
+          })
 
-          ;(function (x) {
-            y = x.insertCell(-1)
-            y.width = "50%"
-            y.appendChild(i)
-            y.setAttribute("rowspan", "2")
+          x.on("cursorActivity", function (x) {
+            output(x, o)
+          })
 
-            sandboxParent = y = x.insertCell(-1)
-            y.width = "50%"
-            y.height = "50%"
-          })(tab.insertRow(-1))
+          process(x, localStorage["saved"])
+        }
 
-          ;(function (x) {
-            y = x.insertCell(-1)
-            y.width = "50%"
-            y.height = "50%"
-            y.appendChild(o)
-          })(tab.insertRow(-1))
-
-          return tab
-        }(document.createElement("table")))
-
-        function output(i, o) {
+        function output(oEditor, o) {
           var output = {
             error:        [],
-            parse:        [],
-            compileEvals: [],
-            compile:      [],
+            prints:       [],
             eval:         [],
-            prints:       []
+            compile:      [],
+            compileEvals: [],
+            parse:        []
           }
+
+          var start = oEditor.getCursor(true).line + 1
+            , end   = oEditor.getCursor(false).line + 1
 
           forms.forEach(function (x) {
             if ("error" in x) {
               output.error.push(x.error)
             }
-            if (x.start <= i.selectionEnd && x.end >= i.selectionStart) {
-              if ("parse" in x) {
-                output.parse.push(x.parse)
-              }
-              output.compileEvals.push.apply(output.compileEvals, x.compileEvals)
-              if ("compile" in x) {
-                output.compile.push(x.compile)
-              }
+            if (x.start <= end && x.end >= start) {
+              output.prints.push.apply(output.prints, x.prints)
               if ("eval" in x) {
                 output.eval.push(x.eval)
               }
-              output.prints.push.apply(output.prints, x.prints)
+              if ("compile" in x) {
+                output.compile.push(x.compile)
+              }
+              output.compileEvals.push.apply(output.compileEvals, x.compileEvals)
+              if ("parse" in x) {
+                output.parse.push(x.parse)
+              }
             }
           })
 
@@ -126,7 +135,7 @@
             r.push(["error"].concat(output.error))
           }
           if (output.prints.length) {
-            r.push(["print"].concat(output.print))
+            r.push(["print"].concat(output.prints))
           }
           if (output.eval.length) {
             r.push(["eval"].concat(output.eval.map(pretty)))
@@ -139,13 +148,38 @@
           }
           if (output.parse.length) {
             r.push(["parse"].concat(output.parse.map(function (x) {
-              return pretty(NULAN.toJSON(x))
+              return prettyParse(x)
             })))
           }
 
-          o.textContent = print(r)
+          o.textContent = NUIT.serialize(r, { multiline: true })
         }
 
+        function prettyParse(x) {
+          // TODO: code duplication with pretty
+          if (Array.isArray(x)) {
+            return "(" + withIndent(function () {
+                           var seen
+                           return x.map(function (x) {
+                             if (Array.isArray(x)) {
+                               seen = true
+                             }
+                             if (seen) {
+                               return "\n" + spaces() + prettyParse(x)
+                             } else {
+                               return prettyParse(x)
+                             }
+                           }).join(" ")
+                         }) + ")"
+          } else if (x instanceof NULAN.Wrapper) {
+            return prettyParse(x.value)
+          } else if (typeof x === "string") {
+            return "\"" + x + "\"" // TODO replace " inside the string with \"
+          } else {
+            return "" + x
+          }
+        }
+/*
         function coords() {
           output(this, o)
         }
@@ -155,12 +189,8 @@
         // TODO: keydown and mousedown fire before selection changes, ugh
         i.addEventListener("keyup", coords, true)
         i.addEventListener("mouseup", coords, true)
-
+*/
         //var myEval = eval
-
-        function print(x) {
-          return NUIT.serialize(x, { multiline: true })
-        }
 
         var indent = 0
 
@@ -188,11 +218,15 @@
         }
 
         function pretty(x) {
+          // TODO: a bit ew
           if (Array.isArray(x)) {
             return "[" + withIndent(function () {
+                           var seen
                            return x.map(function (x) {
-                                 // TODO
                              if (Array.isArray(x)) {
+                               seen = true
+                             }
+                             if (seen) {
                                return "\n" + spaces() + pretty(x)
                              } else {
                                return pretty(x)
@@ -216,7 +250,7 @@
           }
         }
 
-        function process(s) {
+        function process(x, s) {
           if (sandbox) {
             sandboxParent.removeChild(sandbox)
           }
@@ -248,6 +282,7 @@
 
               try {
                 o.compile = NULAN.compile(x)
+                o.eval = myEval(o.compile) // indirect eval
               } catch (e) {
                 o.error = "" + e
                 //o.textContent = print(["" + e])
@@ -256,21 +291,11 @@
               forms.push(o)
             })
 
-            forms.forEach(function (o) {
-              if ("compile" in o) {
-                try {
-                  o.eval = myEval(o.compile) // indirect eval
-                } catch (e) {
-                  o.error = "" + e
-                }
-              }
-            })
-
-            output(i, o)
+            output(x, o)
           })
         }
 
-        if (localStorage["saved"]) {
+        /*if (localStorage["saved"]) {
           i.value = localStorage["saved"]
           process(i.value)
         }
@@ -280,7 +305,33 @@
           localStorage["saved"] = this.value
           process(this.value)
           //}
-        })
+        })*/
+
+        ;(function (tab) {
+          tab.id = "table"
+
+          document.body.appendChild(tab)
+
+          var y
+
+          ;(function (x) {
+            y = x.insertCell(0)
+            y.width = "50%"
+            y.height = "50%"
+            y.appendChild(o)
+          })(tab.insertRow(0))
+
+          ;(function (x) {
+            sandboxParent = y = x.insertCell(0)
+            y.width = "50%"
+            y.height = "50%"
+
+            y = x.insertCell(0)
+            y.width = "50%"
+            y.setAttribute("rowspan", "2")
+            editor(y)
+          })(tab.insertRow(0))
+        }(document.createElement("table")))
       })()
     </script>
   </body>
