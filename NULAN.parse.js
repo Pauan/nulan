@@ -43,6 +43,11 @@ var NULAN = (function (n) {
         }
       }
     }
+    this.text = o.text
+    this.line = o.line
+    this.column = o.column
+    this.length = o.length
+    this.originalMessage = s
     this.message = a.join("")
   }
   n.Error.prototype = new Error()

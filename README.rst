@@ -30,6 +30,8 @@ Features
 
 * Compiles ahead-of-time to extremely fast JavaScript: it should be just as fast or faster than handwritten JS code
 
+* Includes an awesome IDE that runs right in the browser: just open ``nulan.html``
+
 
 Examples
 ========

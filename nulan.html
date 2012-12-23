@@ -4,40 +4,86 @@
     <link rel="stylesheet" href="lib/codemirror-3.0/lib/codemirror.css">
 
     <style type="text/css">
-      textarea {
+      /*textarea {
         resize: none;
-      }
+      }*/
 
-      html, body, #table, #output, #sandbox {
+      html, body, .CodeMirror, #table, #output, #sandbox {
         box-sizing: border-box;
         -moz-box-sizing: border-box;
         -webkit-box-sizing: border-box;
 
-        padding: 0px;
         margin: 0px;
         border: none;
         width: 100%;
         height: 100%;
       }
 
-      td {
-        border: 1px solid black;
-        vertical-align: top;
+      body {
+        overflow: hidden;
       }
+
+      #table {
+        table-layout: fixed;
+        border-collapse: collapse;
+        border-spacing: 0px;
+      }
+
+      .CodeMirror, #output, #sandbox {
+        border: 1px solid black;
+      }
+
+      td {
+        position: relative;
+        padding: 0px;
+      }
+
+      #sandbox {
+        position: absolute;
+        top: -1px;
+        left: 1px;
+        /*display: block;*/ /* aurgh why does this work?! */
+      }
+      #output {
+        position: absolute;
+        top: 1px;
+        left: 1px;
+      }
+/*
+      td:first-child {
+        padding-left: 0px;
+      }
+      td:last-child {
+        padding-right: 0px;
+      }
+      tr:first-child td {
+        padding-top: 0px;
+      }
+      tr:last-child td {
+        padding-bottom: 0px;
+      }*/
 
       .CodeMirror {
-        height: 100%;
+        position: absolute;
+        top: 0px;
+        left: -1px;
+        border-top: none;
+        border-bottom: none;
       }
 
-      #output, #sandbox {
+      /*.CodeMirror, #output, #sandbox {
+        margin: 1px;
+      }*/
+
+      .CodeMirror-scroll, #output, #sandbox {
         overflow: auto;
-        padding: 5px;
+        /*padding: 5px;*/
       }
-
+/*
       #output, #sandbox {
         white-space: pre-wrap;
         word-wrap: break-word;
-      }
+      }*/
 /*
       #input {
         font-family: monospace;
@@ -95,6 +141,31 @@
           })
 
           process(x, localStorage["saved"])
+        }
+
+        var lines = []
+
+        // http://codemirror.net/demo/widget.html
+        function error(oEditor, line, message) {
+          var x = document.createElement("div")
+          x.style.fontFamily = "arial"
+          x.style.fontSize = "70%"
+          x.style.background = "#ffa"
+          x.style.color = "#a00"
+          x.style.padding = "2px 5px 3px"
+
+          var y = document.createElement("span")
+          y.textContent = "!!"
+          y.style.color = "white"
+          y.style.backgroundColor = "red"
+          y.style.fontWeight = "bold"
+          y.style.borderRadius = "50%"
+          y.style.padding = "0 3px"
+          y.style.marginRight = "7px"
+
+          x.appendChild(y)
+          x.appendChild(document.createTextNode(message))
+          lines.push(oEditor.addLineWidget(line - 1, x))
         }
 
         function output(oEditor, o) {
@@ -250,7 +321,12 @@
           }
         }
 
-        function process(x, s) {
+        function process(oEditor, s) {
+          lines.forEach(function (x) {
+            oEditor.removeLineWidget(x)
+          })
+          lines = []
+
           if (sandbox) {
             sandboxParent.removeChild(sandbox)
           }
@@ -284,14 +360,20 @@
                 o.compile = NULAN.compile(x)
                 o.eval = myEval(o.compile) // indirect eval
               } catch (e) {
-                o.error = "" + e
+                if (e instanceof NULAN.Error) {
+                  error(oEditor, e.line, e.originalMessage)
+                } else {
+                  error(oEditor, start, "" + e)
+                }
+
+                //o.error = "" + e
                 //o.textContent = print(["" + e])
               }
 
               forms.push(o)
             })
 
-            output(x, o)
+            output(oEditor, o)
           })
         }
 
