@@ -1,3 +1,3 @@
 NULAN.eval("                                                               \n\
-builtin window document                                                    \n\
+builtin alert window document                                              \n\
 ")
