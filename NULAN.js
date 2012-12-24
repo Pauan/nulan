@@ -277,7 +277,7 @@ var NULAN = (function (n) {
 
   var Uniq, setBuiltin, setSymExternal, setSymToBox, getBox, withLocalScope
 
-  var isMacro, setValue, compileEval
+  var setValue, compileEval
 
 /*
   var boxes = 5
@@ -489,14 +489,14 @@ var NULAN = (function (n) {
       return x
     }
 
-    getBox = function (x) {
+    getBox = function (x, b) {
       if (x instanceof n.Box) {
         return x
       } else if (x instanceof n.Symbol) {
         var y = n.vars[x.value]
         if (y) {
           return boxes[y]
-        } else {
+        } else if (!b) {
           throw new n.Error(x, "undefined variable: " + x)
         }
       }
@@ -544,7 +544,7 @@ var NULAN = (function (n) {
     ;(function () {
       var values = {} // JS Variable -> compile time value
 
-      n.withNewContext = function (f) {
+      n.withNewContext = function () {
         var old  = n.vars
           , old2 = boxes
           , old3 = values
@@ -553,19 +553,16 @@ var NULAN = (function (n) {
         boxes         = Object.create(boxes)
         values        = Object.create(values)
         n.syntaxRules = Object.create(n.syntaxRules)
-        try {
-          var x = f()
-        } finally {
+        return function () {
           n.vars        = old
           boxes         = old2
           values        = old3
           n.syntaxRules = old4
         }
-        return x
       }
 
-      isMacro = function (x) {
-        if ((x = getBox(x)) && (x = values[x.value]) instanceof Macro) {
+      n.isMacro = function (x, b) {
+        if ((x = getBox(x, b)) && (x = values[x.value]) instanceof Macro) {
           return x.value
         }
       }
@@ -665,7 +662,7 @@ var NULAN = (function (n) {
   function mac(a) {
     var x
     if (Array.isArray(a)) {
-      if ((x = isMacro(a[0]))) {
+      if ((x = n.isMacro(a[0]))) {
         return x(a)
       } else if (a.length === 0) { // TODO: this should probably be in splicingArgs
         return ["empty"] // TODO: is this correct?

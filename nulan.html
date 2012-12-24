@@ -2,6 +2,7 @@
 <html>
   <head>
     <link rel="stylesheet" href="lib/codemirror-3.0/lib/codemirror.css">
+    <link rel="stylesheet" href="custom.css">
 
     <style type="text/css">
       /*textarea {
@@ -70,6 +71,7 @@
         border-top: none;
         border-bottom: none;
       }
+      .activeline { background: #2e3436 !important; }
 
       /*.CodeMirror, #output, #sandbox {
         margin: 1px;
@@ -108,6 +110,373 @@
 
     <script src="lib/NUIT.serialize.js"></script>
 
+<pre hidden id="tutorial">
+#  Hi! Welcome to the Nulan tutorial. After reading this, you
+#  should have a very basic idea of how to write Nulan programs.
+
+#  To start with, all Nulan programs are composed of one or more
+#  expressions. Every expression must have a value. The process
+#  of taking an expression and returning a value is called
+#  "evaluation".
+
+#  The simplest expressions are literals, which evaluate to
+#  themself:
+
+5
+
+#  Try clicking on the number 5. In the lower-right panel, you
+#  can see that it evaluates to the number 5.
+
+#  Let's try something more complicated:
+
+5 + 10
+
+#  If you click on the above expression, you'll see it evaluates
+#  to the number 15. That expression is composed of three parts:
+#  the number 5, the symbol +, and the number 10.
+
+#  Now, something I haven't told you yet is that all these
+#  examples are fully interactive. To try it out, go ahead and
+#  change the number 5 to any other number you like, and the
+#  lower-right panel will automatically update with the correct
+#  answer.
+
+#  Nulan also supports the other mathematical symbols like
+#  subtraction, multiplication, and division. In addition,
+#  multiplication/division has higher priority than
+#  addition/subtraction:
+
+1 + 2 * 3 / 4 - 5
+
+#  And you can use parentheses to change the priority of any
+#  expression:
+
+(1 + 2) * 3 / (4 - 5)
+
+#  Let's talk about variables. I think it's best to think of
+#  variables as being like boxes: you can place things inside
+#  the box, and then unbox it later. To create a variable, you
+#  use the `var` symbol:
+
+var foo = 1
+
+#  What we've done here is taken the number 1 and placed it
+#  inside the `foo` variable. We can then "unbox" it by simply
+#  using the `foo` symbol:
+
+foo
+
+#  You might have noticed that the `var` expression evaluated to
+#  `()`. Every expression needs to return a value, but some
+#  expressions don't have anything meaningful to return, so they
+#  return `()` instead.
+
+#  Because everything in Nulan is an expression, variables can
+#  be used as part of a bigger expression:
+
+foo + 2
+
+#  The above evaluates to the number 3. But variables aren't
+#  just a shorthand for referring to expressions. Going back to
+#  the box metaphor, we have taken the number 1 and put it into
+#  the `foo` box. But we can put a different number into the
+#  box:
+
+foo <= 5
+
+foo
+
+#  Now the variable `foo` contains the number `5` rather than
+#  the number `1`. It is like as if we unboxed it, took the
+#  number out, put a new number in, and then reboxed it again.
+#  But even though the stuff inside the box changed, the box
+#  itself is the same. This will be important later on.
+
+#  Let's talk about functions. Functions are extremely common in
+#  Nulan, so it's important to understand them. A function is an
+#  expression that can be passed multiple expressions as
+#  arguments and then returns an expression.
+
+#  It's okay if you didn't understand anything I just said. I'll
+#  take it slow and use lots of examples. First, to create a
+#  function, you use the `->` symbol:
+
+-> a a
+
+#  The above expression returns a function which accepts a
+#  single argument called `a`. It then returns `a`. Let's try
+#  calling the function:
+
+(-> a a) 5
+
+#  The above expression returns 5. One way of thinking about
+#  this is to imagine that Nulan replaced the symbol `a` inside
+#  the function with the number 5. That way of thinking won't
+#  work with more advanced uses of functions, but it will do for
+#  now.
+
+#  The parentheses are necessary because without them, Nulan
+#  would treat it as a function that accepts two arguments (both
+#  called `a`) and then returns 5:
+
+-> a a 5
+
+#  Let's write a function that accepts two arguments and adds
+#  them together:
+
+-> a b (a + b)
+
+#  And now let's call it:
+
+(-> a b (a + b)) 5 10
+
+#  The expression returned 15. Once again, you can pretend that
+#  Nulan replaced `a` with 5, and `b` with 10, and then returned
+#  `5 + 10`.
+
+#  This probably doesn't seem very useful. Let's make it more
+#  useful by taking the function and placing it into a variable:
+
+var add = -> a b (a + b)
+
+#  We created a function using `-> a b (a + b)` and then used
+#  `var` to put it into the `add` variable.
+
+#  This is common enough that Nulan has a special `def` symbol
+#  which is almost exactly like `var`, except that it works
+#  better for functions:
+
+def add -> a b (a + b)
+
+#  Now let's call it:
+
+add 5 10
+
+#  This was a simple example, but functions can become quite
+#  complex. The reason why functions are so useful is that they
+#  let you easily evaluate an expression multiple times.
+#  Consider these three expressions:
+
+1 + 2 * 3 / 10
+
+1 + 2 * 4 / 10
+
+1 + 2 * 5 / 10
+
+#  The only difference between them is that the first case uses
+#  3, the second case uses 4, and the third case uses 5. We
+#  can't use variables to help with the duplication. Functions
+#  to the rescue!
+
+def foo -> a
+  1 + 2 * a / 10
+
+foo 3
+
+foo 4
+
+foo 5
+
+#  Now the parts that remain unchanged are put into the
+#  function. The only part that changes is the argument `a`,
+#  which is passed in when the function is called.
+
+#  And so, functions let you take the unchanging parts and put
+#  them into a single place, which makes it much much easier as
+#  your programs become bigger and more complex.
+
+#  Unfortunately, sometimes you'll find code duplication which
+#  isn't easy to put into a function. For instance, consider
+#  this program:
+
+w/var temp = 5
+  if temp
+    temp + 1
+
+w/var temp = 10
+  if temp
+    temp + 2
+
+#  It is common to create a temporary variable to hold an
+#  expression and then use `if` to see if the variable is true.
+
+#  We can't really put this code into a function. So what do we
+#  do? The answer is macros. What is a macro? Well, functions
+#  have arguments, which are replaced with values, and the
+#  function then returns a value.
+
+#  A macro is a function that has arguments which are replaced
+#  with code, and it then returns code. Rather than going into
+#  all the details, let's jump straight in with an example. To
+#  create a macro, you use the `$mac` symbol:
+
+$mac if-var ->
+
+#  We just took a function, made it into a macro, and then put
+#  it into the variable `if-var`. Right now it doesn't do
+#  anything, though. Let's start by taking our program from
+#  before and inserting it into the macro:
+
+$mac if-var ->
+  w/var temp = 5
+    if temp
+      temp + 1
+
+#  Now we need to add the `'` symbol in front of the code:
+
+$mac if-var ->
+  'w/var temp = 5
+     if temp
+       temp + 1
+
+#  Okay, now it's saying that the variable `temp` is undefined.
+#  To fix that, we can use `w/uniq` to create a special unique
+#  variable which is guaranteed to never clash with any other
+#  variable:
+
+$mac if-var ->
+  w/uniq temp
+    'w/var temp = 5
+       if temp
+         temp + 1
+
+#  Now, this macro works fine for the first case, but it doesn't
+#  work for the second case. So let's ask ourselves: what parts
+#  of the code actually changes? The parts that change need to
+#  be arguments to the macro.
+
+#  Well, the expression `5` will change, so we need to make it
+#  into an argument:
+
+$mac if-var -> x
+  w/uniq temp
+    'w/var temp = x
+       if temp
+         temp + 1
+
+#  Another part that changes is the number `1`, so we'll have
+#  the macro accept a second argument:
+
+$mac if-var -> x y
+  w/uniq temp
+    'w/var temp = x
+       if temp
+         temp + y
+
+#  And now we can run it like so:
+
+if-var 5  1
+if-var 10 2
+
+#  But although this is very short, we honestly could have
+#  written it as a function. In addition, it's not very
+#  flexible: it simply accepts an expression, checks if it's
+#  true, then adds it to a second expression.
+
+#  What if we want to subtract, or divide, or do something else?
+#  That's why we wrote it as a macro. First, let's get rid of
+#  the symbol `+`:
+
+$mac if-var -> x y
+  w/uniq temp
+    'w/var temp = x
+       if temp
+         y
+
+#  And now we can use it like this:
+
+if-var 5
+  temp + 1
+
+if-var 10
+  temp + 2
+
+#  Oops, that didn't work. What happened? Well, we used `w/uniq`
+#  to create a special unique variable. But that unique variable
+#  cannot be accessed outside of the macro. So rather than using
+#  a unique variable, let's use a symbol. We can create a symbol
+#  using the `sym` function:
+
+$mac if-var -> x y
+  w/var temp = sym "it"
+    'w/var temp = x
+       if temp
+         y
+
+#  And now we can use it like this:
+
+if-var 5
+  it + 1
+
+if-var 10
+  it + 2
+
+#  Within the `if-var` expression, we can use the variable `it`
+#  to refer to the first argument. Now we can do all kinds of
+#  things: print it, add it, subtract it, pass it to a function,
+#  etc.
+
+#  If we had tried to use a function to do this, the code would
+#  have been more verbose. Because macros always return code,
+#  anything you can do with macros, you can do by manually
+#  writing the code yourself.
+
+#  The benefit of macros is that you don't *have* to write the
+#  code yourself: you can have the macro write the code for you.
+#  And so, by using macros wisely, you can write shorter, more
+#  readable code.
+</pre>
+
+    <script>
+      CodeMirror.defineMode("nulan", function (config, parserConfig) {
+        return {
+          startState: function () {
+            return {}
+          },
+
+          token: function (stream, state) {
+            var c = stream.next()
+              , x = NULAN.syntaxRules[c]
+              , r
+            if ((c === "`" && state.raw) || c === "#") {
+              stream.eatWhile(/[^\n`]/)
+              if (stream.peek() === "`") {
+                state.raw = true
+                stream.next()
+              }
+              return "comment"
+            } else if (x && x.delimiter) {
+              stream.eatWhile(function (c) {
+                var x = NULAN.syntaxRules[c]
+                return x && x.delimiter
+              })
+              return "special"
+            } else {
+              r = [c]
+              stream.eatWhile(function (c) {
+                if (!(c === "`" && state.raw)) {
+                  var x = NULAN.syntaxRules[c]
+                  if (!(x && x.delimiter)) {
+                    r.push(c)
+                    return true
+                  }
+                }
+              })
+              r = r.join("")
+              // /^([a-z]\-[a-z]|[a-zA-Z])+$/.test(r.join(""))
+              if (/^[0-9]+$/.test(r)) {
+                return "number"
+              } else if (NULAN.isMacro(new NULAN.Symbol(r), true)) {
+                return "keyword"
+              } else {
+                return "variable"
+              }
+            }
+          }
+        }
+      })
+    </script>
+
     <script>
       var forms
 
@@ -116,6 +485,11 @@
           , o = document.createElement("pre")
           , sandbox
           , sandboxParent
+          , lines = []
+
+        if (!localStorage["saved"]) {
+          localStorage["saved"] = document.getElementById("tutorial").textContent
+        }
 /*
         i.id = "input"
         i.setAttribute("autofocus", "") // TODO
@@ -124,26 +498,52 @@
 
         function editor(x) {
           x = CodeMirror(x, {
+            theme: "custom",
             value: localStorage["saved"],
             lineWrapping: true,
             lineNumbers: true,
-            autofocus: true
+            autofocus: true,
+            extraKeys: {
+              "Tab":       "indentMore",
+              "Shift-Tab": "indentLess"
+            },
+            mode: "nulan"
           })
 
+          var timer
+
           x.on("change", function (x, o) {
+            clearTimeout(timer)
             var s = x.getValue()
             localStorage["saved"] = s
             process(x, s)
+            /*timer = setTimeout(function () {
+
+            }, 400)*/
           })
+/*
+          x.on("update", function () {
+            console.log("UPDATE")
+          })*/
 
           x.on("cursorActivity", function (x) {
             output(x, o)
           })
 
+          // http://codemirror.net/demo/activeline.html
+          var hlLine = x.addLineClass(0, "background", "activeline")
+
+          x.on("cursorActivity", function () {
+            var cur = x.getLineHandle(x.getCursor().line)
+            if (cur !== hlLine) {
+              x.removeLineClass(hlLine, "background", "activeline")
+              hlLine = x.addLineClass(cur, "background", "activeline")
+            }
+          })
+
+
           process(x, localStorage["saved"])
         }
-
-        var lines = []
 
         // http://codemirror.net/demo/widget.html
         function error(oEditor, line, message) {
@@ -170,7 +570,7 @@
 
         function output(oEditor, o) {
           var output = {
-            error:        [],
+            //error:        [],
             prints:       [],
             eval:         [],
             compile:      [],
@@ -182,9 +582,9 @@
             , end   = oEditor.getCursor(false).line + 1
 
           forms.forEach(function (x) {
-            if ("error" in x) {
+            /*if ("error" in x) {
               output.error.push(x.error)
-            }
+            }*/
             if (x.start <= end && x.end >= start) {
               output.prints.push.apply(output.prints, x.prints)
               if ("eval" in x) {
@@ -202,21 +602,21 @@
 
           var r = []
 
-          if (output.error.length) {
+          /*if (output.error.length) {
             r.push(["error"].concat(output.error))
-          }
+          }*/
           if (output.prints.length) {
             r.push(["print"].concat(output.prints))
           }
           if (output.eval.length) {
             r.push(["eval"].concat(output.eval.map(pretty)))
           }
-          if (output.compile.length) {
+          /*if (output.compile.length) {
             r.push(["compile"].concat(output.compile))
           }
           if (output.compileEvals.length) {
             r.push(["compile-eval"].concat(output.compileEvals))
-          }
+          }*/
           if (output.parse.length) {
             r.push(["parse"].concat(output.parse.map(function (x) {
               return prettyParse(x)
@@ -246,6 +646,8 @@
             return prettyParse(x.value)
           } else if (typeof x === "string") {
             return "\"" + x + "\"" // TODO replace " inside the string with \"
+          } else if (x === void 0) {
+            return "()"
           } else {
             return "" + x
           }
@@ -291,7 +693,7 @@
         function pretty(x) {
           // TODO: a bit ew
           if (Array.isArray(x)) {
-            return "[" + withIndent(function () {
+            return "{" + withIndent(function () {
                            var seen
                            return x.map(function (x) {
                              if (Array.isArray(x)) {
@@ -303,7 +705,7 @@
                                return pretty(x)
                              }
                            }).join(", ")
-                         }) + "]"
+                         }) + "}"
           /*} else if (x instanceof Object && typeof x !== "function") {
             return "{\n" + withIndent(function () {
                              return Object.getOwnPropertyNames(x).map(function (s) {
@@ -313,32 +715,44 @@
                                           : pretty(x[s]))
                              }).join(",\n")
                            }) + "\n" + spaces() + "}"*/
+          } else if (typeof x === "function") {
+            return "#<function>"
           } else if (typeof x === "string") {
             // TODO
             return "\"" + x + "\""
+          } else if (x === void 0) {
+            return "()"
           } else {
             return "" + x
           }
         }
 
+        var oldContext
+
         function process(oEditor, s) {
-          lines.forEach(function (x) {
-            oEditor.removeLineWidget(x)
-          })
-          lines = []
+          oEditor.operation(function () {
+            lines.forEach(function (x) {
+              oEditor.removeLineWidget(x)
+            })
+            if (sandbox) {
+              sandboxParent.removeChild(sandbox)
+            }
+            if (oldContext) {
+              oldContext()
+            }
 
-          if (sandbox) {
-            sandboxParent.removeChild(sandbox)
-          }
-          sandbox = document.createElement("iframe")
-          sandbox.id = "sandbox"
-          sandboxParent.appendChild(sandbox)
+            oldContext = NULAN.withNewContext()
 
-          var myEval = sandbox.contentWindow.eval
+            sandbox = document.createElement("iframe")
+            sandbox.id = "sandbox"
+            sandboxParent.appendChild(sandbox)
 
-          NULAN.withNewContext(function () {
+            var myEval = sandbox.contentWindow.eval
+
+            lines = []
             forms = []
 
+            // TODO: warp this is a try {} catch {} to catch things like "#| foo"
             NULAN.parse(s, function (x, start, end) {
               var o = {
                 compileEvals: [],
@@ -363,7 +777,7 @@
                 if (e instanceof NULAN.Error) {
                   error(oEditor, e.line, e.originalMessage)
                 } else {
-                  error(oEditor, start, "" + e)
+                  error(oEditor, end, "" + e)
                 }
 
                 //o.error = "" + e
