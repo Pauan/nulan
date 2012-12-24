@@ -99,7 +99,6 @@ var NULAN = (function (n) {
   n.stringBuffer = function (s) {
     var re = /([^\n]*)(?:\n|$)/g
     return {
-      position: 0,
       line: 1,
       column: 1,
       text: reMatch(re, s),
@@ -113,7 +112,6 @@ var NULAN = (function (n) {
           // TODO: a little bit hacky
           if (y === "") {
             ++this.column
-            ++this.position
             this.read = function () {
               return this.text[this.column - 1]
             }
@@ -121,11 +119,9 @@ var NULAN = (function (n) {
             this.text = y
             this.column = 1
             ++this.line
-            ++this.position
           }
         } else {
           ++this.column
-          ++this.position
         }
         return x
       },
@@ -341,7 +337,7 @@ var NULAN = (function (n) {
     "#": {
       delimiter: true,
       whitespace: true,
-      tokenize: function (c, o, push) {
+      tokenize: function (o) {
         o.read()
         if (o.peek() === "|") {
           tokenizeComment(o)
@@ -354,74 +350,25 @@ var NULAN = (function (n) {
       }
     },
 
+    "\"": { delimiter: true }
+/*
     // TODO: change it so tokenize receives a symbol rather than a string?
     "\"": {
       delimiter: true,
       endAt: "\"",
-      // TODO: enrich
-      tokenize: function (q, o, push) {
-        var a = []
-          , c
-        o.read()
-        push(enrich(new n.Symbol(q), o))
-        while (o.has() && o.peek() !== q) {
-          c = o.peek()
-          if (c === "\\") {
-            o.read()
-            c = o.read()
-            if (c === "r") {
-              a.push("\r")
-            } else if (c === "n") {
-              a.push("\n")
-            } else if (c === "t") {
-              a.push("\t")
-            } else if (c === "\"" || c === "@" || c === "\\") {
-              a.push(c)
-            } else {
-              // TODO: a little hacky
-              o.length = 2
-              o.column -= 2
-              throw new n.Error(o, "expected \\r \\n \\t \\\" \\@ \\\\ but got \\" + c)
-            }
-          // TODO
-          } else if (c === "@") {
-            o.read()
-            if (a.length) {
-              push(enrich(new n.Wrapper(a.join("")), o))
-            }
-            a = []
-            push(tokenizeNumOrSym(o))
-            // TODO: should either make "foobar@"testing"" work or throw an error
-            //tokenize(o, push, q) // TODO q
-            //"foo@((bar qux) corge)"
-          } else {
-            a.push(o.read())
-          }
-          /* else {
-            // TODO
-            s.length = 1
-            throw new n.Error(s, "missing ending \"")
-          }*/
-        }
-        o.read()
-        if (a.length) {
-          push(enrich(new n.Wrapper(a.join("")), o))
-        }
-        push(enrich(new n.Symbol(q), o))
-      },
       parse: function (l, s, r) {
                // TODO: s
         l.push([n.box("str")].concat(r[0]))
         return l.concat(r.slice(1))
       }
-    }
+    }*/
   }
 
   // TODO: add in whitespace, comments, and strings to "Customizable syntax.rst"
   n.syntaxRules[" "] = n.syntaxRules["\n"] = {
     delimiter: true,
     whitespace: true,
-    tokenize: function (c, o, push) {
+    tokenize: function (o) {
       o.read()
     }
   }
@@ -468,7 +415,6 @@ var NULAN = (function (n) {
     x.text = start.text
     x.line = start.line
     x.column = start.column
-    x.position = start.position
     x.length = (end
                  ? (end.line === start.line
                      ? end.column - start.column
@@ -480,8 +426,7 @@ var NULAN = (function (n) {
   function store(o) {
     return { text: o.text
            , line: o.line
-           , column: o.column
-           , position: o.position }
+           , column: o.column }
   }
 
   function isDelimiter(o) {
@@ -494,6 +439,56 @@ var NULAN = (function (n) {
   }
 
   var white
+
+  function tokenizeString(q, o) {
+    var a = []
+      , c
+    o.read()
+    //push(enrich(new n.Symbol(q), o))
+    while (o.has() && o.peek() !== q) {
+      c = o.peek()
+      if (c === "\\") {
+        o.read()
+        c = o.read()
+        if (c === "r") {
+          a.push("\r")
+        } else if (c === "n") {
+          a.push("\n")
+        } else if (c === "t") {
+          a.push("\t")
+        } else if (c === "\"" || c === "@" || c === "\\") {
+          a.push(c)
+        } else {
+          // TODO: a little hacky
+          o.length = 2
+          o.column -= 2
+          throw new n.Error(o, "expected \\r \\n \\t \\\" \\@ \\\\ but got \\" + c)
+        }
+      // TODO
+      /*} else if (c === "@") {
+        o.read()
+        if (a.length) {
+          push(enrich(new n.Wrapper(a.join("")), o))
+        }
+        a = []
+        push(tokenizeNumOrSym(o))*/
+
+        // TODO: should either make "foobar@"testing"" work or throw an error
+        //tokenize(o, push, q) // TODO q
+        //"foo@((bar qux) corge)"
+      } else {
+        a.push(o.read())
+      }
+      /* else {
+        // TODO
+        s.length = 1
+        throw new n.Error(s, "missing ending \"")
+      }*/
+    }
+    o.read()
+    return enrich(new n.Wrapper(a.join("")), o)
+    //push(enrich(new n.Symbol(q), o))
+  }
 
   function tokenizeNumOrSym(o) {
     var s = store(o)
@@ -517,62 +512,82 @@ var NULAN = (function (n) {
     }
   }
 
-  function tokenize(o, push, end) {
-    var c, s
-
+  function tokenize(o) {
     white = true
 
-    while (o.has()) {
-      c = o.peek()
-      /*} else if (c === "-") {
-        s = store(o)
-        o.read()
-        c = o.peek()
-        if (c === ">") {
-          o.read()
-          r.push(enrich(n.syntaxRules["->"], s, o))
-        } else if (c === " " || c === "\n") {
-          r.push(enrich(n.syntaxRules["-"], s, o))
-        } else if (c === "-") {
-          o.read()
-          // TODO: this should call tokenizeSym
-          r.push(enrich(n.syntaxRules.literal(new n.Symbol("--")), s, o)) // TODO a bit hacky
-        } else {
-          r.push(enrich(n.syntaxRules["u-"], s, o))
-        }*/
-      if (c === end) {
-        break
-      // TODO: multi-character tokenize and delimiter
-      } else if ((s = n.syntaxRules[c]) && s.tokenize) {
-        // TODO: should probably pass in store somehow
-        /*
-        s = store(o)
-        function (x) {
-          push(enrich(x, s, o))
-        }
-        */
-        s.tokenize(c, o, push)
+    var last
 
-        white = !!s.whitespace
-      } else if (s && s.delimiter) {
-        // TODO: some small code duplication with tokenizeNumOrSym
-        s = store(o)
-        o.read()
-        /*if (n.syntaxRules[c].endAt) {
-          // TODO
-          if (o.has() && n.syntaxRules[o.peek()].endAt) {
-            push(new n.Symbol(o.peek()))
-            push(new n.Symbol(o.read()))
+    function next() {
+      if (o.has()) {
+        var x, s, c = o.peek()
+        /*} else if (c === "-") {
+          s = store(o)
+          o.read()
+          c = o.peek()
+          if (c === ">") {
+            o.read()
+            r.push(enrich(n.syntaxRules["->"], s, o))
+          } else if (c === " " || c === "\n") {
+            r.push(enrich(n.syntaxRules["-"], s, o))
+          } else if (c === "-") {
+            o.read()
+            // TODO: this should call tokenizeSym
+            r.push(enrich(n.syntaxRules.literal(new n.Symbol("--")), s, o)) // TODO a bit hacky
+          } else {
+            r.push(enrich(n.syntaxRules["u-"], s, o))
+          }*/
+        /*if (c === end) {
+          break*/
+        // TODO: multi-character tokenize and delimiter
+        if ((x = n.syntaxRules[c]) && x.tokenize) {
+          // TODO: should probably pass in store somehow
+          /*
+          s = store(o)
+          function (x) {
+            push(enrich(x, s, o))
           }
-        }*/
-        s = enrich(new n.Symbol(c), s, o)
-        s.whitespace = white
-        push(s)
+          */
+          s = x.tokenize(o)
 
-                  // TODO
-        white = !!n.syntaxRules[c].whitespace
-      } else {
-        push(tokenizeNumOrSym(o))
+          white = !!x.whitespace
+          next()
+        } else if (c === "\"") {
+          last = tokenizeString(c, o)
+        } else if (x && x.delimiter) {
+          // TODO: some small code duplication with tokenizeNumOrSym
+          s = store(o)
+          o.read()
+          /*if (n.syntaxRules[c].endAt) {
+            // TODO
+            if (o.has() && n.syntaxRules[o.peek()].endAt) {
+              push(new n.Symbol(o.peek()))
+              push(new n.Symbol(o.read()))
+            }
+          }*/
+          s = enrich(new n.Symbol(c), s, o)
+          s.whitespace = white
+
+          white = !!x.whitespace
+          last = s
+        } else {
+          last = tokenizeNumOrSym(o)
+        }
+      }
+    }
+
+    next()
+
+    return {
+      peek: function () {
+        return last
+      },
+      read: function () {
+        var old = last
+        next()
+        return last
+      },
+      has: function () {
+        return o.has()
       }
     }
   }
@@ -716,42 +731,38 @@ var NULAN = (function (n) {
   }
 
   n.tokenizeRaw = function (o) {
-    var r = []
-    tokenize(o, function (x) {
-      r.push(x)
-    })
-    r.position = o.position // TODO: really hacky
-    return r
+    return tokenize(o)
   }
 
   n.tokenize = function (s) {
     return n.tokenizeRaw(n.stringBuffer(s))
   }
-
+/*
   function lastIter(o) {
-    var x = iter(o)
     return {
-      last: x.peek(),
-      peek: x.peek,
+      last: o.peek(),
+      peek: function () {
+        return o.peek()
+      },
       read: function () {
-        this.last = x.read()
+        if (o.has()) {
+          this.last = o.read()
+        }
         return this.last
       },
-      has: x.has
+      has: function () {
+        return o.has()
+      }
     }
-  }
+  }*/
 
-  // TODO: get rid of "position" property? probably, since I'm using CodeMirror rather than a textarea
   n.parseRaw = function (o, f) {
-    var a = lastIter(o)
-      , x
-    while (a.has()) {
-      x = a.peek()
-      f(unwrap(indent(a, a.peek())),
+    var x
+    while (o.has()) {
+      x = o.peek()
+      f(unwrap(indent(o, o.peek())),
         x.line,
-        a.last.line
-        //(a.has() ? a.peek().position - 1 : o.position)
-        )
+        o.peek().line)
     }
   }
 

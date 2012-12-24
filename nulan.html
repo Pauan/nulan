@@ -22,6 +22,8 @@
 
       body {
         overflow: hidden;
+        font-size: 12px;
+        background-color: #babdb6;
       }
 
       #table {
@@ -49,6 +51,7 @@
         position: absolute;
         top: 1px;
         left: 1px;
+        padding: 5px;
       }
 /*
       td:first-child {
@@ -495,6 +498,7 @@ if-var 10
         i.setAttribute("autofocus", "") // TODO
 */
         o.id = "output"
+        o.className = "cm-s-custom CodeMirror"
 
         function editor(x) {
           x = CodeMirror(x, {
@@ -623,7 +627,16 @@ if-var 10
             })))
           }
 
-          o.textContent = NUIT.serialize(r, { multiline: true })
+          o.textContent = r.map(function (x) {
+            var a = []
+            a.push("@" + x[0])
+            // TODO: ew
+            x.slice(1).forEach(function (x) {
+              a.push("  " + x.replace(/\n/g, "$&  "))
+            })
+            return a.join("\n")
+          }).join("\n\n")
+          // NUIT.serialize(r, { multiline: true })
         }
 
         function prettyParse(x) {
@@ -745,6 +758,7 @@ if-var 10
 
             sandbox = document.createElement("iframe")
             sandbox.id = "sandbox"
+            sandbox.className = "cm-s-custom CodeMirror"
             sandboxParent.appendChild(sandbox)
 
             var myEval = sandbox.contentWindow.eval
