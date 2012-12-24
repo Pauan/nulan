@@ -13,14 +13,14 @@ $mac cwd -> x                                                              \n\
                                                                            \n\
 $mac w/cwd! -> x body                                                      \n\
   w/uniq u                                                                 \n\
-    'w/var u = cwd;                                                        \n\
+    'w/box u = cwd;                                                        \n\
        | cwd x                                                             \n\
        | finally body                                                      \n\
            cwd u                                                           \n\
                                                                            \n\
 $mac load-file -> x                                                        \n\
   w/uniq vm fs                                                             \n\
-    'w/var vm = require \"vm\"                                             \n\
+    'w/box vm = require \"vm\"                                             \n\
            fs = require \"fs\"                                             \n\
        vm.runInNewContext (fs.readFileSync x \"utf8\") global              \n\
 ")

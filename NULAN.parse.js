@@ -300,7 +300,11 @@ var NULAN = (function (n) {
       order: "right",
       parse: function (l, s, r) {
         var args = r.slice(0, -1)
-        l.push([s, args, r[r.length - 1]])
+        if (r.length === 0) {
+          l.push([s, args, []])
+        } else {
+          l.push([s, args, r[r.length - 1]])
+        }
         return l
       }
     },

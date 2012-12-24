@@ -795,7 +795,7 @@ var NULAN = (function (n) {
   function destructure1(args, v, body) {
     if (complex(args)) {
       var u = new Uniq()
-      return [n.box("|"), [n.box("var"), [n.box("="), u, v]], destructure(args, u, body)]
+      return [n.box("|"), [n.box("box"), [n.box("="), u, v]], destructure(args, u, body)]
     } else {
       return destructure(args, v, body)
     }
@@ -806,7 +806,7 @@ var NULAN = (function (n) {
     if (wildcard(args)) {
       return body
     } else if (boxOrSym(args)) {
-      a = [n.box("var"), [n.box("="), args, v]]
+      a = [n.box("box"), [n.box("="), args, v]]
               // TODO better detection for if body is empty
       return (body
                ? [n.box("|"), a, body]
@@ -957,7 +957,7 @@ var NULAN = (function (n) {
     return ["==", mac(x), ["null"]]
   }))
 
-  // TODO: even though it's an ordinary macro, I can't move it into NULAN.macros because "var" depends upon it
+  // TODO: even though it's an ordinary macro, I can't move it into NULAN.macros because "box" depends upon it
   setValue("=", macro(function (x, y) {
     return mac([n.box("if"), [n.box("null?"), x], [n.box("<="), x, y]])
   }))
@@ -1033,7 +1033,7 @@ var NULAN = (function (n) {
   setValue("finally", macro(function (x, y) {
     return ["try", [mac(x)], ["finally", [mac(y)]]]
     /*var u = new Uniq()
-    return ["try", [mac([values["var"], [u, x]])], ["finally", [mac(y), mac(u)]]]*/
+    return ["try", [mac([values["box"], [u, x]])], ["finally", [mac(y), mac(u)]]]*/
   }))
 
 
@@ -1078,7 +1078,7 @@ var NULAN = (function (n) {
         }
         return [n.box("<="), [n.box("."), u, x], y]
       })
-      return mac([n.box("|"), [n.box("var"), [n.box("="), u, [n.box("dict")]]]].concat(a))
+      return mac([n.box("|"), [n.box("box"), [n.box("="), u, [n.box("dict")]]]].concat(a))
     }
   }))
 
@@ -1275,7 +1275,7 @@ var NULAN = (function (n) {
     }
   }))
 
-  setValue("var", macro(function () {
+  setValue("box", macro(function () {
     var args = [].slice.call(arguments)
 
     /*function before(x) {
@@ -1327,7 +1327,7 @@ var NULAN = (function (n) {
         // TODO: code duplication with destructure1
         if (complex(y)) {
           var u = new Uniq()
-          return mac([n.box("|"), [n.box("var"), [n.box("="), u, y]], destructure(x, u)])
+          return mac([n.box("|"), [n.box("box"), [n.box("="), u, y]], destructure(x, u)])
         } else {
           return mac(destructure(x, y))
         }
@@ -1347,7 +1347,7 @@ var NULAN = (function (n) {
     var args = [].slice.call(arguments, 0, -1)
       , body = arguments[arguments.length - 1]
 
-    return mac([n.box("w/new-scope"), [n.box("|"), [n.box("var")].concat(args), body]])
+    return mac([n.box("w/new-scope"), [n.box("|"), [n.box("box")].concat(args), body]])
   }))*/
 
 /*

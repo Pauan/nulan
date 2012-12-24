@@ -18,7 +18,7 @@ Features
 
 * A full-blown Lisp, which means programs are parsed as S-expressions, and there's a very heavy emphasis on "code is data is code"
 
-* `Pattern matching <nulan/blob/javascript/notes/Pattern%20matching.rst>`_ for variable binding
+* `Pattern matching <nulan/blob/javascript/notes/Pattern%20matching.rst>`_
 
 * `Hyper-static scope <nulan/blob/javascript/notes/Hyper-static%20scope.rst>`_ at both the global and function level
 
@@ -39,7 +39,7 @@ Examples
 ::
 
   # This is a dictionary
-  var foo = [ bar 5 qux 10 ]
+  box foo = [ bar 5 qux 10 ]
 
   # Key lookup
   foo.bar
@@ -51,7 +51,7 @@ Examples
 
   # This is a function
   def set -> a
-    | var x = foo[a]  # Lookup by expression
+    | box x = foo[a]  # Lookup by expression
     | foo[a] <= 50    # Assign by expression
     | x
 
@@ -71,7 +71,7 @@ Examples
            | body
            | incr
 
-  for (var i = 0) (i < 10) (++ i)
+  for (box i = 0) (i < 10) (++ i)
     prn i
 
 ::
@@ -83,7 +83,7 @@ Examples
        | if ~ test
            &break;
 
-  var i = 0
+  box i = 0
   do
     | prn i
     | ++ i
@@ -109,9 +109,9 @@ Examples
   $mac w/each -> {('=) x y} body
     w/uniq i len
       w/complex y
-        'w/var len = y.length
-           for (var i = 0) (i ~= len) (++ i)
-             w/var x = y[i]
+        'w/box len = y.length
+           for (box i = 0) (i ~= len) (++ i)
+             w/box x = y[i]
                body
 
   w/each x = {1 2 3}
@@ -125,9 +125,9 @@ Examples
   $mac w/each-rev -> {('=) x y} body
     w/uniq i
       w/complex y
-        'w/var i = y.length
+        'w/box i = y.length
            while i
-             w/var x = y[-- i]
+             w/box x = y[-- i]
                body
 
   w/each-rev x = {1 2 3}
@@ -152,12 +152,12 @@ Examples
 ::
 
   # An example of an unhygienic macro
-  # Just like in Arc, it binds the variable `it` to the test condition
+  # Just like in Arc, it binds the symbol `it` to the test condition
   $mac aif -> test @rest
-    w/var it = sym "it"
-      'w/var it = test
+    w/box it = sym "it"
+      'w/box it = test
          if it ,@:if rest.length >= 2
-                    w/var {x @rest} = rest
+                    w/box {x @rest} = rest
                       'x (aif ,@rest)
                     rest
 
@@ -183,7 +183,7 @@ Examples
 ::
 
   # Array comprehensions
-  var in
+  box in
 
   $mac for -> x {('in) n y}
     'y.map -> n x
@@ -199,9 +199,9 @@ Examples
 
   # A shell script that creates a simple HTTP server
   # Taken from http://nodejs.org/
-  var net = require "net"
+  box net = require "net"
 
-  var server = net.create-server -> o
+  box server = net.create-server -> o
                  | o.write "Echo server\r\n"
                  | o.pipe o
 
@@ -242,7 +242,7 @@ FAQ
 
     prn foo
 
-  **A:** Nulan has a *very* strict separation between compile-time and run-time: variables defined at compile-time **cannot** be used at run-time in any way, shape, or form. And vice versa: variables defined at run-time cannot be used at compile-time.
+  **A:** Nulan has a *very* strict separation between compile-time and run-time: things that exist at compile-time **cannot** be used at run-time in any way, shape, or form. And vice versa: things that exist at run-time cannot be used at compile-time.
 
   Certain macros like ``$mac`` are prefixed with ``$`` which indicates that they are evaluated at compile-time. To make the above example work, you have to evaluate the expression at compile-time by using ``$run``::
 
@@ -264,9 +264,9 @@ FAQ
 
     bar 10
 
-  **A:** Nulan wraps *every* variable in a box. The *value* of the variable ``foo`` is not available, but the *box* is.
+  **A:** Nulan replaces symbols with boxes. The *value* of the symbol ``foo`` is not available, but the *box* is.
 
-  The ``'`` macro returns boxes, which means that the ``bar`` macro returns the *box* for ``foo``, not the *value* for ``foo``. This is the **only** way that you can use run-time variables at compile-time.
+  The ``'`` macro returns boxes, which means that the ``bar`` macro returns the *box* for ``foo``, not the *value* for ``foo``. This is the **only** way that you can use run-time stuff at compile-time.
 
   However, this would not work...
 
@@ -275,7 +275,7 @@ FAQ
     $mac bar -> x
       foo x
 
-  ...because it's trying to use the *value* of the ``foo`` variable, which doesn't exist at compile-time.
+  ...because it's trying to use the *value* of the ``foo`` symbol, which doesn't exist at compile-time.
 
   In addition, if a *macro* is the first element of a list, it is evaluated at compile-time, which is why ``bar 10`` works. But ``prn bar 10`` would **not** work, because the macro ``bar`` isn't the first element of the list
 

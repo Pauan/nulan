@@ -20,6 +20,20 @@
         height: 100%;
       }
 
+      #buttons {
+        padding-bottom: 5px;
+        /*text-align: center;
+        padding-right: 10px;*/
+      }
+
+      button {
+        margin-left: 210px;
+        padding: 0px 5px;
+        /*float: right;
+        margin-right: 25px;*/
+        font-size: 10px;
+      }
+
       body {
         overflow: hidden;
         font-size: 12px;
@@ -448,7 +462,7 @@ if-var 10
           // /^([a-z]\-[a-z]|[a-zA-Z])+$/.test(r.join(""))
           if (/^[0-9]+$/.test(x)) {
             return "number"
-          } else if (forms) {
+          } else if (forms && forms.length) {
             var last = getLast(forms, state)
             if (last.syntaxRules[x]) {
               return "special"
@@ -513,7 +527,7 @@ if-var 10
                 state.string = true
                 return "string"
               } else {
-                if (forms) {
+                if (forms && forms.length) {
                   var rules = getLast(forms, state).syntaxRules
                   if (rules[c] && rules[c].delimiter) {
                     //stream.next()
@@ -554,8 +568,10 @@ if-var 10
           , sandboxParent
           , lines = []
 
+        var tutorial = document.getElementById("tutorial")
+
         if (!localStorage["saved"]) {
-          localStorage["saved"] = document.getElementById("tutorial").textContent
+          localStorage["saved"] = tutorial.textContent
         }
 /*
         i.id = "input"
@@ -577,6 +593,22 @@ if-var 10
             },
             mode: "nulan"
           })
+
+          var y = x.getWrapperElement()
+
+          var buttons = document.createElement("div")
+          buttons.id = "buttons"
+
+          var reset = document.createElement("button")
+          reset.textContent = "Reset Tutorial"
+
+          reset.addEventListener("click", function () {
+            x.setValue(tutorial.textContent)
+          })
+
+          buttons.appendChild(reset)
+
+          y.insertBefore(buttons, y.firstChild)
 
           var timer
 
