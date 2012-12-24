@@ -165,7 +165,7 @@ if (args._.length) {
         console.log()
       }
 
-      o.NULAN.parseRaw(x, function (x) {
+      o.NULAN.parseRaw(x, function (err, x) {
         if (o.NULAN.options.debug) {
           print(["parse", pretty(o.NULAN.toJSON(x))])
           //print(["parse"].concat(NULAN.toJSON(x).map(pretty)))

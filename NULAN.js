@@ -311,9 +311,10 @@ var NULAN = (function (n) {
 */
 
   ;(function () {
-    var boxes = {} // JS Variable -> Box
-    var local
+    // TODO: I no longer need to expose boxes, but I may want to do so anyways
+    n.boxes = {} // JS Variable -> Box
 
+    var local
 
     ;(function () {
       var reserved = {}
@@ -340,7 +341,8 @@ var NULAN = (function (n) {
 
       mangle = function (s) {
         // ((local || mode === "run") && )
-        if (reserved[s] || (local && mode === "compile" && (s === "boxes" || s === "values"))) {
+        // (s === "boxes" || s === "values")
+        if (reserved[s] || (local && mode === "compile" && s === "n")) {
           return "_" + s
         } else {
           return s.replace(to, function (s, s1, s2, s3) {
@@ -388,11 +390,11 @@ var NULAN = (function (n) {
     function findUniq(sOld) {
       var s = sOld
         , i = 2
-      while (boxes[s]) {
+      while (n.boxes[s]) {
         s = sOld + i
         ++i
       }
-      //boxes[s] = true
+      //n.boxes[s] = true
       return s
     }
 
@@ -401,8 +403,8 @@ var NULAN = (function (n) {
       while (true) {
         for (var a = "a".charCodeAt(0), b = "z".charCodeAt(0); a <= b; ++a) {
           s = new Array(i + 1).join(String.fromCharCode(a))
-          if (!boxes[s]) {
-            //boxes[s] = true
+          if (!n.boxes[s]) {
+            //n.boxes[s] = true
             return s
           }
         }
@@ -450,7 +452,7 @@ var NULAN = (function (n) {
       // TODO: code duplication with setSymToBox
       n.vars[sN] = x.value
 
-      boxes[x.value] = x
+      n.boxes[x.value] = x
       x.scope = "builtin"
       //x.local = local // TODO: local
       x.mode["compile"] = true
@@ -463,7 +465,7 @@ var NULAN = (function (n) {
       var x = new n.Box(s.value)
       n.vars[s.value] = x.value
 
-      boxes[x.value] = x
+      n.boxes[x.value] = x
       x.scope = local ? "local" : "global"
       x.mode[mode] = true
 
@@ -482,7 +484,7 @@ var NULAN = (function (n) {
       } else if (x instanceof n.Box) {
         x.value = findUniq(x.name)
       }
-      boxes[x.value] = x
+      n.boxes[x.value] = x
       x.scope = local ? "local" : "global"
       //x.local = local
       x.mode[mode] = true
@@ -495,7 +497,7 @@ var NULAN = (function (n) {
       } else if (x instanceof n.Symbol) {
         var y = n.vars[x.value]
         if (y) {
-          return boxes[y]
+          return n.boxes[y]
         } else if (!b) {
           throw new n.Error(x, "undefined variable: " + x)
         }
@@ -512,7 +514,7 @@ var NULAN = (function (n) {
         })
       })*/
       // TODO does this need to call mangle?
-      return boxes[mangle(s)]
+      return n.boxes[mangle(s)]
     }
 /*
     function withGlobalScope(f) {
@@ -527,14 +529,14 @@ var NULAN = (function (n) {
     }*/
 
     withLocalScope = function (f) {
-      var old  = boxes
+      var old  = n.boxes
         , old2 = local
-      boxes = Object.create(boxes)
+      n.boxes = Object.create(n.boxes)
       local = true
       try {
         var x = f()
       } finally {
-        boxes = old
+        n.boxes = old
         local = old2
       }
       return x
@@ -542,27 +544,27 @@ var NULAN = (function (n) {
 
 
     ;(function () {
-      var values = {} // JS Variable -> compile time value
+      n.values = {} // JS Variable -> compile time value
 
       n.withNewContext = function () {
         var old  = n.vars
-          , old2 = boxes
-          , old3 = values
+          , old2 = n.boxes
+          , old3 = n.values
           , old4 = n.syntaxRules
         n.vars        = Object.create(n.vars)
-        boxes         = Object.create(boxes)
-        values        = Object.create(values)
+        n.boxes       = Object.create(n.boxes)
+        n.values      = Object.create(n.values)
         n.syntaxRules = Object.create(n.syntaxRules)
         return function () {
           n.vars        = old
-          boxes         = old2
-          values        = old3
+          n.boxes       = old2
+          n.values      = old3
           n.syntaxRules = old4
         }
       }
 
       n.isMacro = function (x, b) {
-        if ((x = getBox(x, b)) && (x = values[x.value]) instanceof Macro) {
+        if ((x = getBox(x, b)) && (x = n.values[x.value]) instanceof Macro) {
           return x.value
         }
       }
@@ -572,9 +574,10 @@ var NULAN = (function (n) {
         //b.mode = "compile" // TODO: a teensy bit hacky
         //b.uniqize() // TODO: does this need to uniqize?
         //n.vars[x] = b
-        values[x.value] = y
+        n.values[x.value] = y
       }
 
+      // TODO: this is no longer true, maybe move compileEval out of here?
       // This needs to be in here because `eval` needs access to `values` and `boxes`
       compileEval = function (x) {
         if (mode === "compile") {
@@ -687,9 +690,9 @@ var NULAN = (function (n) {
       if (a.scope === "local" || mode === "run" || (mode !== "quote" && a.scope === "builtin")) {
         return ["name", x]
       } else if (mode === "compile") {
-        return [".", ["name", "values"], x]
+        return [".", [".", ["name", "n"], "values"], x]
       } else if (mode === "quote") {
-        return [".", ["name", "boxes"], x]
+        return [".", [".", ["name", "n"], "boxes"], x]
         //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
         //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
         //return mac([box("&box"), x])
@@ -1311,7 +1314,7 @@ var NULAN = (function (n) {
           if (y === void 0) {
             return ["empty"] // TODO
           } else {
-            return ["=", [".", ["name", "values"], x.value], y]
+            return ["=", [".", [".", ["name", "n"], "values"], x.value], y]
           }
         } else {
           if (y === void 0) {
@@ -1691,7 +1694,8 @@ function infix(i, b, f) {
 
   n.eval = function (s, f) {
     var r = []
-    n.parse(s, function (x) {
+    n.parse(s, function (err, x) {
+      if (err) throw err
       r.push(n.compile(x))
     })
     //r = r.join(";\n")

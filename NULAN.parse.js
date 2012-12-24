@@ -42,11 +42,11 @@ var NULAN = (function (n) {
                         new Array(o.length + 1).join("^"))
         }
       }
+      this.text = o.text
+      this.line = o.line
+      this.column = o.column
+      this.length = o.length
     }
-    this.text = o.text
-    this.line = o.line
-    this.column = o.column
-    this.length = o.length
     this.originalMessage = s
     this.message = a.join("")
   }
@@ -441,52 +441,56 @@ var NULAN = (function (n) {
   var white
 
   function tokenizeString(q, o) {
-    var a = []
+    var s = store(o)
+      , a = []
       , c
     o.read()
     //push(enrich(new n.Symbol(q), o))
-    while (o.has() && o.peek() !== q) {
-      c = o.peek()
-      if (c === "\\") {
-        o.read()
-        c = o.read()
-        if (c === "r") {
-          a.push("\r")
-        } else if (c === "n") {
-          a.push("\n")
-        } else if (c === "t") {
-          a.push("\t")
-        } else if (c === "\"" || c === "@" || c === "\\") {
-          a.push(c)
-        } else {
-          // TODO: a little hacky
-          o.length = 2
-          o.column -= 2
-          throw new n.Error(o, "expected \\r \\n \\t \\\" \\@ \\\\ but got \\" + c)
-        }
-      // TODO
-      /*} else if (c === "@") {
-        o.read()
-        if (a.length) {
-          push(enrich(new n.Wrapper(a.join("")), o))
-        }
-        a = []
-        push(tokenizeNumOrSym(o))*/
+    while (true) {
+      if (o.has()) {
+        c = o.peek()
+        if (c === q) {
+          break
+        } else if (c === "\\") {
+          o.read()
+          c = o.read()
+          if (c === "r") {
+            a.push("\r")
+          } else if (c === "n") {
+            a.push("\n")
+          } else if (c === "t") {
+            a.push("\t")
+          } else if (c === "\"" || c === "@" || c === "\\") {
+            a.push(c)
+          } else {
+            // TODO: a little hacky
+            o.length = 2
+            o.column -= 2
+            throw new n.Error(o, "expected \\r \\n \\t \\\" \\@ \\\\ but got \\" + c)
+          }
+        // TODO
+        /*} else if (c === "@") {
+          o.read()
+          if (a.length) {
+            push(enrich(new n.Wrapper(a.join("")), o))
+          }
+          a = []
+          push(tokenizeNumOrSym(o))*/
 
-        // TODO: should either make "foobar@"testing"" work or throw an error
-        //tokenize(o, push, q) // TODO q
-        //"foo@((bar qux) corge)"
+          // TODO: should either make "foobar@"testing"" work or throw an error
+          //tokenize(o, push, q) // TODO q
+          //"foo@((bar qux) corge)"
+        } else {
+          a.push(o.read())
+        }
       } else {
-        a.push(o.read())
-      }
-      /* else {
         // TODO
         s.length = 1
         throw new n.Error(s, "missing ending \"")
-      }*/
+      }
     }
     o.read()
-    return enrich(new n.Wrapper(a.join("")), o)
+    return enrich(new n.Wrapper(a.join("")), s, o)
     //push(enrich(new n.Symbol(q), o))
   }
 
@@ -494,13 +498,16 @@ var NULAN = (function (n) {
     var s = store(o)
       , r = []
       , b
-    while (o.has() && /\d/.test(o.peek())) {
+    while (o.has() && /^[0-9]$/.test(o.peek())) {
       r.push(o.read())
     }
     if (isDelimiter(o)) {
-      return enrich(new n.Wrapper(+r.join("")), s, o)
+      r = enrich(new n.Wrapper(+r.join("")), s, o)
+      r.whitespace = white
+      white = false
+      return r
     } else {
-      while (o.has() && !isDelimiter(o)) {
+      while (!isDelimiter(o)) {
         r.push(o.read())
       }
       r = r.join("")
@@ -575,16 +582,27 @@ var NULAN = (function (n) {
       }
     }
 
-    next()
-
     return {
+      location: function () {
+        return o
+      },
       peek: function () {
-        return last
+        if (last) {
+          return last
+        } else {
+          next()
+          return last
+        }
       },
       read: function () {
-        var old = last
-        next()
-        return last
+        if (last) {
+          var old = last
+          next()
+          return old
+        } else {
+          next()
+          return last
+        }
       },
       has: function () {
         return o.has()
@@ -700,8 +718,11 @@ var NULAN = (function (n) {
       , y
       , b
       , r
+      //, z
     while (o.has()) {
       y = o.peek()
+      //z = o.location()
+      //console.log("indent", y.line, z.line, y.column, z.column)
       if (y.line === x.line) {
         b = isSeparator(y)
         if (isVertical(y)) {
@@ -737,32 +758,39 @@ var NULAN = (function (n) {
   n.tokenize = function (s) {
     return n.tokenizeRaw(n.stringBuffer(s))
   }
-/*
+
   function lastIter(o) {
     return {
       last: o.peek(),
+      location: function () {
+        return o.location()
+      },
       peek: function () {
         return o.peek()
       },
       read: function () {
-        if (o.has()) {
-          this.last = o.read()
-        }
-        return this.last
+        return (this.last = o.read())
       },
       has: function () {
         return o.has()
       }
     }
-  }*/
+  }
 
   n.parseRaw = function (o, f) {
     var x
+    try {
+      o = lastIter(o)
+    } catch (e) {
+      f(e, null, null, null)
+    }
     while (o.has()) {
       x = o.peek()
-      f(unwrap(indent(o, o.peek())),
-        x.line,
-        o.peek().line)
+      try {
+        f(null, unwrap(indent(o, o.peek())), x.line, o.last.line)
+      } catch (e) {
+        f(e, null, x.line, o.last.line)
+      }
     }
   }
 

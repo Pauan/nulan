@@ -20,7 +20,7 @@ var util = require("util")
 function foo(a) {
   a.forEach(function (x) {
     try {
-      NULAN.parse(x + (Math.random() < 0.5 ? "\n" : ""), function (x) {
+      NULAN.parse(x + (Math.random() < 0.5 ? "\n" : ""), function (err, x) {
         console.log(util.inspect(NULAN.toJSON(x), false, null, true))
       })
     } catch (e) {

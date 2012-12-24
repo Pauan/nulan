@@ -34,14 +34,14 @@ $run                                                                       \n\
     console.log u args                                                     \n\
                                                                            \n\
 $run                                                                       \n\
-  var $mac = make-macro -> {_ boxes f}                                     \n\
+  var $mac = make-macro -> {_ n f}                                         \n\
                w/var u    = make-uniq;                                     \n\
                      args = make-uniq;                                     \n\
                  &compile '$run                                            \n\
-                             | var boxes                                   \n\
-                             | boxes <= w/var u = f                        \n\
-                                          make-macro -> {_ @args}          \n\
-                                            &compile (u @args)             \n\
+                             | var n                                       \n\
+                             | n <= w/var u = f                            \n\
+                                      make-macro -> {_ @args}              \n\
+                                        &compile (u @args)                 \n\
 |#                                                                         \n\
                                                                            \n\
 ###  Macro utilities                                                       \n\
