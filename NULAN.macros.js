@@ -215,7 +215,11 @@ $mac $syntax-helper -> n f                                                 \n\
                                                                            \n\
 $run                                                                       \n\
   | def syntax-infix -> {@l x} s {y @r}                                    \n\
-      ',@l (s x y) ,@r                                                     \n\
+      if: null? x                                                          \n\
+        ',@l (s y) ,@r                                                     \n\
+        if: null? y                                                        \n\
+          &error s \"missing expression on the right side of @s\"          \n\
+          ',@l (s x y) ,@r                                                 \n\
   | $syntax-helper $syntax-infix syntax-infix                              \n\
                                                                            \n\
 $run                                                                       \n\

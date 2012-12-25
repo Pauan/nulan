@@ -195,7 +195,7 @@ var NULAN = (function (n) {
     },
 
     "[": {
-      priority: 110,
+      priority: 100, // TODO: 110
       delimiter: true,
       endAt: "]",
       parse: function (l, s, r) {

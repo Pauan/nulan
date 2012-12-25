@@ -499,7 +499,7 @@ var NULAN = (function (n) {
         if (y) {
           return n.boxes[y]
         } else if (!b) {
-          throw new n.Error(x, "undefined variable: " + x)
+          throw new n.Error(x, "undefined symbol: " + x)
         }
       }
     }
@@ -650,7 +650,7 @@ var NULAN = (function (n) {
       return y
     } else {
       y = formatMode(Object.keys(y.mode))
-      throw new n.Error(x, "undefined variable (but it exists at " + y + " time): " + x)
+      throw new n.Error(x, "undefined symbol (but it exists at " + y + " time): " + x)
     }
   }
 
@@ -757,6 +757,7 @@ var NULAN = (function (n) {
                                  a.length - i]],
                                x)
       } else {
+        console.log(y)
         return destructure1(y, [n.box("."), v, i], x)
       }
     }, body)
@@ -1187,7 +1188,6 @@ var NULAN = (function (n) {
     return loop(a[1])
   }))
 
-  // TODO: name collision with the macro which imports only specific variables
   setValue("external", macro(function () {
     [].forEach.call(arguments, function (x) {
       setSymExternal(x)
