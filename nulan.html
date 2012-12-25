@@ -206,7 +206,7 @@
 
 box foo = 2
 
-#  What we've done here is taken the number `1` and placed it
+#  What we've done here is taken the number `2` and placed it
 #  inside a box. We then took that box and assigned it to the
 #  symbol `foo`. We can then unbox it by simply using the symbol
 #  `foo`:
@@ -224,13 +224,13 @@ foo
 foo + 2
 
 #  But boxes aren't just a shorthand for referring to values.
-#  Right now, the `foo` box contains the number `1`. But we can
+#  Right now, the `foo` box contains the number `2`. But we can
 #  put a different number into the box:
 
 foo <= 5
 
 #  Now the box `foo` contains the number `5` rather than the
-#  number `1`. It is like as if we unboxed it, took the number
+#  number `2`. It is like as if we unboxed it, took the number
 #  out, put a new number in, and then reboxed it again.
 #  But even though the stuff inside the box changed, the box
 #  itself is the same. This will be important later on.
@@ -978,7 +978,7 @@ div
                              } else {
                                return pretty(x)
                              }
-                           }).join(", ")
+                           }).join(" ")
                          }) + "}"
           /*} else if (x instanceof Object && typeof x !== "function") {
             return "{\n" + withIndent(function () {
