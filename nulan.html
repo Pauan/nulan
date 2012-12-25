@@ -229,7 +229,7 @@ foo + 2
 
 foo <= 5
 
-#  Now the box `foo` contains the number `5` rather than the
+#  Now the `foo` box contains the number `5` rather than the
 #  number `2`. It is like as if we unboxed it, took the number
 #  out, put a new number in, and then reboxed it again.
 #  But even though the stuff inside the box changed, the box
@@ -260,30 +260,30 @@ foo <= 5
 #  treat it as a function that accepts two arguments and always
 #  returns `5`.
 
-#  Let's write a function that takes any number and adds `5` to
+#  Let's write a function that takes any number and adds `10` to
 #  it:
 
--> a (a + 5)
+-> a (a + 10)
 
 #  And now let's call it:
 
-(-> a (a + 5)) 5
+(-> a (a + 10)) 5
 
-#  Nulan replaced `a` with `5`, and then returned `(5 + 5)`.
+#  Nulan replaced `a` with `5`, and then returned `(5 + 10)`.
 
 #  This probably doesn't seem very useful. Let's make it more
 #  useful by taking the function and placing it into a box:
 
-box add = -> a (a + 5)
+box add = -> a (a + 10)
 
-#  We created a function using `-> a (a + 5)` and then used
+#  We created a function using `-> a (a + 10)` and then used
 #  `box` to assign it to the `add` symbol.
 
 #  This is common enough that Nulan has a special `def` symbol
 #  which is almost exactly like `box`, except that it works
 #  better for functions:
 
-def add -> a (a + 5)
+def add -> a (a + 10)
 
 #  Now let's call it:
 
@@ -323,8 +323,9 @@ add 1 2 3
 1 + 2 * 5 / 10
 
 #  The only difference between them is that the first uses `3`,
-#  the second uses `4`, and the third uses `5`. We can't use
-#  boxes to help with the duplication. Functions to the rescue!
+#  the second uses `4`, and the third uses `5`. Using boxes
+#  won't help with the code duplication. Functions to the
+#  rescue!
 
 def foo -> a
   1 + 2 * a / 10
@@ -358,7 +359,7 @@ w/box temp = 10
 
 #  The `if` symbol checks if its first argument is true. If it
 #  is, then it will evaluate the second argument. Otherwise
-#  it'll evaluate the third argument.
+#  it will evaluate the third argument.
 
 #  This pattern of creating a temporary box and using `if` is
 #  quite common. Let's try using a function to get rid of the
@@ -391,7 +392,7 @@ if-box 10 -> x (x + 2)
 
 #  This works, but it's a bit verbose. Let's use a macro to
 #  remove the verbosity! You've already seen a bunch of macros,
-#  but you didn't realize it: `+ - * / box <= -> def w/box if`
+#  but you didn't realize it: `+ - * / box = <= -> def w/box if`
 #  are all macros.
 
 #  What is a macro? Well, a function has arguments, which are
@@ -404,10 +405,10 @@ if-box 10 -> x (x + 2)
 
 $mac if-box ->
 
-#  The above took the empty function `->`, converted it into a
-#  macro, and then assigned it to the symbol `if-box`. But this
-#  macro doesn't do anything yet. Let's start by copying in our
-#  original program:
+#  The above expression took the empty function `->`, converted
+#  it into a macro, and then assigned it to the symbol `if-box`.
+#  But this macro doesn't do anything yet. Let's start by
+#  copying in our original program:
 
 $mac if-box ->
   w/box temp = 5
@@ -415,19 +416,18 @@ $mac if-box ->
       temp + 1
 
 #  We can't use this macro just yet, though. Remember when I
-#  said that macros accept code and return code? Well, right now
-#  the macro is returning a value, not code. The way that Nulan
-#  distinguishes between code and values is by using the `'`
-#  macro:
+#  said that macros are given code and return code? Well, right
+#  now the macro is returning a value, not code. If we use the
+#  `'` macro, we tell Nulan to treat it as code rather than a
+#  value:
 
 $mac if-box ->
   'w/box temp = 5
      if temp
        temp + 1
 
-#  By using the `'` macro, we're telling Nulan to treat it as
-#  code, rather than a value. But oops, Nulan is saying that the
-#  symbol `temp` is undefined. What's the problem?!
+#  Oops, Nulan is saying that the symbol `temp` is undefined.
+#  What happened?!
 
 #  Well, do you remember when I said earlier that you can change
 #  the value of a box without changing the box itself? The `'`
@@ -554,7 +554,8 @@ div
 #  If you look in the upper-right panel, you should see two
 #  boxes. If you click on them, they'll tell you what color they
 #  are. Both of the boxes were generated with the above code.
-#  If you change the code, it'll change the boxes. Try it out!</pre>
+#  If you change the code, it'll change the boxes. Try it out!
+</pre>
 
     <script>
       CodeMirror.defineMode("nulan", function (config, parserConfig) {
