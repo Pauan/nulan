@@ -30,13 +30,13 @@ var o = (function () {
 
 load("./NULAN.parse.js", o)
 
-load("./lib/NINO.compile.js", o)
-load("./lib/NINO.transform.js", o)
-load("./lib/NINO.partial.js", o)
+load("./lib/nino/compile.js", o)
+load("./lib/nino/transform.js", o)
+load("./lib/nino/partial.js", o)
 
 load("./NULAN.js", o)
 
-load("./lib/NUIT.serialize.js", o)
+load("./lib/nuit/serialize.js", o)
 /*
 NULAN.readFile = function (s) {
   return fs.readFileSync(s, "utf8")

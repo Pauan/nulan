@@ -1,0 +1,6 @@
+[submodule "lib/nuit"]
+	path = lib/nuit
+	url = git://github.com/Pauan/nuit.git
+[submodule "lib/nino"]
+	path = lib/nino
+	url = git://github.com/Pauan/nino.git

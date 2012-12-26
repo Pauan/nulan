@@ -12,7 +12,7 @@ function load(path, context) {
 load("./NULAN.parse.js")
 load("./NULAN.js")
 
-load("./lib/NUIT.parse.js")
+load("./lib/nuit/parse.js")
 
 
 var util = require("util")
