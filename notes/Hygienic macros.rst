@@ -14,11 +14,11 @@ I'm not a fan of text-book definitions, so instead I'll give an example to demon
     `(let x 10
        (+ x ,y)))
 
-  (add10 20)
+The symbol ``mac`` creates a new macro, ``let`` creates a new local variable, and ``+`` adds things together.
 
-The above creates a macro ``add10`` that adds ``10`` to its argument.
+The above creates a macro ``add10`` that accepts a single argument and adds ``10`` to it.
 
-We then call the macro, which will be expanded to ``(let x 10 (+ x 20))``.  This works just fine and returns ``30``
+Now, when the compiler sees ``(add10 20)`` it will replace it with ``(let x 10 (+ x 20))``. This works just fine and returns ``30``.
 
 But now consider this::
 
@@ -31,7 +31,7 @@ The above will not return ``60`` as you might have expected, but instead returns
     (let x 10
       (+ x x)))
 
-This unexpected behavior, which is called a "hygiene violation" can be solved through the use of a unique variable that is guaranteed to not conflict with any other variable. Using a unique variable, the macro ``add10`` can be rewritten to this::
+This unexpected behavior, which is called a "hygiene violation" can be solved through the use of a unique variable that is guaranteed to not conflict with any other variable. Using ``w/uniq``, the macro ``add10`` can be rewritten to this::
 
   (mac add10 (y)
     (w/uniq x
@@ -53,7 +53,7 @@ In this case, we're using ``let`` to change the definition of ``+``, which certa
 
 The Scheme macro system uses syntax objects and all kinds of buffoonery to fix these hygiene problems, but the end result is a system that is **very** complicated.
 
-This problem of correctness vs simplicity is at the core of the Scheme vs Common Lisp debate. However, after understanding the problem better, it is possible to design a system that is even simpler than Common Lisp macros, yet has the same correctness as Scheme macros.
+This problem of correctness vs simplicity is at the core of the Scheme vs Common Lisp debate. However, after understanding the problem better, it is possible to design a system that is arguably simpler than Common Lisp macros, yet has the same correctness as Scheme macros.
 
 But first, I would like to point out that this problem of "hygiene" is not specific to Lisp macros. In particular, the same exact thing happens with functions in languages that use dynamic scope. As explained in `hyper-static scope <Hyper-static%20scope.rst>`_, the definition of dynamic vs lexical can be summed up like this:
 
@@ -67,7 +67,7 @@ So "lack of hygiene" really just means "dynamic scope" and "hygienic macros" rea
 
 Now that we understand the problem that we're trying to solve, how do we actually solve it? Scheme does so with syntax objects that keep track of the lexical information, but we don't want such a complicated system.
 
-Macros are really just functions that accept an S-expression and return an S-expression. And functions are lexically scoped. So why can't we use the lexical scope of functions to make macros lexically scoped?
+Macros are really just functions that accept code and return code. And functions are lexically scoped. So why can't we use the lexical scope of functions to make macros lexically scoped?
 
 The problem is that macros are written using ``quote``, which returns an unevaluated expression. In particular, in the expression ```(let x 5 x)``, the symbols ``let`` and ``x`` are not evaluated. The macro is then expanded, and the symbols are evaluated in the environment where the macro is called.
 
@@ -77,7 +77,7 @@ So, why don't we just use ``,`` to evaluate everything in the environment where 
 
   Simply changing Scheme to allow access to macro values shouldn't be very difficult, but the whole point of this system is to create macros that are simpler than Scheme's macros, so you might as well overhaul the entire system while you're at it. But a lot of people are heavily invested in the existing Scheme macro system and do not like change. That social hurdle would need to be overcome.
 
-  Of course, that doesn't apply to new languages, which aren't held back by old baggage.
+  Of course, that doesn't apply to new languages (like Nulan), which aren't held back by old baggage.
 
   Arc, thankfully, doesn't have this problem, but the compiler *assumes* that macros are always symbols and barfs if given a macro value. However, it's only a couple lines to change the Arc compiler so it accepts macros as values.
 
@@ -106,18 +106,18 @@ So, why don't we just use ``,`` to evaluate everything in the environment where 
 
 Nulan implements all of the above changes, except:
 
-- There is no ````` operator, only ``'``, and ``'`` evaluates symbols::
+- There is no ````` macro, only ``'``, and ``'`` expands to boxes rather than symbols::
 
-    '(foo bar qux) -> (list foo bar qux)
+    'foo bar qux -> (list (box "foo") (box "bar") (box "qux"))
 
-- The ``'`` operator supports ``,`` just like ````` in other Lisps::
+- The ``'`` macro supports ``,`` just like ````` in other Lisps::
 
-    '(foo (bar) qux)  -> (list foo (list bar) qux)
-    '(foo ,(bar) qux) -> (list foo (bar) qux)
+    'foo (bar 1) qux  -> (list foo (list bar 1) qux)
+    'foo ,(bar 1) qux -> (list foo (bar 1) qux)
 
 - If you want to write an "unhygienic macro", you need to use the ``sym`` function, which converts a string to a symbol::
 
-    '(let ,(sym "x") 5 ,(sym "x"))
+    'w/box ,(sym "x") 5 ,(sym "x")
 
-    (let x (sym "x")
-      '(let x 5 x))
+    w/box x (sym "x")
+      'w/box x 5 x
