@@ -1,3 +1,11 @@
+How to install
+==============
+
+::
+
+  git clone --recursive https://github.com/Pauan/nulan.git nulan
+
+
 How to run
 ==========
 
