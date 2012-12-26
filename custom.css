@@ -1,0 +1,33 @@
+@charset "UTF-8";
+/* This is a custom CSS Theme for CodeMirror */
+
+.cm-s-custom.CodeMirror {
+  background: #0c1214;
+  color: #eeeeec;
+}
+.cm-s-custom .CodeMirror-selected {
+  background: #2e3436 !important;
+}
+.cm-s-custom .CodeMirror-focused .CodeMirror-selected {
+  background: #555753 !important;
+}
+.cm-s-custom .CodeMirror-gutters {
+  background: black;
+  border-right: 1px solid #1A1A1A;
+}
+.cm-s-custom .CodeMirror-linenumber {
+  color: #555753;
+}
+.cm-s-custom .CodeMirror-cursor {
+  border-left: 1px solid #d3d7cf !important;
+}
+
+.cm-s-custom span.cm-keyword  { color: #73d216; } /* macros */
+.cm-s-custom span.cm-builtin  { color: #fcaf3e; } /* functions */
+.cm-s-custom span.cm-variable { color: #75ace4; } /* locals */
+
+.cm-s-custom span.cm-special  { color: #d3d7cf; }
+.cm-s-custom span.cm-comment  { color: #888a85; }
+.cm-s-custom span.cm-string   { color: #f57900; }
+.cm-s-custom span.cm-number,
+.cm-s-custom span.cm-atom     { color: #ef2929; }
