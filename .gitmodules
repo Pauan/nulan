@@ -4,3 +4,6 @@
 [submodule "lib/nino"]
 	path = lib/nino
 	url = git://github.com/Pauan/nino.git
+[submodule "lib/codemirror"]
+	path = lib/codemirror
+	url = git://github.com/marijnh/CodeMirror.git
