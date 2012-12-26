@@ -1,3 +1,9 @@
-[submodule "nulan"]
-	path = nulan
-	url = git://github.com/Pauan/nulan.git
+[submodule "lib/codemirror"]
+	path = lib/codemirror
+	url = git://github.com/marijnh/CodeMirror.git
+[submodule "lib/nino"]
+	path = lib/nino
+	url = git://github.com/Pauan/nino.git
+[submodule "lib/nuit"]
+	path = lib/nuit
+	url = git://github.com/Pauan/nuit.git
