@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html>
+<body>
+<pre hidden id="default">
+#  Hi! Welcome to the Nulan tutorial. After reading this, you
+#  should have a very basic idea of how to write Nulan programs.
+
+#  To start with, all Nulan programs are composed of zero or
+#  more expressions. Every expression must have a value. The
+#  process of taking an expression and returning a value is
+#  called "evaluation".
+
+#  The simplest expressions are literals, which evaluate to
+#  themself:
+
+5
+
+#  Try clicking on the above expression `5`. In the lower-right
+#  panel, you can see that it evaluates to the number `5`.
+
+#  Another type of literal is a string:
+
+"I'm a string"
+
+#  Strings start with ", contain zero or more characters, and
+#  end with ". They're used for storing text.
+
+#  Let's try something more complicated:
+
+5 + 10
+
+#  If you click on the above expression, you'll see it evaluates
+#  to the number `15`. That expression is composed of three
+#  parts: the number `5`, the symbol `+`, and the number `10`.
+
+#  Now, something I haven't told you yet is that all these
+#  examples are fully interactive. To try it out, go ahead and
+#  change the expression `5 + 10` to anything you like, and the
+#  lower-right panel will automatically update with the answer.
+
+#  Any changes you make are automatically saved, so you can
+#  close this tab and reopen it later.
+
+#  If at any time you want to undo the changes you've made,
+#  click the "Reset Tutorial" button at the top of the screen.
+#  Be careful, it will wipe out your changes, and you can't get
+#  them back.
+
+#  Nulan also supports some more math stuff with the usual
+#  priority:
+
+1 + 2 * 3 / 4 - 5
+
+#  And you can use parentheses to change the priority of any
+#  expression:
+
+(1 + 2) * 3 / (4 - 5)
+
+#  Let's talk about boxes. A box is something that can hold a
+#  single value. It can then be unboxed later. To create a box,
+#  you use the `box` symbol:
+
+box foo = 2
+
+#  What we've done here is taken the number `2` and placed it
+#  inside a box. We then took that box and assigned it to the
+#  symbol `foo`. We can then unbox it by simply using the symbol
+#  `foo`:
+
+foo
+
+#  You might have noticed that the `box` expression evaluated to
+#  `()`. Every expression needs to return a value, but some
+#  expressions don't have anything meaningful to return, so they
+#  return `()` instead.
+
+#  Because everything in Nulan is an expression, symbols can
+#  be used as part of a bigger expression:
+
+foo + 2
+
+#  But boxes aren't just a shorthand for referring to values.
+#  Right now, the `foo` box contains the number `2`. But we can
+#  put a different number into the box:
+
+foo <= 5
+
+#  Now the `foo` box contains the number `5` rather than the
+#  number `2`. It is like as if we unboxed it, took the number
+#  out, put a new number in, and then reboxed it again.
+#  But even though the stuff inside the box changed, the box
+#  itself is the same. This will be important later on.
+
+#  Let's talk about functions. Functions are extremely common in
+#  Nulan, so it's important to understand them. A function is a
+#  value that can be called with multiple expressions as
+#  arguments and then returns an expression.
+
+#  It's okay if you didn't understand anything I just said. I'll
+#  take it slow and use lots of examples. First, to create a
+#  function, you use the `->` symbol:
+
+-> a a
+
+#  The above expression returns a function which accepts a
+#  single argument called `a`. It then returns `a`. Let's try
+#  calling the function:
+
+(-> a a) 5
+
+#  One way of thinking about this is to imagine that Nulan
+#  replaced the symbol `a` inside the function with the number
+#  `5`, then returned `5`.
+
+#  The parentheses are needed because without them, Nulan would
+#  treat it as a function that accepts two arguments and always
+#  returns `5`.
+
+#  Let's write a function that takes any number and adds `10` to
+#  it:
+
+-> a (a + 10)
+
+#  And now let's call it:
+
+(-> a (a + 10)) 5
+
+#  Nulan replaced `a` with `5`, and then returned `(5 + 10)`.
+
+#  This probably doesn't seem very useful. Let's make it more
+#  useful by taking the function and placing it into a box:
+
+box add = -> a (a + 10)
+
+#  We created a function using `-> a (a + 10)` and then used
+#  `box` to assign it to the `add` symbol.
+
+#  This is common enough that Nulan has a special `def` symbol
+#  which is almost exactly like `box`, except that it works
+#  better for functions:
+
+def add -> a (a + 10)
+
+#  Now let's call it:
+
+add 5
+
+add 10
+
+add 15
+
+#  Notice that we called it three times, with a different
+#  argument each time. In the first call, `a` was replaced with
+#  `5`, in the second it was replaced with `10`, and in the
+#  third it was replaced with `15`.
+
+#  Let's make a function that accepts three arguments and adds
+#  them together:
+
+def add -> a b c
+  a + b + c
+
+#  Now let's call it:
+
+add 1 2 3
+
+#  Nulan replaced `a` with `1`, `b` with `2`, and `c` with `3`,
+#  then returned `1 + 2 + 3`.
+
+#  That was a simple example, but functions can become quite
+#  complex. The reason why functions are so useful is that they
+#  let you easily evaluate an expression multiple times.
+#  Consider these three expressions:
+
+1 + 2 * 3 / 10
+
+1 + 2 * 4 / 10
+
+1 + 2 * 5 / 10
+
+#  The only difference between them is that the first uses `3`,
+#  the second uses `4`, and the third uses `5`. Using boxes
+#  won't help with the code duplication. Functions to the
+#  rescue!
+
+def foo -> a
+  1 + 2 * a / 10
+
+foo 3
+
+foo 4
+
+foo 5
+
+#  Now the parts that remain unchanged are put into the
+#  function. The only part that changes is the argument `a`,
+#  which is replaced when the function is called.
+
+#  And so, functions let you take the unchanging parts and put
+#  them into a single place, which makes it much much easier as
+#  your programs become bigger and more complex.
+
+#  Moving on, let's look at this program:
+
+w/box temp = 5
+  if temp
+    temp + 1
+
+w/box temp = 10
+  if temp
+    temp + 2
+
+#  The `w/box` symbol is like `box` but the box it creates can
+#  only be accessed inside the `w/box` expression.
+
+#  The `if` symbol checks if its first argument is true. If it
+#  is, then it will evaluate the second argument. Otherwise
+#  it will evaluate the third argument.
+
+#  This pattern of creating a temporary box and using `if` is
+#  quite common. Let's try using a function to get rid of the
+#  code duplication:
+
+def if-box -> x y
+  if x
+    x + y
+
+if-box 5  1
+if-box 10 2
+
+#  This works, but it's not very flexible. What if we wanted to
+#  subtract the numbers, or divide the numbers, or do something
+#  else? The `if-box` function will only add, nothing else.
+
+#  One of the cool things about functions is that because they
+#  are values, they can be used as arguments to other functions:
+
+def if-box -> x f
+  if x
+    f x
+
+if-box 5  -> x (x + 1)
+if-box 10 -> x (x + 2)
+
+#  Here's what happened. We called `if-box` with two arguments:
+#  the number `5` and the function `-> x (x + 1)`, which were
+#  then replaced like usual.
+
+#  This works, but it's a bit verbose. Let's use a macro to
+#  remove the verbosity! You've already seen a bunch of macros,
+#  but you didn't realize it: `+ - * / box = <= -> def w/box if`
+#  are all macros.
+
+#  What is a macro? Well, a function has arguments, which are
+#  replaced with values, and the function then returns a value.
+#  A macro is a special kind of function that has arguments,
+#  which are replaced with code, and the macro then returns
+#  code.
+
+#  First, to create a macro, we use the `$mac` macro:
+
+$mac if-box ->
+
+#  The above expression took the empty function `->`, converted
+#  it into a macro, and then assigned it to the symbol `if-box`.
+#  But this macro doesn't do anything yet. Let's start by
+#  copying in our original program:
+
+$mac if-box ->
+  w/box temp = 5
+    if temp
+      temp + 1
+
+#  We can't use this macro just yet, though. Remember when I
+#  said that macros are given code and return code? Well, right
+#  now the macro is returning a value, not code. If we use the
+#  `'` macro, we tell Nulan to treat it as code rather than a
+#  value:
+
+$mac if-box ->
+  'w/box temp = 5
+     if temp
+       temp + 1
+
+#  Oops, Nulan is saying that the symbol `temp` is undefined.
+#  What happened?!
+
+#  Well, do you remember when I said earlier that you can change
+#  the value of a box without changing the box itself? The `'`
+#  macro returns boxes, not symbols. And the `temp` box isn't
+#  defined.
+
+#  To fix this, we'll need to assign `temp` to a box. To create
+#  a box, we can use the `w/uniq` macro:
+
+$mac if-box ->
+  w/uniq temp
+    'w/box temp = 5
+       if temp
+         temp + 1
+
+#  And now it works just fine. But it only works for the first
+#  use case, not the second. Let's figure out the parts that
+#  change: those parts will need to be arguments to the macro.
+
+#  Well, the expression `5` changes, so let's replace that with
+#  an argument:
+
+$mac if-box -> x
+  w/uniq temp
+    'w/box temp = x
+       if temp
+         temp + 1
+
+#  And the expression `1` changes too, so let's add another
+#  argument:
+
+$mac if-box -> x y
+  w/uniq temp
+    'w/box temp = x
+       if temp
+         temp + y
+
+#  And now we can use it like so:
+
+if-box 5  1
+if-box 10 2
+
+#  But wait a minute, this looks just like earlier, when we were
+#  using a function. The reason for using a macro is so that we
+#  don't hardcode the `+` symbol, so let's start by getting rid
+#  of that:
+
+$mac if-box -> x y
+  w/uniq temp
+    'w/box temp = x
+       if temp
+         y
+
+#  Now, you might be tempted to use it like this:
+
+if-box 5
+  temp + 1
+
+if-box 10
+  temp + 2
+
+#  But as you can see, that doesn't work. The reason is because
+#  inside the macro, we used `w/uniq` to create a new box, but
+#  that box is only accessible *inside* the macro. Instead,
+#  let's use a symbol:
+
+$mac if-box -> x y
+  w/box temp = sym "it"
+    'w/box temp = x
+       if temp
+         y
+
+#  We used the `sym` function to create a new symbol and then
+#  inserted that rather than a box. And now we can use the macro
+#  like this:
+
+if-box 5
+  it + 1
+
+if-box 10
+  it + 2
+
+#  Inside the `if-box` expression, you can use the symbol `it`
+#  to refer to the first argument of `if-box`. As you can see,
+#  this is indeed shorter than using a function.
+
+#  Because macros always return code, anything you can do with
+#  macros, you can do by manually writing the code yourself.
+
+#  The benefit of macros is that you don't *have* to write the
+#  code yourself: you can have the macro write the code for you.
+#  And so, by using macros wisely, you can write shorter, more
+#  readable code.
+
+#  Now, with that out of the way, let's do something fun!
+
+div
+  style
+    border-radius    "5px"
+    opacity          "1"
+    width            "50px"
+    height           "50px"
+    background-color "green"
+
+  on "click" ->
+    alert "I'm green!"
+
+
+div
+  style
+    border-radius    "5px"
+    opacity          "0.5"
+    width            "50px"
+    height           "50px"
+    background-color "red"
+
+    position         "relative"
+    top              "-25px"
+    left             "25px"
+
+  on "click" ->
+    alert "I'm red!"
+
+#  If you look in the upper-right panel, you should see two
+#  boxes. If you click on them, they'll tell you what color they
+#  are. Both of the boxes were generated with the above code.
+#  If you change the code, it'll change the boxes. Try it out!</pre>
+<script src="doc.js"></script>
+<script>
+doc.init("tutorial", "default", "Reset Tutorial")
+</script>
+</body>
+</html>
