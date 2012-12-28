@@ -28,13 +28,13 @@ var o = (function () {
   return x
 })()
 
-load("./NULAN.parse.js", o)
+load("./src/NULAN.parse.js", o)
 
 load("./lib/nino/compile.js", o)
 load("./lib/nino/transform.js", o)
 load("./lib/nino/partial.js", o)
 
-load("./NULAN.js", o)
+load("./src/NULAN.js", o)
 
 load("./lib/nuit/serialize.js", o)
 /*
@@ -114,8 +114,8 @@ function evalFile(s, o) {
 o.NULAN.from("Node.js").to("Node.js")
 
 try {
-  load("./NULAN.macros.js", o)
-  load("./modes/Node.js", o)
+  load("./src/NULAN.macros.js", o)
+  load("./src/modes/Node.js", o)
   //evalFile("NULAN.macros", o)
   //evalFile("modes/Node.js", o)
 } catch (e) {

@@ -12,7 +12,7 @@ How to run
 Browser
 -------
 
-Load ``nulan.html`` in a modern web browser (I've only tested with Google Chrome 23)
+Load ``doc/tutorial.html`` in a modern web browser (I've only tested with Google Chrome 23)
 
 
 Node.js
@@ -38,7 +38,7 @@ Features
 
 * Compiles ahead-of-time to extremely fast JavaScript: it should be just as fast or faster than handwritten JS code
 
-* Includes an awesome IDE (built using `CodeMirror <http://codemirror.net/>`_) that runs right in the browser: just open ``nulan.html``
+* Includes an awesome IDE (built using `CodeMirror <http://codemirror.net/>`_) that runs right in the browser: just open ``doc/tutorial.html``
 
 
 Examples
