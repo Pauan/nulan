@@ -430,6 +430,7 @@ var doc = (function (n) {
           oldContext = NULAN.withNewContext()
 
           sandbox = document.createElement("iframe")
+          sandbox.src = "javascript:;" // TODO: hack needed for Firefox
           sandbox.id = "sandbox"
           sandbox.className = "cm-s-custom CodeMirror"
           sandboxParent.appendChild(sandbox)
@@ -508,24 +509,34 @@ var doc = (function (n) {
 
         document.body.appendChild(tab)
 
-        var y
+        var y, z
 
         ;(function (x) {
           y = x.insertCell(0)
           y.width = "50%"
           y.height = "50%"
-          y.appendChild(o)
+          z = document.createElement("div")
+          z.className = "wrapper-for-firefox"
+          z.appendChild(o)
+          y.appendChild(z)
         })(tab.insertRow(0))
 
         ;(function (x) {
-          sandboxParent = y = x.insertCell(0)
+          y = x.insertCell(0)
           y.width = "50%"
           y.height = "50%"
+          z = document.createElement("div")
+          z.className = "wrapper-for-firefox"
+          y.appendChild(z)
+          sandboxParent = z
 
           y = x.insertCell(0)
           y.width = "50%"
           y.setAttribute("rowspan", "2")
-          editor(y)
+          z = document.createElement("div")
+          z.className = "wrapper-for-firefox"
+          y.appendChild(z)
+          editor(z)
         })(tab.insertRow(0))
       }(document.createElement("table")))
     })
