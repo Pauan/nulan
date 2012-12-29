@@ -104,11 +104,11 @@ $mac w/expression -> x y                                                   \n\
                                                                            \n\
 #|                                                                         \n\
 $mac str -> @args                                                          \n\
-  '(+) \"\" ,@args                                                         \n\
+  '(\") ,@args                                                             \n\
 |#                                                                         \n\
                                                                            \n\
 $mac words -> @args                                                        \n\
-  '{,@(args.map -> x (str x))}                                             \n\
+  '{,@(args.map -> x \"@x\")}                                              \n\
                                                                            \n\
 #|                                                                         \n\
 $mac call -> x y @args                                                     \n\
@@ -196,7 +196,7 @@ $mac $syntax-protect -> body                                               \n\
                                                                            \n\
 $mac $syntax-rule -> s o                                                   \n\
   '$run                                                                    \n\
-     (syntax-rules;)[,(str s)] <= o                                        \n\
+     syntax-rules;[s] <= o                                                 \n\
                                                                            \n\
 $mac $syntax-helper -> n f                                                 \n\
   w/uniq s i o u                                                           \n\
@@ -228,26 +228,26 @@ $run                                                                       \n\
   | $syntax-helper $syntax-unary syntax-unary                              \n\
                                                                            \n\
                                                                            \n\
-$syntax-unary ~  90                                                        \n\
+$syntax-unary \"~\"  80                                                    \n\
                                                                            \n\
-$syntax-infix *  80                                                        \n\
-$syntax-infix /  80                                                        \n\
+$syntax-infix \"*\"  70                                                    \n\
+$syntax-infix \"/\"  70                                                    \n\
                                                                            \n\
-$syntax-infix +  70                                                        \n\
-$syntax-infix -  70                                                        \n\
+$syntax-infix \"+\"  60                                                    \n\
+$syntax-infix \"-\"  60                                                    \n\
                                                                            \n\
-$syntax-infix <  60                                                        \n\
-$syntax-infix =< 60                                                        \n\
-$syntax-infix >  60                                                        \n\
-$syntax-infix >= 60                                                        \n\
+$syntax-infix \"<\"  50                                                    \n\
+$syntax-infix \"=<\" 50                                                    \n\
+$syntax-infix \">\"  50                                                    \n\
+$syntax-infix \">=\" 50                                                    \n\
                                                                            \n\
-$syntax-infix == 50                                                        \n\
-$syntax-infix |= 50                                                        \n\
-$syntax-infix ~= 50                                                        \n\
+$syntax-infix \"==\" 40                                                    \n\
+$syntax-infix \"|=\" 40                                                    \n\
+$syntax-infix \"~=\" 40                                                    \n\
                                                                            \n\
-$syntax-infix && 40                                                        \n\
+$syntax-infix \"&&\" 30                                                    \n\
                                                                            \n\
-$syntax-infix || 30                                                        \n\
+$syntax-infix \"||\" 20                                                    \n\
                                                                            \n\
                                                                            \n\
                                                                            \n\

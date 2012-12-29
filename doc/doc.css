@@ -129,3 +129,28 @@ tr:last-child td {
   font-family: monospace;
   outline: none;
 }*/
+
+.nulan-error {
+  white-space: pre;
+  font-family: monospace;
+  font-size: 12px;
+  background: #ffa;
+  color: #a00;
+  //padding: 2px 5px 3px;
+  padding-top: 1px;
+  padding-bottom: 2px;
+}
+
+.nulan-error-icon {
+  display: inline-block;
+  color: white;
+  background-color: red;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 25%;
+  padding-left: 4px;
+  padding-right: 3px;
+  padding-bottom: 1px;
+  margin-left: 2px;
+  margin-right: 4px;
+}

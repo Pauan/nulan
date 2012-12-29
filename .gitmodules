@@ -10,3 +10,6 @@
 [submodule "node_modules/optimist"]
 	path = node_modules/optimist
 	url = http://github.com/substack/node-optimist.git
+[submodule "node_modules/wordwrap"]
+	path = node_modules/wordwrap
+	url = https://github.com/substack/node-wordwrap.git

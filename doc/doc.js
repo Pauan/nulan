@@ -147,7 +147,8 @@ var doc = (function (n) {
         debug.addEventListener("change", function () {
           localStorage[name + ".debug"] = this.checked ? "yes" : ""
           n.options.debug = this.checked
-          output(x, o)
+          //output(x, o)
+          process(x, localStorage[name + ".saved"]) // TODO: inefficient, but necessary to make the errors toggle
         }, true)
 
         buttons.appendChild(reset)
@@ -198,34 +199,20 @@ var doc = (function (n) {
         var line, message
         if (e instanceof NULAN.Error) {
           line = e.line
-          message = e.originalMessage
+          message = (n.options.debug
+                      ? "" + e
+                      : e.originalMessage)
         } else {
           line = end
           message = "" + e
         }
 
         var x = document.createElement("div")
-        x.style.fontFamily = "monospace"
-        x.style.fontSize = "12px"
-        x.style.background = "#ffa"
-        x.style.color = "#a00"
-        //x.style.padding = "2px 5px 3px"
-        x.style.paddingTop = "1px"
-        x.style.paddingBottom = "2px"
+        x.className = "nulan-error"
 
         var y = document.createElement("span")
+        y.className = "nulan-error-icon"
         y.textContent = "!"
-        y.style.color = "white"
-        y.style.backgroundColor = "red"
-        y.style.fontSize = "12px"
-        y.style.fontWeight = "bold"
-        y.style.borderRadius = "25%"
-        y.style.cssFloat = "left"
-        y.style.paddingLeft = "4px"
-        y.style.paddingRight = "3px"
-        y.style.paddingBottom = "1px"
-        y.style.marginLeft = "2px"
-        y.style.marginRight = "4px"
 
         x.appendChild(y)
         x.appendChild(document.createTextNode(message))
@@ -306,26 +293,48 @@ var doc = (function (n) {
         // NUIT.serialize(r, { multiline: true })
       }
 
+      // TODO: these pretty functions should be in Nulan
+      function prettyString(x) {
+        return "\"" + x.replace(/[\r\n\t"\\]/g, function (s) {
+          if (s === "\r") {
+            return "\\r"
+          } else if (s === "\n") {
+            return "\\n"
+          } else if (s === "\t") {
+            return "\\t"
+          } else {
+            return "\\" + s
+          }
+        }) + "\""
+      }
+
       function prettyParse(x) {
         // TODO: code duplication with pretty
         if (Array.isArray(x)) {
-          return "(" + withIndent(function () {
-                         var seen
-                         return x.map(function (x) {
-                           if (Array.isArray(x)) {
-                             seen = true
-                           }
-                           if (seen) {
-                             return "\n" + spaces() + prettyParse(x)
-                           } else {
-                             return prettyParse(x)
-                           }
-                         }).join(" ")
-                       }) + ")"
+          if (x.length) {
+            var seen
+            return "(" + //prettyParse(x[0]) + " " +
+                                  // TODO: ew slice
+                                  x.map(function (x) {
+                                    return withIndent(function () {
+                                      indent += 2
+                                      if (Array.isArray(x)) {
+                                        seen = true
+                                      }
+                                      if (seen) {
+                                        return "\n" + spaces() + prettyParse(x)
+                                      } else {
+                                        return prettyParse(x)
+                                      }
+                                    })
+                                  }).join(" ") + ")"
+          } else {
+            return "()"
+          }
         } else if (x instanceof NULAN.Wrapper) {
           return prettyParse(x.value)
         } else if (typeof x === "string") {
-          return "\"" + x + "\"" // TODO replace " inside the string with \"
+          return prettyString(x)
         } else if (x === void 0) {
           return "()"
         } else {
@@ -349,13 +358,18 @@ var doc = (function (n) {
 
       function withIndent(f) {
         var old = indent
-        indent += 2
+        //indent += 2
         try {
           var x = f()
         } finally {
           indent = old
         }
         return x
+      }
+
+      function indenter(s) {
+        indent += s.length
+        return s
       }
 
       function spaces() {
@@ -373,9 +387,10 @@ var doc = (function (n) {
       function pretty(x) {
         // TODO: a bit ew
         if (Array.isArray(x)) {
-          return "{" + withIndent(function () {
-                         var seen
-                         return x.map(function (x) {
+          var seen
+          return "{" + x.map(function (x) {
+                         return withIndent(function () {
+                           indent += 2
                            if (Array.isArray(x)) {
                              seen = true
                            }
@@ -384,8 +399,8 @@ var doc = (function (n) {
                            } else {
                              return pretty(x)
                            }
-                         }).join(" ")
-                       }) + "}"
+                         })
+                       }).join(" ") + "}"
         /*} else if (x instanceof Object && typeof x !== "function") {
           return "{\n" + withIndent(function () {
                            return Object.getOwnPropertyNames(x).map(function (s) {
@@ -400,8 +415,7 @@ var doc = (function (n) {
         } else if (x && typeof x === "object") {
           return "#<dict>"
         } else if (typeof x === "string") {
-          // TODO
-          return "\"" + x + "\""
+          return prettyString(x)
         } else if (x === void 0) {
           return "()"
         } else if (x === true) {

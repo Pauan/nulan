@@ -257,7 +257,7 @@ var NULAN = (function (n) {
 
   function slicer(v, i, iLen) {
     var r = [[n.box("."),
-              [n.box("."), [n.box("list")], "slice"],
+              [n.box("."), [n.box("{")], "slice"],
                "call"],
              v]
     var i2 = i - iLen + 1
@@ -715,7 +715,7 @@ var NULAN = (function (n) {
     } else if (typeof x !== "string") {
       throw new n.Error(x, "invalid expression: " + x)
     }*/
-    //return [n.box("list"), x].concat([].slice.call(a, 1))
+    //return [n.box("{"), x].concat([].slice.call(a, 1))
     return (a.length === 1
              ? a[0]
              : [a[0][1]].concat(a.slice(1)))
@@ -739,7 +739,7 @@ var NULAN = (function (n) {
   var patterns = {}
 
   // TODO: mangle
-  patterns[mangle("list")] = function (args, v, body) {
+  patterns[mangle("{")] = function (args, v, body) {
     args = args.slice(1)
     var index
     args.forEach(function (x, i) {
@@ -757,13 +757,13 @@ var NULAN = (function (n) {
                                  a.length - i]],
                                x)
       } else {
-        console.log(y)
+        //console.log(y)
         return destructure1(y, [n.box("."), v, i], x)
       }
     }, body)
   }
 
-  patterns[mangle("dict")] = function (args, v, body) {
+  patterns[mangle("[")] = function (args, v, body) {
     args = args.slice(1)
     return pair(args).reduceRight(function (x, y) {
       return destructure1(y[1], [n.box("."), v, y[0]], x)
@@ -915,7 +915,7 @@ var NULAN = (function (n) {
     return $mac([].slice.call(arguments))
   }))
 
-  setValue("list", macro(function () {
+  setValue("{", macro(function () {
     return ["array", [].map.call(arguments, mac)]
   }))
 
@@ -929,14 +929,16 @@ var NULAN = (function (n) {
   }))
 
   // TODO: can't be defined in NULAN.macros because it's the primitive for the " syntax
-  setValue("str", macro(function () {
+  setValue("\"", macro(function () {
     var a = [].slice.call(arguments)
+    /*
                           // TODO: why is this needed for ~= ?
     if (a.length === 1 && (typeof a[0] === "string" || a[0] instanceof n.Wrapper && typeof a[0].value === "string")) {
       return mac(a[0])
     } else {
-      return mac([n.box("+"), ""].concat(a))
-    }
+
+    }*/
+    return mac([n.box("+"), ""].concat(a))
   }))
 
   // TODO
@@ -1058,7 +1060,7 @@ var NULAN = (function (n) {
     }
   }))
 
-  setValue("dict", macro(function () {
+  setValue("[", macro(function () {
     var args = pair(arguments)
       , a
       , u
@@ -1079,7 +1081,7 @@ var NULAN = (function (n) {
         }
         return [n.box("<="), [n.box("."), u, x], y]
       })
-      return mac([n.box("|"), [n.box("box"), [n.box("="), u, [n.box("dict")]]]].concat(a))
+      return mac([n.box("|"), [n.box("box"), [n.box("="), u, [n.box("[")]]]].concat(a))
     }
   }))
 
@@ -1240,7 +1242,7 @@ var NULAN = (function (n) {
                 var x
                 while (i2 > i) {
                   x = args[i2]
-                                        // TODO: code duplication with the list pattern
+                                        // TODO: code duplication with the { pattern
                   body = destructure(x, [n.box("."), u,
                                           [n.box("-"),
                                            [n.box("."), u, "length"],
@@ -1695,7 +1697,10 @@ function infix(i, b, f) {
   n.eval = function (s, f) {
     var r = []
     n.parse(s, function (err, x) {
-      if (err) throw err
+      if (err) {
+        console.error("" + err)
+        throw err
+      }
       r.push(n.compile(x))
     })
     //r = r.join(";\n")
