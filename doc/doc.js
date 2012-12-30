@@ -261,7 +261,6 @@ var doc = (function (n) {
           var ch, sLine
           var s = currentToken.string
             , r = []
-          console.info(s, line, end, o.getLine(line))
           while (line < end) {
             ch = 0
             sLine = o.getLine(line)
@@ -293,7 +292,7 @@ var doc = (function (n) {
       function isHighlight(x) {
         return x.type === "keyword"  ||
                x.type === "builtin"  ||
-               //x.type === "variable" ||
+               x.type === "variable" ||
                x.type === "atom"     ||
                x.type === "number"
       }
@@ -320,15 +319,15 @@ var doc = (function (n) {
         var start = oEditor.getCursor(true).line + 1
           , end   = oEditor.getCursor(false).line + 1
 
-        var currentForm
+        //var currentForm
 
         n.forms.forEach(function (x) {
           /*if ("error" in x) {
             output.error.push(x.error)
           }*/
-          if (start >= x.start && end <= x.end) {
+          /*if (start >= x.start && end <= x.end) {
             currentForm = x
-          }
+          }*/
           if (x.start <= end && x.end >= start) {
             output.prints.push.apply(output.prints, x.prints)
             if ("eval" in x) {
@@ -347,19 +346,19 @@ var doc = (function (n) {
         var startCursor  = oEditor.getCursor("head")
           , currentToken = oEditor.getTokenAt(startCursor)
 
-        if (currentToken.type === "variable") {
+        /*if (currentToken.type === "variable") {
           if (currentForm) {
             mark(oEditor, currentToken, startCursor, currentForm.start - 1, currentForm.end)
           }
-        } else if (isHighlight(currentToken)) {
+        } else */if (isHighlight(currentToken)) {
           mark(oEditor, currentToken, startCursor, 0, oEditor.lineCount())
         } else {
           currentToken = oEditor.getTokenAt({ line: startCursor.line, ch: startCursor.ch + 1 })
-          if (currentToken.type === "variable") {
+          /*if (currentToken.type === "variable") {
             if (currentForm) {
               mark(oEditor, currentToken, startCursor, currentForm.start - 1, currentForm.end)
             }
-          } else if (isHighlight(currentToken)) {
+          } else */if (isHighlight(currentToken)) {
             mark(oEditor, currentToken, startCursor, 0, oEditor.lineCount())
           }
         }
@@ -611,10 +610,12 @@ var doc = (function (n) {
                 //o.textContent = print(["" + e])
               }
 
+              o.boxes       = NULAN.boxes
               o.vars        = NULAN.vars
               o.values      = NULAN.values
               o.syntaxRules = NULAN.syntaxRules
 
+              //NULAN.boxes       = Object.create(NULAN.boxes)
               NULAN.vars        = Object.create(NULAN.vars)
               NULAN.values      = Object.create(NULAN.values)
               NULAN.syntaxRules = Object.create(NULAN.syntaxRules)

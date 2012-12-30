@@ -41,10 +41,11 @@ CodeMirror.defineMode("nulan", function (config, parserConfig) {
           return "atom"
         }
       }
-      if (last.vars[x]) {
-        return "builtin"
-      } else {
+      console.info(x, state.box)
+      if ((x = last.vars[x]) && (x = last.boxes[x]) && x.scope === "local") {
         return "variable"
+      } else {
+        return "builtin"
       }
     }
   }

@@ -38,8 +38,8 @@ var NULAN = (function (n) {
   }
 
   function compileOnlyError(x) {
-    if (mode === "run") {
-      throw new n.Error(x, "cannot use " + x + " at run time")
+    if (mode !== "compile") {
+      throw new n.Error(x, "cannot use " + x + " at " + mode + " time")
     }
   }
 
@@ -275,7 +275,7 @@ var NULAN = (function (n) {
 
   var mangle, unmangle, validJS
 
-  var Uniq, setBuiltin, setSymExternal, setSymToBox, setPlace, getBox, withLocalScope
+  var Uniq, setBuiltin, setSymExternal, setSymToBox, setPlace, getBox, withLocalScope, withNewScope
 
   var setValue, compileEval
 
@@ -314,7 +314,7 @@ var NULAN = (function (n) {
     // TODO: I no longer need to expose boxes, but I may want to do so anyways
     n.boxes = {} // JS Variable -> Box
 
-    var local
+    var scope = "global"
 
     ;(function () {
       var reserved = {}
@@ -340,9 +340,9 @@ var NULAN = (function (n) {
       var to = new RegExp("^([0-9])|([a-z])\-([a-z])|[^$a-z0-9]", "g")
 
       mangle = function (s) {
-        // ((local || mode === "run") && )
+        // ((scope === "local" || mode === "run") && )
         // (s === "boxes" || s === "values")
-        if (reserved[s] || (local && mode === "compile" && s === "n")) {
+        if (reserved[s] || (scope === "local" && mode === "compile" && s === "n")) {
           return "_" + s
         } else {
           return s.replace(to, function (s, s1, s2, s3) {
@@ -466,7 +466,7 @@ var NULAN = (function (n) {
       n.vars[s.value] = x.value
 
       n.boxes[x.value] = x
-      x.scope = local ? "local" : "global"
+      x.scope = scope
       x.mode[mode] = true
 
       return x
@@ -485,7 +485,7 @@ var NULAN = (function (n) {
         x.value = findUniq(x.name)
       }
       n.boxes[x.value] = x
-      x.scope = local ? "local" : "global"
+      x.scope = scope
       //x.local = local
       x.mode[mode] = true
       return x
@@ -540,14 +540,28 @@ var NULAN = (function (n) {
 
     withLocalScope = function (f) {
       var old  = n.boxes
-        , old2 = local
+        , old2 = scope
       n.boxes = Object.create(n.boxes)
-      local = true
+      scope   = "local"
       try {
         var x = f()
       } finally {
         n.boxes = old
-        local = old2
+        scope   = old2
+      }
+      return x
+    }
+
+    withNewScope = function (f) {
+      var old  = n.vars
+        , old2 = scope // TODO
+      n.vars = Object.create(n.vars)
+      scope  = "local" // TODO
+      try {
+        var x = f()
+      } finally {
+        n.vars = old
+        scope  = old2 // TODO
       }
       return x
     }
@@ -635,17 +649,6 @@ var NULAN = (function (n) {
   }))*/
 
 
-  function withNewScope(f) {
-    var old = n.vars
-    n.vars = Object.create(n.vars)
-    try {
-      var x = f()
-    } finally {
-      n.vars = old
-    }
-    return x
-  }
-
   function formatMode(a) {
     switch (a.length) {
     case 0:
@@ -661,7 +664,7 @@ var NULAN = (function (n) {
 
   function checkBox(x, y) {
     // TODO: x.local ||
-    if (mode === "quote" || y.mode[mode]) {
+    if (y.mode[mode]) {
       return y
     } else {
       y = formatMode(Object.keys(y.mode))
@@ -676,6 +679,21 @@ var NULAN = (function (n) {
       return false
     }
   }*/
+
+  function macBox(x) {
+    x = getBox(x)
+    if (x instanceof n.Box) {
+      if (x.scope === "local") {
+        return ["name", x.value]
+      } else {
+        return [".", [".", ["name", "n"], "boxes"], x.value]
+      }
+      /*return withMode("quote", function () {
+        return mac(x)
+      })*/
+    }
+    //withMode("quote", function () { return mac(a) })
+  }
 
   function mac(a) {
     var x
@@ -700,20 +718,17 @@ var NULAN = (function (n) {
     } else if (a instanceof n.Symbol) {
       return mac(checkBox(a, getBox(a)))
     } else if (a instanceof n.Box) {
-      x = a.value
-
-      if (a.scope === "local" || mode === "run" || (mode !== "quote" && a.scope === "builtin")) {
-        return ["name", x]
-      } else if (mode === "compile") {
-        // TODO: move this up so it works in all modes, not just "compile"
-        if ("get" in a) {
-          x = withMode("quote", function () { return mac(a) })
-          return ["call", [".", x, "get"], []]
+      if ("get" in a) {
+        if (mode === "compile") {
+          return ["call", [".", macBox(a), "get"], []]
         } else {
-          return [".", [".", ["name", "n"], "values"], x]
+          throw new n.Error(a, "cannot use getter at " + mode + " time")
         }
-      } else if (mode === "quote") {
-        return [".", [".", ["name", "n"], "boxes"], x]
+      } else if (mode === "run" || a.scope === "local" || a.scope === "builtin") {
+        return ["name", a.value]
+      } else if (mode === "compile") {
+        return [".", [".", ["name", "n"], "values"], a.value]
+      //} else if (mode === "quote") {
         //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
         //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
         //return mac([box("&box"), x])
@@ -915,8 +930,11 @@ var NULAN = (function (n) {
     if (b) {
       b = checkBox(x, b)
       if ("set" in b) {
-        b = withMode("quote", function () { return mac(b) })
-        return ["call", [".", b, "set"], [mac(y)]]
+        if (mode === "compile") {
+          return ["call", [".", macBox(b), "set"], [mac(y)]]
+        } else {
+          throw new n.Error(b, "cannot use setter at " + mode + " time")
+        }
       } else {
         return ["=", mac(b), mac(y)]
       }
@@ -1032,6 +1050,9 @@ var NULAN = (function (n) {
   }))
 
   setValue("w/new-scope", macro(function (body) {
+    // TODO
+    //return mac([[n.box("->"), [], body]])
+    //return ["call", ["function", "", [], [["return", mac(body)]]], []]
     return withNewScope(function () {
       return mac(body)
     })
@@ -1214,9 +1235,7 @@ var NULAN = (function (n) {
         // TODO: a little hacky
         return mac([n.box("sym"), x.value])
       } else if (boxOrSym(x)) {
-        return withMode("quote", function () {
-          return mac(x)
-        })
+        return macBox(x)
       } else {
         // TODO
         return mac(x)
@@ -1775,7 +1794,9 @@ function infix(i, b, f) {
     })
   }
 
-  n.options = { debug: false }
+  n.options = {
+    debug: false
+  }
 
   return n
 })(NULAN || {})
