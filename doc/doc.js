@@ -290,7 +290,7 @@ var doc = (function (n) {
       }
 
       function isHighlight(x) {
-        return x.type === "keyword"  ||
+        return x.type === "special"  ||
                x.type === "builtin"  ||
                x.type === "variable" ||
                x.type === "atom"     ||

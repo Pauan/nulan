@@ -22,10 +22,10 @@
   border-left: 1px solid #d3d7cf !important;
 }
 
-.cm-s-custom span.cm-keyword     { color: #73d216; } /* macros */
+.cm-s-custom span.cm-keyword     { color: #d3d7cf; } /* syntax */
 .cm-s-custom span.cm-builtin     { color: #fcaf3e; } /* functions */
 .cm-s-custom span.cm-variable    { color: #75ace4; } /* locals */
-.cm-s-custom span.cm-special     { color: #d3d7cf; } /* syntax */
+.cm-s-custom span.cm-special     { color: #73d216; } /* macros */
 
 .cm-s-custom span.cm-comment,
 .cm-s-custom span.cm-comment-doc { color: #888a85; }

@@ -94,13 +94,15 @@ CodeMirror.defineMode("nulan", function (config, parserConfig) {
           return "comment-doc"
         } else if (x.type === "symbol") {
           if (x.syntax || !x.box) {
-            return "special"
+            return "keyword"
           } else {
             state.box = x.box
             if (x.box.scope === "local") {
               return "variable"
             } else if (NULAN.isMacro(x.box)) {
-              return "keyword"
+              return "special"
+            } else if (x.box.value === "true" || x.box.value === "false") {
+              return "atom"
             } else {
               return "builtin"
             }
