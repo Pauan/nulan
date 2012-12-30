@@ -81,6 +81,11 @@ var NULAN = (function (n) {
   }
 
 
+  //function ParseBypass() {}
+
+  function Bypass(x) { this.value = x }
+
+
   // Converts any array-like object into an iterator
   function iter(s) {
     var i = 0
@@ -370,40 +375,36 @@ var NULAN = (function (n) {
     },
 
     "#": {
+      //priority: 9001,
+      //order: "right",
       delimiter: true,
       whitespace: true,
+      endAt: "|#", // TODO: hacky, but it works
       tokenize: function (o) {
         var s = store(o)
         o.read()
         if (o.peek() === "|") {
           tokenizeComment(o)
           o.read()
+          return []
+        // TODO: hacky, but it works
+        } else if (o.peek() === ">") {
+          return tokenizeCommentDoc(o, s)
         } else {
           while (o.has() && o.peek() !== "\n") {
-            if (o.peek() === "`") {
-              o.read()
-              n.tokenUpdate(enrich({}, s, o), function (o) {
-                o.type = "comment"
-              })
-              processUntil(o, "`", function (x) {
-                var s
-                if ((s = n.vars[x.value])) {
-                  n.tokenUpdate(x, function (o) {
-                    o.box = n.boxes[s]
-                  })
-                }
-              })
-              s = store(o)
-              o.read()
-            } else {
-              o.read()
-            }
+            o.read()
           }
           n.tokenUpdate(enrich({}, s, o), function (o) {
             o.type = "comment"
           })
+          return []
         }
-        return []
+        //return enrich(new ParseBypass(), s, o)
+      },
+      // TODO: hacky, but it works
+      parse: function (l, s, r) {
+        l.push([s].concat(r[0]))
+        return l.concat(r.slice(1))
       }
     },
 
@@ -428,6 +429,54 @@ var NULAN = (function (n) {
   inert("(", ")")
   inert("[", "]")
   inert("{", "}")
+  inert("#|", "|#")
+
+  function tokenizeCommentDoc(o, s) {
+    var seen, r = []
+
+    function push() {
+      if (seen) {
+        n.tokenUpdate(enrich({}, s, o), function (o) {
+          o.type = "comment-doc"
+        })
+      } else {
+        seen = true
+        var x = enrich(new n.Symbol("#"), s, o)
+        r.push(x)
+        n.tokenUpdate(x, function (o) {
+          o.type = "comment-doc"
+        })
+      }
+    }
+
+    while (o.has() && o.peek() !== "\n") {
+      if (o.peek() === "`") {
+        o.read()
+        push()
+
+        r.push(new Bypass(unwrap(processUntil(o, "`"))))
+        /*  function (x) {
+          var s
+          if ((s = n.vars[x.value])) {
+            n.tokenUpdate(x, function (o) {
+              o.box = n.boxes[s]
+            })
+          }
+        } */
+        if (o.peek() === "`") {
+          s = store(o)
+          o.read()
+        } else {
+          throw new n.Error(s, "missing ending `")
+        }
+      } else {
+        o.read()
+      }
+    }
+    push()
+    r.push(new n.Symbol("|#"))
+    return r
+  }
 
   function tokenizeComment(o) {
     var s = store(o)
@@ -492,16 +541,16 @@ var NULAN = (function (n) {
 
   var white
 
-  function processUntil(oOrig, s, f) {
+  function processUntil(oOrig, s) {
     var r = []
       , c
 
     var o = tokenize(oOrig)
     while (o.has()) {
       c = o.peek()
-      if (c instanceof n.Symbol) {
+      /*if (c instanceof n.Symbol) {
         f(c)
-      }
+      }*/
       r.push(c)
       if (oOrig.peek() === s) {
         break
@@ -510,11 +559,12 @@ var NULAN = (function (n) {
       }
     }
 
-    var temp = []
+    //var temp = []
     r = iter(r)
     // TODO: use something other than braces?
-    braces(r, r.peek(), temp)
-    return process(iter(temp), -1)
+    //braces(r, r.peek(), temp)
+    //return process(iter(temp), -1)
+    return indent(r, r.peek())
   }
 
   function processOne(o) {
@@ -752,8 +802,6 @@ var NULAN = (function (n) {
   }
 
 
-  function Bypass(x) { this.value = x }
-
   // Modified Pratt Parser, designed for lists of symbols rather than tokens
   function process(o, i) {
     var pri, x, y, r, l = []
@@ -768,6 +816,8 @@ var NULAN = (function (n) {
       o.read()
       l.push(x)
     }
+
+    //l.tap()
 
     // TODO: fold this into the above while loop somehow?
     while (o.has() && (x = o.peek()) && x instanceof n.Symbol && (y = n.syntaxRules[x.value])) {
@@ -855,12 +905,21 @@ var NULAN = (function (n) {
 */
 
   function braces(o, x, a) {
+    /*if (x instanceof ParseBypass) {
+      o.read()
+      //braces(o, o.peek(), a)
+    } else {*/
     if (isEndAt(x)) {
       a.push(x)
       x = until(o, o.read(), n.syntaxRules[x.value].endAt)
     }
     o.read()
+    /*if (x instanceof ParseBypass) {
+      braces(o, o.peek(), a)
+    } else {*/
     a.push(x)
+    //}
+    //}
   }
 
   function indent(o, x) {
@@ -869,11 +928,34 @@ var NULAN = (function (n) {
       , b
       , r
       //, z
+    /*if (x instanceof ParseBypass) {
+      o.read()
+      x = o.peek()
+    }*/
+    /*while (x instanceof ParseBypass) {
+      o.read()
+      x = o.peek()
+    }*/
     while (o.has()) {
       y = o.peek()
+      /*if (y instanceof ParseBypass) {
+        //console.info(x.line, y.line)
+        if (y.line !== x.line && y.column <= x.column) {
+          //console.info("HIYA", y)
+          break
+        } else {
+          o.read()
+          continue
+        }
+      }*/
       //z = o.location()
       //console.log("indent", y.line, z.line, y.column, z.column)
       if (y.line === x.line) {
+        /*if (y instanceof ParseBypass) {
+          console.log(y)
+          o.read()
+          console.log(o.peek())
+        } else {*/
         b = isSeparator(y)
         if (isVertical(y)) {
           r = []
@@ -892,12 +974,14 @@ var NULAN = (function (n) {
         } else {
           braces(o, o.peek(), a)
         }
+        //}
       } else if (y.column > x.column) {
         a.push(new Bypass(unwrap(indent(o, o.peek()))))
       } else {
         break
       }
     }
+    //a.tap()
     return process(iter(a), -1)
   }
 

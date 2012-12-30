@@ -287,7 +287,7 @@ var NULAN = (function (n) {
 
   var mangle, unmangle, validJS
 
-  var Uniq, setBuiltin, setSymExternal, setSymToBox, setPlace, getBox, withLocalScope, withNewScope
+  var Uniq, setBuiltin, setSymExternal, setSymToBox, setPlace, getBox, withLocalScope, withNewScope, withPreviousScope
 
   var setValue, compileEval
 
@@ -558,10 +558,14 @@ var NULAN = (function (n) {
       return x
     }*/
 
+    var prevBoxes = n.boxes
+      , prevVars  = n.vars
+
     withLocalScope = function (f) {
       var old  = n.boxes
         , old2 = scope
       n.boxes = Object.create(n.boxes)
+      prevBoxes = n.boxes
       scope   = "local"
       try {
         var x = f()
@@ -576,12 +580,27 @@ var NULAN = (function (n) {
       var old  = n.vars
         , old2 = scope // TODO
       n.vars = Object.create(n.vars)
+      prevVars = n.vars
       scope  = "local" // TODO
       try {
         var x = f()
       } finally {
         n.vars = old
         scope  = old2 // TODO
+      }
+      return x
+    }
+
+    withPreviousScope = function (f) {
+      var old  = n.boxes
+        , old2 = n.vars
+      n.boxes = prevBoxes
+      n.vars  = prevVars
+      try {
+        var x = f()
+      } finally {
+        n.boxes = old
+        n.vars  = old2
       }
       return x
     }
@@ -599,6 +618,8 @@ var NULAN = (function (n) {
         n.boxes       = Object.create(n.boxes)
         n.values      = Object.create(n.values)
         n.syntaxRules = Object.create(n.syntaxRules)
+        prevBoxes = n.boxes
+        prevVars  = n.vars
         return function () {
           n.vars        = old
           n.boxes       = old2
@@ -607,8 +628,8 @@ var NULAN = (function (n) {
         }
       }
 
-      n.isMacro = function (x, b) {
-        if ((x = getBox(x, b)) && (x = n.values[x.value]) instanceof Macro) {
+      n.isMacro = function (x) {
+        if ((x = getBox(x)) && (x = n.values[x.value]) instanceof Macro) {
           return x.value
         }
       }
@@ -977,6 +998,22 @@ var NULAN = (function (n) {
     } else {
       return ["=", mac(x), mac(y)]
     }
+  }))
+
+  // TODO: hacky, but it works
+  setValue("#", macro(function () {
+    var args = [].slice.call(arguments)
+    //console.info([].slice.call(arguments))
+    withPreviousScope(function () {
+      args.forEach(function anon(x) {
+        if (Array.isArray(x)) {
+          x.forEach(anon)
+        } else if (boxOrSym(x)) {
+          getBox(x, true)
+        }
+      })
+    })
+    return ["empty"]
   }))
 
 // TODO: make , and @ into make-macro-error macros
@@ -1791,7 +1828,7 @@ function infix(i, b, f) {
     var r = []
     n.parse(s, function (err, x) {
       if (err) {
-        //console.error("" + err)
+        console.error("" + err)
         throw err
       }
       r.push(n.compile(x))

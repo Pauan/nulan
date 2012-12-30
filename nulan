@@ -160,10 +160,10 @@ if (args._.length) {
   rl.on("input", function (s) {
     try {
       var x = o.NULAN.tokenize(s)
-      if (o.NULAN.options.debug) {
+      /*if (o.NULAN.options.debug) {
         print(["tokenize", printTokens(x)])
         console.log()
-      }
+      }*/
 
       o.NULAN.parseRaw(x, function (err, x) {
         if (o.NULAN.options.debug) {

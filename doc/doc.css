@@ -24,7 +24,8 @@ html, body, .CodeMirror, #table, #output, #sandbox {
   /*padding-bottom: 5px;*/
   /*text-align: center;
   padding-right: 10px;*/
-  height: 26px;
+  /*height: 26px;*/
+  height: 2em;
   position: absolute;
   z-index: 6; /* needed so it'll be just underneath the scrollbar */
   padding-right: 35px;
@@ -40,7 +41,9 @@ html, body, .CodeMirror, #table, #output, #sandbox {
 }
 
 .CodeMirror-lines {
-  padding-top: 26px;
+  padding: 0px;
+  margin-top: 2em;
+  padding: 1em 0px;
 }
 
 button {

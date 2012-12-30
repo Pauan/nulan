@@ -279,7 +279,7 @@ var doc = (function (n) {
             var y = o.getTokenAt(x)
             //console.info(s, y.state.box)
             if (y.string === s &&
-                //y.type === currentToken.type &&
+                y.type === currentToken.type &&
                 currentToken.state.box === y.state.box) {
               marks.push(o.markText({ line: x.line, ch: y.start },
                                     { line: x.line, ch: y.end },

@@ -90,6 +90,8 @@ CodeMirror.defineMode("nulan", function (config, parserConfig) {
           return "string"
         } else if (x.type === "comment") {
           return "comment"
+        } else if (x.type === "comment-doc") {
+          return "comment-doc"
         } else if (x.type === "symbol") {
           if (x.syntax || !x.box) {
             return "special"
