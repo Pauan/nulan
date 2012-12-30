@@ -196,7 +196,7 @@ $mac $syntax-protect -> body                                               \n\
                                                                            \n\
 $mac $syntax-rule -> s o                                                   \n\
   '$run                                                                    \n\
-     syntax-rules;[s] <= o                                                 \n\
+     syntax-rules[s] <= o                                                  \n\
                                                                            \n\
 $mac $syntax-helper -> n f                                                 \n\
   w/uniq s i o u                                                           \n\
@@ -248,112 +248,4 @@ $syntax-infix \"~=\" 40                                                    \n\
 $syntax-infix \"&&\" 30                                                    \n\
                                                                            \n\
 $syntax-infix \"||\" 20                                                    \n\
-                                                                           \n\
-                                                                           \n\
-                                                                           \n\
-#|                                                                         \n\
-(mac complex (x body)                                                      \n\
-  (w/uniq (u v)                                                            \n\
-    `(if (isa ,x 'sym)                                                     \n\
-         ,body                                                             \n\
-         (w/uniq (,u ,v)                                                   \n\
-           (withs (,v ,x                                                   \n\
-                   ,x ,u)                                                  \n\
-              `(let ,,u ,,v                                                \n\
-                 ,,body))))))                                              \n\
-                                                                           \n\
-mac uniqs -> @args body                                                    \n\
-  '| box ,@(args.map -> x 'x = uniq;)                                      \n\
-   | body                                                                  \n\
-                                                                           \n\
-mac vars -> @args                                                          \n\
-  '(|) ,@(args.map -> x 'var x)                                            \n\
-                                                                           \n\
-mac w/vars -> @args                                                        \n\
-  args.reduceRight -> x y                                                  \n\
-    'w/var y x                                                             \n\
-                                                                           \n\
-mac w/def -> x '(| f @body)                                                \n\
-  'w/var x                                                                 \n\
-     (|) (x <= f) ,@body                                                   \n\
-                                                                           \n\
-w/def foo                                                                  \n\
-  | -> a (a + 2)                                                           \n\
-      foo                                                                  \n\
-  | foobar                                                                 \n\
-                                                                           \n\
-w/def foo ((|) bar 1 2 3)                                                  \n\
-                                                                           \n\
-$run                                                                       \n\
-  w/var y = {1 2 3}                                                        \n\
-    w/complex y y                                                          \n\
-                                                                           \n\
-w/uniq u v                                                                 \n\
-  w/var v = y                                                              \n\
-        y = u                                                              \n\
-    'w/var u = v                                                           \n\
-      y                                                                    \n\
-|#                                                                         \n\
-                                                                           \n\
-#|                                                                         \n\
-[ foo -> 10                                                                \n\
-| bar -> 20                                                                \n\
-| qux -> 30 ]                                                              \n\
-                                                                           \n\
-| foo | bar | qux                                                          \n\
-                                                                           \n\
-                                                                           \n\
-let u {}                                                                   \n\
-  | foo 1                                                                  \n\
-  | bar 5                                                                  \n\
-  | qux 10                                                                 \n\
-                                                                           \n\
-                                                                           \n\
-|||| foo | bar ||| qux                                                     \n\
-                                                                           \n\
-                                                                           \n\
--> a a | 5                                                                 \n\
-                                                                           \n\
-                                                                           \n\
-{ -> a b c | -> a b c | -> a b c }                                         \n\
-                                                                           \n\
-                                                                           \n\
-foo bar @qux                                                               \n\
-                                                                           \n\
-'foo bar @qux                                                              \n\
-                                                                           \n\
-''foo bar @qux                                                             \n\
-                                                                           \n\
-'''foo bar @qux                                                            \n\
-                                                                           \n\
-                                                                           \n\
-'foo ,bar ,@qux                                                            \n\
-                                                                           \n\
-''foo ,bar ,@qux                                                           \n\
-                                                                           \n\
-''foo ,,bar ,,@qux                                                         \n\
-                                                                           \n\
-                                                                           \n\
-if qux corge                                                               \n\
-  | a                                                                      \n\
-  | b                                                                      \n\
-  if foo bar                                                               \n\
-    | d                                                                    \n\
-    | e                                                                    \n\
-    if nou yesno                                                           \n\
-      | f                                                                  \n\
-      | g                                                                  \n\
-      h                                                                    \n\
-                                                                           \n\
-if qux corge                                                               \n\
-  | a                                                                      \n\
-  | b                                                                      \n\
-  foo bar                                                                  \n\
-  | d                                                                      \n\
-  | e                                                                      \n\
-  nou yesno                                                                \n\
-  | f                                                                      \n\
-  | g                                                                      \n\
-  h                                                                        \n\
-|#                                                                         \n\
 ")

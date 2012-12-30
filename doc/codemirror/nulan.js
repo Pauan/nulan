@@ -17,9 +17,11 @@ CodeMirror.defineMode("nulan", function (config, parserConfig) {
   function symbol(x, state) {
     // /^([a-z]\-[a-z]|[a-zA-Z])+$/.test(r.join(""))
     if (/^[0-9]+$/.test(x)) {
+      state.box = null
       return "number"
     } else if (doc.forms && doc.forms.length) {
       var last = getLast(doc.forms, state)
+      state.box = last.vars[x]
       if (last.syntaxRules[x]) {
         return "special"
       } else {

@@ -130,27 +130,49 @@ tr:last-child td {
   outline: none;
 }*/
 
+.CodeMirror-matchhighlight {
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.75);
+  /*text-decoration: underline overline;*/
+  outline: 1px solid rgba(255, 255, 255, 0.3);
+}
+/*.CodeMirror-matchhighlight::after {
+  background: #555753;
+  height: 5px;
+  content: " ";
+}*/
+
 .nulan-error {
-  white-space: pre;
   font-family: monospace;
   font-size: 12px;
   background: #ffa;
-  color: #a00;
   //padding: 2px 5px 3px;
   padding-top: 1px;
   padding-bottom: 2px;
 }
 
-.nulan-error-icon {
+.nulan-error-message {
   display: inline-block;
+
+  font-family: inherit;
+  white-space: pre;
+  color: #a00;
+}
+
+.nulan-error-icon {
+  /*display: inline-block;*/
+  float: left;
+
   color: white;
   background-color: red;
-  font-size: 12px;
   font-weight: bold;
+  font-family: arial;
   border-radius: 25%;
-  padding-left: 4px;
-  padding-right: 3px;
-  padding-bottom: 1px;
+
+  padding-left: 5px;
+  padding-right: 4px;
+  padding-top: 1px;
+
   margin-left: 2px;
   margin-right: 4px;
 }

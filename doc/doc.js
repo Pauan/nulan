@@ -83,6 +83,7 @@ var doc = (function (n) {
   })
 
   script("../lib/codemirror/lib/codemirror.js", function () {
+    //"../lib/codemirror/lib/util/searchcursor.js"
     script("codemirror/nulan.js")
   })
 
@@ -213,13 +214,100 @@ var doc = (function (n) {
         var y = document.createElement("span")
         y.className = "nulan-error-icon"
         y.textContent = "!"
-
         x.appendChild(y)
-        x.appendChild(document.createTextNode(message))
+
+        y = document.createElement("span")
+        y.className = "nulan-error-message"
+        y.textContent = message
+        x.appendChild(y)
+
         lines.push(oEditor.addLineWidget(line - 1, x))
       }
 
+/*
+      function some(a, f) {
+        var x
+        for (var i = 0, iLen = a.length; i < iLen; ++i) {
+          if ((x = f(a[i]))) {
+            return x
+          }
+        }
+        return false
+      }
+
+      function find(x, info) {
+        if (Array.isArray(x)) {
+          return some(x, function (x) {
+            return find(x, info)
+          })
+        } else if (x instanceof NULAN.Symbol) {
+          if (x.line === info.line + 1 &&
+              info.ch + 1 >= x.column &&
+              info.ch + 1 <= x.length + x.column) {
+            return x.value
+          } else {
+            return false
+          }
+        } else {
+          return false
+        }
+      }*/
+
+      var marks
+
+      function mark(o, currentToken, startCursor, line, end) {
+          //, line = startCursor.line
+        o.operation(function () {
+          var ch, sLine
+          var s = currentToken.string
+            , r = []
+          console.info(s, line, end, o.getLine(line))
+          while (line < end) {
+            ch = 0
+            sLine = o.getLine(line)
+            while (true) {
+              ch = sLine.indexOf(s, ch)
+              if (ch === -1) {
+                break
+              } else {
+                r.push({ line: line, ch: ch + 1 })
+                ch += s.length
+              }
+            }
+            ++line
+          }
+          r.forEach(function (x) {
+            var y = o.getTokenAt(x)
+            //console.info(s, y.state.box)
+            if (y.string === s &&
+                y.type === currentToken.type &&
+                currentToken.state.box === y.state.box) {
+              marks.push(o.markText({ line: x.line, ch: y.start },
+                                    { line: x.line, ch: y.end },
+                                    { className: "CodeMirror-matchhighlight" }))
+            }
+          })
+        })
+      }
+
+      function isHighlight(x) {
+        return x.type === "keyword"  ||
+               x.type === "builtin"  ||
+               //x.type === "variable" ||
+               x.type === "atom"     ||
+               x.type === "number"
+      }
+
       function output(oEditor, o) {
+        if (marks) {
+          oEditor.operation(function () {
+            marks.forEach(function (x) {
+              x.clear()
+            })
+          })
+        }
+        marks = []
+
         var output = {
           //error:        [],
           prints:       [],
@@ -232,10 +320,15 @@ var doc = (function (n) {
         var start = oEditor.getCursor(true).line + 1
           , end   = oEditor.getCursor(false).line + 1
 
+        var currentForm
+
         n.forms.forEach(function (x) {
           /*if ("error" in x) {
             output.error.push(x.error)
           }*/
+          if (start >= x.start && end <= x.end) {
+            currentForm = x
+          }
           if (x.start <= end && x.end >= start) {
             output.prints.push.apply(output.prints, x.prints)
             if ("eval" in x) {
@@ -250,6 +343,34 @@ var doc = (function (n) {
             }
           }
         })
+
+        var startCursor  = oEditor.getCursor("head")
+          , currentToken = oEditor.getTokenAt(startCursor)
+
+        if (currentToken.type === "variable") {
+          if (currentForm) {
+            mark(oEditor, currentToken, startCursor, currentForm.start - 1, currentForm.end)
+          }
+        } else if (isHighlight(currentToken)) {
+          mark(oEditor, currentToken, startCursor, 0, oEditor.lineCount())
+        } else {
+          currentToken = oEditor.getTokenAt({ line: startCursor.line, ch: startCursor.ch + 1 })
+          if (currentToken.type === "variable") {
+            if (currentForm) {
+              mark(oEditor, currentToken, startCursor, currentForm.start - 1, currentForm.end)
+            }
+          } else if (isHighlight(currentToken)) {
+            mark(oEditor, currentToken, startCursor, 0, oEditor.lineCount())
+          }
+        }
+/*
+        if (currentForm) {
+                                                // TODO: slight code duplication
+          currentForm = find(currentForm.parse, oEditor.getCursor(true))
+          if (currentForm) {
+
+          }
+        }*/
 
         var r = []
 
@@ -473,7 +594,7 @@ var doc = (function (n) {
                 o.compileEvals.push(x)
               }
 
-              sandbox.contentWindow.console.log = function () {
+              console.log = sandbox.contentWindow.console.log = function () {
                 o.prints.push([].slice.call(arguments).join(" "))
               }
 

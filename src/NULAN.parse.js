@@ -466,8 +466,9 @@ var NULAN = (function (n) {
     }
 
     var temp = []
+    r = iter(r)
     // TODO: use something other than braces?
-    braces(iter(r), temp)
+    braces(r, r.peek(), temp)
     return process(iter(temp), -1)
   }
 
@@ -702,11 +703,11 @@ var NULAN = (function (n) {
     return x instanceof n.Symbol && x.value === y
   }
 
-  function until(o, s) {
-    var x = o.read()
-      , y
+  function until(o, x, s) {
+    var y
       , z
       , r = []
+      , first = true
     while (true) {
       if (o.has()) {
         y = o.peek()
@@ -714,7 +715,7 @@ var NULAN = (function (n) {
           break
         } else if (isSeparator(y)) {
           //if (s === ")") { // TODO
-          z = until(o, s)
+          z = until(o, o.read(), s)
           r.push(y)
           if (z.value.length !== 0) {
             r.push(z)
@@ -724,8 +725,18 @@ var NULAN = (function (n) {
             o.read()
             r.push(new Bypass(process(iter([braces(o)]), -1))) // TODO
           }*/
+        /*} else if (first) {
+          first = false
+          o.read()
+          z = o.peek()
+          if (isSym(z, s)) {
+            r.push(y)
+            break
+          } else {
+            braces(o, y, r)
+          }*/
         } else {
-          braces(o, r)
+          braces(o, o.peek(), r)
         }
       } else {
         throw new n.Error(x, "missing ending " + s)
@@ -741,11 +752,10 @@ var NULAN = (function (n) {
       `,@l ,r
 */
 
-  function braces(o, a) {
-    var x = o.peek()
+  function braces(o, x, a) {
     if (isEndAt(x)) {
       a.push(x)
-      x = until(o, n.syntaxRules[x.value].endAt)
+      x = until(o, o.read(), n.syntaxRules[x.value].endAt)
     }
     o.read()
     a.push(x)
@@ -778,7 +788,7 @@ var NULAN = (function (n) {
           o.read()
           a.push(y, indent(o, o.peek()))
         } else {
-          braces(o, a)
+          braces(o, o.peek(), a)
         }
       } else if (y.column > x.column) {
         a.push(new Bypass(unwrap(indent(o, o.peek()))))

@@ -275,7 +275,7 @@ var NULAN = (function (n) {
 
   var mangle, unmangle, validJS
 
-  var Uniq, setBuiltin, setSymExternal, setSymToBox, getBox, withLocalScope
+  var Uniq, setBuiltin, setSymExternal, setSymToBox, setPlace, getBox, withLocalScope
 
   var setValue, compileEval
 
@@ -491,6 +491,16 @@ var NULAN = (function (n) {
       return x
     }
 
+    setPlace = function (x, y) {
+      x = setSymToBox(new n.Symbol(x))
+      if ("get" in y) {
+        x.get = y.get
+      }
+      if ("set" in y) {
+        x.set = y.set
+      }
+    }
+
     getBox = function (x, b) {
       if (x instanceof n.Box) {
         return x
@@ -610,8 +620,13 @@ var NULAN = (function (n) {
 
   // TODO: `syntax-rules <= [ ... ]`
   //       `w/dict! syntax-rules ...
-  setValue("syntax-rules", function () {
-    return n.syntaxRules
+  setPlace("syntax-rules", {
+    get: function () {
+      return n.syntaxRules
+    },
+    set: function (x) {
+      n.syntaxRules = x
+    }
   })
   /*setValue("syntax-rules", new Alias(function () {
     return n.syntaxRules
@@ -690,7 +705,13 @@ var NULAN = (function (n) {
       if (a.scope === "local" || mode === "run" || (mode !== "quote" && a.scope === "builtin")) {
         return ["name", x]
       } else if (mode === "compile") {
-        return [".", [".", ["name", "n"], "values"], x]
+        // TODO: move this up so it works in all modes, not just "compile"
+        if ("get" in a) {
+          x = withMode("quote", function () { return mac(a) })
+          return ["call", [".", x, "get"], []]
+        } else {
+          return [".", [".", ["name", "n"], "values"], x]
+        }
       } else if (mode === "quote") {
         return [".", [".", ["name", "n"], "boxes"], x]
         //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
@@ -778,7 +799,7 @@ var NULAN = (function (n) {
   patterns[mangle("'")] = function (args, v, body) {
     compileOnlyError(args[0])
 
-    var x = getBox(args[1])
+    var x = getBox(args[1]) // TODO: checkBox ?
     return [n.box("if"), [n.box("&box=="), v, x.value],
                          body,
                          [n.box("&error"), v, [n.box("+"), "expected " + args[1] + " but got ", v]]]
@@ -871,7 +892,7 @@ var NULAN = (function (n) {
   setValue("&in",         binary("in"))
   setValue("&instanceof", binary("instanceof"))
   setValue("mod",         binary("%"))
-  setValue("<=",          binary("="))
+  //setValue("<=",          binary("="))
 
   setValue("==",          binand("===", ["boolean", "true"]))
   setValue("<",           binand("<",   ["boolean", "true"]))
@@ -887,6 +908,22 @@ var NULAN = (function (n) {
   setValue("-",           binreduce1("-", function (x) { return ["u-", x] }))
   setValue("|",           binreduce1(","))
   setValue("/",           binreduce1("/"))
+
+  setValue("<=", macro(function (x, y) {
+    // TODO: a teensy tiny itty bitty bit hacky that I'm using getBox and checkBox in here
+    var b = getBox(x)
+    if (b) {
+      b = checkBox(x, b)
+      if ("set" in b) {
+        b = withMode("quote", function () { return mac(b) })
+        return ["call", [".", b, "set"], [mac(y)]]
+      } else {
+        return ["=", mac(b), mac(y)]
+      }
+    } else {
+      return ["=", mac(x), mac(y)]
+    }
+  }))
 
 // TODO: make , and @ into make-macro-error macros
 // TODO: change if so it only accepts 0-3 arguments
@@ -1297,7 +1334,7 @@ var NULAN = (function (n) {
       if (Array.isArray(x)) {
         // TODO: use isSym ?
         if (!n.isBox(x[0], "=")) {
-          throw new n.Error(x[0], "expected ('=) but got " + x[0])
+          throw new n.Error(x[0], "expected = but got " + x[0])
         }
         y = x[2]
         x = x[1]
@@ -1328,6 +1365,7 @@ var NULAN = (function (n) {
       } else {
         // TODO: code duplication with destructure1
         if (complex(y)) {
+          console.info(y)
           var u = new Uniq()
           return mac([n.box("|"), [n.box("box"), [n.box("="), u, y]], destructure(x, u)])
         } else {
@@ -1698,7 +1736,7 @@ function infix(i, b, f) {
     var r = []
     n.parse(s, function (err, x) {
       if (err) {
-        console.error("" + err)
+        //console.error("" + err)
         throw err
       }
       r.push(n.compile(x))
