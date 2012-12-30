@@ -1,10 +1,22 @@
 var NULAN = (function (n) {
   "use strict";
 
-  // TODO
-  n.box = function (x) {
-    return new n.Symbol(x)
+  n.tokenInfo = {}
+
+  n.tokenUpdate = function (o, f) {
+    var s = o.line + ":" + o.column
+      , x = n.tokenInfo[s]
+    if (!x) {
+      x = n.tokenInfo[s] = {}
+    }
+    x.line   = o.line
+    x.column = o.column
+    x.length = o.length
+    if (f) {
+      f(x)
+    }
   }
+
 
   // TODO: maybe move this into NULAN.js?
   // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Error#Custom_Error_Types
@@ -67,6 +79,11 @@ var NULAN = (function (n) {
   n.Symbol.prototype.toString = function () {
     return this.value
   }
+
+
+  //function ParseBypass() {}
+
+  function Bypass(x) { this.value = x }
 
 
   // Converts any array-like object into an iterator
@@ -172,9 +189,8 @@ var NULAN = (function (n) {
 
   // TODO: make them into proper infix, so they behave correctly when only given a left or right side
   n.syntaxRules = {
-    // TODO: do these need to be priority 120?
     "(": {
-      priority: 110,
+      priority: 90,
       delimiter: true,
       endAt: ")",
       parse: function (l, s, r) {
@@ -184,35 +200,49 @@ var NULAN = (function (n) {
     },
 
     "{": {
-      priority: 110,
+      priority: 90,
       delimiter: true,
       endAt: "}",
       parse: function (l, s, r) {
-        r[0].unshift(n.box("list"))
+        r[0].unshift(s)
         l.push(r[0])
         return l.concat(r.slice(1))
       }
     },
 
     "[": {
-      priority: 100, // TODO: 110
+      priority: 90,
       delimiter: true,
       endAt: "]",
       parse: function (l, s, r) {
         if (s.whitespace) {
-          r[0].unshift(n.box("dict"))
+          r[0].unshift(s)
           l.push(r[0])
         } else {
           var x = l[l.length - 1]
           l = l.slice(0, -1)
-          l.push([n.box("."), x, unwrap(r[0])])
+                  // TODO: does this need to enrich?
+          l.push([enrich(new n.Symbol("."), s), x, unwrap(r[0])])
         }
         return l.concat(r.slice(1))
       }
     },
 
+    "\"": {
+      priority: 90,
+      delimiter: true,
+      endAt: "\"",
+      tokenize: function (o) {
+        return tokenizeString(o)
+      },
+      parse: function (l, s, r) {
+        l.push([s].concat(r[0]))
+        return l.concat(r.slice(1))
+      }
+    },
+
     ";": {
-      priority: 100,
+      priority: 90,
       delimiter: true,
       parse: function (l, s, r) {
         l.push([l.pop()])
@@ -222,7 +252,7 @@ var NULAN = (function (n) {
     },
 
     ":": {
-      priority: 100,
+      priority: 90, // TODO: does this need to be 90?
       delimiter: true,
       separator: true,
       parse: function (l, s, r) {
@@ -234,7 +264,7 @@ var NULAN = (function (n) {
 
     // TODO: update "Customizable syntax.rst" with the new definition of "."
     ".": {
-      priority: 100,
+      priority: 90,
       delimiter: true,
       parse: function (l, s, r) {
         function parse(x, y) {
@@ -246,8 +276,14 @@ var NULAN = (function (n) {
             var i = (x.value + "." + y.value)
             i = enrich(new n.Wrapper(+i), x)
             i.length = x.length + y.length + 1
+            n.tokenUpdate(i, function (o) {
+              o.type = "number"
+            })
             return i
           } else if (y instanceof n.Symbol) {
+            n.tokenUpdate(y, function (o) {
+              o.type = "string"
+            })
             return [s, x, y.value]
           } else if (x === void 0) {
 
@@ -261,8 +297,8 @@ var NULAN = (function (n) {
     },
 
                     // TODO
-    ",":  unary(90, true),
-    "@":  unary(90, true),
+    ",":  unary(80, true),
+    "@":  unary(80, true),
     //"~":  unary(90, false),
 
     /*"*":  infix(80),
@@ -284,7 +320,7 @@ var NULAN = (function (n) {
     "||": infix(30),*/
 
     "'": {
-      priority: 90, // TODO: 10
+      priority: 80, // TODO: 10
       whitespace: true,
       delimiter: true,
       separator: true,
@@ -339,33 +375,40 @@ var NULAN = (function (n) {
     },
 
     "#": {
+      //priority: 9001,
+      //order: "right",
       delimiter: true,
       whitespace: true,
+      endAt: "|#", // TODO: hacky, but it works
       tokenize: function (o) {
+        var s = store(o)
         o.read()
         if (o.peek() === "|") {
           tokenizeComment(o)
           o.read()
+          return []
+        // TODO: hacky, but it works
+        } else if (o.peek() === ">") {
+          return tokenizeCommentDoc(o, s)
         } else {
           while (o.has() && o.peek() !== "\n") {
             o.read()
           }
+          n.tokenUpdate(enrich({}, s, o), function (o) {
+            o.type = "comment"
+          })
+          return []
         }
+        //return enrich(new ParseBypass(), s, o)
+      },
+      // TODO: hacky, but it works
+      parse: function (l, s, r) {
+        l.push([s].concat(r[0]))
+        return l.concat(r.slice(1))
       }
     },
 
-    "\"": { delimiter: true }
-/*
-    // TODO: change it so tokenize receives a symbol rather than a string?
-    "\"": {
-      delimiter: true,
-      endAt: "\"",
-      parse: function (l, s, r) {
-               // TODO: s
-        l.push([n.box("str")].concat(r[0]))
-        return l.concat(r.slice(1))
-      }
-    }*/
+    "`": { delimiter: true }
   }
 
   // TODO: add in whitespace, comments, and strings to "Customizable syntax.rst"
@@ -373,13 +416,67 @@ var NULAN = (function (n) {
     delimiter: true,
     whitespace: true,
     tokenize: function (o) {
+      var s = store(o)
       o.read()
+      n.tokenUpdate(enrich({}, s, o), function (o) {
+        o.type = "symbol"
+        o.syntax = true
+      })
+      return []
     }
   }
 
   inert("(", ")")
   inert("[", "]")
   inert("{", "}")
+  inert("#|", "|#")
+
+  function tokenizeCommentDoc(o, s) {
+    var seen, r = []
+
+    function push() {
+      if (seen) {
+        n.tokenUpdate(enrich({}, s, o), function (o) {
+          o.type = "comment-doc"
+        })
+      } else {
+        seen = true
+        var x = enrich(new n.Symbol("#"), s, o)
+        r.push(x)
+        n.tokenUpdate(x, function (o) {
+          o.type = "comment-doc"
+        })
+      }
+    }
+
+    while (o.has() && o.peek() !== "\n") {
+      if (o.peek() === "`") {
+        o.read()
+        push()
+
+        r.push(new Bypass(unwrap(processUntil(o, "`"))))
+        /*  function (x) {
+          var s
+          if ((s = n.vars[x.value])) {
+            n.tokenUpdate(x, function (o) {
+              o.box = n.boxes[s]
+            })
+          }
+        } */
+        if (o.peek() === "`") {
+          s = store(o)
+          o.read()
+        } else {
+          throw new n.Error(s, "missing ending `")
+        }
+      } else {
+        o.read()
+      }
+    }
+    push()
+    r.push(new n.Symbol("|#"))
+    return r
+  }
 
   function tokenizeComment(o) {
     var s = store(o)
@@ -444,16 +541,74 @@ var NULAN = (function (n) {
 
   var white
 
-  function tokenizeString(q, o) {
+  function processUntil(oOrig, s) {
+    var r = []
+      , c
+
+    var o = tokenize(oOrig)
+    while (o.has()) {
+      c = o.peek()
+      /*if (c instanceof n.Symbol) {
+        f(c)
+      }*/
+      r.push(c)
+      if (oOrig.peek() === s) {
+        break
+      } else {
+        o.read()
+      }
+    }
+
+    //var temp = []
+    r = iter(r)
+    // TODO: use something other than braces?
+    //braces(r, r.peek(), temp)
+    //return process(iter(temp), -1)
+    return indent(r, r.peek())
+  }
+
+  function processOne(o) {
+    var stack = []
+      , r     = []
+      , c
+
+    o = tokenize(o)
+
+    while (o.has()) {
+      c = o.peek()
+      r.push(c)
+      if (c instanceof n.Symbol) {
+        if (c.value === stack[stack.length - 1]) {
+          stack.pop()
+        } else if ((c = n.syntaxRules[c.value]) && "endAt" in c) {
+          stack.push(c.endAt)
+        }
+      }
+      if (stack.length === 0) {
+        break
+      } else {
+        o.read()
+      }
+    }
+
+    var temp = []
+    r = iter(r)
+    // TODO: use something other than braces?
+    braces(r, r.peek(), temp)
+    return process(iter(temp), -1)
+  }
+
+  function tokenizeString(o) {
     var s = store(o)
+      , q = o.read()
+      , r = [enrich(new n.Symbol(q), s, o)]
       , a = []
       , c
-    o.read()
-    //push(enrich(new n.Symbol(q), o))
     while (true) {
       if (o.has()) {
         c = o.peek()
         if (c === q) {
+          o.read()
           break
         } else if (c === "\\") {
           o.read()
@@ -472,18 +627,19 @@ var NULAN = (function (n) {
             o.column -= 2
             throw new n.Error(o, "expected \\r \\n \\t \\\" \\@ \\\\ but got \\" + c)
           }
-        // TODO
-        /*} else if (c === "@") {
+        } else if (c === "@") {
+          //r[0] = enrich(r[0], s, o)
+          n.tokenUpdate(enrich({}, s, o), function (o) {
+            o.type = "string"
+          })
+
           o.read()
           if (a.length) {
-            push(enrich(new n.Wrapper(a.join("")), o))
+            r.push(enrich(new n.Wrapper(a.join("")), s, o)) // TODO: use a different store
           }
           a = []
-          push(tokenizeNumOrSym(o))*/
-
-          // TODO: should either make "foobar@"testing"" work or throw an error
-          //tokenize(o, push, q) // TODO q
-          //"foo@((bar qux) corge)"
+          r.push(new Bypass(unwrap(processOne(o))))
+          s = store(o)
         } else {
           a.push(o.read())
         }
@@ -493,9 +649,20 @@ var NULAN = (function (n) {
         throw new n.Error(s, "missing ending \"")
       }
     }
-    o.read()
-    return enrich(new n.Wrapper(a.join("")), s, o)
-    //push(enrich(new n.Symbol(q), o))
+    //r[0] = enrich(r[0], s, o)
+    n.tokenUpdate(enrich({}, s, o), function (o) {
+      o.type = "string"
+    })
+
+    if (a.length) {
+      r.push(enrich(new n.Wrapper(a.join("")), s, o))
+    }
+    r.push(enrich(new n.Symbol(q), o)) // TODO
+    if (r.length === 3 && r[1] instanceof n.Wrapper) {
+      return r[1]
+    } else {
+      return r
+    }
   }
 
   function tokenizeNumOrSym(o) {
@@ -509,6 +676,10 @@ var NULAN = (function (n) {
       r = enrich(new n.Wrapper(+r.join("")), s, o)
       r.whitespace = white
       white = false
+
+      n.tokenUpdate(r, function (o) {
+        o.type = "number"
+      })
       return r
     } else {
       while (!isDelimiter(o)) {
@@ -519,6 +690,11 @@ var NULAN = (function (n) {
       r = enrich(new n.Symbol(r), s, o)
       r.whitespace = white
       white = (b ? !!b.whitespace : false)
+
+      n.tokenUpdate(r, function (o) {
+        o.type = "symbol"
+        o.syntax = !!(b && (b.parse || b.tokenize)) // TODO: should this include b.tokenize?
+      })
       return r
     }
   }
@@ -526,7 +702,9 @@ var NULAN = (function (n) {
   function tokenize(o) {
     white = true
 
-    var last
+    var lastIndex
+      , lastToken = {}
+      , last      = lastToken
 
     function next() {
       if (o.has()) {
@@ -558,12 +736,9 @@ var NULAN = (function (n) {
             push(enrich(x, s, o))
           }
           */
-          s = x.tokenize(o)
-
+          lastIndex = 0
+          last = x.tokenize(o)
           white = !!x.whitespace
-          next()
-        } else if (c === "\"") {
-          last = tokenizeString(c, o)
         } else if (x && x.delimiter) {
           // TODO: some small code duplication with tokenizeNumOrSym
           s = store(o)
@@ -575,47 +750,57 @@ var NULAN = (function (n) {
               push(new n.Symbol(o.read()))
             }
           }*/
-          s = enrich(new n.Symbol(c), s, o)
-          s.whitespace = white
-
+          last = enrich(new n.Symbol(c), s, o)
+          last.whitespace = white
           white = !!x.whitespace
-          last = s
+
+          n.tokenUpdate(last, function (o) {
+            o.type = "symbol"
+            o.delimiter = true
+            o.syntax = !!(x.parse || x.tokenize) // TODO: should this include x.tokenize?
+          })
         } else {
           last = tokenizeNumOrSym(o)
         }
       }
     }
 
-    return {
+    function read() {
+      next()
+      while (Array.isArray(last) && last.length === 0 && o.has()) {
+        next()
+      }
+    }
+
+    var oIter = {
       location: function () {
         return o
       },
       peek: function () {
-        if (last) {
-          return last
+        if (last === lastToken) {
+          read()
+        }
+        if (Array.isArray(last)) {
+          return last[lastIndex]
         } else {
-          next()
           return last
         }
       },
       read: function () {
-        if (last) {
-          var old = last
-          next()
-          return old
-        } else {
-          next()
-          return last
+        var old = oIter.peek()
+        if (!(Array.isArray(last) && ++lastIndex < last.length)) {
+          read()
         }
+        return old
       },
       has: function () {
-        return o.has()
+        return o.has() || (Array.isArray(last) && lastIndex < last.length)
       }
     }
+
+    return oIter
   }
 
-
-  function Wrap(x) { this.value = x }
 
   // Modified Pratt Parser, designed for lists of symbols rather than tokens
   function process(o, i) {
@@ -623,7 +808,7 @@ var NULAN = (function (n) {
 
     while (o.has()) {
       x = o.peek()
-      if (x instanceof Wrap) {
+      if (x instanceof Bypass) {
         x = x.value
       } else if (x instanceof n.Symbol && n.syntaxRules[x.value]) {
         break
@@ -631,6 +816,8 @@ var NULAN = (function (n) {
       o.read()
       l.push(x)
     }
+
+    //l.tap()
 
     // TODO: fold this into the above while loop somehow?
     while (o.has() && (x = o.peek()) && x instanceof n.Symbol && (y = n.syntaxRules[x.value])) {
@@ -668,11 +855,11 @@ var NULAN = (function (n) {
     return x instanceof n.Symbol && x.value === y
   }
 
-  function until(o, s) {
-    var x = o.read()
-      , y
+  function until(o, x, s) {
+    var y
       , z
       , r = []
+      , first = true
     while (true) {
       if (o.has()) {
         y = o.peek()
@@ -680,7 +867,7 @@ var NULAN = (function (n) {
           break
         } else if (isSeparator(y)) {
           //if (s === ")") { // TODO
-          z = until(o, s)
+          z = until(o, o.read(), s)
           r.push(y)
           if (z.value.length !== 0) {
             r.push(z)
@@ -688,16 +875,26 @@ var NULAN = (function (n) {
           /*} else {
             r.push(y)
             o.read()
-            r.push(new Wrap(process(iter([braces(o)]), -1))) // TODO
+            r.push(new Bypass(process(iter([braces(o)]), -1))) // TODO
+          }*/
+        /*} else if (first) {
+          first = false
+          o.read()
+          z = o.peek()
+          if (isSym(z, s)) {
+            r.push(y)
+            break
+          } else {
+            braces(o, y, r)
           }*/
         } else {
-          braces(o, r)
+          braces(o, o.peek(), r)
         }
       } else {
         throw new n.Error(x, "missing ending " + s)
       }
     }
-    return new Wrap(process(iter(r), -1))
+    return new Bypass(process(iter(r), -1))
   }
 
 /*
@@ -707,14 +904,22 @@ var NULAN = (function (n) {
       `,@l ,r
 */
 
-  function braces(o, a) {
-    var x = o.peek()
+  function braces(o, x, a) {
+    /*if (x instanceof ParseBypass) {
+      o.read()
+      //braces(o, o.peek(), a)
+    } else {*/
     if (isEndAt(x)) {
       a.push(x)
-      x = until(o, n.syntaxRules[x.value].endAt)
+      x = until(o, o.read(), n.syntaxRules[x.value].endAt)
     }
     o.read()
+    /*if (x instanceof ParseBypass) {
+      braces(o, o.peek(), a)
+    } else {*/
     a.push(x)
+    //}
+    //}
   }
 
   function indent(o, x) {
@@ -723,11 +928,34 @@ var NULAN = (function (n) {
       , b
       , r
       //, z
+    /*if (x instanceof ParseBypass) {
+      o.read()
+      x = o.peek()
+    }*/
+    /*while (x instanceof ParseBypass) {
+      o.read()
+      x = o.peek()
+    }*/
     while (o.has()) {
       y = o.peek()
+      /*if (y instanceof ParseBypass) {
+        //console.info(x.line, y.line)
+        if (y.line !== x.line && y.column <= x.column) {
+          //console.info("HIYA", y)
+          break
+        } else {
+          o.read()
+          continue
+        }
+      }*/
       //z = o.location()
       //console.log("indent", y.line, z.line, y.column, z.column)
       if (y.line === x.line) {
+        /*if (y instanceof ParseBypass) {
+          console.log(y)
+          o.read()
+          console.log(o.peek())
+        } else {*/
         b = isSeparator(y)
         if (isVertical(y)) {
           r = []
@@ -744,14 +972,16 @@ var NULAN = (function (n) {
           o.read()
           a.push(y, indent(o, o.peek()))
         } else {
-          braces(o, a)
+          braces(o, o.peek(), a)
         }
+        //}
       } else if (y.column > x.column) {
-        a.push(new Wrap(unwrap(indent(o, o.peek()))))
+        a.push(new Bypass(unwrap(indent(o, o.peek()))))
       } else {
         break
       }
     }
+    //a.tap()
     return process(iter(a), -1)
   }
 

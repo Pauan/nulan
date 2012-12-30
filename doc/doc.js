@@ -83,6 +83,7 @@ var doc = (function (n) {
   })
 
   script("../lib/codemirror/lib/codemirror.js", function () {
+    //"../lib/codemirror/lib/util/searchcursor.js"
     script("codemirror/nulan.js")
   })
 
@@ -147,7 +148,8 @@ var doc = (function (n) {
         debug.addEventListener("change", function () {
           localStorage[name + ".debug"] = this.checked ? "yes" : ""
           n.options.debug = this.checked
-          output(x, o)
+          //output(x, o)
+          process(x, localStorage[name + ".saved"]) // TODO: inefficient, but necessary to make the errors toggle
         }, true)
 
         buttons.appendChild(reset)
@@ -198,41 +200,114 @@ var doc = (function (n) {
         var line, message
         if (e instanceof NULAN.Error) {
           line = e.line
-          message = e.originalMessage
+          message = (n.options.debug
+                      ? "" + e
+                      : e.originalMessage)
         } else {
           line = end
           message = "" + e
         }
 
         var x = document.createElement("div")
-        x.style.fontFamily = "monospace"
-        x.style.fontSize = "12px"
-        x.style.background = "#ffa"
-        x.style.color = "#a00"
-        //x.style.padding = "2px 5px 3px"
-        x.style.paddingTop = "1px"
-        x.style.paddingBottom = "2px"
+        x.className = "nulan-error"
 
         var y = document.createElement("span")
+        y.className = "nulan-error-icon"
         y.textContent = "!"
-        y.style.color = "white"
-        y.style.backgroundColor = "red"
-        y.style.fontSize = "12px"
-        y.style.fontWeight = "bold"
-        y.style.borderRadius = "25%"
-        y.style.cssFloat = "left"
-        y.style.paddingLeft = "4px"
-        y.style.paddingRight = "3px"
-        y.style.paddingBottom = "1px"
-        y.style.marginLeft = "2px"
-        y.style.marginRight = "4px"
-
         x.appendChild(y)
-        x.appendChild(document.createTextNode(message))
+
+        y = document.createElement("span")
+        y.className = "nulan-error-message"
+        y.textContent = message
+        x.appendChild(y)
+
         lines.push(oEditor.addLineWidget(line - 1, x))
       }
 
+/*
+      function some(a, f) {
+        var x
+        for (var i = 0, iLen = a.length; i < iLen; ++i) {
+          if ((x = f(a[i]))) {
+            return x
+          }
+        }
+        return false
+      }
+
+      function find(x, info) {
+        if (Array.isArray(x)) {
+          return some(x, function (x) {
+            return find(x, info)
+          })
+        } else if (x instanceof NULAN.Symbol) {
+          if (x.line === info.line + 1 &&
+              info.ch + 1 >= x.column &&
+              info.ch + 1 <= x.length + x.column) {
+            return x.value
+          } else {
+            return false
+          }
+        } else {
+          return false
+        }
+      }*/
+
+      var marks
+
+      function mark(o, currentToken, startCursor, line, end) {
+          //, line = startCursor.line
+        o.operation(function () {
+          var ch, sLine
+          var s = currentToken.string
+            , r = []
+          while (line < end) {
+            ch = 0
+            sLine = o.getLine(line)
+            while (true) {
+              ch = sLine.indexOf(s, ch)
+              if (ch === -1) {
+                break
+              } else {
+                r.push({ line: line, ch: ch + 1 })
+                ch += s.length
+              }
+            }
+            ++line
+          }
+          r.forEach(function (x) {
+            var y = o.getTokenAt(x)
+            //console.info(s, y.state.box)
+            if (y.string === s &&
+                y.type === currentToken.type &&
+                currentToken.state.box === y.state.box) {
+              marks.push(o.markText({ line: x.line, ch: y.start },
+                                    { line: x.line, ch: y.end },
+                                    { className: "CodeMirror-matchhighlight" }))
+            }
+          })
+        })
+      }
+
+      function isHighlight(x) {
+        return x.type === "special"  ||
+               x.type === "builtin"  ||
+               x.type === "variable" ||
+               x.type === "atom"     ||
+               x.type === "number"   ||
+               x.type === "string"
+      }
+
       function output(oEditor, o) {
+        if (marks) {
+          oEditor.operation(function () {
+            marks.forEach(function (x) {
+              x.clear()
+            })
+          })
+        }
+        marks = []
+
         var output = {
           //error:        [],
           prints:       [],
@@ -245,9 +320,14 @@ var doc = (function (n) {
         var start = oEditor.getCursor(true).line + 1
           , end   = oEditor.getCursor(false).line + 1
 
+        //var currentForm
+
         n.forms.forEach(function (x) {
           /*if ("error" in x) {
             output.error.push(x.error)
+          }*/
+          /*if (start >= x.start && end <= x.end) {
+            currentForm = x
           }*/
           if (x.start <= end && x.end >= start) {
             output.prints.push.apply(output.prints, x.prints)
@@ -263,6 +343,34 @@ var doc = (function (n) {
             }
           }
         })
+
+        var startCursor  = oEditor.getCursor("head")
+          , currentToken = oEditor.getTokenAt(startCursor)
+
+        /*if (currentToken.type === "variable") {
+          if (currentForm) {
+            mark(oEditor, currentToken, startCursor, currentForm.start - 1, currentForm.end)
+          }
+        } else */if (isHighlight(currentToken)) {
+          mark(oEditor, currentToken, startCursor, 0, oEditor.lineCount())
+        } else {
+          currentToken = oEditor.getTokenAt({ line: startCursor.line, ch: startCursor.ch + 1 })
+          /*if (currentToken.type === "variable") {
+            if (currentForm) {
+              mark(oEditor, currentToken, startCursor, currentForm.start - 1, currentForm.end)
+            }
+          } else */if (isHighlight(currentToken)) {
+            mark(oEditor, currentToken, startCursor, 0, oEditor.lineCount())
+          }
+        }
+/*
+        if (currentForm) {
+                                                // TODO: slight code duplication
+          currentForm = find(currentForm.parse, oEditor.getCursor(true))
+          if (currentForm) {
+
+          }
+        }*/
 
         var r = []
 
@@ -306,26 +414,48 @@ var doc = (function (n) {
         // NUIT.serialize(r, { multiline: true })
       }
 
+      // TODO: these pretty functions should be in Nulan
+      function prettyString(x) {
+        return "\"" + x.replace(/[\r\n\t"\\]/g, function (s) {
+          if (s === "\r") {
+            return "\\r"
+          } else if (s === "\n") {
+            return "\\n"
+          } else if (s === "\t") {
+            return "\\t"
+          } else {
+            return "\\" + s
+          }
+        }) + "\""
+      }
+
       function prettyParse(x) {
         // TODO: code duplication with pretty
         if (Array.isArray(x)) {
-          return "(" + withIndent(function () {
-                         var seen
-                         return x.map(function (x) {
-                           if (Array.isArray(x)) {
-                             seen = true
-                           }
-                           if (seen) {
-                             return "\n" + spaces() + prettyParse(x)
-                           } else {
-                             return prettyParse(x)
-                           }
-                         }).join(" ")
-                       }) + ")"
+          if (x.length) {
+            var seen
+            return "(" + //prettyParse(x[0]) + " " +
+                                  // TODO: ew slice
+                                  x.map(function (x) {
+                                    return withIndent(function () {
+                                      indent += 2
+                                      if (Array.isArray(x)) {
+                                        seen = true
+                                      }
+                                      if (seen) {
+                                        return "\n" + spaces() + prettyParse(x)
+                                      } else {
+                                        return prettyParse(x)
+                                      }
+                                    })
+                                  }).join(" ") + ")"
+          } else {
+            return "()"
+          }
         } else if (x instanceof NULAN.Wrapper) {
           return prettyParse(x.value)
         } else if (typeof x === "string") {
-          return "\"" + x + "\"" // TODO replace " inside the string with \"
+          return prettyString(x)
         } else if (x === void 0) {
           return "()"
         } else {
@@ -349,13 +479,18 @@ var doc = (function (n) {
 
       function withIndent(f) {
         var old = indent
-        indent += 2
+        //indent += 2
         try {
           var x = f()
         } finally {
           indent = old
         }
         return x
+      }
+
+      function indenter(s) {
+        indent += s.length
+        return s
       }
 
       function spaces() {
@@ -373,9 +508,10 @@ var doc = (function (n) {
       function pretty(x) {
         // TODO: a bit ew
         if (Array.isArray(x)) {
-          return "{" + withIndent(function () {
-                         var seen
-                         return x.map(function (x) {
+          var seen
+          return "{" + x.map(function (x) {
+                         return withIndent(function () {
+                           indent += 2
                            if (Array.isArray(x)) {
                              seen = true
                            }
@@ -384,8 +520,8 @@ var doc = (function (n) {
                            } else {
                              return pretty(x)
                            }
-                         }).join(" ")
-                       }) + "}"
+                         })
+                       }).join(" ") + "}"
         /*} else if (x instanceof Object && typeof x !== "function") {
           return "{\n" + withIndent(function () {
                            return Object.getOwnPropertyNames(x).map(function (s) {
@@ -400,8 +536,7 @@ var doc = (function (n) {
         } else if (x && typeof x === "object") {
           return "#<dict>"
         } else if (typeof x === "string") {
-          // TODO
-          return "\"" + x + "\""
+          return prettyString(x)
         } else if (x === void 0) {
           return "()"
         } else if (x === true) {
@@ -437,8 +572,10 @@ var doc = (function (n) {
 
           var myEval = sandbox.contentWindow.eval
 
-          lines = []
+          lines   = []
           n.forms = []
+
+          NULAN.tokenInfo = {}
 
           NULAN.parse(s, function (err, x, start, end) {
             if (err) {
@@ -459,7 +596,7 @@ var doc = (function (n) {
                 o.compileEvals.push(x)
               }
 
-              sandbox.contentWindow.console.log = function () {
+              console.log = sandbox.contentWindow.console.log = function () {
                 o.prints.push([].slice.call(arguments).join(" "))
               }
 
@@ -475,14 +612,16 @@ var doc = (function (n) {
                 //o.error = "" + e
                 //o.textContent = print(["" + e])
               }
-
+/*
+              o.boxes       = NULAN.boxes
               o.vars        = NULAN.vars
               o.values      = NULAN.values
               o.syntaxRules = NULAN.syntaxRules
 
+              //NULAN.boxes       = Object.create(NULAN.boxes)
               NULAN.vars        = Object.create(NULAN.vars)
               NULAN.values      = Object.create(NULAN.values)
-              NULAN.syntaxRules = Object.create(NULAN.syntaxRules)
+              NULAN.syntaxRules = Object.create(NULAN.syntaxRules)*/
 
               n.forms.push(o)
             }
