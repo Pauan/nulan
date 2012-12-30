@@ -279,7 +279,7 @@ var doc = (function (n) {
             var y = o.getTokenAt(x)
             //console.info(s, y.state.box)
             if (y.string === s &&
-                y.type === currentToken.type &&
+                //y.type === currentToken.type &&
                 currentToken.state.box === y.state.box) {
               marks.push(o.markText({ line: x.line, ch: y.start },
                                     { line: x.line, ch: y.end },
@@ -294,7 +294,8 @@ var doc = (function (n) {
                x.type === "builtin"  ||
                x.type === "variable" ||
                x.type === "atom"     ||
-               x.type === "number"
+               x.type === "number"   ||
+               x.type === "string"
       }
 
       function output(oEditor, o) {
@@ -571,8 +572,10 @@ var doc = (function (n) {
 
           var myEval = sandbox.contentWindow.eval
 
-          lines = []
+          lines   = []
           n.forms = []
+
+          NULAN.tokenInfo = {}
 
           NULAN.parse(s, function (err, x, start, end) {
             if (err) {
@@ -609,7 +612,7 @@ var doc = (function (n) {
                 //o.error = "" + e
                 //o.textContent = print(["" + e])
               }
-
+/*
               o.boxes       = NULAN.boxes
               o.vars        = NULAN.vars
               o.values      = NULAN.values
@@ -618,7 +621,7 @@ var doc = (function (n) {
               //NULAN.boxes       = Object.create(NULAN.boxes)
               NULAN.vars        = Object.create(NULAN.vars)
               NULAN.values      = Object.create(NULAN.values)
-              NULAN.syntaxRules = Object.create(NULAN.syntaxRules)
+              NULAN.syntaxRules = Object.create(NULAN.syntaxRules)*/
 
               n.forms.push(o)
             }

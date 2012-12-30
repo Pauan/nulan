@@ -29,7 +29,19 @@ var NULAN = (function (n) {
   }
 
 
-  function Macro(x) { this.value = x }
+  function Macro(f) {
+    this.value = f
+    /*this.value = function (a) {
+      if (a[0] instanceof n.Symbol) {
+        n.tokenUpdate(a[0], function (o) {
+          o.box = getBox(a[0])
+          //o.macro = true
+          //o.macro = !!n.isMacro(o.box)
+        })
+      }
+      return f(a)
+    }*/
+  }
 
   function macro(f) {
     return new Macro(function (a) {
@@ -473,12 +485,16 @@ var NULAN = (function (n) {
     }
 
     setSymToBox = function (x) {
-      var s
+      var y
       if (x instanceof n.Symbol) {
-        s = x.value
-        x = setSymToBox(new n.Box(mangle(x.value)))
-        n.vars[s] = x.value
-        return x
+        y = setSymToBox(new n.Box(mangle(x.value)))
+        n.vars[x.value] = y.value
+        n.tokenUpdate(x, function (o) {
+          //o.type = "symbol"
+          o.box = y
+          //o.macro = !!n.isMacro(o.box)
+        })
+        return y
       } else if (x instanceof Uniq) {
         x.value = getUniq()
       } else if (x instanceof n.Box) {
@@ -507,7 +523,11 @@ var NULAN = (function (n) {
       } else if (x instanceof n.Symbol) {
         var y = n.vars[x.value]
         if (y) {
-          return n.boxes[y]
+          y = n.boxes[y]
+          n.tokenUpdate(x, function (o) {
+            o.box = y
+          })
+          return y
         } else if (!b) {
           throw new n.Error(x, "undefined symbol: " + x)
         }
@@ -681,12 +701,19 @@ var NULAN = (function (n) {
   }*/
 
   function macBox(x) {
-    x = getBox(x)
-    if (x instanceof n.Box) {
-      if (x.scope === "local") {
-        return ["name", x.value]
+    var y = getBox(x)
+    /*if (x instanceof n.Symbol) {
+      n.tokenUpdate(x, function (o) {
+        //o.type = "symbol"
+        o.box = y
+        //o.macro = !!n.isMacro(o.box)
+      })
+    }*/
+    if (y instanceof n.Box) {
+      if (y.scope === "local") {
+        return ["name", y.value]
       } else {
-        return [".", [".", ["name", "n"], "boxes"], x.value]
+        return [".", [".", ["name", "n"], "boxes"], y.value]
       }
       /*return withMode("quote", function () {
         return mac(x)
@@ -707,6 +734,9 @@ var NULAN = (function (n) {
         return splicingArgs(mac(a[0]), a.slice(1))
       }
     } else if (a instanceof n.Wrapper) {
+/*      n.tokenUpdate(a, function (o) {
+        o.type = typeof a.value
+      })*/
       return mac(a.value) // TODO: check all the places that currently expect strings/numbers and won't work with a wrapper
     } else if (typeof a === "number") {
       return ["number", "" + a]
@@ -716,7 +746,13 @@ var NULAN = (function (n) {
     /*} else if (a === void 0) { // TODO
       return ["void", ["number", "0"]]*/
     } else if (a instanceof n.Symbol) {
-      return mac(checkBox(a, getBox(a)))
+      x = checkBox(a, getBox(a))
+/*      n.tokenUpdate(a, function (o) {
+        //o.type = "symbol"
+        o.box = x
+        //o.macro = !!n.isMacro(x)
+      })*/
+      return mac(x)
     } else if (a instanceof n.Box) {
       if ("get" in a) {
         if (mode === "compile") {
