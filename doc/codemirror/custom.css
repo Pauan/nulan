@@ -28,8 +28,18 @@
 .cm-s-custom span.cm-special     { color: #73d216; } /* macros */
 
 .cm-s-custom span.cm-comment,
-.cm-s-custom span.cm-comment-doc { color: #888a85; }
-.cm-s-custom span.cm-comment-doc:first-child { margin-left: -2em; }
+.cm-s-custom span.cm-comment-doc {
+  color: #888a85;
+}
+.cm-s-custom span.cm-comment-doc:first-child {
+  margin-left: -21px; /* TODO: don't hardcode this */
+  /*clip: rect(0px, auto, auto, 5px);*/
+  /*position: absolute;*/
+  /*content: "  ";*/
+  /*background-color: #0c1214;*/
+}
+/*.cm-s-custom span.cm-comment-doc:first-child { margin-left: -17px; }*/ /* TODO: don't hardcode this */
+/*.cm-s-custom span:not(.cm-comment-doc):first-child { margin-left: 14px; }*/ /* TODO: don't hardcode this */
 
 .cm-s-custom span.cm-string      { color: #f57900; }
 .cm-s-custom span.cm-number,

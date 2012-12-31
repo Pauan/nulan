@@ -46,6 +46,10 @@ html, body, .CodeMirror, #table, #output, #sandbox {
   padding: 1em 0px;
 }
 
+/*.CodeMirror pre {
+  padding: 0px 2px;
+}*/
+
 button {
   margin-left: 210px;
   padding: 0px 5px;
@@ -112,7 +116,9 @@ tr:last-child td {
   border-top: none;
   border-bottom: none;
 }
-.activeline { background: #2e3436 !important; }
+.activeline {
+  background: #2e3436 !important;
+}
 
 /*.CodeMirror, #output, #sandbox {
   margin: 1px;
