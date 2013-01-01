@@ -90,27 +90,28 @@ CodeMirror.defineMode("nulan", function (config, parserConfig) {
           return "string"
         } else if (x.type === "comment") {
           return "comment"
-        } else if (x.type === "comment-doc") {
-          return "comment-doc"
+        } else if (x.type === "hidden") {
+          return "hidden"
         } else if (x.type === "symbol") {
           if (x.syntax || !x.box) {
-            return "keyword"
+            return "operator"
           } else {
             state.box = x.box
             if (x.box.scope === "local") {
-              return "variable"
+              return "variable-2"
             } else if (NULAN.isMacro(x.box)) {
-              return "special"
+              return "keyword"
             } else if (x.box.value === "true" || x.box.value === "false") {
               return "atom"
             } else {
-              return "builtin"
+              return "variable"
             }
           }
         }
       } else {
         stream.next()
       }
+      return null
       /*var c = stream.next()
         , r
       if (state.string) {

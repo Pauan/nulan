@@ -1351,6 +1351,8 @@ var NULAN = (function (n) {
   */
           var x, u, s, r = []
 
+          setSymExternal(new n.Symbol("this"))
+
           for (var i = 0, iLen = args.length; i < iLen; ++i) {
             x = args[i]
 
@@ -1788,6 +1790,8 @@ function infix(i, b, f) {
              "parseFloat", "Uint8Array", "clearInterval", "Infinity",
              "JSON", "Function", "setInterval", "encodeURIComponent",
              "decodeURI", "ArrayBuffer", "RegExp")
+
+  n.builtins("this")
 
   // Modes for a specific environment
   n.modes = {

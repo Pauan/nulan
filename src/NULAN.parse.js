@@ -384,8 +384,8 @@ var NULAN = (function (n) {
         var s = store(o)
         o.read()
         if (o.peek() === "|") {
-          tokenizeComment(o)
           o.read()
+          tokenizeComment(o, s)
           return []
         // TODO: hacky, but it works
         } else if (o.peek() === ">") {
@@ -418,10 +418,10 @@ var NULAN = (function (n) {
     tokenize: function (o) {
       var s = store(o)
       o.read()
-      n.tokenUpdate(enrich({}, s, o), function (o) {
+      /*n.tokenUpdate(enrich({}, s, o), function (o) {
         o.type = "symbol"
         o.syntax = true
-      })
+      })*/
       return []
     }
   }
@@ -431,22 +431,22 @@ var NULAN = (function (n) {
   inert("{", "}")
   inert("#|", "|#")
 
-  function tokenizeCommentDoc(o, s) {
+  function tokenizeCommentDoc(o, sFirst) {
     var seen, r = []
 
+    o.read()
+
+    var x = enrich(new n.Symbol("#"), sFirst, o)
+    r.push(x)
+
+    n.tokenUpdate(x, function (o) {
+      o.type = "hidden"
+    })
+
+    var s = store(o)
+
     function push() {
-      if (seen) {
-        n.tokenUpdate(enrich({}, s, o), function (o) {
-          o.type = "comment-doc"
-        })
-      } else {
-        seen = true
-        var x = enrich(new n.Symbol("#"), s, o)
-        r.push(x)
-        n.tokenUpdate(x, function (o) {
-          o.type = "comment-doc"
-        })
-      }
+
     }
 
     while (o.has() && o.peek() !== "\n") {
@@ -473,31 +473,51 @@ var NULAN = (function (n) {
         o.read()
       }
     }
-    push()
+    n.tokenUpdate(enrich({}, s, o), function (o) {
+      o.type = "comment"
+    })
+    //push()
     r.push(new n.Symbol("|#"))
     return r
   }
 
-  function tokenizeComment(o) {
-    var s = store(o)
-    // TODO: a teensy bit hacky
-    --s.column
-    s.length = 2
+  function tokenizeComment(o, sFirst) {
+    var s = sFirst
+      , c
+      , sNew
     while (true) {
       if (!o.has()) {
-        throw new n.Error(s, "missing ending |#")
+        // TODO: a teensy bit hacky
+        sFirst.length = 2
+        throw new n.Error(sFirst, "missing ending |#")
       }
-      o.read()
-      if (o.peek() === "|") {
+      c = o.peek()
+      if (c === "|") {
         o.read()
         if (o.peek() === "#") {
+          o.read()
+          n.tokenUpdate(enrich({}, s, o), function (o) {
+            o.type = "comment"
+          })
           break
         }
-      } else if (o.peek() === "#") {
+      } else if (c === "#") {
+        sNew = store(o)
         o.read()
         if (o.peek() === "|") {
-          tokenizeComment(o)
+          // TODO: a teensy bit hacky
+          //++sNew.column
+          o.read()
+          tokenizeComment(o, sNew)
         }
+      } else if (c === "\n") {
+        n.tokenUpdate(enrich({}, s, o), function (o) {
+          o.type = "comment"
+        })
+        o.read()
+        s = store(o)
+      } else {
+        o.read()
       }
     }
   }
@@ -601,9 +621,27 @@ var NULAN = (function (n) {
   function tokenizeString(o) {
     var s = store(o)
       , q = o.read()
-      , r = [enrich(new n.Symbol(q), s, o)]
+      , r = []
       , a = []
       , c
+      , seen
+
+    // TODO: code duplication
+    function push() {
+      if (seen) {
+        n.tokenUpdate(enrich({}, s, o), function (o) {
+          o.type = "string"
+        })
+      } else {
+        seen = true
+        var x = enrich(new n.Symbol(q), s, o)
+        r.push(x)
+        n.tokenUpdate(x, function (o) {
+          o.type = "string"
+        })
+      }
+    }
+
     while (true) {
       if (o.has()) {
         c = o.peek()
@@ -629,16 +667,23 @@ var NULAN = (function (n) {
           }
         } else if (c === "@") {
           //r[0] = enrich(r[0], s, o)
-          n.tokenUpdate(enrich({}, s, o), function (o) {
+          /*n.tokenUpdate(enrich({}, s, o), function (o) {
             o.type = "string"
-          })
+          })*/
+
+          push()
 
           o.read()
+
           if (a.length) {
             r.push(enrich(new n.Wrapper(a.join("")), s, o)) // TODO: use a different store
           }
           a = []
           r.push(new Bypass(unwrap(processOne(o))))
+          s = store(o)
+        } else if (c === "\n") {
+          push()
+          a.push(o.read())
           s = store(o)
         } else {
           a.push(o.read())
@@ -650,14 +695,16 @@ var NULAN = (function (n) {
       }
     }
     //r[0] = enrich(r[0], s, o)
-    n.tokenUpdate(enrich({}, s, o), function (o) {
+    push()
+    /*n.tokenUpdate(enrich({}, s, o), function (o) {
       o.type = "string"
-    })
+    })*/
 
     if (a.length) {
       r.push(enrich(new n.Wrapper(a.join("")), s, o))
     }
-    r.push(enrich(new n.Symbol(q), o)) // TODO
+    r.push(enrich(new n.Symbol(q), s, o))
+
     if (r.length === 3 && r[1] instanceof n.Wrapper) {
       return r[1]
     } else {

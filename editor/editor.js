@@ -1,4 +1,4 @@
-var doc = (function (n) {
+var editor = (function (n) {
   "use strict";
 
   function stylesheet(s) {
@@ -70,7 +70,7 @@ var doc = (function (n) {
 
   stylesheet("../lib/codemirror/lib/codemirror.css")
   stylesheet("codemirror/custom.css")
-  stylesheet("doc.css")
+  stylesheet("editor.css")
 
   script(["../src/NULAN.parse.js",
           "../lib/nino/compile.js",
@@ -93,12 +93,11 @@ var doc = (function (n) {
   }
 
   n.init = function (name, defText, resetText) {
+    //localStorage[name + ".debug"] = "yes"
+    n.options.debug = true
+
     domReady(function () {
-      var i// = document.createElement("textarea")
-        , o = document.createElement("pre")
-        , sandbox
-        , sandboxParent
-        , lines = []
+      var lines = []
 
       defText = document.getElementById(defText)
 
@@ -109,15 +108,13 @@ var doc = (function (n) {
       i.id = "input"
       i.setAttribute("autofocus", "") // TODO
     */
-      o.id = "output"
-      o.className = "cm-s-custom CodeMirror"
 
-      function editor(x) {
+      function editor(x, o) {
         x = CodeMirror(x, {
           theme: "custom",
           value: localStorage[name + ".saved"],
           lineWrapping: true,
-          lineNumbers: true,
+          //lineNumbers: true,
           autofocus: true,
           extraKeys: {
             "Tab":       "indentMore",
@@ -126,6 +123,7 @@ var doc = (function (n) {
           mode: "nulan"
         })
 
+/*
         var y = x.getWrapperElement()
 
         var buttons = document.createElement("div")
@@ -149,7 +147,7 @@ var doc = (function (n) {
           localStorage[name + ".debug"] = this.checked ? "yes" : ""
           n.options.debug = this.checked
           //output(x, o)
-          process(x, localStorage[name + ".saved"]) // TODO: inefficient, but necessary to make the errors toggle
+          process(x, localStorage[name + ".saved"], o) // TODO: inefficient, but necessary to make the errors toggle
         }, true)
 
         buttons.appendChild(reset)
@@ -158,15 +156,16 @@ var doc = (function (n) {
         label.appendChild(document.createTextNode("Debug mode"))
         buttons.appendChild(label)
 
-        y.insertBefore(buttons, y.firstChild)
+        y.insertBefore(buttons, y.firstChild)*/
+
 
         var timer
 
-        x.on("change", function (x, o) {
+        x.on("change", function (x) {
           clearTimeout(timer)
           var s = x.getValue()
           localStorage[name + ".saved"] = s
-          process(x, s)
+          process(x, s, o)
           /*timer = setTimeout(function () {
 
           }, 400)*/
@@ -192,7 +191,7 @@ var doc = (function (n) {
         })
 
 
-        process(x, localStorage[name + ".saved"])
+        process(x, localStorage[name + ".saved"], o)
       }
 
       // http://codemirror.net/demo/widget.html
@@ -290,12 +289,39 @@ var doc = (function (n) {
       }
 
       function isHighlight(x) {
-        return x.type === "special"  ||
-               x.type === "builtin"  ||
-               x.type === "variable" ||
-               x.type === "atom"     ||
-               x.type === "number"   ||
+        return x.type === "keyword"    ||
+               x.type === "variable"   ||
+               x.type === "variable-2" ||
+               x.type === "atom"       ||
+               x.type === "number"     ||
                x.type === "string"
+      }
+
+      function typeToType(x) {
+        if (x === "variable-2") {
+          return "local"
+        } else if (x === "variable") {
+          return "normal"
+        } else if (x === "keyword") {
+          return "macro"
+        }
+      }
+
+      function outputToken(x, r) {
+        if (x.state.box) {
+          var s = typeToType(x.type)
+          if (x.state.box.mode["compile"] && s !== "macro") {
+            r.push(["token",
+                     ["type ", s],
+                     ["mode ", Object.keys(x.state.box.mode).join(", ")]])
+          } else {
+            r.push(["token",
+                     ["type ", s]])
+          }
+        } else {
+          r.push(["token",
+                   ["type ", x.type]])
+        }
       }
 
       function output(oEditor, o) {
@@ -344,6 +370,8 @@ var doc = (function (n) {
           }
         })
 
+        var r = []
+
         var startCursor  = oEditor.getCursor("head")
           , currentToken = oEditor.getTokenAt(startCursor)
 
@@ -353,6 +381,9 @@ var doc = (function (n) {
           }
         } else */if (isHighlight(currentToken)) {
           mark(oEditor, currentToken, startCursor, 0, oEditor.lineCount())
+          if (n.options.debug) {
+            outputToken(currentToken, r)
+          }
         } else {
           currentToken = oEditor.getTokenAt({ line: startCursor.line, ch: startCursor.ch + 1 })
           /*if (currentToken.type === "variable") {
@@ -361,6 +392,9 @@ var doc = (function (n) {
             }
           } else */if (isHighlight(currentToken)) {
             mark(oEditor, currentToken, startCursor, 0, oEditor.lineCount())
+            if (n.options.debug) {
+              outputToken(currentToken, r)
+            }
           }
         }
 /*
@@ -371,8 +405,6 @@ var doc = (function (n) {
 
           }
         }*/
-
-        var r = []
 
         /*if (output.error.length) {
           r.push(["error"].concat(output.error))
@@ -402,15 +434,27 @@ var doc = (function (n) {
           }
         }
 
-        o.textContent = r.map(function (x) {
-          return (x[0] !== ""
-                   ? "@" + x[0] + "\n\n"
-                   : "\n") +
-            // TODO: ew
-            x.slice(1).map(function (x) {
-              return "  " + x.replace(/\n/g, "$&  ")
-            }).join("\n\n")
-        }).join("\n\n\n")
+        function prettyOutput1(x) {
+          return "  @" + x[0] + x[1]
+        }
+
+        function prettyOutput(r) {
+          return r.map(function (x) {
+            return (x[0] !== ""
+                     ? "@" + x[0] + "\n\n"
+                     : "\n") +
+                    // TODO: ew
+                   x.slice(1).map(function (x) {
+                     if (Array.isArray(x)) {
+                       return prettyOutput1(x)
+                     } else {
+                       return "  " + x.replace(/\n/g, "$&  ")
+                     }
+                   }).join("\n\n")
+          }).join("\n\n\n")
+        }
+
+        o.textContent = prettyOutput(r)
         // NUIT.serialize(r, { multiline: true })
       }
 
@@ -548,9 +592,9 @@ var doc = (function (n) {
         }
       }
 
-      var oldContext
+      var oldContext, sandbox, sandboxParent
 
-      function process(oEditor, s) {
+      function process(oEditor, s, o) {
         oEditor.operation(function () {
           lines.forEach(function (x) {
             oEditor.removeLineWidget(x)
@@ -566,8 +610,7 @@ var doc = (function (n) {
 
           sandbox = document.createElement("iframe")
           sandbox.src = "javascript:;" // TODO: hack needed for Firefox
-          sandbox.id = "sandbox"
-          sandbox.className = "cm-s-custom CodeMirror"
+          //sandbox.className = "cm-s-custom CodeMirror"
           sandboxParent.appendChild(sandbox)
 
           var myEval = sandbox.contentWindow.eval
@@ -631,53 +674,37 @@ var doc = (function (n) {
         })
       }
 
-      /*if (localStorage["saved"]) {
-        i.value = localStorage["saved"]
-        process(i.value)
-      }
+      ;(function (main) {
+        main.id = "main"
 
-      i.addEventListener("input", function () {
-        //if (this.value !== localStorage["saved"]) {
-        localStorage["saved"] = this.value
-        process(this.value)
-        //}
-      })*/
+        var x
 
-      ;(function (tab) {
-        tab.id = "table"
+        x = document.createElement("div")
+        x.id = "sidebar"
+        main.appendChild(x)
 
-        document.body.appendChild(tab)
+        var xEditor = document.createElement("div")
+        xEditor.id = "editors"
+        main.appendChild(xEditor)
 
-        var y, z
+        x = document.createElement("div")
+        x.id = "panels"
 
-        ;(function (x) {
-          y = x.insertCell(0)
-          y.width = "50%"
-          y.height = "50%"
-          z = document.createElement("div")
-          z.className = "wrapper-for-firefox"
-          z.appendChild(o)
-          y.appendChild(z)
-        })(tab.insertRow(0))
+        var xSandbox = document.createElement("div")
+        xSandbox.id = "sandbox"
+        sandboxParent = xSandbox
+        x.appendChild(xSandbox)
 
-        ;(function (x) {
-          y = x.insertCell(0)
-          y.width = "50%"
-          y.height = "50%"
-          z = document.createElement("div")
-          z.className = "wrapper-for-firefox"
-          y.appendChild(z)
-          sandboxParent = z
+        var xOutput = document.createElement("div")
+        xOutput.id = "output"
+        //xOutput.className = "cm-s-custom CodeMirror"
+        x.appendChild(xOutput)
 
-          y = x.insertCell(0)
-          y.width = "50%"
-          y.setAttribute("rowspan", "2")
-          z = document.createElement("div")
-          z.className = "wrapper-for-firefox"
-          y.appendChild(z)
-          editor(z)
-        })(tab.insertRow(0))
-      }(document.createElement("table")))
+        main.appendChild(x)
+
+        document.body.appendChild(main)
+        editor(xEditor, xOutput)
+      }(document.createElement("div")))
     })
   }
 
