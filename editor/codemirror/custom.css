@@ -1,6 +1,21 @@
 @charset "UTF-8";
 /* This is a custom CSS Theme for CodeMirror */
 
+.cm-s-custom .CodeMirror-cursor {
+  -webkit-transition-property: top, left;
+  -webkit-transition-duration: 0.1s;
+  -webkit-transition-timing-function: ease;
+  border: none !important;
+  /*padding: 1px 0px;
+  margin-top: -1px;*/
+  border-left: 1px solid white !important;
+  /*margin: -1px;*/
+  /*margin-top: -1px;*/
+  /*width: 12px !important;
+  margin-left: -2px;
+  padding: 0px;*/
+}
+
 .cm-s-custom .CodeMirror-selected {
   background: #2e3436 !important;
 }
@@ -14,16 +29,14 @@
 .cm-s-custom .CodeMirror-linenumber {
   color: #555753;
 }
-.cm-s-custom .CodeMirror-cursor {
-  border-left: 1px solid #d3d7cf !important;
-}
 
-.cm-s-custom span.cm-operator   { color: #d3d7cf; } /* syntax */
-.cm-s-custom span.cm-variable-2 { color: hsl(210, 95%, 70%); } /* locals */
-.cm-s-custom span.cm-variable   { color: hsl(40,  95%, 50%); } /* functions */
-.cm-s-custom span.cm-keyword    { color: hsl(90,  90%, 50%); } /* macros */
+.cm-s-custom span.cm-operator,
+.cm-s-custom span.cm-brackets   { color: #d3d7cf; } /* syntax */
+.cm-s-custom span.cm-variable-2 { color: hsl(210, 90%, 70%); } /* locals */
+.cm-s-custom span.cm-variable   { color: hsl(150, 88%, 60%); } /* functions */
+.cm-s-custom span.cm-keyword    { color: hsl(90,  85%, 50%); } /* macros */
 
-.cm-s-custom span.cm-hidden     { display: none; }
+.cm-s-custom span.cm-hidden     { background-color: blue; /*display: none;*/ }
 
 .cm-s-custom span.cm-comment    { color: #888a85; }
 /*.cm-s-custom span.cm-comment-doc:first-child {
@@ -36,13 +49,13 @@
 /*.cm-s-custom span.cm-comment-doc:first-child { margin-left: -17px; }*/ /* TODO: don't hardcode this */
 /*.cm-s-custom span:not(.cm-comment-doc):first-child { margin-left: 14px; }*/ /* TODO: don't hardcode this */
 
-.cm-s-custom span.cm-string {
+/*.cm-s-custom span.cm-string {
   position: relative;
   color: hsl(5, 50%, 50%);
-  /*color: hsl(20, 100%, 50%);*/
-}
+  *//*color: hsl(20, 100%, 50%);*//*
+}*/
 
-.cm-s-custom span.cm-string::before,
+/*.cm-s-custom span.cm-string::before,
 .cm-s-custom span.cm-string::after {
   content: "\"";
   color: hsl(5, 90%, 50%);
@@ -54,7 +67,11 @@
 .cm-s-custom span.cm-string::after {
   position: absolute;
   right: 0px;
-}
+}*/
+
+.cm-s-custom span.cm-string,
+.cm-s-custom span.cm-property { /*color: hsl(25, 100%, 50%);*/
+                                color: hsl(35, 100%, 50%); }
 
 .cm-s-custom span.cm-number,
-.cm-s-custom span.cm-atom    { color: hsl(5, 90%, 50%); }
+.cm-s-custom span.cm-atom     { color: hsl(5, 90%, 50%); }

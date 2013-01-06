@@ -51,14 +51,53 @@ CodeMirror.defineMode("nulan", function (config, parserConfig) {
     }
   }*/
 
+  function getToken(state, col) {
+    return NULAN.tokenInfo[state.line + ":" + (col + 1)]
+  }
+
+  function getType(x, state) {
+    if (x.type === "symbol") {
+      if (x.syntaxRule) {
+        if (x.syntaxRule.endAt || x.syntaxRule.startAt) {
+          return "brackets"
+        } else {
+          return "operator"
+        }
+      } else if (x.box) {
+        state.box = x.box
+        if (x.box.scope === "local") {
+          return "variable-2"
+        } else if (NULAN.isMacro(x.box)) {
+          return "keyword"
+        } else if (x.box.value === "true" || x.box.value === "false") {
+          return "atom"
+        } else {
+          return "variable"
+        }
+      }
+    } else if (x.type) {
+      return x.type
+    }
+    return null
+  }
+
   return {
     startState: function () {
-      return { line: 0 }
+      return {
+        line: 0,
+        tokens: []
+      }
     },
 
     blankLine: function (state) {
       ++state.line
     },
+
+    /*copyState: function (state) {
+      return {
+        tokens:
+      }
+    },*/
 
     token: function (stream, state) {
       if (stream.sol()) {
@@ -75,41 +114,27 @@ CodeMirror.defineMode("nulan", function (config, parserConfig) {
         }
         return "comment"
       } else*/
-      if ((x = NULAN.tokenInfo[state.line + ":" + (stream.column() + 1)])) {
-        if (!x.length) {
-          stream.next()
-        } else {
-          for (var i = 0; i < x.length; ++i) {
+      if ((x = getToken(state, stream.column()))) {
+        state.tokens.push(x)
+      }
+      stream.next()
+      if (state.tokens.length) {
+        x = state.tokens[state.tokens.length - 1]
+        var i = 1
+        while (true) {
+          if (state.line >= x.end.line && (stream.column() + i + 1) >= x.end.column) {
+            state.tokens.pop()
+            break
+          } else if (stream.eol() || (!x.override && getToken(state, stream.column() + i))) {
+            break
+          } else {
             stream.next()
           }
+          ++i
         }
+        state.token = x
         state.box = null
-        if (x.type === "number") {
-          return "number"
-        } else if (x.type === "string") {
-          return "string"
-        } else if (x.type === "comment") {
-          return "comment"
-        } else if (x.type === "hidden") {
-          return "hidden"
-        } else if (x.type === "symbol") {
-          if (x.syntax || !x.box) {
-            return "operator"
-          } else {
-            state.box = x.box
-            if (x.box.scope === "local") {
-              return "variable-2"
-            } else if (NULAN.isMacro(x.box)) {
-              return "keyword"
-            } else if (x.box.value === "true" || x.box.value === "false") {
-              return "atom"
-            } else {
-              return "variable"
-            }
-          }
-        }
-      } else {
-        stream.next()
+        return getType(x, state)
       }
       return null
       /*var c = stream.next()

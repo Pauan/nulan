@@ -287,7 +287,7 @@ var NULAN = (function (n) {
 
   var mangle, unmangle, validJS
 
-  var Uniq, setBuiltin, setSymExternal, setSymToBox, setPlace, getBox, withLocalScope, withNewScope, withPreviousScope
+  var Uniq, setBuiltin, setSymExternal, setBoxToken, setSymToBox, setPlace, getBox, withLocalScope, withNewScope, withPreviousScope
 
   var setValue, compileEval
 
@@ -484,16 +484,20 @@ var NULAN = (function (n) {
       return x
     }
 
+    setBoxToken = function (x, y) {
+      n.tokenUpdate(x, function (o) {
+        //o.type = "symbol"
+        o.box = y
+        //o.macro = !!n.isMacro(o.box)
+      })
+    }
+
     setSymToBox = function (x) {
       var y
       if (x instanceof n.Symbol) {
         y = setSymToBox(new n.Box(mangle(x.value)))
         n.vars[x.value] = y.value
-        n.tokenUpdate(x, function (o) {
-          //o.type = "symbol"
-          o.box = y
-          //o.macro = !!n.isMacro(o.box)
-        })
+        setBoxToken(x, y)
         return y
       } else if (x instanceof Uniq) {
         x.value = getUniq()
@@ -1198,6 +1202,10 @@ var NULAN = (function (n) {
     // TODO: make it work with boxes too
     if (args.every(function (a) { return a[0] instanceof n.Symbol })) {
       a = args.map(function (a) {
+        // TODO: eh, not sure if this should be in here or not
+        n.tokenUpdate(a[0], function (o) {
+          o.type = "property"
+        })
         return [a[0].value, mac(a[1])]
       })
       return ["object", a]
@@ -1208,6 +1216,10 @@ var NULAN = (function (n) {
           , y = a[1]
         // TODO: make it work with boxes too?
         if (x instanceof n.Symbol) {
+          // TODO: eh, not sure if this should be in here or not
+          n.tokenUpdate(x, function (o) {
+            o.type = "property"
+          })
           x = x.value
         }
         return [n.box("<="), [n.box("."), u, x], y]
@@ -1250,11 +1262,9 @@ var NULAN = (function (n) {
           return findCommas(x, function (y, i) {
             if (i === 0) {
               if (Array.isArray(y) && n.isBox(y[0], "@")) {
-                                     // TODO: a teensy bit hacky
-                throw new n.Error({ text:   s.text
-                                  , column: s.column
-                                  , line:   s.line
-                                  , length: y[0].column - s.column + 1 }, "',@ is invalid")
+                                  // TODO: use enrich on this
+                                  // enrich(s, y[0])
+                throw new n.Error({}, "',@ is invalid")
               } else {
                 y = mac(y)
               }
@@ -1321,7 +1331,7 @@ var NULAN = (function (n) {
 
   setValue("external", macro(function () {
     [].forEach.call(arguments, function (x) {
-      setSymExternal(x)
+      setBoxToken(x, setSymExternal(x))
       //setSymToBox(x) // TODO: is this correct?
       //setNewBox(x)
                        // (&eval '(&list 1 2 3))
@@ -1333,8 +1343,8 @@ var NULAN = (function (n) {
 
   setValue("builtin", macro(function () {
     [].forEach.call(arguments, function (x) {
-      // TODO: meh
-      setBuiltin(x.value, x.value)
+                     // TODO: meh
+      setBoxToken(x, setBuiltin(x.value, x.value))
     })
     return ["empty"]
   }))
@@ -1832,7 +1842,7 @@ function infix(i, b, f) {
     var r = []
     n.parse(s, function (err, x) {
       if (err) {
-        console.error("" + err)
+        //console.error("" + err)
         throw err
       }
       r.push(n.compile(x))

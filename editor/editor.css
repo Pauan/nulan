@@ -16,10 +16,6 @@ body {
   background-color: #babdb6;
 }
 
-.cm-s-custom.CodeMirror {
-
-}
-
 #main {
   display: -webkit-flex;
 }
@@ -39,7 +35,7 @@ body {
 
 #editors {
   -webkit-flex: 1;
-  margin: 0px 2px;
+  margin: 0px 1px;
 }
 
 .CodeMirror {
@@ -56,9 +52,9 @@ body {
 }*/
 
 #sandbox {
-  margin-top: -2px;
-  padding-top: 2px;
-  margin-bottom: 2px;
+  margin-top: -1px;
+  padding-top: 1px;
+  margin-bottom: 1px;
 }
 
 #sandbox > iframe {
@@ -86,9 +82,18 @@ body {
 }*/
 
 #output {
+  line-height: 1;
   padding: 5px;
   white-space: pre;
   /*.CodeMirror-scroll*/ overflow: auto;
+}
+
+#debug-label {
+  float: right;
+}
+
+#debug-label > input {
+  vertical-align: middle;
 }
 
 .activeline {
@@ -99,7 +104,8 @@ body {
   display: inline-block; /* TODO: used only for visual purposes */
   background: rgba(0, 0, 0, 0.75);
   /*text-decoration: underline overline;*/
-  outline: 1px solid rgba(255, 255, 255, 0.3);
+  margin: -1px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .nulan-error {

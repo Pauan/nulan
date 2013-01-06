@@ -4,16 +4,17 @@ var NULAN = (function (n) {
   n.tokenInfo = {}
 
   n.tokenUpdate = function (o, f) {
-    var s = o.line + ":" + o.column
-      , x = n.tokenInfo[s]
-    if (!x) {
-      x = n.tokenInfo[s] = {}
-    }
-    x.line   = o.line
-    x.column = o.column
-    x.length = o.length
-    if (f) {
-      f(x)
+    if (o.start) {
+      var s = o.start.line + ":" + o.start.column
+        , x = n.tokenInfo[s]
+      if (!x) {
+        x = n.tokenInfo[s] = {}
+      }
+      x.start = o.start
+      x.end   = o.end
+      if (f) {
+        f(x)
+      }
     }
   }
 
@@ -23,8 +24,8 @@ var NULAN = (function (n) {
   n.Error = function (o, s) {
     var a = [s]
     if (o instanceof Object) {
-      var b1 = "line"   in o
-        , b2 = "column" in o
+      var b1 = "line"   in o.start
+        , b2 = "column" in o.start
       if (o.text || b1 || b2) {
         var iOffset = 0
         a.push("\n")
@@ -39,25 +40,25 @@ var NULAN = (function (n) {
         if (b1 || b2) {
           a.push("  (")
           if (b1) {
-            a.push("line ", o.line)
+            a.push("line ", o.start.line)
           }
           if (b1 && b2) {
             a.push(", ")
           }
           if (b2) {
-            a.push("column ", o.column)
+            a.push("column ", o.start.column)
           }
           a.push(")")
         }
         if (o.text && b2) {
-          a.push("\n ", new Array(o.column - iOffset + 1).join(" "),
-                        new Array(o.length + 1).join("^"))
+          // TODO: make it work for multi-line tokens
+          a.push("\n ", new Array(o.start.column - iOffset + 1).join(" "),
+                        new Array((o.end.column - o.start.column) + 1).join("^"))
         }
       }
-      this.text = o.text
-      this.line = o.line
-      this.column = o.column
-      this.length = o.length
+      this.text  = o.text
+      this.start = o.start
+      this.end   = o.end
     }
     this.originalMessage = s
     this.message = a.join("")
@@ -176,6 +177,7 @@ var NULAN = (function (n) {
   function inert(start, end) {
     n.syntaxRules[end] = {
       delimiter: true,
+      startAt: start,
       parse: function (l, s, r) {
         throw new n.Error(s, "missing starting " + start)
       }
@@ -222,7 +224,7 @@ var NULAN = (function (n) {
           var x = l[l.length - 1]
           l = l.slice(0, -1)
                   // TODO: does this need to enrich?
-          l.push([enrich(new n.Symbol("."), s), x, unwrap(r[0])])
+          l.push([enrich(new n.Symbol("."), s.start, s.end), x, unwrap(r[0])])
         }
         return l.concat(r.slice(1))
       }
@@ -274,15 +276,16 @@ var NULAN = (function (n) {
               typeof x.value === "number" &&
               typeof y.value === "number") {
             var i = (x.value + "." + y.value)
-            i = enrich(new n.Wrapper(+i), x)
-            i.length = x.length + y.length + 1
+            i = enrich(new n.Wrapper(+i), x.start, y.end)
+            //i.length = x.length + y.length + 1
             n.tokenUpdate(i, function (o) {
+              o.override = true // TODO: replace this with priority
               o.type = "number"
             })
             return i
           } else if (y instanceof n.Symbol) {
             n.tokenUpdate(y, function (o) {
-              o.type = "string"
+              o.type = "property"
             })
             return [s, x, y.value]
           } else if (x === void 0) {
@@ -445,14 +448,11 @@ var NULAN = (function (n) {
 
     var s = store(o)
 
-    function push() {
-
-    }
-
     while (o.has() && o.peek() !== "\n") {
       if (o.peek() === "`") {
         o.read()
-        push()
+
+        var s2 = store(o)
 
         r.push(new Bypass(unwrap(processUntil(o, "`"))))
         /*  function (x) {
@@ -464,10 +464,9 @@ var NULAN = (function (n) {
           }
         } */
         if (o.peek() === "`") {
-          s = store(o)
           o.read()
         } else {
-          throw new n.Error(s, "missing ending `")
+          throw new n.Error(enrichL(s2, 1), "missing ending `")
         }
       } else {
         o.read()
@@ -476,27 +475,27 @@ var NULAN = (function (n) {
     n.tokenUpdate(enrich({}, s, o), function (o) {
       o.type = "comment"
     })
-    //push()
-    r.push(new n.Symbol("|#"))
+    // TODO
+    o = enrichL(o, 2)
+    r.push(enrich(new n.Symbol("|#"), o.start, o.end))
     return r
   }
 
   function tokenizeComment(o, sFirst) {
-    var s = sFirst
-      , c
+    var c
       , sNew
     while (true) {
       if (!o.has()) {
         // TODO: a teensy bit hacky
-        sFirst.length = 2
-        throw new n.Error(sFirst, "missing ending |#")
+        //sFirst.length = 2
+        throw new n.Error(enrichL(sFirst, 2), "missing ending |#")
       }
       c = o.peek()
       if (c === "|") {
         o.read()
         if (o.peek() === "#") {
           o.read()
-          n.tokenUpdate(enrich({}, s, o), function (o) {
+          n.tokenUpdate(enrich({}, sFirst, o), function (o) {
             o.type = "comment"
           })
           break
@@ -510,12 +509,6 @@ var NULAN = (function (n) {
           o.read()
           tokenizeComment(o, sNew)
         }
-      } else if (c === "\n") {
-        n.tokenUpdate(enrich({}, s, o), function (o) {
-          o.type = "comment"
-        })
-        o.read()
-        s = store(o)
       } else {
         o.read()
       }
@@ -533,20 +526,22 @@ var NULAN = (function (n) {
 
 
   function enrich(x, start, end) {
-    x.text = start.text
-    x.line = start.line
-    x.column = start.column
-    x.length = (end
-                 ? (end.line === start.line
-                     ? end.column - start.column
-                     : 1)
-                 : start.length)
+    x.text  = start.text
+    x.start = { line:   start.line
+              , column: start.column }
+    x.end   = { line:   end.line
+              , column: end.column }
     return x
   }
 
+  function enrichL(o, i) {
+    return enrich({}, o, { line:   o.line
+                         , column: o.column + i })
+  }
+
   function store(o) {
-    return { text: o.text
-           , line: o.line
+    return { text:   o.text
+           , line:   o.line
            , column: o.column }
   }
 
@@ -618,36 +613,53 @@ var NULAN = (function (n) {
     return process(iter(temp), -1)
   }
 
+  function iterStoreText(o) {
+    var a = []
+      , f = o.read
+    //o = Object.create(o)
+    o.textValue = a
+    o.read = function () {
+      var x = f.call(this)
+      a.push(x)
+      return x
+    }
+    return o
+  }
+
   function tokenizeString(o) {
     var s = store(o)
       , q = o.read()
-      , r = []
+      , r = [new n.Symbol(q)]
       , a = []
       , c
-      , seen
 
-    // TODO: code duplication
-    function push() {
-      if (seen) {
-        n.tokenUpdate(enrich({}, s, o), function (o) {
-          o.type = "string"
-        })
-      } else {
-        seen = true
-        var x = enrich(new n.Symbol(q), s, o)
-        r.push(x)
-        n.tokenUpdate(x, function (o) {
-          o.type = "string"
-        })
-      }
-    }
+    o = iterStoreText(o)
+
+    var sFirst = s
 
     while (true) {
       if (o.has()) {
         c = o.peek()
         if (c === q) {
+          s = o.textValue.join("")
           o.read()
-          break
+
+          r[0] = enrich(r[0], sFirst, o)
+          n.tokenUpdate(r[0], function (o) {
+            o.type = "string"
+            o.value = s
+          })
+
+          if (a.length) {
+            r.push(enrich(new n.Wrapper(a.join("")), sFirst, o))
+          }
+          r.push(enrich(new n.Symbol(q), sFirst, o)) // TODO
+
+          if (r.length === 3 && r[1] instanceof n.Wrapper) {
+            return r[1]
+          } else {
+            return r
+          }
         } else if (c === "\\") {
           o.read()
           c = o.read()
@@ -660,10 +672,10 @@ var NULAN = (function (n) {
           } else if (c === "\"" || c === "@" || c === "\\") {
             a.push(c)
           } else {
+            //o.length = 2
             // TODO: a little hacky
-            o.length = 2
             o.column -= 2
-            throw new n.Error(o, "expected \\r \\n \\t \\\" \\@ \\\\ but got \\" + c)
+            throw new n.Error(enrichL(o, 2), "expected \\r \\n \\t \\\" \\@ \\\\ but got \\" + c)
           }
         } else if (c === "@") {
           //r[0] = enrich(r[0], s, o)
@@ -671,45 +683,42 @@ var NULAN = (function (n) {
             o.type = "string"
           })*/
 
-          push()
+          s = store(o) // TODO
 
           o.read()
 
+          n.tokenUpdate(enrich({}, s, o), function (o) {
+            o.syntaxRule = n.syntaxRules[c]
+            o.type = "symbol"
+          })
+
           if (a.length) {
-            r.push(enrich(new n.Wrapper(a.join("")), s, o)) // TODO: use a different store
+            r.push(enrich(new n.Wrapper(a.join("")), s, o))
           }
           a = []
+
           r.push(new Bypass(unwrap(processOne(o))))
-          s = store(o)
-        } else if (c === "\n") {
-          push()
-          a.push(o.read())
           s = store(o)
         } else {
           a.push(o.read())
         }
       } else {
-        // TODO
-        s.length = 1
-        throw new n.Error(s, "missing ending \"")
+        // TODO: is there a way to get rid of this?
+        throw new n.Error(enrichL(sFirst, 1), "missing ending \"")
       }
     }
+
+    /*
+                  // TODO: ew
+    n.tokenUpdate(enrich({}, { line: r[0].start.line, column: r[0].start.column + 1 },
+                             { line: r[0].end.line,   column: r[0].end.column - 1 }),
+                  function (o) {
+                    o.type = "string"
+                  })*/
     //r[0] = enrich(r[0], s, o)
-    push()
     /*n.tokenUpdate(enrich({}, s, o), function (o) {
       o.type = "string"
     })*/
-
-    if (a.length) {
-      r.push(enrich(new n.Wrapper(a.join("")), s, o))
-    }
-    r.push(enrich(new n.Symbol(q), s, o))
-
-    if (r.length === 3 && r[1] instanceof n.Wrapper) {
-      return r[1]
-    } else {
-      return r
-    }
   }
 
   function tokenizeNumOrSym(o) {
@@ -740,7 +749,7 @@ var NULAN = (function (n) {
 
       n.tokenUpdate(r, function (o) {
         o.type = "symbol"
-        o.syntax = !!(b && (b.parse || b.tokenize)) // TODO: should this include b.tokenize?
+        o.syntaxRule = b //!!(b && (b.parse || b.tokenize)) // TODO: should this include b.tokenize?
       })
       return r
     }
@@ -804,7 +813,7 @@ var NULAN = (function (n) {
           n.tokenUpdate(last, function (o) {
             o.type = "symbol"
             o.delimiter = true
-            o.syntax = !!(x.parse || x.tokenize) // TODO: should this include x.tokenize?
+            o.syntaxRule = x //!!(x.parse || x.tokenize) // TODO: should this include x.tokenize?
           })
         } else {
           last = tokenizeNumOrSym(o)
@@ -997,7 +1006,7 @@ var NULAN = (function (n) {
       }*/
       //z = o.location()
       //console.log("indent", y.line, z.line, y.column, z.column)
-      if (y.line === x.line) {
+      if (y.start.line === x.start.line) {
         /*if (y instanceof ParseBypass) {
           console.log(y)
           o.read()
@@ -1006,7 +1015,7 @@ var NULAN = (function (n) {
         b = isSeparator(y)
         if (isVertical(y)) {
           r = []
-          while (o.has() && isSym(o.peek(), y.value) && o.peek().column === y.column) {
+          while (o.has() && isSym(o.peek(), y.value) && o.peek().start.column === y.start.column) {
             if (b) {
               o.read()
               r.push(indent(o, o.peek()))
@@ -1022,7 +1031,7 @@ var NULAN = (function (n) {
           braces(o, o.peek(), a)
         }
         //}
-      } else if (y.column > x.column) {
+      } else if (y.start.column > x.start.column) {
         a.push(new Bypass(unwrap(indent(o, o.peek()))))
       } else {
         break
@@ -1068,9 +1077,9 @@ var NULAN = (function (n) {
     while (o.has()) {
       x = o.peek()
       try {
-        f(null, unwrap(indent(o, o.peek())), x.line, o.last.line)
+        f(null, unwrap(indent(o, o.peek())), x.start.line, o.last.start.line)
       } catch (e) {
-        f(e, null, x.line, o.last.line)
+        f(e, null, x.start.line, o.last.start.line)
       }
     }
   }

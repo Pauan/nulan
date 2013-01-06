@@ -94,7 +94,7 @@ var editor = (function (n) {
 
   n.init = function (name, defText, resetText) {
     //localStorage[name + ".debug"] = "yes"
-    n.options.debug = true
+    //n.options.debug = true
 
     domReady(function () {
       var lines = []
@@ -159,16 +159,14 @@ var editor = (function (n) {
         y.insertBefore(buttons, y.firstChild)*/
 
 
-        var timer
+        //var timer
 
         x.on("change", function (x) {
-          clearTimeout(timer)
+          //clearTimeout(timer)
           var s = x.getValue()
           localStorage[name + ".saved"] = s
-          process(x, s, o)
-          /*timer = setTimeout(function () {
-
-          }, 400)*/
+          process(s)
+          output(x, o)
         })
     /*
         x.on("update", function () {
@@ -176,7 +174,7 @@ var editor = (function (n) {
         })*/
 
         x.on("cursorActivity", function (x) {
-          output(x, o)
+          output(x, o) // TODO: don't do a full output
         })
 
         // http://codemirror.net/demo/activeline.html
@@ -190,15 +188,17 @@ var editor = (function (n) {
           }
         })
 
+        process(x.getValue()) //localStorage[name + ".saved"]
+        output(x, o)
 
-        process(x, localStorage[name + ".saved"], o)
+        return x
       }
 
       // http://codemirror.net/demo/widget.html
       function error(oEditor, e, end) {
         var line, message
         if (e instanceof NULAN.Error) {
-          line = e.line
+          line = e.start.line
           message = (n.options.debug
                       ? "" + e
                       : e.originalMessage)
@@ -254,11 +254,15 @@ var editor = (function (n) {
 
       var marks
 
+      function nulanToCodeMirror(x) {
+        return { line: x.line - 1, ch: x.column - 1 }
+      }
+
       function mark(o, currentToken, startCursor, line, end) {
           //, line = startCursor.line
         o.operation(function () {
           var ch, sLine
-          var s = currentToken.string
+          var s = /^.*/.exec(tokenValue(currentToken))[0]
             , r = []
           while (line < end) {
             ch = 0
@@ -276,12 +280,12 @@ var editor = (function (n) {
           }
           r.forEach(function (x) {
             var y = o.getTokenAt(x)
-            //console.info(s, y.state.box)
-            if (y.string === s &&
-                y.type === currentToken.type &&
+              , t = y.state.token
+            if (compatibleTypes(y, currentToken) &&
+                tokenValue(y) === tokenValue(currentToken) &&
                 currentToken.state.box === y.state.box) {
-              marks.push(o.markText({ line: x.line, ch: y.start },
-                                    { line: x.line, ch: y.end },
+              marks.push(o.markText(nulanToCodeMirror(t.start),
+                                    nulanToCodeMirror(t.end),
                                     { className: "CodeMirror-matchhighlight" }))
             }
           })
@@ -294,7 +298,8 @@ var editor = (function (n) {
                x.type === "variable-2" ||
                x.type === "atom"       ||
                x.type === "number"     ||
-               x.type === "string"
+               x.type === "string"     ||
+               x.type === "property"
       }
 
       function typeToType(x) {
@@ -307,20 +312,36 @@ var editor = (function (n) {
         }
       }
 
+      function compatibleTypes(x, y) {
+        return ((x.type === "property" || x.type === "string") &&
+                (y.type === "property" || y.type === "string")) ||
+               x.type === y.type
+      }
+
+      function tokenValue(x) {
+        return x.state.token.value || x.string
+      }
+
       function outputToken(x, r) {
         if (x.state.box) {
           var s = typeToType(x.type)
           if (x.state.box.mode["compile"] && s !== "macro") {
             r.push(["token",
-                     ["type ", s],
-                     ["mode ", Object.keys(x.state.box.mode).join(", ")]])
+                     ["type   ", s],
+                     ["string ", x.string],
+                     ["value  ", tokenValue(x)],
+                     ["mode   ", Object.keys(x.state.box.mode).join(", ")]])
           } else {
             r.push(["token",
-                     ["type ", s]])
+                     ["type   ", s],
+                     ["string ", x.string],
+                     ["value  ", tokenValue(x)]])
           }
         } else {
           r.push(["token",
-                   ["type ", x.type]])
+                   ["type   ", x.type],
+                   ["string ", x.string],
+                   ["value  ", tokenValue(x)]])
         }
       }
 
@@ -580,7 +601,17 @@ var editor = (function (n) {
         } else if (x && typeof x === "object") {
           return "#<dict>"
         } else if (typeof x === "string") {
-          return prettyString(x)
+          return "\"" + x.replace(/[\r\n\t"\\]/g, function (s) {
+            if (s === "\r") {
+              return "\\r"
+            } else if (s === "\n") {
+              return "\n" + spaces()
+            } else if (s === "\t") {
+              return "\\t"
+            } else {
+              return "\\" + s
+            }
+          }) + "\""
         } else if (x === void 0) {
           return "()"
         } else if (x === true) {
@@ -593,20 +624,18 @@ var editor = (function (n) {
       }
 
       var oldContext, sandbox, sandboxParent
-
-      function process(oEditor, s, o) {
+/*
+      clearTimeout(timer)
         oEditor.operation(function () {
-          lines.forEach(function (x) {
-            oEditor.removeLineWidget(x)
-          })
+          if (!isTimer) {
+            lines.forEach(function (x) {
+              oEditor.removeLineWidget(x)
+            })
+          }
+
           if (sandbox) {
             sandboxParent.removeChild(sandbox)
           }
-          if (oldContext) {
-            oldContext()
-          }
-
-          oldContext = NULAN.withNewContext()
 
           sandbox = document.createElement("iframe")
           sandbox.src = "javascript:;" // TODO: hack needed for Firefox
@@ -616,61 +645,75 @@ var editor = (function (n) {
           var myEval = sandbox.contentWindow.eval
 
           lines   = []
-          n.forms = []
-
-          NULAN.tokenInfo = {}
-
-          NULAN.parse(s, function (err, x, start, end) {
-            if (err) {
-              error(oEditor, err, end)
-            } else {
-              var o = {
-                compileEvals: [],
-                prints:       [],
-                parse:        x,
-                start:        start,
-                end:          end,
-                /*vars:         NULAN.vars,
-                values:       NULAN.values,
-                syntaxRules:  NULAN.syntaxRules*/
-              }
-
-              NULAN.options.debug = function (x) {
-                o.compileEvals.push(x)
-              }
-
-              console.log = sandbox.contentWindow.console.log = function () {
-                o.prints.push([].slice.call(arguments).join(" "))
-              }
-
-              //console.log("PROCESS", start)
-
-              try {
-                o.compile = NULAN.compile(x)
-                o.eval = myEval(o.compile) // indirect eval
-              } catch (e) {
-                //console.log("ERROR", e)
-                error(oEditor, e, end)
-
-                //o.error = "" + e
-                //o.textContent = print(["" + e])
-              }
-/*
-              o.boxes       = NULAN.boxes
-              o.vars        = NULAN.vars
-              o.values      = NULAN.values
-              o.syntaxRules = NULAN.syntaxRules
-
-              //NULAN.boxes       = Object.create(NULAN.boxes)
-              NULAN.vars        = Object.create(NULAN.vars)
-              NULAN.values      = Object.create(NULAN.values)
-              NULAN.syntaxRules = Object.create(NULAN.syntaxRules)*/
-
-              n.forms.push(o)
-            }
-          })
 
           output(oEditor, o)
+        })
+
+        timer = setTimeout(function () {
+              isTimer = false
+              error(oEditor, err, end)
+            }, 400)
+
+        o.eval = myEval(o.compile) // indirect eval
+*/
+      function process(s) {
+        if (oldContext) {
+          oldContext()
+        }
+        oldContext = NULAN.withNewContext()
+
+        n.forms = []
+
+        NULAN.tokenInfo = {} // TODO: make this a part of withNewContext?
+
+        // TODO: use enriched arrays instead of a start and line argument ?
+        NULAN.parse(s, function (err, x, start, end) {
+          var o = {
+            compileEvals: [],
+            prints:       [],
+            start:        start,
+            end:          end,
+            /*vars:         NULAN.vars,
+            values:       NULAN.values,
+            syntaxRules:  NULAN.syntaxRules*/
+          }
+
+          if (err) {
+            o.error = err
+          } else {
+            o.parse = x
+
+            NULAN.options.debug = function (x) {
+              o.compileEvals.push(x)
+            }
+
+            console.log = /*sandbox.contentWindow.console.log = */function () {
+              o.prints.push([].slice.call(arguments).join(" "))
+            }
+
+            //console.log("PROCESS", start)
+
+            try {
+              o.compile = NULAN.compile(x)
+            } catch (e) {
+              o.error = e
+              //console.log("ERROR", e)
+              //o.error = "" + e
+              //o.textContent = print(["" + e])
+            }
+/*
+            o.boxes       = NULAN.boxes
+            o.vars        = NULAN.vars
+            o.values      = NULAN.values
+            o.syntaxRules = NULAN.syntaxRules
+
+            //NULAN.boxes       = Object.create(NULAN.boxes)
+            NULAN.vars        = Object.create(NULAN.vars)
+            NULAN.values      = Object.create(NULAN.values)
+            NULAN.syntaxRules = Object.create(NULAN.syntaxRules)*/
+          }
+
+          n.forms.push(o)
         })
       }
 
@@ -698,12 +741,36 @@ var editor = (function (n) {
         var xOutput = document.createElement("div")
         xOutput.id = "output"
         //xOutput.className = "cm-s-custom CodeMirror"
+
+        var xText = document.createElement("div")
+
+        var xLabel = document.createElement("label")
+        xLabel.id = "debug-label"
+
+        var xCheckbox = document.createElement("input")
+        xCheckbox.type = "checkbox"
+        xCheckbox.checked = n.options.debug = !!localStorage[name + ".debug"]
+
+        xLabel.appendChild(xCheckbox)
+        xLabel.appendChild(document.createTextNode("Debug mode"))
+
+        xOutput.appendChild(xLabel)
+        xOutput.appendChild(xText)
         x.appendChild(xOutput)
 
         main.appendChild(x)
 
         document.body.appendChild(main)
-        editor(xEditor, xOutput)
+
+        xEditor = editor(xEditor, xText)
+
+        xCheckbox.addEventListener("change", function () {
+          localStorage[name + ".debug"] = n.options.debug = this.checked ? "yes" : ""
+          //output(x, o)
+          // TODO: save the errors and rerun them rather than calling process
+          //process(xEditor, xEditor.getValue(), xText) // TODO: inefficient, but necessary to make the errors toggle
+          //output(xEditor, xText)
+        }, true)
       }(document.createElement("div")))
     })
   }
