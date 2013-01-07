@@ -24,8 +24,8 @@ var NULAN = (function (n) {
   n.Error = function (o, s) {
     var a = [s]
     if (o instanceof Object) {
-      var b1 = "line"   in o.start
-        , b2 = "column" in o.start
+      var b1 = o.start && ("line"   in o.start)
+        , b2 = o.start && ("column" in o.start)
       if (o.text || b1 || b2) {
         var iOffset = 0
         a.push("\n")
@@ -66,6 +66,78 @@ var NULAN = (function (n) {
   n.Error.prototype = new Error()
   n.Error.prototype.constructor = n.Error
   n.Error.prototype.name = "NULAN.Error"
+
+
+  ;(function () {
+    var reserved = {}
+
+    /*
+    Object.getOwnPropertyNames(window).forEach(function (s) {
+      if (!Object.getOwnPropertyDescriptor(window, s).writable) {
+        console.log(s)
+      }
+    })
+    */
+
+    // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Reserved_Words
+    ;("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with " +
+      "class enum export extends import super " +
+      "implements interface let package private protected public static yield " +
+      "null true false " +
+      "undefined NaN Infinity " + // TODO: document isn't writable either, but should probably be handled in a different way
+      "arguments").split(" ").forEach(function (s) {
+      reserved[s] = true
+    })
+
+    var to = new RegExp("^([0-9])|([a-z])\\-([a-z])|[^$a-zA-Z0-9]", "g")
+
+    n.mangle = function (s) {
+      // ((scope === "local" || mode === "run") && )
+      // (s === "boxes" || s === "values")
+      // TODO
+      if (reserved[s]/* || (scope === "local" && mode === "compile" && s === "n")*/) {
+        return "_" + s
+      } else {
+        return s.replace(to, function (s, s1, s2, s3) {
+          if (s1) {
+            return "_" + s1
+          } else if (s2) {
+            return s2 + s3.toLocaleUpperCase()
+          } else {
+            return s === "_" ? "__" : "_" + s.charCodeAt(0) + "_"
+          }
+        })
+      }
+    }
+
+    // mangle("50fooBar-qux")
+
+    var from = new RegExp("_([0-9]*)_|^_([a-z0-9])|([a-z])([A-Z])", "g")
+
+    n.unmangle = function (s) {
+      return s.replace(from, function (_, s, s1, s2, s3) {
+        if (s1) {
+          return s1
+        } else if (s2) {
+          return s2 + "-" + s3.toLocaleLowerCase()
+        } else {
+          return s === "" ? "_" : String.fromCharCode(s)
+        }
+      })
+    }
+/*
+    validJS = function (x) {
+      if (typeof x === "string") {
+        // TODO: code duplication with mangle
+        x = x.replace(/([a-z])\-([a-z])/g, function (_, s1, s2) {
+          return s1 + s2.toLocaleUpperCase()
+        })
+        if (/^[$_a-zA-Z][$_a-zA-Z0-9]*$/.test(x)) {
+          return x
+        }
+      }
+    }*/
+  })()
 
 
   // TODO: make symbol inherit from wrapper?
@@ -188,6 +260,15 @@ var NULAN = (function (n) {
     return x.length === 1 ? x[0] : x
   }
 
+  // TODO: ugh I wish I could do this natively in JS
+  function pair(a) {
+    var r = []
+    for (var i = 0, iLen = a.length - 1; i < iLen; i += 2) {
+      r.push([a[i], a[i + 1]])
+    }
+    return r
+  }
+
 
   // TODO: make them into proper infix, so they behave correctly when only given a left or right side
   n.syntaxRules = {
@@ -215,11 +296,21 @@ var NULAN = (function (n) {
     "[": {
       priority: 90,
       delimiter: true,
+      separator: "|",
       endAt: "]",
       parse: function (l, s, r) {
         if (s.whitespace) {
-          r[0].unshift(s)
-          l.push(r[0])
+          console.info(r[0])
+          l.push([s].concat(pair(r[0]).map(function (x) {
+            if (x[0] instanceof n.Symbol) {
+              n.tokenUpdate(x[0], function (o) {
+                o.type = "property"
+              })
+              return [enrich(new n.Wrapper(n.mangle(x[0].value)), x[0].start, x[0].end), x[1]]
+            } else {
+              return x
+            }
+          })))
         } else {
           var x = l[l.length - 1]
           l = l.slice(0, -1)
@@ -256,7 +347,7 @@ var NULAN = (function (n) {
     ":": {
       priority: 90, // TODO: does this need to be 90?
       delimiter: true,
-      separator: true,
+      indent: true,
       parse: function (l, s, r) {
         l.push(r[0])
         l.push.apply(l, r.slice(1))
@@ -287,7 +378,8 @@ var NULAN = (function (n) {
             n.tokenUpdate(y, function (o) {
               o.type = "property"
             })
-            return [s, x, y.value]
+            return [s, x, enrich(new n.Wrapper(n.mangle(y.value)), y.start, y.end)]
+          // TODO
           } else if (x === void 0) {
 
           } else {
@@ -326,7 +418,7 @@ var NULAN = (function (n) {
       priority: 80, // TODO: 10
       whitespace: true,
       delimiter: true,
-      separator: true,
+      indent: true,
       parse: function (l, s, r) {
         l.push([s, unwrap(r[0])])
         l.push.apply(l, r.slice(1))
@@ -350,7 +442,7 @@ var NULAN = (function (n) {
 
     "=": {
       priority: 10,
-      separator: true,
+      indent: true,
       parse: function (l, s, r) {
         var x = l[l.length - 1]
         l = l.slice(0, -1)
@@ -368,7 +460,7 @@ var NULAN = (function (n) {
     },
 
     "|": {
-      separator: true,
+      indent: true,
       vertical: true,
       parse: function (l, s, r) {
         l.push([s].concat(r[0].map(unwrap)))
@@ -895,8 +987,13 @@ var NULAN = (function (n) {
     return l
   }
 
+  // TODO: code duplication
   function isSeparator(x) {
     return x instanceof n.Symbol && (x = n.syntaxRules[x.value]) && x.separator
+  }
+
+  function isIndent(x) {
+    return x instanceof n.Symbol && (x = n.syntaxRules[x.value]) && x.indent
   }
 
   function isVertical(x) {
@@ -912,16 +1009,22 @@ var NULAN = (function (n) {
   }
 
   function until(o, x, s) {
-    var y
+    var first = true
+      , sep   = isSeparator(x)
+      , r     = []
+      , y
       , z
-      , r = []
-      , first = true
     while (true) {
       if (o.has()) {
         y = o.peek()
+        //console.info(y.value, sep)
         if (isSym(y, s)) {
           break
-        } else if (isSeparator(y)) {
+        /*} else if (sep && isSym(y, sep)) {
+          o.read()
+          r.push(r)
+          r = []*/
+        } else if (isIndent(y)) {
           //if (s === ")") { // TODO
           z = until(o, o.read(), s)
           r.push(y)
@@ -1012,7 +1115,7 @@ var NULAN = (function (n) {
           o.read()
           console.log(o.peek())
         } else {*/
-        b = isSeparator(y)
+        b = isIndent(y)
         if (isVertical(y)) {
           r = []
           while (o.has() && isSym(o.peek(), y.value) && o.peek().start.column === y.start.column) {

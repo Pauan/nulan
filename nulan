@@ -115,7 +115,7 @@ o.NULAN.from("Node.js").to("Node.js")
 
 try {
   load("./src/NULAN.macros.js", o)
-  load("./src/modes/Node.js", o)
+  load("./src/modes/node.js", o)
   //evalFile("NULAN.macros", o)
   //evalFile("modes/Node.js", o)
 } catch (e) {

@@ -65,11 +65,12 @@ CodeMirror.defineMode("nulan", function (config, parserConfig) {
         }
       } else if (x.box) {
         state.box = x.box
-        if (x.box.scope === "local") {
+        if (x.box._38_scope === "local") {
           return "variable-2"
         } else if (NULAN.isMacro(x.box)) {
           return "keyword"
-        } else if (x.box.value === "true" || x.box.value === "false") {
+          // TODO: test this
+        } else if (x.box._38_uniqueName === "true" || x.box._38_uniqueName === "false") {
           return "atom"
         } else {
           return "variable"
