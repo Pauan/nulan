@@ -119,7 +119,7 @@ CodeMirror.defineMode("nulan", function (config, parserConfig) {
         state.tokens.push(x)
       }
       stream.next()
-      if (state.tokens.length) {
+      /*if (state.tokens.length) {
         x = state.tokens[state.tokens.length - 1]
         var i = 1
         while (true) {
@@ -136,7 +136,7 @@ CodeMirror.defineMode("nulan", function (config, parserConfig) {
         state.token = x
         state.box = null
         return getType(x, state)
-      }
+      }*/
       return null
       /*var c = stream.next()
         , r

@@ -9,13 +9,17 @@ $eval                                                                      \n\
   | ()                                                                     \n\
                                                                            \n\
 $eval                                                                      \n\
-  | box $mac                                                               \n\
-  | ('$mac).&macro <= make-macro -> n f                                    \n\
+  | box $macs                                                              \n\
+  | ('$macs).&macro <= make-macro -> @args                                 \n\
       '$eval                                                               \n\
-         | box n                                                           \n\
-         | ('n).&macro <= make-macro f                                     \n\
+         | box ,@(args.map -> {x} x)                                       \n\
+         | ,@(args.map -> {x y} '('x).&macro <= make-macro y)              \n\
          | ()                                                              \n\
   | ()                                                                     \n\
+                                                                           \n\
+$macs                                                                      \n\
+  $mac -> n f                                                              \n\
+    '$macs: n f                                                            \n\
                                                                            \n\
 $mac $run -> x                                                             \n\
   '$eval                                                                   \n\
@@ -47,9 +51,9 @@ $mac w/complex -> x body                                                   \n\
                                                                            \n\
                                                                            \n\
 ###  Boxes                                                                 \n\
-$mac defs -> @body                                                         \n\
-  '| box ,@(body.map -> {x} x)                                             \n\
-   | ,@(body.map -> {x y} 'x <= y)                                         \n\
+$mac defs -> @args                                                         \n\
+  '| box ,@(args.map -> {x} x)                                             \n\
+   | ,@(args.map -> {x y} 'x <= y)                                         \n\
                                                                            \n\
 #|                                                                         \n\
 # TODO: define def in terms of defs?                                       \n\
@@ -148,6 +152,11 @@ $mac w/map -> {('=) x y} body                                              \n\
                                                                            \n\
                                                                            \n\
 ###  TODO                                                                  \n\
+$mac $pattern -> n f                                                       \n\
+  '$run                                                                    \n\
+     | box n                                                               \n\
+     | ('n).&pattern <= make-macro f                                       \n\
+                                                                           \n\
 $mac $getset -> n get set                                                  \n\
   '$run                                                                    \n\
      | box n                                                               \n\
@@ -187,6 +196,14 @@ $mac w/exclude -> @args body                                               \n\
        | body                                                              \n\
        | ,@r                                                               \n\
        | ()                                                                \n\
+                                                                           \n\
+                                                                           \n\
+$mac re -> x                                                               \n\
+  'new RegExp x                                                            \n\
+                                                                           \n\
+$mac re-replace -> in r y                                                  \n\
+  'in.replace (re r) y                                                     \n\
+                                                                           \n\
                                                                            \n\
 ###  Syntax                                                                \n\
 # TODO                                                                     \n\

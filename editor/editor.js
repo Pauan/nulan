@@ -74,13 +74,12 @@ var editor = (function (n) {
 
   script(["../src/NULAN.parse.js",
           "../lib/nino/compile.js",
-          "../lib/nino/transform.js",
+          //"../lib/nino/transform.js",
           "../lib/nino/partial.js",
           "../src/NULAN.js"], function () {
     script("../src/NULAN.macros.js", function () {
       script(["../src/modes/browser.js",
-              //"../src/modes/node.js"
-              ])
+              "../src/modes/node.js"])
     })
   })
 
@@ -570,7 +569,9 @@ var editor = (function (n) {
               o.compileEvals.push(x)
             }
 
-            console.log = /*sandbox.contentWindow.console.log = */function () {
+            var old = console.log
+
+            console.log = o.printer = /*sandbox.contentWindow.console.log = */function () {
               o.prints.push([].slice.call(arguments).join(" "))
             }
 
@@ -584,6 +585,8 @@ var editor = (function (n) {
               //o.error = "" + e
               //o.textContent = print(["" + e])
             }
+
+            console.log = old
 /*
             o.boxes       = NULAN.boxes
             o.vars        = NULAN.vars
@@ -606,7 +609,7 @@ var editor = (function (n) {
           mode: "nulan",
           theme: "custom",
           lineWrapping: true,
-          //lineNumbers: true,
+          lineNumbers: true,
           autofocus: true,
           extraKeys: {
             "Tab":       "indentMore",
@@ -714,6 +717,7 @@ var editor = (function (n) {
           n.forms.forEach(function (x) {
             if ("compile" in x) {
               try {
+                sandbox.contentWindow.console.log = x.printer
                 x.eval = myEval(x.compile) // indirect eval
               } catch (e) {
                 x.error = e

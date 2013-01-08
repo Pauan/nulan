@@ -31,7 +31,7 @@ var o = (function () {
 load("./src/NULAN.parse.js", o)
 
 load("./lib/nino/compile.js", o)
-load("./lib/nino/transform.js", o)
+//load("./lib/nino/transform.js", o)
 load("./lib/nino/partial.js", o)
 
 load("./src/NULAN.js", o)
@@ -111,7 +111,7 @@ function evalFile(s, o) {
   }
 }*/
 
-o.NULAN.from("Node.js").to("Node.js")
+//o.NULAN.from("Node.js").to("Node.js")
 
 try {
   load("./src/NULAN.macros.js", o)

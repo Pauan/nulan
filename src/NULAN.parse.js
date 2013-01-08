@@ -300,13 +300,14 @@ var NULAN = (function (n) {
       endAt: "]",
       parse: function (l, s, r) {
         if (s.whitespace) {
-          console.info(r[0])
           l.push([s].concat(pair(r[0]).map(function (x) {
             if (x[0] instanceof n.Symbol) {
+              var val = n.mangle(x[0].value)
               n.tokenUpdate(x[0], function (o) {
                 o.type = "property"
+                o.value = val
               })
-              return [enrich(new n.Wrapper(n.mangle(x[0].value)), x[0].start, x[0].end), x[1]]
+              return [enrich(new n.Wrapper(val), x[0].start, x[0].end), x[1]]
             } else {
               return x
             }
@@ -375,10 +376,12 @@ var NULAN = (function (n) {
             })
             return i
           } else if (y instanceof n.Symbol) {
+            var val = n.mangle(y.value)
             n.tokenUpdate(y, function (o) {
               o.type = "property"
+              o.value = val
             })
-            return [s, x, enrich(new n.Wrapper(n.mangle(y.value)), y.start, y.end)]
+            return [s, x, enrich(new n.Wrapper(val), y.start, y.end)]
           // TODO
           } else if (x === void 0) {
 
@@ -791,6 +794,12 @@ var NULAN = (function (n) {
 
           r.push(new Bypass(unwrap(processOne(o))))
           s = store(o)
+        } else if (c === "\n") {
+          a.push(o.read())
+          var i = sFirst.column
+          while (i--) {
+            o.read()
+          }
         } else {
           a.push(o.read())
         }
