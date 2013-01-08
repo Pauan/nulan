@@ -14,7 +14,9 @@ var NULAN = (function (n) {
     // TODO: change NINO to accept a single argument
     // TODO: should partial or transform come first?
     // NINO.transform()
-    return NINO.compile(NINO.partial([mac(a)]))
+    return NINO.compile(NINO.partial(withExpression(function () {
+      return withBlock(a)
+    })))
   }
 
 
@@ -42,7 +44,77 @@ var NULAN = (function (n) {
   var expression = true
     , statements
 
-  function withStatement(x, f) {
+  function isPure(x) {
+    if (Array.isArray(x)) {
+      switch (x[0]) {
+      case "empty":
+      case "name":
+      case "number":
+      case "boolean":
+      case "null":
+      case "regexp":
+      case "string":
+      case "function":
+        return true
+
+      case "id":
+      case "break":
+      case "continue":
+      case "debugger":
+      case "return":
+      case "throw":
+      case "var":
+      case "new":
+      case "call":
+      case "++":
+      case "--":
+      case "delete":
+      case "=":
+      case "+=":
+      case "-=":
+      case "*=":
+      case "/=":
+      case "%=":
+      case "<<=":
+      case ">>=":
+      case ">>>=":
+      case "&=":
+      case "^=":
+      case "|=":
+      case "function-statement":
+        return false
+
+      default:
+        return x.every(isPure)
+      }
+    } else {
+      return true
+    }
+  }
+
+  function isVoid(x) {
+    if (Array.isArray(x)) {
+      switch (x[0]) {
+      case "void":
+      case "empty":
+        return true
+      }
+    }
+    return false
+  }
+
+  function withExpression(f) {
+    var old = expression
+    expression = true
+    try {
+      var x = f()
+    } finally {
+      expression = old
+    }
+    return x
+  }
+
+  function withStatement(f) {
     var old = expression
     expression = false
     try {
@@ -53,15 +125,48 @@ var NULAN = (function (n) {
     return x
   }
 
+  function mergeVars(x) {
+    var r = []
+      , a = []
+    x.forEach(function (x) {
+      if (Array.isArray(x) && x[0] === "var") {
+        a.push(x[1][0])
+      } else {
+        if (a.length) {
+          r.push(["var", a])
+        }
+        a = []
+        r.push(x)
+      }
+    })
+    if (a.length) {
+      r.push(["var", a])
+    }
+    return r
+  }
+
   function withBlock(x) {
     var old = statements
     statements = []
     try {
       statements.push(mac(x))
     } finally {
+      x = statements
       statements = old
     }
-    return statements.join(";\n")
+    if (expression) {
+      if (x.length) {
+        // TODO: ew
+        x = x.slice(0, -1).filter(function (x) {
+          return !isPure(x)
+        }).concat([x[x.length - 1]])
+      }
+    } else {
+      x = x.filter(function (x) {
+        return !isPure(x)
+      })
+    }
+    return mergeVars(x)
   }
 
 
@@ -857,7 +962,6 @@ var NULAN = (function (n) {
   setMacro("num",         unary("u+"))
   setMacro("~",           unary("!"))
   setMacro("&typeof",     unary("typeof"))
-  setMacro("throw",       unary("throw"))
 
   setMacro("&in",         binary("in"))
   setMacro("&instanceof", binary("instanceof"))
@@ -876,7 +980,7 @@ var NULAN = (function (n) {
   setMacro("*",           binreduce0("*",  ["number", "1"]))
 
   setBox("-",             binreduce1("-", function (x) { return ["u-", x] }))
-  setBox("|",             binreduce1(","))
+  //setBox("|",             binreduce1(","))
   setBox("/",             binreduce1("/"))
 
   setMacro("<=", function (x, y) {
@@ -929,7 +1033,38 @@ var NULAN = (function (n) {
 */
 
   setMacro("&break", function () {
-    return ["break"]
+    statements.push(["break"])
+    return ["empty"]
+  })
+
+  setMacro("throw", function (x) {
+    statements.push(["throw", mac(x)])
+    return ["empty"]
+  })
+
+  setMacro("&return", function (x) {
+    x = mac(x)
+    if (isVoid(x)) {
+      if (expression) {
+        statements.push(["return"])
+      }
+    } else {
+      statements.push(["return", x])
+    }
+    return ["empty"]
+  })
+
+  setMacro("|", function () {
+    var args = [].slice.call(arguments, 0, -1)
+    args.forEach(function (x) {
+      statements.push(mac(x))
+    })
+    if (arguments.length) {
+      return mac(arguments[arguments.length - 1])
+    } else {
+      // TODO: put error here
+      return ["empty"]
+    }
   })
 
   setMacro("$eval", function (x) {
@@ -1049,7 +1184,10 @@ var NULAN = (function (n) {
 
   setMacro("while", function (test, body) {
     return withNewScope(function () {
-      return ["while", mac(test), [mac(body)]]
+      statements.push(["while", mac(test), withStatement(function () {
+        return withBlock(body)
+      })])
+      return ["empty"]
     })
   })
 
@@ -1063,6 +1201,17 @@ var NULAN = (function (n) {
   })
 
   setMacro("if", function () {
+    function branch(u, x) {
+      return withNewScope(function () {
+        //return withStatement(function () {
+        //[n.box("<="), u, x]
+        return withExpression(function () {
+          return withBlock(x)
+        })
+        //})
+      })
+    }
+
     // TODO: I'm not sure whether the then/else branches should get their own withNewScope or not
     function loop(a) {
       switch (a.length) {
@@ -1072,18 +1221,49 @@ var NULAN = (function (n) {
       case 1:
         return mac(a[0])
       case 2:
-        return ["if", mac(a[0]), [withNewScope(function () { return mac(a[1]) })], []]
       case 3:
-        return ["if", mac(a[0]),
-                 [withNewScope(function () { return mac(a[1]) })],
-                 [withNewScope(function () { return mac(a[2]) })]]
+        var x = mac(a[0])
+          , y = branch(u, a[1])
+          , z = (a.length === 3
+                  ? branch(u, a[2])
+                  : [])
+
+        var b1 = (y.length && !isVoid(y[y.length - 1]))
+          , b2 = (z.length && !isVoid(z[z.length - 1]))
+
+        if (b1 || b2) {
+          var u = new Uniq()
+          statements.push(mac([n.box("box"), u]))
+          if (b1) {
+            y.push(["=", mac(u), y.pop()])
+          }
+          if (b2) {
+            z.push(["=", mac(u), z.pop()])
+          }
+        }
+        if (!b1) {
+          y.pop()
+        }
+        if (!b2) {
+          z.pop()
+        }
+
+        statements.push(["if", x, y, z ])
+
+        if (b1 || b2) {
+          return mac(u)
+        } else {
+          return ["empty"]
+        }
       // TODO: maybe simplify this a bit?
       default:
-        return ["if", mac(a[0]),
+        return loop([a[0], a[1], loop(a.slice(2))])
+        /*return ["if", mac(a[0]),
                  [withNewScope(function () { return mac(a[1]) })],
-                 [loop.apply(this, a.slice(2))]]
+                 [loop.apply(this, a.slice(2))]]*/
       }
     }
+
     var a = [].slice.call(arguments)
     return withNewScope(function () {
       return loop(a)
@@ -1095,7 +1275,16 @@ var NULAN = (function (n) {
   })*/
 
   setMacro("finally", function (x, y) {
-    return ["try", [mac(x)], [], [mac(y)]]
+    // TODO: fix this so it works the same as the "if" macro
+    var u = new Uniq()
+    statements.push(["try", withStatement(function () {
+                              return withBlock(mac([n.box("box"), [n.box("="), u, x]]))
+                            }),
+                            [],
+                            withStatement(function () {
+                              return withBlock(y)
+                            })])
+    return mac(u)
     /*var u = new Uniq()
     return ["try", [mac([values["box"], [u, x]])], ["finally", [mac(y), mac(u)]]]*/
   })
@@ -1349,7 +1538,7 @@ var NULAN = (function (n) {
           }
 
           return ["function", "", r, withStatement(function () {
-            return ["return", withBlock(body)]
+            return withBlock([n.box("&return"), body])
           })]
         })
       })
@@ -1373,7 +1562,9 @@ var NULAN = (function (n) {
       }
     }*/
 
-    return args.map(function (x) {
+    var lastSym
+
+    args = args.map(function (x) {
       var y
       if (Array.isArray(x)) {
         // TODO: use isSym ?
@@ -1383,6 +1574,7 @@ var NULAN = (function (n) {
         y = x[2]
         x = x[1]
       }
+      // TODO: should return the result of this
       if (wildcard(x)) {
         return mac(y)
       } else if (boxOrSym(x)) {
@@ -1390,7 +1582,7 @@ var NULAN = (function (n) {
           y = mac(y)
         }
 
-        x = setSymToBox(x)
+        lastSym = x = setSymToBox(x)
 
             // TODO: !x.local
         if (x._38_scope !== "local" && mode === "compile") {
@@ -1417,9 +1609,21 @@ var NULAN = (function (n) {
           return mac(destructure(x, y))
         }
       }
-    }).reduce(function (x, y) {
-      return [",", x, y]
     })
+
+    args.forEach(function (x) {
+      statements.push(x)
+    })
+
+    if (lastSym === void 0) {
+      return ["empty"]
+    } else {
+      return mac(lastSym)
+    }
+/*
+    return .reduce(function (x, y) {
+      return [",", x, y]
+    })*/
   })
 
 /*
