@@ -64,6 +64,8 @@ var NULAN = (function (n) {
       case "return":
       case "throw":
       case "var":
+      case "for":
+      case "while":
       case "new":
       case "call":
       case "++":
@@ -134,6 +136,13 @@ var NULAN = (function (n) {
       } else {
         if (a.length) {
           r.push(["var", a])
+          var y = a[a.length - 1]
+          if (y.length === 1 && x[0] === "=" && Array.isArray(x[1]) && x[1][0] === "name") {
+            if (y[0] === x[1][1]) {
+              y.push(x[2])
+              x = x[1]
+            }
+          }
         }
         a = []
         r.push(x)
@@ -145,6 +154,23 @@ var NULAN = (function (n) {
     return r
   }
 
+  function pruneStuff(x) {
+    if (expression) {
+      if (x.length) {
+        // TODO: ew
+        return x.slice(0, -1).filter(function (x) {
+          return !isPure(x)
+        }).concat([x[x.length - 1]])
+      } else {
+        return x
+      }
+    } else {
+      return x.filter(function (x) {
+        return !isPure(x)
+      })
+    }
+  }
+
   function withBlock(x) {
     var old = statements
     statements = []
@@ -154,19 +180,7 @@ var NULAN = (function (n) {
       x = statements
       statements = old
     }
-    if (expression) {
-      if (x.length) {
-        // TODO: ew
-        x = x.slice(0, -1).filter(function (x) {
-          return !isPure(x)
-        }).concat([x[x.length - 1]])
-      }
-    } else {
-      x = x.filter(function (x) {
-        return !isPure(x)
-      })
-    }
-    return mergeVars(x)
+    return pruneStuff(mergeVars(pruneStuff(x))) // TODO: figure out a way so that a double prune isn't necessary anymore?
   }
 
 
@@ -456,6 +470,9 @@ var NULAN = (function (n) {
       var s, i = 1
       while (true) {
         for (var a = "a".charCodeAt(0), b = "z".charCodeAt(0); a <= b; ++a) {
+          if (scope === "local" && mode === "compile" && String.fromCharCode(a) === "n") {
+            continue
+          }
           s = new Array(i + 1).join(String.fromCharCode(a))
           if (!n.boxes[s]) {
             //n.boxes[s] = true
@@ -1062,7 +1079,7 @@ var NULAN = (function (n) {
     if (arguments.length) {
       return mac(arguments[arguments.length - 1])
     } else {
-      // TODO: put error here
+      // TODO: put error here ?
       return ["empty"]
     }
   })
@@ -1200,74 +1217,72 @@ var NULAN = (function (n) {
     })
   })
 
-  setMacro("if", function () {
-    function branch(u, x) {
-      return withNewScope(function () {
-        //return withStatement(function () {
-        //[n.box("<="), u, x]
-        return withExpression(function () {
-          return withBlock(x)
+  setBox("if", {
+    _38_macro: function (a) {
+      var first = a[0]
+
+      function branch(u, x) {
+        return withNewScope(function () {
+          //return withStatement(function () {
+          //[n.box("<="), u, x]
+          return withExpression(function () {
+            return withBlock(x)
+          })
+          //})
         })
-        //})
+      }
+
+      // TODO: I'm not sure whether the then/else branches should get their own withNewScope or not
+      function loop(a) {
+        switch (a.length) {
+        case 0:
+        case 1:
+          throw new n.Error(first, "expected 2 or more arguments but got " + a.length)
+        case 2:
+        case 3:
+          var x = mac(a[0])
+            , y = branch(u, a[1])
+            , z = (a.length === 3
+                    ? branch(u, a[2])
+                    : [])
+
+          var b1 = (y.length && !isVoid(y[y.length - 1]))
+            , b2 = (z.length && !isVoid(z[z.length - 1]))
+
+          if (b1 || b2) {
+            var u = new Uniq()
+            statements.push(mac([n.box("box"), u]))
+            if (b1) {
+              y.push(["=", mac(u), y.pop()])
+            }
+            if (b2) {
+              z.push(["=", mac(u), z.pop()])
+            }
+          }
+          if (!b1) {
+            y.pop()
+          }
+          if (!b2) {
+            z.pop()
+          }
+
+          statements.push(["if", x, y, z ])
+
+          if (b1 || b2) {
+            return mac(u)
+          } else {
+            return ["empty"]
+          }
+        default:
+          // TODO: should the sub-expressions create a new scope ?
+          return loop([a[0], a[1], [n.box("if")].concat(a.slice(2))])
+        }
+      }
+
+      return withNewScope(function () {
+        return loop(a.slice(1))
       })
     }
-
-    // TODO: I'm not sure whether the then/else branches should get their own withNewScope or not
-    function loop(a) {
-      switch (a.length) {
-      case 0:
-               // TODO
-        return ["empty"] //["void", ["number", "0"]]
-      case 1:
-        return mac(a[0])
-      case 2:
-      case 3:
-        var x = mac(a[0])
-          , y = branch(u, a[1])
-          , z = (a.length === 3
-                  ? branch(u, a[2])
-                  : [])
-
-        var b1 = (y.length && !isVoid(y[y.length - 1]))
-          , b2 = (z.length && !isVoid(z[z.length - 1]))
-
-        if (b1 || b2) {
-          var u = new Uniq()
-          statements.push(mac([n.box("box"), u]))
-          if (b1) {
-            y.push(["=", mac(u), y.pop()])
-          }
-          if (b2) {
-            z.push(["=", mac(u), z.pop()])
-          }
-        }
-        if (!b1) {
-          y.pop()
-        }
-        if (!b2) {
-          z.pop()
-        }
-
-        statements.push(["if", x, y, z ])
-
-        if (b1 || b2) {
-          return mac(u)
-        } else {
-          return ["empty"]
-        }
-      // TODO: maybe simplify this a bit?
-      default:
-        return loop([a[0], a[1], loop(a.slice(2))])
-        /*return ["if", mac(a[0]),
-                 [withNewScope(function () { return mac(a[1]) })],
-                 [loop.apply(this, a.slice(2))]]*/
-      }
-    }
-
-    var a = [].slice.call(arguments)
-    return withNewScope(function () {
-      return loop(a)
-    })
   })
 /*
   setMacro("re", function (x) {
@@ -1275,16 +1290,31 @@ var NULAN = (function (n) {
   })*/
 
   setMacro("finally", function (x, y) {
-    // TODO: fix this so it works the same as the "if" macro
-    var u = new Uniq()
-    statements.push(["try", withStatement(function () {
-                              return withBlock(mac([n.box("box"), [n.box("="), u, x]]))
-                            }),
+    x = withExpression(function () {
+      return withBlock(x)
+    })
+    var b = (x.length && !isVoid(x[x.length - 1]))
+    //[n.box("box"), [n.box("="), u, x]]
+    if (b) {
+      var u = new Uniq()
+      //statements.push(mac([n.box("box"), u]))
+      //x.push(["=", mac(u), x.pop()])
+      // TODO: code duplication with "box"
+      u = setSymToBox(u)
+      x.push(["var", [[u._38_uniqueName, x.pop()]]])
+    } else {
+      x.pop()
+    }
+    statements.push(["try", x,
                             [],
                             withStatement(function () {
                               return withBlock(y)
                             })])
-    return mac(u)
+    if (b) {
+      return mac(u)
+    } else {
+      return ["empty"]
+    }
     /*var u = new Uniq()
     return ["try", [mac([values["box"], [u, x]])], ["finally", [mac(y), mac(u)]]]*/
   })

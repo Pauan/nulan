@@ -219,12 +219,13 @@ $mac $syntax-rule -> s o                                                   \n\
 $mac $syntax-helper -> n f                                                 \n\
   w/uniq s i o u                                                           \n\
     '$mac n -> s (i = 0) (o = '[])                                         \n\
-       '$run                                                               \n\
-          # TODO: make it work with w/complex somehow?                     \n\
-          w/box u = o                                                      \n\
-            | u.priority <= i                                              \n\
-            | u.parse <= f                                                 \n\
-            | $syntax-rule s u                                             \n\
+       w/uniq u  # TODO figure out a way to remove this                    \n\
+         '$run                                                             \n\
+            # TODO: make it work with w/complex somehow?                   \n\
+            w/box u = o                                                    \n\
+              | u.priority <= i                                            \n\
+              | u.parse <= f                                               \n\
+              | $syntax-rule s u                                           \n\
                                                                            \n\
 #| TODO: Fix this                                                          \n\
 | [].foo <= 10                                                             \n\
