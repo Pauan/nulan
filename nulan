@@ -18,7 +18,7 @@ var o = (function () {
     x[s] = global[s]
   }
   x.global = x
-  x.global.global = x
+  x.global.global = x // TODO: is this needed?
 
   x.console = console //new Console(this.outputStream)
   x.module  = module
@@ -28,15 +28,17 @@ var o = (function () {
   return x
 })()
 
-load("./src/NULAN.parse.js", o)
+var path = require("path")
 
-load("./lib/nino/compile.js", o)
+load(path.resolve(__dirname, "src/NULAN.parse.js"), o)
+
+load(path.resolve(__dirname, "lib/nino/compile.js"), o)
 //load("./lib/nino/transform.js", o)
-load("./lib/nino/partial.js", o)
+load(path.resolve(__dirname, "lib/nino/partial.js"), o)
 
-load("./src/NULAN.js", o)
+load(path.resolve(__dirname, "src/NULAN.js"), o)
 
-load("./lib/nuit/serialize.js", o)
+load(path.resolve(__dirname, "lib/nuit/serialize.js"), o)
 /*
 NULAN.readFile = function (s) {
   return fs.readFileSync(s, "utf8")
@@ -114,8 +116,8 @@ function evalFile(s, o) {
 //o.NULAN.from("Node.js").to("Node.js")
 
 try {
-  load("./src/NULAN.macros.js", o)
-  load("./src/modes/node.js", o)
+  load(path.resolve(__dirname, "src/NULAN.macros.js"), o)
+  load(path.resolve(__dirname, "src/modes/node.js"), o)
   //evalFile("NULAN.macros", o)
   //evalFile("modes/Node.js", o)
 } catch (e) {

@@ -28,9 +28,12 @@ $mac $run -> x                                                             \n\
                                                                            \n\
 # TODO partial scope, if it isn't too hard to add in                       \n\
 $mac w/box -> @args body                                                   \n\
-  'w/new-scope                                                             \n\
-     | box ,@args                                                          \n\
-     | body                                                                \n\
+  if: == scope \"global\"                                                  \n\
+    ':->                                                                   \n\
+       w/box ,@args body                                                   \n\
+    'w/new-scope                                                           \n\
+       | box ,@args                                                        \n\
+       | body                                                              \n\
                                                                            \n\
                                                                            \n\
 ###  Macro utilities                                                       \n\
@@ -203,6 +206,10 @@ $mac re -> x                                                               \n\
                                                                            \n\
 $mac re-replace -> in r y                                                  \n\
   'in.replace (re r) y                                                     \n\
+                                                                           \n\
+                                                                           \n\
+$mac has -> x y                                                            \n\
+  '~= (x.index-of y) (- 1)                                                 \n\
                                                                            \n\
                                                                            \n\
 ###  Syntax                                                                \n\

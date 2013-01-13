@@ -758,7 +758,13 @@ var NULAN = (function (n) {
         } else if (c === "\\") {
           o.read()
           c = o.read()
-          if (c === "r") {
+          if (c === "\n") {
+            // TODO: code duplication
+            var i = sFirst.column
+            while (i--) {
+              o.read()
+            }
+          } else if (c === "r") {
             a.push("\r")
           } else if (c === "n") {
             a.push("\n")
@@ -770,7 +776,7 @@ var NULAN = (function (n) {
             //o.length = 2
             // TODO: a little hacky
             o.column -= 2
-            throw new n.Error(enrichL(o, 2), "expected \\r \\n \\t \\\" \\@ \\\\ but got \\" + c)
+            throw new n.Error(enrichL(o, 2), "expected \\ \\r \\n \\t \\\" \\@ \\\\ but got \\" + c)
           }
         } else if (c === "@") {
           //r[0] = enrich(r[0], s, o)
@@ -1129,8 +1135,16 @@ var NULAN = (function (n) {
           r = []
           while (o.has() && isSym(o.peek(), y.value) && o.peek().start.column === y.start.column) {
             if (b) {
+              // TODO: should probably also do this if it's not indent
+              // TODO: why doesn't this work...?!
+              y = o.peek()
               o.read()
-              r.push(indent(o, o.peek()))
+              x = o.peek()
+              if (x.start.line === y.start.line || x.start.column > y.start.column) {
+                r.push(indent(o, x))
+              } else {
+                break
+              }
             } else {
               r.push.apply(r, indent(o, o.read()))
             }

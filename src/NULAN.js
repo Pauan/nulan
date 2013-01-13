@@ -408,7 +408,7 @@ var NULAN = (function (n) {
 
   n.vars = {} // Nulan Variable -> JS Variable (guaranteed unique)
 
-  var myMangle, Uniq, setBuiltin, tokenBox, setSymToBox, setSymExternal, setBox, getBox, withLocalScope, withNewScope, withPreviousScope, compileEval
+  var myMangle, Uniq, setBuiltin, tokenBox, setSymToBox, setSymExternal, setBox, getBox, remBox, withLocalScope, withNewScope, withPreviousScope, compileEval
 
 /*
   var boxes = 5
@@ -442,13 +442,12 @@ var NULAN = (function (n) {
 */
 
   ;(function () {
+    n.scope = "global"
     // TODO: I no longer need to expose boxes, but I may want to do so anyways
     n.boxes = {} // JS Variable -> Box
 
-    var scope = "global"
-
     myMangle = function (x) {
-      if (scope === "local" && mode === "compile" && x === "n") {
+      if (n.scope === "local" && mode === "compile" && x === "n") {
         return "_" + x
       } else {
         return n.mangle(x)
@@ -470,7 +469,7 @@ var NULAN = (function (n) {
       var s, i = 1
       while (true) {
         for (var a = "a".charCodeAt(0), b = "z".charCodeAt(0); a <= b; ++a) {
-          if (scope === "local" && mode === "compile" && String.fromCharCode(a) === "n") {
+          if (n.scope === "local" && mode === "compile" && String.fromCharCode(a) === "n") {
             continue
           }
           s = new Array(i + 1).join(String.fromCharCode(a))
@@ -552,7 +551,7 @@ var NULAN = (function (n) {
         x._38_uniqueName = findUniq(x._38_originalName)
       }
       n.boxes[x._38_uniqueName] = x
-      x._38_scope = scope
+      x._38_scope = n.scope
       //x.local = local
       x._38_mode[mode] = true
       return x
@@ -588,6 +587,13 @@ var NULAN = (function (n) {
       }
     }
 
+    remBox = function (x) {
+      delete n.boxes[x._38_uniqueName]
+      delete x._38_uniqueName
+      delete x._38_scope
+      x._38_mode = {}
+    }
+
     n.box = function (s) {
       /*
       // TODO
@@ -617,30 +623,30 @@ var NULAN = (function (n) {
 
     withLocalScope = function (f) {
       var old  = n.boxes
-        , old2 = scope
+        , old2 = n.scope
       n.boxes   = Object.create(n.boxes)
       prevBoxes = n.boxes
-      scope     = "local"
+      n.scope   = "local"
       try {
         var x = f()
       } finally {
         n.boxes = old
-        scope   = old2
+        n.scope = old2
       }
       return x
     }
 
     withNewScope = function (f) {
       var old  = n.vars
-        , old2 = scope // TODO
+        , old2 = n.scope // TODO
       n.vars   = Object.create(n.vars)
       prevVars = n.vars
-      scope    = "local" // TODO
+      n.scope  = "local" // TODO
       try {
         var x = f()
       } finally {
-        n.vars = old
-        scope  = old2 // TODO
+        n.vars  = old
+        n.scope = old2 // TODO
       }
       return x
     }
@@ -908,8 +914,7 @@ var NULAN = (function (n) {
   setBuiltin("%t", "true")
   setBuiltin("%f", "false")
 
-  // TODO: `syntax-rules <= [ ... ]`
-  //       `w/dict! syntax-rules ...
+  // TODO: why does this need to use compileOnlyError?
   setBox("syntax-rules", {
     _38_get: function (a) {
       compileOnlyError(a[0])
@@ -918,6 +923,17 @@ var NULAN = (function (n) {
     _38_set: function (a) {
       compileOnlyError(a[0])
       return ["=", [".", ["name", "n"], "syntaxRules"], mac(a[1])]
+    }
+  })
+
+  setBox("scope", {
+    _38_get: function (a) {
+      compileOnlyError(a[0])
+      return [".", ["name", "n"], "scope"]
+    },
+    _38_set: function (a) {
+      compileOnlyError(a[0])
+      return ["=", [".", ["name", "n"], "scope"], mac(a[1])]
     }
   })
 
@@ -1144,6 +1160,8 @@ var NULAN = (function (n) {
     return mac([n.box("+"), ""].concat(a))
   })
 
+  setBox("str", n.box("\"")) // TODO: remove this once I get (") to parse correctly
+
   // TODO
   setBox(",", {})
   setBox("@", {})
@@ -1240,6 +1258,9 @@ var NULAN = (function (n) {
           throw new n.Error(first, "expected 2 or more arguments but got " + a.length)
         case 2:
         case 3:
+          var u = new Uniq()
+          setSymToBox(u)
+
           var x = mac(a[0])
             , y = branch(u, a[1])
             , z = (a.length === 3
@@ -1250,14 +1271,17 @@ var NULAN = (function (n) {
             , b2 = (z.length && !isVoid(z[z.length - 1]))
 
           if (b1 || b2) {
-            var u = new Uniq()
-            statements.push(mac([n.box("box"), u]))
+            // TODO: code duplication with "box"
+            statements.push(["var", [[u._38_uniqueName]]])
+            //statements.push(mac([n.box("box"), u]))
             if (b1) {
               y.push(["=", mac(u), y.pop()])
             }
             if (b2) {
               z.push(["=", mac(u), z.pop()])
             }
+          } else {
+            remBox(u)
           }
           if (!b1) {
             y.pop()
@@ -1290,19 +1314,24 @@ var NULAN = (function (n) {
   })*/
 
   setMacro("finally", function (x, y) {
+    var u = new Uniq()
+
+    setSymToBox(u)
+
     x = withExpression(function () {
       return withBlock(x)
     })
+
     var b = (x.length && !isVoid(x[x.length - 1]))
     //[n.box("box"), [n.box("="), u, x]]
     if (b) {
-      var u = new Uniq()
+      //statements.push(v)
       //statements.push(mac([n.box("box"), u]))
       //x.push(["=", mac(u), x.pop()])
       // TODO: code duplication with "box"
-      u = setSymToBox(u)
       x.push(["var", [[u._38_uniqueName, x.pop()]]])
     } else {
+      remBox(u)
       x.pop()
     }
     statements.push(["try", x,
@@ -2013,6 +2042,8 @@ function infix(i, b, f) {
     })
   }*/
 
+  n.evalString = eval
+
   n.eval = function (s, f) {
     var r = []
     n.parse(s, function (err, x) {
@@ -2022,14 +2053,11 @@ function infix(i, b, f) {
       }
       r.push(n.compile(x))
     })
-    r = r.join(";\n\n")
+    r = NINO.joinStatements(r, "\n\n")
     if (f) {
       f(r)
     } else {
-      // TODO: should be global eval, maybe?
-      //       or at least it should have access to values and boxes, right?
-      //       or does it need access to those things?
-      eval(r)
+      n.evalString(r)
       //require("vm").runInNewContext(r, global)
     }
   }
