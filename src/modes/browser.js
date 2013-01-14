@@ -1,5 +1,5 @@
 NULAN.eval("                                                               \n\
-builtin alert window document                                              \n\
+&builtin! alert window document                                            \n\
                                                                            \n\
 $mac element -> x @args                                                    \n\
   w/uniq u                                                                 \n\

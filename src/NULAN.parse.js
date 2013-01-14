@@ -620,12 +620,26 @@ var NULAN = (function (n) {
   }*/
 
 
+  // TODO: change the stringBuffer to follow the normal interface for enriched objects
   function enrich(x, start, end) {
     x.text  = start.text
     x.start = { line:   start.line
               , column: start.column }
     x.end   = { line:   end.line
               , column: end.column }
+    return x
+  }
+
+  n.enrich = function (x, start, end) {
+    x.text = start.text
+    if ("start" in start) {
+      x.start = { line:   start.start.line
+                , column: start.start.column }
+    }
+    if ("end" in end) {
+      x.end   = { line:   end.end.line
+                , column: end.end.column }
+    }
     return x
   }
 

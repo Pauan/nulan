@@ -1,7 +1,7 @@
 NULAN.eval("                                                               \n\
 ###  Core                                                                  \n\
 $eval                                                                      \n\
-  | box make-macro =                                                       \n\
+  | box &make-macro =                                                      \n\
       # TODO                                                               \n\
       -> f                                                                 \n\
         -> {_ @args}                                                       \n\
@@ -10,10 +10,10 @@ $eval                                                                      \n\
                                                                            \n\
 $eval                                                                      \n\
   | box $macs                                                              \n\
-  | ('$macs).&macro <= make-macro -> @args                                 \n\
+  | ('$macs).&macro <= &make-macro -> @args                                \n\
       '$eval                                                               \n\
          | box ,@(args.map -> {x} x)                                       \n\
-         | ,@(args.map -> {x y} '('x).&macro <= make-macro y)              \n\
+         | ,@(args.map -> {x y} '('x).&macro <= &make-macro y)             \n\
          | ()                                                              \n\
   | ()                                                                     \n\
                                                                            \n\
@@ -34,6 +34,18 @@ $mac w/box -> @args body                                                   \n\
     'w/new-scope                                                           \n\
        | box ,@args                                                        \n\
        | body                                                              \n\
+                                                                           \n\
+$mac &builtin! -> @args                                                    \n\
+  '| external! ,@args                                                      \n\
+   | $run                                                                  \n\
+       external! ,@args                                                    \n\
+                                                                           \n\
+&builtin! Number Math Boolean TypeError String Int16Array Float32Array isFinite Array DataView Float64Array ReferenceError SyntaxError Int32Array Uint16Array clearTimeout decodeURIComponent Uint32Array setTimeout eval console URIError unescape Date escape encodeURI Error Int8Array EvalError RangeError NaN isNaN parseInt undefined Object Uint8ClampedArray parseFloat Uint8Array clearInterval Infinity JSON Function setInterval encodeURIComponent decodeURI ArrayBuffer RegExp\n\
+                                                                           \n\
+&builtin! %t = true                                                        \n\
+          %f = false                                                       \n\
+                                                                           \n\
+&builtin! this                                                             \n\
                                                                            \n\
                                                                            \n\
 ###  Macro utilities                                                       \n\
@@ -158,13 +170,13 @@ $mac w/map -> {('=) x y} body                                              \n\
 $mac $pattern -> n f                                                       \n\
   '$run                                                                    \n\
      | box n                                                               \n\
-     | ('n).&pattern <= make-macro f                                       \n\
+     | ('n).&pattern <= &make-macro f                                      \n\
                                                                            \n\
 $mac $getset -> n get set                                                  \n\
   '$run                                                                    \n\
      | box n                                                               \n\
-     | ('n).&get <= make-macro get                                         \n\
-     | ('n).&set <= make-macro set                                         \n\
+     | ('n).&get <= &make-macro get                                        \n\
+     | ('n).&set <= &make-macro set                                        \n\
                                                                            \n\
 $mac alias -> {('=) x y}                                                   \n\
   w/uniq u                                                                 \n\

@@ -408,7 +408,7 @@ var NULAN = (function (n) {
 
   n.vars = {} // Nulan Variable -> JS Variable (guaranteed unique)
 
-  var myMangle, Uniq, setBuiltin, tokenBox, setSymToBox, setSymExternal, setBox, getBox, remBox, withLocalScope, withNewScope, withPreviousScope, compileEval
+  var myMangle, Uniq, tokenBox, setSymToBox, setExternal, setExternalVar, setBox, getBox, remBox, withLocalScope, withNewScope, withPreviousScope, compileEval
 
 /*
   var boxes = 5
@@ -482,9 +482,10 @@ var NULAN = (function (n) {
       }
     }
 
-    n.Box = function (s) {
+    n.Box = function (s, sPrint) {
       this._38_originalName = this._38_uniqueName = s
       this._38_mode = {}
+      this._38_print = sPrint
     }
     /*n.Box.prototype.uniqize = function () {
       //this.local = local
@@ -496,8 +497,13 @@ var NULAN = (function (n) {
       return this
     }*/
     n.Box.prototype.toString = function () {
-             // TODO: should this use unmangle?
-      return "#<box " + n.unmangle(this._38_uniqueName) + ">"
+      if (this._38_print) {
+        // TODO: does this need to coerce to a string?
+        return "" + this._38_print
+      } else {
+               // TODO: should this use unmangle?
+        return "#<box " + n.unmangle(this._38_uniqueName) + ">"
+      }
     }
 
     Uniq = function () {}
@@ -517,19 +523,6 @@ var NULAN = (function (n) {
       this.value = getUniq()
     }*/
 
-    setBuiltin = function (sN, sJS) {
-      var x = new n.Box(sJS)
-      // TODO: code duplication with setSymToBox
-      n.vars[sN] = x._38_uniqueName
-
-      n.boxes[x._38_uniqueName] = x
-      x._38_scope = "builtin"
-      //x.local = local // TODO: local
-      x._38_mode["compile"] = true
-      x._38_mode["run"] = true
-      return x
-    }
-
     tokenBox = function (x, y) {
       n.tokenUpdate(x, function (o) {
         //o.type = "symbol"
@@ -538,10 +531,18 @@ var NULAN = (function (n) {
       })
     }
 
+    function updateBox(x) {
+      n.boxes[x._38_uniqueName] = x
+      x._38_scope = n.scope
+      //x.local = local
+      x._38_mode[mode] = true
+      return x
+    }
+
     setSymToBox = function (x) {
       var y
       if (x instanceof n.Symbol) {
-        y = setSymToBox(new n.Box(myMangle(x.value)))
+        y = setSymToBox(n.enrich(new n.Box(myMangle(x.value), x), x, x))
         n.vars[x.value] = y._38_uniqueName
         tokenBox(x, y)
         return y
@@ -550,18 +551,25 @@ var NULAN = (function (n) {
       } else if (x instanceof n.Box) {
         x._38_uniqueName = findUniq(x._38_originalName)
       }
-      n.boxes[x._38_uniqueName] = x
-      x._38_scope = n.scope
-      //x.local = local
-      x._38_mode[mode] = true
-      return x
+      return updateBox(x)
     }
 
-    // TODO: should this call tokenBox?
-    setSymExternal = function (s) {
-      var x = setSymToBox(new n.Box(s.value))
+    setExternal = function (x, y) {
+      if (y === void 0) {
+        y = x
+      }
+      var b = n.enrich(updateBox(n.boxes[y.value] || new n.Box(y.value, x)), x, x)
+      b._38_external = true
+      return b
+    }
+
+    setExternalVar = function (x, y) {
+      var b = setExternal(x, y)
+      n.vars[x.value] = b._38_uniqueName
+      return b
+      /*var x = setSymToBox(new n.Box(s.value))
       n.vars[s.value] = x._38_uniqueName
-      return x
+      return x*/
     }
 
     setBox = function (x, y) {
@@ -739,13 +747,14 @@ var NULAN = (function (n) {
     }
   }
 
-  function checkBox(x, y) {
+  // TODO: better error messages
+  function checkBox(x) {
     // TODO: x.local ||
-    if (y._38_mode[mode]) {
-      return y
+    if (x._38_mode[mode]) {
+      return x
     } else {
-      y = formatMode(Object.keys(y._38_mode))
-      throw new n.Error(x, "undefined symbol (but it exists at " + y + " time): " + x)
+      var s = formatMode(Object.keys(x._38_mode))
+      throw new n.Error(x, "undefined symbol (but it exists at " + s + " time): " + x)
     }
   }
 
@@ -803,12 +812,7 @@ var NULAN = (function (n) {
     /*} else if (a === void 0) { // TODO
       return ["void", ["number", "0"]]*/
     } else if (a instanceof n.Symbol) {
-      x = getBox(a)
-      if ("_38_get" in x) {
-        return mac(x)
-      } else {
-        return mac(checkBox(a, x))
-      }
+      return mac(getBox(a))
 /*      n.tokenUpdate(a, function (o) {
         //o.type = "symbol"
         o.box = x
@@ -822,21 +826,24 @@ var NULAN = (function (n) {
         } else {
           throw new n.Error(a, "cannot use getter at " + mode + " time")
         }*/
-      } else if (mode === "run" || a._38_scope === "local" || a._38_scope === "builtin") {
-        return ["name", a._38_uniqueName]
-      } else if (mode === "compile") {
-        //if ("_38_value" in a) {
-        return [".", macBox(a), "_38_value"]
-        // TODO
-        /*} else {
-          throw new n.Error(a, a + " does not have `&get` or `&value` property")
-        }*/
-      //} else if (mode === "quote") {
-        //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
-        //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
-        //return mac([box("&box"), x])
       } else {
-        throw new n.Error(a, "invalid mode: " + mode) // TODO
+        checkBox(a)
+        if (mode === "run" || a._38_scope === "local" || a._38_external) {
+          return ["name", a._38_uniqueName]
+        } else if (mode === "compile") {
+          //if ("_38_value" in a) {
+          return [".", macBox(a), "_38_value"]
+          // TODO
+          /*} else {
+            throw new n.Error(a, a + " does not have `&get` or `&value` property")
+          }*/
+        //} else if (mode === "quote") {
+          //return ["call", [".", ["name", "n"], "getBox"], [mac(x)]]
+          //return ["new", [".", ["name", "n"], "Box"], [mac(x)]]
+          //return mac([box("&box"), x])
+        } else {
+          throw new n.Error(a, "invalid mode: " + mode) // TODO
+        }
       }
     } else {
       throw new n.Error(a, "invalid expression: " + a)
@@ -910,9 +917,6 @@ var NULAN = (function (n) {
     }
   }
 
-
-  setBuiltin("%t", "true")
-  setBuiltin("%f", "false")
 
   // TODO: why does this need to use compileOnlyError?
   setBox("syntax-rules", {
@@ -1028,7 +1032,7 @@ var NULAN = (function (n) {
           throw new n.Error(b, "cannot use setter at " + mode + " time")
         }*/
       } else {
-        return ["=", mac(checkBox(x, b)), mac(y)]
+        return ["=", mac(checkBox(b)), mac(y)]
       }
     } else {
       return ["=", mac(x), mac(y)]
@@ -1447,9 +1451,7 @@ var NULAN = (function (n) {
             return findCommas(x, function (y, i) {
               if (i === 0) {
                 if (Array.isArray(y) && n.isBox(y[0], "@")) {
-                                    // TODO: use enrich on this
-                                    // enrich(s, y[0])
-                  throw new n.Error({}, "',@ is invalid")
+                  throw new n.Error(n.enrich({}, s, y[0]), "',@ is invalid")
                 } else {
                   y = mac(y)
                 }
@@ -1515,22 +1517,26 @@ var NULAN = (function (n) {
     }
   })
 
-  setMacro("external", function () {
+  setMacro("external!", function () {
     [].forEach.call(arguments, function (x) {
-      tokenBox(x, setSymExternal(x))
+      if (Array.isArray(x)) {
+        // TODO: code duplication with "box"
+        // TODO: use isSym ?
+        if (!n.isBox(x[0], "=")) {
+          throw new n.Error(x[0], "expected = but got " + x[0])
+        }
+        // TODO: should this check if `x[1]` and `x[2]` are symbols/boxes?
+        tokenBox(x, setExternalVar(x[1], x[2]))
+      // TODO: should this check if `x` is a symbol/box?
+      // TODO: should this work for boxes too?
+      } else {
+        tokenBox(x, setExternalVar(x))
+      }
       //setSymToBox(x) // TODO: is this correct?
       //setNewBox(x)
                        // (&eval '(&list 1 2 3))
                        // (include &list)
                        // (&eval '(&list 1 2 3))
-    })
-    return ["empty"]
-  })
-
-  setMacro("builtin", function () {
-    [].forEach.call(arguments, function (x) {
-                     // TODO: meh
-      tokenBox(x, setBuiltin(x.value, x.value))
     })
     return ["empty"]
   })
@@ -1547,7 +1553,7 @@ var NULAN = (function (n) {
   */
           var x, u, s, r = []
 
-          setSymExternal(new n.Symbol("this"))
+          setExternalVar(new n.Symbol("this"))
 
           for (var i = 0, iLen = args.length; i < iLen; ++i) {
             x = args[i]
@@ -1557,7 +1563,7 @@ var NULAN = (function (n) {
               r.push(x._38_uniqueName)
 
             } else if (Array.isArray(x) && n.isBox(x[0], "@")) {
-              s = setSymExternal(new n.Symbol("arguments"))
+              s = setExternal(new n.Symbol("arguments"))
               //s = new n.Box("arguments") // TODO: ew
               //s._38_scope = "local" // TODO: ew
 
@@ -1943,43 +1949,6 @@ function infix(i, b, f) {
   // {{list 1 2} @{3 4} {&splice 5}}
   // [["list", 1, 2]].concat([3, 4], [["@", 5]])
 
-  n.external = function () {
-    [].forEach.call(arguments, function (x) {
-      setSymExternal(new n.Symbol(x))
-      //setSymToBox(new n.Symbol(x)) // TODO is this correct?
-      //setNewBox(new n.Symbol(x))
-    })
-  }
-
-  n.builtin = function (x, y) {
-    setBuiltin(x, y)
-    /*Object.keys(o).forEach(function (x) {
-      setValue(x, o[x])
-    })*/
-    /*[].forEach.call(arguments, function (x) {
-      x = new n.Symbol(x)
-      setBox(x)
-      //setNewBox(new n.Symbol(x))
-    })*/
-    /*var args = arguments
-    // TODO: get it to allow for the variable at both compile at runtime
-    withMode("compile", function () {
-      //withLocalScope(function () {
-      n.include.apply(null, args)
-      //})
-    })*/
-  }
-
-  n.builtins = function () {
-    [].forEach.call(arguments, function (x) {
-      n.builtin(x, x)
-    })
-  }
-
-  // TODO: make it possible to have a variable at both runtime and compiletime
-  //n.include("console", "Array")
-  //n.builtin({ "console": console, "Array": Array, "Object": Object })
-
   // Object.getOwnPropertyNames(global)
   /*var n = {
     builtin: function () {
@@ -1990,56 +1959,6 @@ function infix(i, b, f) {
         return !(x in window)
       }))
     }
-  }*/
-
-  // Globals that exist in all environments
-  n.builtins("Number", "Math", "Boolean", "TypeError", "String",
-             "Int16Array", "Float32Array", "isFinite", "Array", "DataView",
-             "Float64Array", "ReferenceError", "SyntaxError", "Int32Array",
-             "Uint16Array", "clearTimeout", "decodeURIComponent",
-             "Uint32Array", "setTimeout", "eval", "console", "URIError",
-             "unescape", "Date", "escape", "encodeURI", "Error",
-             "Int8Array", "EvalError", "RangeError", "NaN", "isNaN",
-             "parseInt", "undefined", "Object", "Uint8ClampedArray",
-             "parseFloat", "Uint8Array", "clearInterval", "Infinity",
-             "JSON", "Function", "setInterval", "encodeURIComponent",
-             "decodeURI", "ArrayBuffer", "RegExp")
-
-  n.builtins("this")
-
-  // Modes for a specific environment
-  n.modes = {
-    "Node.js": function (f) {
-      f("Buffer", "global", "GLOBAL", "process", "root", "require", "module")
-    },
-    "browser": function (f) {
-      f("window", "document")
-    },
-    "Chrome Extension": function (f) {
-      n.modes["browser"](f)
-      f("chrome")
-    }
-  }
-
-  n.from = function (from) {
-    return {
-      to: function (to) {
-        if (from === to) {
-          n.modes[from](n.builtins)
-        } else {
-          n.modes[from](n.external)
-          withMode("run", function () {
-            n.modes[to](n.external)
-          })
-        }
-      }
-    }
-  }
-/*
-  n.import = function () {
-    [].forEach.call(arguments, function (s) {
-      n.eval(n.readFile(s))
-    })
   }*/
 
   n.evalString = eval
