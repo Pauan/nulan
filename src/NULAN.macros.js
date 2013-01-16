@@ -28,12 +28,9 @@ $mac $run -> x                                                             \n\
                                                                            \n\
 # TODO partial scope, if it isn't too hard to add in                       \n\
 $mac w/box -> @args body                                                   \n\
-  if: == scope \"global\"                                                  \n\
-    ':->                                                                   \n\
-       w/box ,@args body                                                   \n\
-    'w/new-scope                                                           \n\
-       | box ,@args                                                        \n\
-       | body                                                              \n\
+  'w/new-scope                                                             \n\
+     | box ,@args                                                          \n\
+     | body                                                                \n\
                                                                            \n\
 $mac &builtin! -> @args                                                    \n\
   '| external! ,@args                                                      \n\

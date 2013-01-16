@@ -24,6 +24,9 @@ var NULAN = (function (n) {
   n.Error = function (o, s) {
     var a = [s]
     if (o instanceof Object) {
+      n.tokenUpdate(o, function (o) {
+        o.type = "error"
+      })
       var b1 = o.start && ("line"   in o.start)
         , b2 = o.start && ("column" in o.start)
       if (o.text || b1 || b2) {
@@ -269,6 +272,15 @@ var NULAN = (function (n) {
     return r
   }
 
+  function builtin(x, sOther) {
+    var s = x.value
+    return s[0] === "&"
+             ? "builtin"
+             : s[s.length - 1] === "!"
+                 ? "variable-3"
+                 : sOther
+  }
+
 
   // TODO: make them into proper infix, so they behave correctly when only given a left or right side
   n.syntaxRules = {
@@ -304,7 +316,7 @@ var NULAN = (function (n) {
             if (x[0] instanceof n.Symbol) {
               var val = n.mangle(x[0].value)
               n.tokenUpdate(x[0], function (o) {
-                o.type = "property"
+                o.type = builtin(x[0], "property")
                 o.value = val
               })
               return [enrich(new n.Wrapper(val), x[0].start, x[0].end), x[1]]
@@ -378,7 +390,7 @@ var NULAN = (function (n) {
           } else if (y instanceof n.Symbol) {
             var val = n.mangle(y.value)
             n.tokenUpdate(y, function (o) {
-              o.type = "property"
+              o.type = builtin(y, "property")
               o.value = val
             })
             return [s, x, enrich(new n.Wrapper(val), y.start, y.end)]
@@ -803,7 +815,7 @@ var NULAN = (function (n) {
           o.read()
 
           n.tokenUpdate(enrich({}, s, o), function (o) {
-            o.syntaxRule = n.syntaxRules[c]
+            o.syntaxRule = n.syntaxRules[c] // TODO: shouldn't this ALWAYS be treated as syntax?
             o.type = "symbol"
           })
 
@@ -869,7 +881,7 @@ var NULAN = (function (n) {
       white = (b ? !!b.whitespace : false)
 
       n.tokenUpdate(r, function (o) {
-        o.type = "symbol"
+        o.type = builtin(r, "symbol")
         o.syntaxRule = b //!!(b && (b.parse || b.tokenize)) // TODO: should this include b.tokenize?
       })
       return r
@@ -932,7 +944,7 @@ var NULAN = (function (n) {
           white = !!x.whitespace
 
           n.tokenUpdate(last, function (o) {
-            o.type = "symbol"
+            o.type = builtin(last, "symbol")
             o.delimiter = true
             o.syntaxRule = x //!!(x.parse || x.tokenize) // TODO: should this include x.tokenize?
           })

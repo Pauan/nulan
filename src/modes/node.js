@@ -1,5 +1,5 @@
 NULAN.eval("                                                               \n\
-&builtin! Buffer global GLOBAL process root require module                 \n\
+external! Buffer global GLOBAL process root require module                 \n\
                                                                            \n\
 box {_ &exec &script @&args} = process.argv                                \n\
                                                                            \n\

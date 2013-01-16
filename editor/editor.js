@@ -78,8 +78,10 @@ var editor = (function (n) {
           "../lib/nino/partial.js",
           "../src/NULAN.js"], function () {
     script("../src/NULAN.macros.js", function () {
+      //NULAN.withModes(["run", "compile"], function () {
       script(["../src/modes/browser.js",
               "../src/modes/node.js"])
+      //})
     })
   })
 
@@ -306,10 +308,12 @@ var editor = (function (n) {
         return x.type === "keyword"    ||
                x.type === "variable"   ||
                x.type === "variable-2" ||
+               x.type === "variable-3" ||
                x.type === "atom"       ||
                x.type === "number"     ||
                x.type === "string"     ||
-               x.type === "property"
+               x.type === "property"   ||
+               x.type === "builtin"
       }
 
       function typeToType(x) {
@@ -319,6 +323,12 @@ var editor = (function (n) {
           return "normal"
         } else if (x === "keyword") {
           return "macro"
+        } else if (x === "builtin") {
+          return "internal"
+        } else if (x === "variable-3") {
+          return "dangerous"
+        } else {
+          return x
         }
       }
 
@@ -333,8 +343,8 @@ var editor = (function (n) {
       }
 
       function outputToken(x, r) {
+        var s = typeToType(x.type)
         if (x.state.box) {
-          var s = typeToType(x.type)
           if (x.state.box._38_mode["compile"] && s !== "macro") {
             r.push(["token",
                      ["type   ", s],
@@ -349,7 +359,7 @@ var editor = (function (n) {
           }
         } else {
           r.push(["token",
-                   ["type   ", x.type],
+                   ["type   ", s],
                    ["string ", x.string],
                    ["value  ", tokenValue(x)]])
         }
