@@ -21,9 +21,9 @@ $macs                                                                      \n\
   $mac -> n f                                                              \n\
     '$macs: n f                                                            \n\
                                                                            \n\
-$mac $run -> x                                                             \n\
+$mac $run -> @body                                                         \n\
   '$eval                                                                   \n\
-     | x                                                                   \n\
+     | ,@body                                                              \n\
      | ()                                                                  \n\
                                                                            \n\
 # TODO partial scope, if it isn't too hard to add in                       \n\
@@ -147,6 +147,14 @@ $mac w/each -> {('=) x y} body                                             \n\
            w/box x = y[i]                                                  \n\
              body                                                          \n\
                                                                            \n\
+$mac w/each-dict -> k {('=) v x} body                                      \n\
+  w/uniq u                                                                 \n\
+    w/complex x                                                            \n\
+      'w/each u = Object.keys x                                            \n\
+         w/box k = u                                                       \n\
+               v = x[u]                                                    \n\
+           body                                                            \n\
+                                                                           \n\
 $mac w/each-rev -> {('=) x y} body                                         \n\
   w/uniq i                                                                 \n\
     w/complex y                                                            \n\
@@ -166,14 +174,14 @@ $mac w/map -> {('=) x y} body                                              \n\
 ###  TODO                                                                  \n\
 $mac $pattern -> n f                                                       \n\
   '$run                                                                    \n\
-     | box n                                                               \n\
-     | ('n).&pattern <= &make-macro f                                      \n\
+     box n                                                                 \n\
+     ('n).&pattern <= &make-macro f                                        \n\
                                                                            \n\
 $mac $getset -> n get set                                                  \n\
   '$run                                                                    \n\
-     | box n                                                               \n\
-     | ('n).&get <= &make-macro get                                        \n\
-     | ('n).&set <= &make-macro set                                        \n\
+     box n                                                                 \n\
+     ('n).&get <= &make-macro get                                          \n\
+     ('n).&set <= &make-macro set                                          \n\
                                                                            \n\
 $mac alias -> {('=) x y}                                                   \n\
   w/uniq u                                                                 \n\
@@ -249,18 +257,18 @@ $mac $syntax-helper -> n f                                                 \n\
 |#                                                                         \n\
                                                                            \n\
 $run                                                                       \n\
-  | def syntax-infix -> {@l x} s {y @r}                                    \n\
-      if: null? x                                                          \n\
-        ',@l (s y) ,@r                                                     \n\
-        if: null? y                                                        \n\
-          &error s \"missing expression on the right side of @s\"          \n\
-          ',@l (s x y) ,@r                                                 \n\
-  | $syntax-helper $syntax-infix syntax-infix                              \n\
+  def syntax-infix -> {@l x} s {y @r}                                      \n\
+    if: null? x                                                            \n\
+      ',@l (s y) ,@r                                                       \n\
+      if: null? y                                                          \n\
+        &error s \"missing expression on the right side of @s\"            \n\
+        ',@l (s x y) ,@r                                                   \n\
+  $syntax-helper $syntax-infix syntax-infix                                \n\
                                                                            \n\
 $run                                                                       \n\
-  | def syntax-unary -> l s {y @r}                                         \n\
-      ',@l (s y) ,@r                                                       \n\
-  | $syntax-helper $syntax-unary syntax-unary                              \n\
+  def syntax-unary -> l s {y @r}                                           \n\
+    ',@l (s y) ,@r                                                         \n\
+  $syntax-helper $syntax-unary syntax-unary                                \n\
                                                                            \n\
                                                                            \n\
 $syntax-unary \"~\"  80                                                    \n\

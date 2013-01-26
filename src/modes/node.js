@@ -1,6 +1,10 @@
 NULAN.eval("                                                               \n\
 external! Buffer global GLOBAL process root require module                 \n\
                                                                            \n\
+external! NUIT  # TODO: this shouldn't be in node.js                       \n\
+alias nuit-parse = NUIT.parse                                              \n\
+alias nuit-serialize = NUIT.serialize                                      \n\
+                                                                           \n\
 box {_ &exec &script @&args} = process.argv                                \n\
                                                                            \n\
 $mac delay -> body                                                         \n\
@@ -10,12 +14,8 @@ $getset cwd                                                                \n\
   -> 'process.cwd;                                                         \n\
   -> x 'process.chdir x                                                    \n\
                                                                            \n\
-$mac w/file -> {('=) n v} body                                             \n\
-  w/uniq err                                                               \n\
-    '(require \"fs\").read-file v \"utf8\" -> err n                        \n\
-       | if err                                                            \n\
-           throw err                                                       \n\
-       | body                                                              \n\
+def readfile -> x                                                          \n\
+  (require \"fs\").read-file-sync x \"utf8\"                               \n\
                                                                            \n\
 $mac load-file -> x                                                        \n\
   '(require \"vm\").run-in-new-context                                     \n\
@@ -47,6 +47,7 @@ $mac w/stdin -> n body                                                     \n\
              body                                                          \n\
        |  process.stdin.resume;                                            \n\
                                                                            \n\
+                                                                           \n\
 def expandpath -> x                                                        \n\
   re-replace x \"^~/\" ->                                                  \n\
     \"@(process.env.HOME)/\"                                               \n\
@@ -64,8 +65,28 @@ def path -> @args                                                          \n\
 def abspath -> @args                                                       \n\
   (require \"fs\").realpath-sync: path @args                               \n\
                                                                            \n\
-def dir -> x                                                               \n\
-  (require \"fs\").readdir-sync x                                          \n\
+def dirpath -> x                                                           \n\
+  (require \"path\").dirname x                                             \n\
+                                                                           \n\
+def filepath -> @args                                                      \n\
+  (require \"path\").basename @args                                        \n\
+                                                                           \n\
+def hiddenpath? -> x                                                       \n\
+  (filepath x).0 == \".\"                                                  \n\
+                                                                           \n\
+def extpath -> x                                                           \n\
+  ((require \"path\").extname x).slice 1                                   \n\
+                                                                           \n\
+def namepath -> x                                                          \n\
+  re-replace x \"^(.+)\\\\.[^\\\\.]*$\" -> _ s s                           \n\
+                                                                           \n\
+def shellpath -> x                                                         \n\
+  \"'@(re-replace x \"'\" \"\\\\'\")'\"                                    \n\
+                                                                           \n\
+                                                                           \n\
+def dir -> d                                                               \n\
+  w/map f = (require \"fs\").readdir-sync d                                \n\
+    path d f                                                               \n\
                                                                            \n\
 def dir? -> x                                                              \n\
   ((require \"fs\").stat-sync x).is-directory;                             \n\
@@ -77,33 +98,15 @@ def dirs -> x f                                                            \n\
   w/box r = {}                                                             \n\
     | def loop -> x                                                        \n\
         w/each s = dir x                                                   \n\
-          w/box x = path x s                                               \n\
-            | if: dir? x                                                   \n\
-                if: f s %t                                                 \n\
-                  loop x                                                   \n\
-                if: f s %f                                                 \n\
-                  r.push x                                                 \n\
-            | ()                                                           \n\
+          | if: dir? s                                                     \n\
+              if: f s %t                                                   \n\
+                loop s                                                     \n\
+              if: f s %f                                                   \n\
+                r.push s                                                   \n\
+          | ()                                                             \n\
     | loop x                                                               \n\
     | r                                                                    \n\
                                                                            \n\
-def hiddenpath? -> x                                                       \n\
-  x.0 == \".\"                                                             \n\
-                                                                           \n\
-def dirpath -> x                                                           \n\
-  (require \"path\").dirname x                                             \n\
-                                                                           \n\
-def filepath -> @args                                                      \n\
-  (require \"path\").basename @args                                        \n\
-                                                                           \n\
-def extpath -> x                                                           \n\
-  ((require \"path\").extname x).slice 1                                   \n\
-                                                                           \n\
-def namepath -> x                                                          \n\
-  re-replace x \"^(.+)\\\\.[^\\\\.]*$\" -> _ s s                           \n\
-                                                                           \n\
-def shellpath -> x                                                         \n\
-  \"'@(re-replace x \"'\" \"\\\\'\")'\"                                    \n\
                                                                            \n\
 box import-paths = { (dirpath &script)                                     \n\
                      (abspath (dirpath &exec) \"lib\") }                   \n\

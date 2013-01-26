@@ -425,7 +425,7 @@ var NULAN = (function (n) {
 
   n.vars = {} // Nulan Variable -> JS Variable (guaranteed unique)
 
-  var myMangle, Uniq, tokenBox, setSymToBox, setExternal, setExternalVar, setBox, getBox, remBox, withLocalScope, withNewScope, withPreviousScope, compileEval
+  var myMangle, Uniq, tokenBox, setSymToBox, setExternal, setExternalVar, setBox, getBox, remBox, withLocalScope, withNewScope, withPreviousScope
 
 /*
   var boxes = 5
@@ -677,13 +677,15 @@ var NULAN = (function (n) {
       n.scope  = "local" // TODO
       try {
         var x = (old2 === "global"
-                  ? ["call", ["function", "", [], withStatement(function () {
-                               return withBlock(function () {
-                                 return withReturn(function () {
-                                   return f()
+                  ? ["call", withLocalScope(function () {
+                               return ["function", "", [], withStatement(function () {
+                                 return withBlock(function () {
+                                   return withReturn(function () {
+                                     return f()
+                                   })
                                  })
-                               })
-                             })], []]
+                               })]
+                             }), []]
                   : f())
       } finally {
         n.vars  = old
@@ -730,17 +732,13 @@ var NULAN = (function (n) {
   })()
 
   function compileEval(x) {
-    if (mode === "compile") {
-      return mac(x)
-    } else {
-      return withMode("compile", function () {
-        x = compile(x)
-        if (n.options.debug) {
-          n.options.debug(x)
-        }
-        return ["id", eval(x)]
-      })
-    }
+    return withMode("compile", function () {
+      x = compile(x)
+      if (n.options.debug) {
+        n.options.debug(x)
+      }
+      return eval(x)
+    })
   }
 
   function isBox(x, s) {
@@ -752,13 +750,37 @@ var NULAN = (function (n) {
     return isBox(x, myMangle(s))
   }
 
-  function setMacro(s, f) {
+  function setMacro(s, input, output, f) {
     return setBox(s, {
       _38_macro: function (a) {
         return f.apply(this, a.slice(1))
       }
     })
   }
+/*
+  n.Type = function (x, f) {
+    this._38_test = f
+    this.toString = function () {
+      // TODO: does this need to coerce to a string?
+      return "" + x
+    }
+  }
+
+  function setType(s, f) {
+    var x = setBox(s, {
+      _38_pattern: function (args, v, body) {
+        return destructure1([n.box("$cast"), args[1], x], v, body)
+      },
+      _38_macro: function (a) {
+        return mac([n.box("$cast"), a[1], x])
+      }
+    })
+    x._38_type = new n.Type(x, f || function (x) {
+      return this === x
+    })
+    //x._38_value = x
+    return x
+  }*/
 
   /*setValue("syntax-rules", new Alias(function () {
     return n.syntaxRules
@@ -830,7 +852,12 @@ var NULAN = (function (n) {
         return ["empty"] // TODO: is this correct?
         //return ["void", ["number", "0"]]
       } else {
-        return splicingArgs(mac(a[0]), a.slice(1))
+        x = mac(a[0])
+        var y = splicingArgs(x, a.slice(1))
+        /*if (x._38_type != null && x._38_type !== n.box("any?")) {
+          y._38_type = x._38_type._38_return
+        }*/
+        return y
       }
     } else if (a instanceof n.Wrapper) {
 /*      n.tokenUpdate(a, function (o) {
@@ -838,10 +865,18 @@ var NULAN = (function (n) {
       })*/
       return mac(a.value) // TODO: check all the places that currently expect strings/numbers and won't work with a wrapper
     } else if (typeof a === "number") {
-      return ["number", "" + a]
+      x = ["number", "" + a]
+      /*if (Math.round(a) === a) {
+        x._38_type = n.box("int?")._38_type
+      } else {
+        x._38_type = n.box("num?")._38_type
+      }*/
+      return x
     // TODO: find all places that unwrap to strings but don't call mac
     } else if (typeof a === "string") {
-      return ["string", a]
+      x = ["string", a]
+      //x._38_type = n.box("str?")._38_type
+      return x
     /*} else if (a === void 0) { // TODO
       return ["void", ["number", "0"]]*/
     } else if (a instanceof n.Symbol) {
@@ -863,10 +898,14 @@ var NULAN = (function (n) {
       } else {
         checkBox(a)
         if (mode === "run" || a._38_scope === "local" || a._38_external) {
-          return ["name", a._38_uniqueName]
+          x = ["name", a._38_uniqueName]
+          //x._38_type = a._38_type
+          return x
         } else if (mode === "compile") {
           //if ("_38_value" in a) {
-          return [".", macBox(a), "_38_value"]
+          x = [".", macBox(a), "_38_value"]
+          //x._38_type = a._38_type
+          return x
           // TODO
           /*} else {
             throw new n.Error(a, a + " does not have `&get` or `&value` property")
@@ -917,9 +956,11 @@ var NULAN = (function (n) {
 
 
   function destructure1(args, v, body) {
-    if (complex(args)) {
+                         // TODO
+    if (complex(args) && complex(v)) {
       var u = new Uniq()
-      return [n.box("|"), [n.box("box"), [n.box("="), u, v]], destructure(args, u, body)]
+      return [n.box("|"), [n.box("box"), [n.box("="), u, v]],
+                          [n.box("pattern-match"), args, u, body]]
     } else {
       return destructure(args, v, body)
     }
@@ -936,18 +977,31 @@ var NULAN = (function (n) {
                ? [n.box("|"), a, body]
                : a)
     } else if (Array.isArray(args)) {
-      if ((f = getBox(args[0])) && "_38_pattern" in f) {
-        return f._38_pattern(args, v, body)
-      } else {
-        throw new n.Error(args[0], args[0] + " is not a pattern")
+      if ((f = getBox(args[0]))) {
+        if ("_38_pattern" in f) {
+          return f._38_pattern(args, v, body)
+        // TODO: this is broken
+        }/* else if ("_38_macro" in f) {
+          return destructure(f._38_macro(args), v, body)
+        }*/
       }
+      throw new n.Error(args[0], args[0] + " is not a pattern")
     } else {
-      return [n.box("if"),
-               [n.box("=="), v, args],
-               body,
-               [n.box("throw"),
-                 [n.box("new"), n.box("Error"),
-                   [n.box("+"), "expected " + args + " but got ", v]]]]
+      // TODO: code duplication
+      if (body) {
+        return [n.box("if"),
+                 [n.box("=="), v, args],
+                 body,
+                 [n.box("throw"),
+                   [n.box("new"), n.box("Error"),
+                     [n.box("+"), "expected " + args + " but got ", v]]]]
+      } else {
+        return [n.box("if"),
+                 [n.box("~"), [n.box("=="), v, args]],
+                 [n.box("throw"),
+                   [n.box("new"), n.box("Error"),
+                     [n.box("+"), "expected " + args + " but got ", v]]]]
+      }
     }
   }
 
@@ -1030,31 +1084,50 @@ var NULAN = (function (n) {
 
 
   // Simple complexity
-  setMacro("num",         unary("u+"))
-  setMacro("~",           unary("!"))
-  setMacro("&typeof",     unary("typeof"))
+  setMacro("num",         ["any?"], "num?",  unary("u+"))
+  setMacro("~",           ["any?"], "bool?", unary("!"))
+  setMacro("&typeof",     ["any?"], "str?",  unary("typeof"))
 
-  setMacro("&in",         binary("in"))
-  setMacro("&instanceof", binary("instanceof"))
-  setMacro("mod",         binary("%"))
+  setMacro("&in",         ["str?", "dict?"], "bool?", binary("in"))
+  setMacro("&instanceof", ["dict?", ["->"]],   "bool?", binary("instanceof"))
+  setMacro("mod",         ["num?", "num?"],  "num?",  binary("%"))
   //setMacro("<=",          binary("="))
 
-  setMacro("==",          binand("===", ["boolean", "true"]))
-  setMacro("<",           binand("<",   ["boolean", "true"]))
-  setMacro("=<",          binand("<=",  ["boolean", "true"]))
-  setMacro(">",           binand(">",   ["boolean", "true"]))
-  setMacro(">=",          binand(">=",  ["boolean", "true"]))
+  setMacro("==",          [["@", "any?"]], "bool?", binand("===", ["boolean", "true"]))
+  setMacro("<",           [["@", "any?"]], "bool?", binand("<",   ["boolean", "true"]))
+  setMacro("=<",          [["@", "any?"]], "bool?", binand("<=",  ["boolean", "true"]))
+  setMacro(">",           [["@", "any?"]], "bool?", binand(">",   ["boolean", "true"]))
+  setMacro(">=",          [["@", "any?"]], "bool?", binand(">=",  ["boolean", "true"]))
 
-  setMacro("&&",          binreduce0("&&", ["boolean", "true"]))
-  setMacro("||",          binreduce0("||", ["boolean", "false"]))
-  setMacro("+",           binreduce0("+",  ["number", "0"]))
-  setMacro("*",           binreduce0("*",  ["number", "1"]))
+  setMacro("&&",          [["@", "any?"]], "any?", binreduce0("&&", ["boolean", "true"]))
+  setMacro("||",          [["@", "any?"]], "any?", binreduce0("||", ["boolean", "false"]))
+  setMacro("+",           [["@", "any?"]], ["$or?", "num?", "str?"], binreduce0("+",  ["number", "0"]))
+  setMacro("*",           [["@", "num?"]], "num?", binreduce0("*",  ["number", "1"]))
 
-  setBox("-",             binreduce1("-", function (x) { return ["u-", x] }))
+  setBox("-",             binreduce1("-", function (x) { return ["u-", x] })) // [["@", "num?"]], "num?"
   //setBox("|",             binreduce1(","))
-  setBox("/",             binreduce1("/"))
+  setBox("/",             binreduce1("/")) // [["@", "num?"]], "num?"
+/*
+  function isType(x, y) {
+    var z = mac(x)
+    if (z._38_type != null &&
+        z._38_type !== n.box("any?")._38_type &&
+        !y._38_type._38_test(z._38_type)) {
+      throw new n.Error(x, "expected type " + y + " but got type " + z._38_type)
+    }
+    return z
+  }
 
-  setMacro("<=", function (x, y) {
+  function retType(x, y) {
+    x._38_type = y
+    return x
+  }*/
+
+  /*setMacro("-", ["num?", "num?"], "num?", function (x, y) {
+    return ["-", x, y]
+  })*/
+
+  setMacro("<=", [["lvalue?", "any?"], "any?"], "any?", function (x, y) {
     // TODO: a teensy tiny itty bitty bit hacky that I'm using getBox and checkBox in here
     var b = getBox(x)
     if (b) {
@@ -1066,15 +1139,21 @@ var NULAN = (function (n) {
           throw new n.Error(b, "cannot use setter at " + mode + " time")
         }*/
       } else {
-        return ["=", mac(checkBox(b)), mac(y)]
+        checkBox(b)
+        x = mac(b)
+        y = mac(y)
+        //b._38_type = y._38_type
+        return ["=", x, y]
       }
     } else {
-      return ["=", mac(x), mac(y)]
+      x = mac(x)
+      y = mac(y)
+      return ["=", x, y]
     }
   })
 
   // TODO: hacky, but it works
-  setMacro("#", function () {
+  setMacro("#", [["@", "any?"]], "void?", function () {
     var args = [].slice.call(arguments)
     //console.info([].slice.call(arguments))
     withPreviousScope(function () {
@@ -1103,41 +1182,106 @@ var NULAN = (function (n) {
   prn i
 */
 
-  setMacro("&break", function () {
+  setMacro("&break", [], "void?", function () {
     statements.push(["break"])
     return ["empty"]
   })
 
-  setMacro("throw", function (x) {
+  setMacro("throw", ["any?"], "void?", function (x) {
     statements.push(["throw", mac(x)])
     return ["empty"]
   })
 
-  setMacro("&return", function (x) {
+  setMacro("&return", ["any?"], "void?", function (x) {
     return withReturn(function () {
       return mac(x)
     })
   })
 
-  setMacro("|", function () {
-    var args = [].slice.call(arguments, 0, -1)
-    args.forEach(function (x) {
-      statements.push(mac(x))
+  setMacro("|", [["@", "any?"]], "any?", function () {
+    var args = [].map.call(arguments, mac)
+    args.slice(0, -1).forEach(function (x) {
+      statements.push(x)
     })
-    if (arguments.length) {
-      return mac(arguments[arguments.length - 1])
+    if (args.length) {
+      return args[args.length - 1]
     } else {
       // TODO: put error here ?
       return ["empty"]
     }
   })
 
-  setMacro("$eval", function (x) {
-    return compileEval(x)
+  setMacro("$eval", ["any?"], "any?", function (x) {
+    if (mode === "compile") {
+      return mac(x)
+    } else {
+      return ["id", compileEval(x)]
+    }
   })
 
+/*
+  setBox("$cast", {
+    _38_pattern: function (args, v, body) {
+                   // TODO: ew, calling `mac` on it
+      var type   = mac(v)._38_type
+        , expect = getBox(args[2])._38_type
+      //console.info("$cast pattern", type)
+      if (type   != null &&
+          expect != null &&
+          type   !== n.box("any?")._38_type &&
+          expect !== n.box("any?")._38_type &&
+          !expect._38_test(type)
+          //type   !== expect
+          ) {
+        throw new n.Error(args[0], "expected type " + expect + " but got type " + type)
+      }
+      //return v
+      return destructure1(args[1], [args[0], v, args[2]], body)
+    },
+    _38_macro: function (a) {
+      // TODO
+      var x = mac(a[1])
+      x._38_type = getBox(a[2])._38_type
+      //compileEval(a[2])
+      //console.info("$cast macro", x._38_type)
+      return x
+    }
+  })
+
+  setBox("$or?", {
+    _38_pattern: function (args, v, body) {
+      var last, err
+      for (var i = 1, iLen = args.length; i < iLen; ++i) {
+        try {
+          last = destructure(args[i], v, body)
+        } catch (e) {
+          err = e
+          continue
+        }
+        break
+      }
+      if (!last && err) {
+        throw err
+      }
+      return last
+    }
+  })
+
+  setType("any?", function (x) {
+    return true
+  })
+
+  setType("num?", function (x) {
+    return this === x || n.box("int?")._38_type._38_test(x)
+  })
+
+  setType("str?")
+  setType("int?")
+*/
+
   // TODO: maybe I can make this into a function instead?
-  setMacro("&", function () {
+                // TODO
+  setMacro("&", [["@", "any?"]], "any?", function () {
     return $mac([].slice.call(arguments))
   })
 
@@ -1170,7 +1314,8 @@ var NULAN = (function (n) {
     }
   })
 
-  setMacro(".", function (x, y) {
+                          // TODO: shorthand for this
+  setMacro(".", ["dict?", ["$or?", "str?", "num?"]], "any?", function (x, y) {
     var s
     if ((s = validJS(y))) {
       return [".", mac(x), s]
@@ -1180,7 +1325,7 @@ var NULAN = (function (n) {
   })
 
   // TODO: can't be defined in NULAN.macros because it's the primitive for the " syntax
-  setMacro("\"", function () {
+  setMacro("\"", [["@", "any?"]], "str?", function () {
     var a = [].slice.call(arguments)
     /*
                           // TODO: why is this needed for ~= ?
@@ -1209,7 +1354,7 @@ var NULAN = (function (n) {
   }))
 */
 
-  setMacro("null?", function (x) {
+  setMacro("null?", ["any?"], "bool?", function (x) {
     return ["==", mac(x), ["null"]]
   })
 
@@ -1226,7 +1371,7 @@ var NULAN = (function (n) {
     }
   })
 
-  setMacro("++", function (x, y) {
+  setMacro("++", [["lvalue?", "num?"], "num?"], "num?", function (x, y) {
     if (y == null) y = 1
     if (y === 1) {
       return ["++", mac(x)]
@@ -1235,7 +1380,7 @@ var NULAN = (function (n) {
     }
   })
 
-  setMacro("--", function (x, y) {
+  setMacro("--", [["lvalue?", "num?"], "num?"], "num?", function (x, y) {
     if (y == null) y = 1
     if (y === 1) {
       return ["--", mac(x)]
@@ -1244,12 +1389,12 @@ var NULAN = (function (n) {
     }
   })
 
-  setMacro("new", function (x) {
+  setMacro("new", [["->"], ["@", "any?"]], "dict?", function (x) {
     var args = [].slice.call(arguments, 1)
     return ["new", mac(x), args.map(mac)]
   })
 
-  setMacro("while", function (test, body) {
+  setMacro("while", ["any?"], "void?", function (test, body) {
     return withNewScope(function () {
       statements.push(["while", mac(test), withStatement(function () {
         return withBlock(function () {
@@ -1260,13 +1405,18 @@ var NULAN = (function (n) {
     })
   })
 
-  setMacro("w/new-scope", function (body) {
+  // TODO: multi-args
+  setMacro("w/new-scope", ["any?"], "any?", function (body) {
     // TODO
     //return mac([[n.box("->"), [], body]])
     //return ["call", ["function", "", [], [["return", mac(body)]]], []]
     return withNewScope(function () {
       return mac(body)
     })
+  })
+
+  setMacro("pattern-match", ["any?", "any?", "any?"], "any?", function (args, v, body) {
+    return mac(destructure(args, v, body))
   })
 
   setBox("if", {
@@ -1354,7 +1504,7 @@ var NULAN = (function (n) {
     return ["regexp", x]
   })*/
 
-  setMacro("finally", function (x, y) {
+  setMacro("finally", ["any?", "any?"], "any?", function (x, y) {
     var u = new Uniq()
 
     //return withNewScope(function () {
@@ -1411,7 +1561,7 @@ var NULAN = (function (n) {
   // $eval
   //   del foo
   // foo
-  setMacro("del", function (x) {
+  setMacro("del", [["lvalue?", "any?"]], "any?", function (x) {
     // TODO: make it work with boxes too?
     if (x instanceof n.Symbol) {
       var s = mac(x)
@@ -1567,7 +1717,7 @@ var NULAN = (function (n) {
     }
   })
 
-  setMacro("external!", function () {
+  setMacro("external!", [["@", "box?"]], "void?", function () {
     [].forEach.call(arguments, function (x) {
       if (Array.isArray(x)) {
         // TODO: code duplication with "box"
@@ -1593,7 +1743,7 @@ var NULAN = (function (n) {
 
 
   // Heavy complexity
-  setMacro("->", function (args, body) {
+  setMacro("->", [["@", "any?"], "any?"], ["->"], function (args, body) {
     if (Array.isArray(args)) {
       return withLocalScope(function () {
         return withNewScope(function () {
@@ -1652,13 +1802,23 @@ var NULAN = (function (n) {
             }
           }
 
-          return ["function", "", r, withStatement(function () {
+          var type // TODO remove this
+
+          x = ["function", "", r, withStatement(function () {
             return withBlock(function () {
               return withReturn(function () {
-                return mac(body)
+                type = mac(body)
+                return type
               }) //mac([n.box("&return"), body])
             })
           })]
+
+          /*x._38_type = new n.Type(n.box("->"), function (x) {
+            this._38_return === x._38_return
+          })
+          x._38_type._38_return = type._38_type*/
+
+          return x
         })
       })
     } else {
@@ -1666,7 +1826,7 @@ var NULAN = (function (n) {
     }
   })
 
-  setMacro("box", function () {
+  setMacro("box", [["@", [["box?", "="], "box?", "any?"]], "any?"], "any?", function () {
     var args = [].slice.call(arguments)
 
     /*function before(x) {
@@ -1697,35 +1857,41 @@ var NULAN = (function (n) {
       if (wildcard(x)) {
         return mac(y)
       } else if (boxOrSym(x)) {
+        var z
         if (y !== void 0) {
-          y = mac(y)
+          z = mac(y)
         }
 
         lastSym = x = setSymToBox(x)
+
+        /*if (y !== void 0) {
+          x._38_type = z._38_type
+        }*/
 
             // TODO: !x.local
         if (x._38_scope !== "local" && mode === "compile") {
           if (y === void 0) {
             return ["empty"] // TODO
           } else {
-            return ["=", [".", macBox(x), "_38_value"], y]
+            return ["=", [".", macBox(x), "_38_value"], z]
             //return ["=", [".", [".", ["name", "n"], "values"], x._uniqueName], y]
           }
         } else {
           if (y === void 0) {
             return ["var", [[x._38_uniqueName]]]
           } else {
-            return ["var", [[x._38_uniqueName, y]]]
+            return ["var", [[x._38_uniqueName, z]]]
           }
         }
       } else {
+        var u = new Uniq()
+        //u._38_type = y._38_type
         // TODO: code duplication with destructure1
         if (complex(y)) {
-          console.info(y)
-          var u = new Uniq()
-          return mac([n.box("|"), [n.box("box"), [n.box("="), u, y]], destructure(x, u)])
+          return mac([n.box("|"), [n.box("box"), [n.box("="), u, y]],
+                                  [n.box("pattern-match"), x, u]])
         } else {
-          return mac(destructure(x, y))
+          return mac([n.box("pattern-match"), x, y])
         }
       }
     })

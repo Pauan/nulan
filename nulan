@@ -38,6 +38,7 @@ load(path.resolve(__dirname, "lib/nino/partial.js"), o)
 
 load(path.resolve(__dirname, "src/NULAN.js"), o)
 
+load(path.resolve(__dirname, "lib/nuit/parse.js"), o)
 load(path.resolve(__dirname, "lib/nuit/serialize.js"), o)
 /*
 NULAN.readFile = function (s) {
