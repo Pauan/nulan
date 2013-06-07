@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <script src="../lib/nino/compile.js"></script>
+    <script src="../src/parse.js"></script>
+    <script src="../src/nulan.js"></script>
+    <script>
+      // TODO move into nulan.js, probably
+      NINO.error = function (x, s) {
+        return new NULAN.Error(x, s)
+      }
+
+      NULAN.options.debug = function (x) {
+        console.log(x)
+      }
+    </script>
+    <script src="../src/NULAN.macros.js"></script>
+    <script>
+      function test(a) {
+        var scope = {}
+        a.forEach(function (x) {
+          try {
+            var o = NULAN.tokenize(x)
+            while (o.has()) {
+              var x = NULAN.compile(NULAN.parse(o))
+              //console.log(x)
+              console.log(NINO.print(x))
+              x = NINO.traverse(x, scope)
+              x = NINO.compile(x, scope, "expression")
+              console.log(x)
+              console.log("")
+            }
+          } catch (e) {
+            if (e instanceof NULAN.Error) {
+              console.error(e.message)
+            } else {
+              throw e
+            }
+          }
+        })
+      }
+
+      test([
+        "1 + 2 * 3",
+        "1 * 2 + 3",
+        "\\+ 1 2 3 4 5",
+
+        "++ 0",
+        "++ 0 1",
+        "++ 0 2",
+
+        "-- 0",
+        "-- 0 1",
+        "-- 0 2",
+
+        "vars foo = -> ()",
+
+        "foo 1 2 3",
+        "foo @[1 2 3]",
+        "foo @[1 2 3] 4",
+        "foo 1 @[2 3 4]",
+        "foo 1 @[2 3 4] 5",
+
+        /*"str 1",
+        "str 1 2 3 4 5",
+
+        "sym 1",
+        "sym 1 2 3 4 5",*/
+
+        "$eval\n  sym 1",
+        "$eval\n  | sym 1\n  | ()",
+        "$eval\n  | sym 1 2 3 4 5\n  | ()",
+
+        "',1",
+        "',@1",
+        "'1 [2 3] 4",
+        "'1 ,[2 3] 4",
+        "'1 ,@[2 3] 4",
+        "'1 (2 + 3)",
+        "'1 ,(2 + 3)",
+        "'1 '2 3",
+        "'1 '2 ,3",
+        "'1 '2 ,@3",
+        "'1 '2 ,,3",
+        "'1 '2 ,,@3",
+        "'1 '2 '3 '4 ,,5",
+        "'1 '2 '3 '4 ,,@5",
+        "'1 '2 ,(3 + 4)",
+        "'1 '2 ,@[1 2 3]",
+        "'1 '2 ,@,[1 2 3]",
+        "'1 '2 ,,@[1 2 3]",
+
+        "[@[2]]",
+        "[1 2]",
+        "[1 @[2]]",
+        "[1 @[2] 3]",
+
+        "-> a a",
+        "-> a b a + b",
+        "-> (return 1)",
+
+        "vars foo = [1 2]",
+        "vars [foo bar] = foo",
+        "vars [foo bar] = [1 2]",
+        "vars _ = 1",
+        "vars _ = [1 2]",
+
+        "vars foo       = 1\n     [foo bar] = [2 foo]\n     bar       = foo",
+
+        "-> @b 1",
+        "-> @b c 1",
+        "-> @b c d 1",
+        "-> a @b 1",
+        "-> a @b c 1",
+        "-> a @b c d 1",
+
+        "-> [a b] 1",
+        "-> [@b] 1",
+        "-> [@b c] 1",
+        "-> [@b c d] 1",
+        "-> [a @b] 1",
+        "-> [a @b c] 1",
+        "-> [a @b c d] 1",
+
+        "->\n  if 1\n    vars a = 2\n    vars b = 3",
+
+        "num 1",
+        "num 1 2",
+
+        "mod 1 2",
+        "mod 1 2 3",
+
+        "{ foo 1 bar 2 }",
+
+        "return 1",
+        "break 2",
+
+        "if;",
+        "if 1",
+        "if 1 2",
+        "if 1 2 3",
+        "if 1 2 3 4",
+        "if 1 2 3 4 5",
+        "if 1\n  vars a = 1\n  vars a = 2",
+        "| if 1\n  vars a = 1\n  vars a = 2\n| a",
+        "if (vars a = 1) a a",
+        "if (vars a = 1)\n  a\n  a",
+
+        "\\| 1 2 3 4 5",
+        "\\|;",
+
+        "$eval 1 + 2",
+        "$eval { foo 1 bar 2 }",
+        "$eval [1 2 3]",
+        "$eval sym",
+      ])
+    </script>
+  </body>
+</html>

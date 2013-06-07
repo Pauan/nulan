@@ -9,6 +9,44 @@ var NULAN = (function (n) {
     return x
   }
 
+  function isFirst(x, y) {
+    return Array.isArray(x) && isBox(x[0], y)
+  }
+
+  function wildcard(x) {
+    return isFirst(x, "_")
+  }
+
+  function isComplex(x) {
+    return Array.isArray(x) && !isBox(x[0], "_")
+  }
+
+  function compileOnlyError(x) {
+    if (mode !== "compile") {
+      throw new n.Error(x, "cannot use " + n.print(x) + " at " + mode + " time")
+    }
+  }
+
+  function isString(x) {
+    if (typeof x === "string") {
+      return x
+    } else if (x instanceof n.String) {
+      return x.value
+    } else {
+      return null
+    }
+  }
+
+  function isNumber(x) {
+    if (typeof x === "number") {
+      return x
+    } else if (x instanceof n.Number) {
+      return x.value
+    } else {
+      return null
+    }
+  }
+
   // TODO should maybe be in nino/compile.js
   function one(x, y) {
     if (x === 1) {
@@ -32,20 +70,61 @@ var NULAN = (function (n) {
   }
 
   function checkBox(x) {
-    if (!x["&mode"][mode]) {
-      var s = formatMode(Object.keys(x["&mode"]))
-      throw new NINO.Error(x, "undefined variable (but it exists at " + s + " time): " + x["&name"])
+    if (!x.mode[mode]) {
+      var s = formatMode(Object.keys(x.mode))
+      throw new n.Error(x, "undefined variable (but it exists at " + s + " time)")
+    }
+  }
+
+  function checkAssign(x) {
+    // TODO: use isSym ?
+    if (!isBox(x, "=")) {
+      throw new n.Error(x, "expected = but got " + n.print(x))
     }
   }
 
   function boxOrSym(x) {
-    x = NINO.unwrap(x)
-    return x.op === "variable" || x.op === "unique"
+    return x instanceof n.Symbol || x instanceof n.Box
   }
 
-  function wildcard(w) {
-    var x = NINO.unwrap(w)
-    return boxOrSym(w) && x.args[0] === "_"
+  function slicer(v, i, iLen) {
+    var r = [[box("."),
+               [box("."), [box("[")], "&slice"],
+               "&call"],
+             v]
+    var i2 = i - iLen + 1
+    if (i2 !== 0 || i !== 0) {
+      r.push(i)
+    }
+    if (i2 !== 0) {
+      r.push(i2)
+    }
+    return r
+  }
+
+  function lengther(u, a, i) {
+    return [box("."), u,
+             [box("-"),
+               [box("."), u, "&length"],
+               a.length - i]]
+  }
+
+  function concater(l, r) {
+    if (l.length === 0) {
+      if (r.length === 1) {
+        return r[0]
+      } else {
+        return NINO.opArray("call", NINO.op(".", r[0], NINO.op("string", "concat")),
+                                    r.slice(1))
+      }
+    } else {
+      l = NINO.opArray("array", l)
+      if (r.length === 0) {
+        return l
+      } else {
+        return NINO.opArray("call", NINO.op(".", l, NINO.op("string", "concat")), r)
+      }
+    }
   }
 
   /**
@@ -56,10 +135,12 @@ var NULAN = (function (n) {
     , scope = "global"
     , mode  = "compile"
 
-  function Box() {
-    this["&scope"]      = scope
-    this["&mode"]       = {}
-    this["&mode"][mode] = true
+  n.Box = function (s) {
+    this.value      = s
+    this.scope      = scope
+    this.mode       = {}
+    this.mode[mode] = true
+    this.toNino     = NINO.op("unique", s)
   }
 
   function withLocalScope(f) {
@@ -107,95 +188,90 @@ var NULAN = (function (n) {
   }
 
   function box(s) {
-    return boxes[s]
+    if (boxes[s] == null) {
+      throw new Error("box " + s + " does not exist")
+    } else {
+      return boxes[s]
+    }
   }
 
-  function isBox(w, s) {
-    var x = NINO.unwrap(w)
-    if (x.op === "variable") {
-      w = getBox(w)
-      x = NINO.unwrap(w)
+  function isBox(x, s) {
+    if (x instanceof n.Symbol) {
+      x = getBox(x)
     }
-    if (x.op === "unique") {
-      return x["&box"] === s
-    } else {
-      throw new NINO.Error(w, "expected variable but got " + NINO.print(w))
-    }
+    return x instanceof n.Box && x.unique === s
   }
 
   function symBypass(s) {
     return new n.Bypass(NINO.op("variable", s))
   }
 
-  function getBox(w) {
-    var x = NINO.unwrap(w)
-      , y = vars[x.args[0]]
-    // TODO: not sure if this should enrich or not...
-    //       it mostly affects macros:
-    //
-    //         $mac foo ->
-    //           'sym "5"
-    //         foo;
-    if (y == null) {
-      throw new NINO.Error(w, "undefined variable: " + x.args[0])
+  function getBox(x) {
+    if (x instanceof n.Box) {
+      return x
+    } else if (x instanceof n.Symbol) {
+      var y = vars[x.value]
+      // TODO: not sure if this should enrich or not...
+      //       it mostly affects macros:
+      //
+      //         $mac foo ->
+      //           'sym "5"
+      //         foo;
+      if (y == null) {
+        throw new n.Error(x, "undefined variable")
+      } else {
+        return n.enrich(Object.create(boxes[y]), x)
+      }
+    } else {
+      throw new n.Error(x, "expected variable but got " + n.print(x))
     }
-    return NINO.enrich(Object.create(boxes[y]), w)
   }
 
   function compileValue(x) {
-    if (x["&box"] == null) {
-      if (x["&name"] == null) {
-        throw new NINO.Error(x, "cannot use variable as a global at compile time")
-      } else {
-        throw new NINO.Error(x, "cannot use variable as a global at compile time: " + x["&name"])
-      }
+    if (x.unique == null) {
+      throw new n.Error(x, "cannot use variable as a global at compile time")
+    } else {
+      return n.enrich(NINO.op(".", NINO.op("call", NINO.op("variable", "box"),
+                                                   NINO.op("string", x.unique)),
+                                   NINO.op("string", "fn")),
+                      x)
     }
-    return NINO.enrich(NINO.op(".", NINO.op(".", NINO.op("variable", "boxes"),
-                                                 NINO.op("string", x["&box"])),
-                                    NINO.op("string", "&value")), x)
-  }
-
-  function makeUniq() {
-    var x        = new Box()
-    x["&unique"] = NINO.op("unique")
-    return x
   }
 
   function setBox(s) {
-    var x             = new Box()
-    x["&name"]        = s
-    x["&unique"]      = NINO.op("unique", s)
-    x["&box"]         = NINO.getUnique(s, boxes) // TODO rename to setUnique
-    boxes[x["&box"]]  = x
-    vars[s]           = x["&box"]
+    var x           = new n.Box(s)
+    x.unique        = NINO.getUnique(s, boxes)
+    boxes[x.unique] = x
+    vars[s]         = x.unique
     return x
   }
 
   function setExternal(x, y) {
     x = setBox(x)
-    x["&external"] = y
+    x.external = y
     return x
   }
 
   function symToBox(x) {
-    if (boxOrSym(x)) {
-      return NINO.enrich(setBox(NINO.unwrap(x).args[0]), x)
+    if (x instanceof n.Box) {
+      return x
+    } else if (x instanceof n.Symbol) {
+      return n.enrich(setBox(x.value), x)
     } else {
-      throw new NINO.Error(x, "expected variable but got " + NINO.print(x))
+      throw new n.Error(x, "expected variable but got " + n.print(x))
     }
   }
 
+  // TODO make it work with boxes too
   function symToExternal(x, y) {
     if (boxOrSym(x)) {
       if (boxOrSym(y)) {
-        return NINO.enrich(setExternal(NINO.unwrap(x).args[0],
-                                       NINO.unwrap(y).args[0]),
-                           x)
+        return n.enrich(setExternal(x.value, y.value), x)
       } else {
-        throw new NINO.Error(y, "expected variable but got " + NINO.print(y))
+        throw new n.Error(y, "expected variable but got " + n.print(y))
       }
     } else {
-      throw new NINO.Error(x, "expected variable but got " + NINO.print(x))
+      throw new n.Error(x, "expected variable but got " + n.print(x))
     }
   }
 
@@ -208,163 +284,235 @@ var NULAN = (function (n) {
   }
 
   function macro(s, f) {
-    return set(s, { "&macro": f })
+    return set(s, { builtin: f })
   }
 
   function func(s, f) {
-    return set(s, { "&value": f })
+    return set(s, { fn: f })
   }
 
-  function op(len, s, s2) {
+  function op(s, s2) {
     return set(s, {
-      "&macro": function (a) {
+      builtin: function (a) {
         /*if (len !== null && (a.length - 1) !== len) {
-          throw new NINO.Error(a[0], s + " expected " +
-                               one(len, "argument") + " but got " +
-                               (a.length - 1))
+          throw new n.Error(a[0], s + " expected " +
+                            one(len, "argument") + " but got " +
+                            (a.length - 1))
         }*/
-        return NINO.enrich(NINO.opArray(s2, a.slice(1).map(compile)), a[0])
+        return n.enrich(NINO.opArray(s2, a.slice(1).map(compile)), a[0])
       }
     })
   }
 
 
-  function concater(l, r) {
-    if (l.length === 0) {
-      if (r.length === 1) {
-        return r[0]
+  function makeConcat(a, f) {
+    var r1 = []
+      , r2 = []
+      , seen
+    a.forEach(function (x) {
+      if (isFirst(x, "@")) {
+        seen = true
+        r2.push(compile(x[1]))
+      } else if (seen) {
+        r2.push(NINO.op("array", compile(x)))
       } else {
-        return NINO.opArray("call", NINO.op(".", r[0], NINO.op("string", "concat")),
-                                    r.slice(1))
+        r1.push(compile(x))
       }
+    })
+    if (seen) {
+      return f(concater(r1, r2), seen)
     } else {
-      l = NINO.opArray("array", l)
-      if (r.length === 0) {
-        return l
-      } else {
-        return NINO.opArray("call", NINO.op(".", l, NINO.op("string", "concat")), r)
-      }
+      return f(r1, seen)
     }
   }
 
   function functionCall(a) {
-    var f  = compile(a[0])
-      , r1 = []
-      , r2 = []
-      , seen
-    a.slice(1).forEach(function (w) {
-      var x = NINO.unwrap(w)
-      if (Array.isArray(x) && isBox(x[0], "@")) {
-        seen = true
-        r2.push(compile(x[1]))
-      } else if (seen) {
-        r2.push(NINO.op("array", compile(w)))
+    var f = compile(a[0])
+    return makeConcat(a.slice(1), function (r, seen) {
+      if (seen) {
+        return n.enrich(NINO.op("call", NINO.op(".", f, NINO.op("string", "apply")),
+                                        NINO.op("null"),
+                                        r),
+                        a[0])
       } else {
-        r1.push(compile(w))
+        return n.enrich(NINO.opArray("call", f, r), a[0])
       }
     })
-    if (seen) {
-      return NINO.op("call", NINO.op(".", f, NINO.op("string", "apply")),
-                             NINO.op("null"),
-                             concater(r1, r2))
-    } else {
-      return NINO.opArray("call", f, r1)
-    }
   }
 
-  function patternMatch(k, v, body) {
-    var a = NINO.unwrap(k)
-    if (wildcard(k)) {
-      return body
-    } else if (boxOrSym(k)) {
-      a = [box("var"), [box("="), k, v]]
-      return (body == null
-               ? a
-               : [box("|"), a, body])
-    } else if (Array.isArray(a)) {
-      var f = getBox(a[0])
-        , g = NINO.unwrap(f)
-      //if (f) { TODO
-      if (g["&pattern"] != null) {
-        return g["&pattern"](a, v, body)
-      } else if ((f = n.isMacro(f))) {
-        return patternMatch(f(a), v, body)
+  function patternMatch1(k, v) {
+    if (boxOrSym(k)) {
+      return [box("vars"), [box("="), k, v]]
+    } else if (Array.isArray(k)) {
+      var f = getBox(k[0])
+      if (f.pattern != null) {
+        return f.pattern([k[0], k.slice(1), v])
+      /*} else if ((f = n.isMacro(f))) {
+        return patternMatch1(f(k), v)*/
       } else {
-        throw new NINO.Error(a[0], g.args[0] + " does not have a &pattern property")
+        throw new n.Error(k[0], "is not a pattern")
       }
     } else {
-      var err = [box("throw"),
-                  [box("new"), symBypass("Error"),
-                    [box("+"), "expected " + NINO.print(k) + " but got ", v]]]
-      if (body == null) {
-        return [box("if"),
-                 [box("~="), v, k],
-                 err]
-      } else {
-        return [box("if"),
-                 [box("=="), v, k],
-                 body,
-                 err]
-      }
+      return [box("if"),
+               [box("~="), v, k],
+               [box("throw"),
+                 [box("new"), symBypass("Error"),
+                   [box("+"), "expected " + n.print(k) + " but got ", v]]]]
     }
   }
 
-  function slicer(v, i, iLen) {
-    var r = [[box("."),
-               [box("."), [box("[")], NINO.op("string", "slice")],
-                NINO.op("string", "call")],
-             v]
-    var i2 = i - iLen + 1
-    if (i2 !== 0 || i !== 0) {
-      r.push(NINO.op("number", i))
+  function patternMatch(k, v) {
+    if (isComplex(k) && isComplex(v)) {
+      var u = new n.Box()
+      return [box("|"), [box("vars"), [box("="), u, v]],
+                        patternMatch1(k, u)]
+    } else {
+      return patternMatch1(k, v)
     }
-    if (i2 !== 0) {
-      r.push(NINO.op("number", i2))
-    }
-    return r
   }
 
-  function compile(w) {
-    var x, a = NINO.unwrap(w)
-    if (a instanceof n.Bypass) {
-      return NINO.enrich(a.value, w)
-    } else if (Array.isArray(a)) {
-      if (a.length === 0) {
-        return NINO.enrich(NINO.op("empty"), w)
-      } else if ((x = n.isMacro(a[0]))) {
-        return x(a) // TODO wrap ?
+  // TODO pretty ew, but it does work...
+  function eachVars(f, x, after) {
+    // TODO this should work even if the pattern returns a macro that expands to | or vars
+    if (isFirst(x, "|")) {
+      x.slice(1).forEach(function (x) {
+        eachVars(f, x, after)
+      })
+    } else if (isFirst(x, "vars")) {
+      x.slice(1).forEach(f)
+    } else {
+      x = compile(x)
+      after.push(function () {
+        return x
+      })
+    }
+  }
+
+  function compile(x) {
+    var f
+    if (x instanceof n.Bypass) {
+      return x.value
+    } else if (Array.isArray(x)) {
+      if (x.length === 0) {
+        return NINO.op("empty")
+      } else if ((f = n.isMacro(x[0]))) {
+        return f(x)
       } else {
-        return NINO.enrich(functionCall(a), a[0]) // TODO wrap ?
+        return functionCall(x)
       }
-    } else if (a.op === "number" || a.op === "string") {
-      return NINO.enrich(a, w)
-    } else if (a.op === "variable") {
-      return compile(getBox(w))
-    } else if (a.op === "unique") {
-      if (a["&get"] != null) {
-        return NINO.enrich(a["&get"]([a]), w) // TODO
+    } else if ((f = isNumber(x)) !== null) {
+      return NINO.op("number", f)
+    } else if ((f = isString(x)) !== null) {
+      return NINO.op("string", f)
+    } else if (x instanceof n.Symbol) {
+      return compile(getBox(x))
+    } else if (x instanceof n.Box) {
+      if (x.get != null) {
+        return compile(x.get([x]))
       } else {
-        checkBox(w)
-        if (a["&external"] != null) {
-          return NINO.enrich(NINO.op("variable", a["&external"]), w)
-        } else if (mode === "run" || a["&scope"] === "local") {
+        checkBox(x)
+        if (x.external != null) {
+          return n.enrich(NINO.op("variable", x.external), x)
+        } else if (mode === "run" || x.scope === "local") {
           //x._38_type = a._38_type
-          return NINO.wrap(w, a)
+          return x.toNino
         } else if (mode === "compile") {
-          return compileValue(w)
+          return compileValue(x)
         } else {
-          throw new NINO.Error(w, "invalid mode: " + mode)
+          throw new n.Error(x, "invalid mode: " + mode)
         }
       }
     } else {
-      throw new NINO.Error(w, "invalid expression: " + NINO.print(w))
+      throw new n.Error(x, "invalid expression: " + n.print(x))
     }
   }
 
   "#"
-  "="
-  "pattern-match"
-  "'"
+
+  func("&box==", function (x, y) {
+    return isBox(x, y)
+  })
+
+  set("'", {
+    pattern: function (a) {
+      compileOnlyError(a[0])
+
+      var x = getBox(a[1][0]) // TODO: checkBox ?
+        , v = a[2]
+      return [box("if"), [box("~"), [box("&box=="), v, x.unique]],
+                                                           // TODO
+               [box("&error"), v, [box("+"), "expected " + n.print(x) + " but got ", v]]]
+    },
+    macro: function (a) {
+      var s = a[0]
+        , i = 1
+
+      // TODO: move these both outside of ' ?
+      function findCommas(x) {
+        var i2 = 0
+          , y  = x
+        while (isFirst(y, ",")) {
+          y = y[1]
+          ++i2
+        }
+        if (i2 !== i) {
+          y = loop(y)
+          var b = loop(x[0])
+          while (i2 > 0) {
+            y = [box("["), b, y]
+            --i2
+          }
+        }
+        return y
+      }
+
+      function withQuote(x, f) {
+        if (isBox(x[0], "'")) {
+          ++i
+          try {
+            return f()
+          } finally {
+            --i
+          }
+        } else {
+          return f()
+        }
+      }
+
+      function loop(x) {
+        if (Array.isArray(x)) {
+          if (isBox(x[0], ",")) {
+            return findCommas(x)
+          } else {
+            return withQuote(x, function () {
+              return [box("[")].concat(x.map(loop))
+            })
+          }
+        } else if (boxOrSym(x)) {
+          x = getBox(x)
+                                     // TODO is this correct? test this
+          if (x.scope === "local" || x.unique == null) {
+            return x
+          } else {
+            return [symBypass("box"), x.unique]
+          }
+        } else {
+          return x
+        }
+      }
+
+      function checkSplicing(x) {
+        if (isFirst(x, ",") && isFirst(x[1], "@")) {
+          throw new n.Error(n.enrich({}, s, x[1][0]), "',@ is invalid")
+        }
+      }
+
+      compileOnlyError(s)
+      checkSplicing(a[1])
+
+      return loop(a[1])
+    }
+  })
 
   set(",", {})
   set("@", {})
@@ -381,203 +529,259 @@ var NULAN = (function (n) {
           })
         }
       })
-      return NINO.enrich(NINO.opArray("if", r), a[0])
+      return n.enrich(NINO.opArray("if", r), a[0])
     })
   })
 
-  macro("[", function (a) {
-    return NINO.enrich(NINO.opArray("array", a.slice(1).map(compile)), a[0])
+  set("_", {
+    pattern: function (a) {
+      //return a[2]
+      return []
+    }
+  })
+
+  macro("vars", function (a) {
+    var after = []
+    a.slice(1).forEach(function anon(x) {
+      if (Array.isArray(x)) {
+        checkAssign(x[0])
+        var k = x[1]
+          , v = x[2]
+        if (boxOrSym(k)) {
+          v = compile(v)
+          after.push(function () {
+            k = symToBox(k)
+            if (k.scope !== "local" && mode === "compile") {
+              return n.enrich(NINO.op("=", compileValue(k), v), x[0])
+            } else {
+              k = compile(k)
+              return n.enrich(NINO.op("var", NINO.op("=", k, v)), x[0])
+            }
+          })
+        } else if (wildcard(k)) { // TODO kinda ew
+          v = compile(v)
+          after.push(function () {
+            return v
+          })
+        } else {
+          x = patternMatch(k, v)
+          eachVars(anon, x, after)
+        }
+      } else {
+        after.push(function () {
+          var k = symToBox(x)
+          if (k.scope !== "local" && mode === "compile") {
+            return n.enrich(NINO.op("empty"), x)
+          } else {
+            return n.enrich(NINO.op("var", compile(k)), x)
+          }
+        })
+      }
+    })
+    return n.enrich(NINO.opArray(",", after.map(function (f) { return f() })), a[0])
+  })
+
+  set("[", {
+    builtin: function (a) {
+      return makeConcat(a.slice(1), function (r, seen) {
+        if (seen) {
+          return n.enrich(r, a[0])
+        } else {
+          return n.enrich(NINO.opArray("array", r), a[0])
+        }
+      })
+    },
+    pattern: function (a) {
+      var args = a[1]
+        , v    = a[2]
+        , seen
+
+      args = args.map(function (x, i) {
+        if (isFirst(x, "@")) {
+          seen = true
+          return [box("="), x[1], slicer(v, i, args.length)]
+        } else if (seen) {
+          return [box("="), x, lengther(v, args, i)]
+        } else {
+          return [box("="), x, [box("."), v, i]]
+        }
+      })
+
+      return [box("vars")].concat(args)
+    }
   })
 
   macro("{", function (a) {
     var r = []
     a.slice(1).forEach(function (x) {
-      r.push(x[0])
+      r.push(compile(x[0]))
       r.push(compile(x[1]))
     })
-    return NINO.enrich(NINO.opArray("object", r), a[0])
-  })
-
-  macro("var", function (a) {
-    var r = a.slice(1).map(function (w) {
-      var x = NINO.unwrap(w)
-      if (Array.isArray(x) && isBox(x[0], "=")) {
-        var k = x[1]
-          , v = x[2]
-        if (boxOrSym(k) && !wildcard(k)) {
-          v = compile(v)
-          k = symToBox(k)
-          return NINO.op("var", NINO.op("=", k, v))
-        } else {
-          //var u = makeUniq()
-          return patternMatch(k, v)
-        }
-      } else {
-        return NINO.op("var", w)
-      }
-    })
-    return NINO.enrich(NINO.opArray(",", r), a[0])
+    return n.enrich(NINO.opArray("object", r), a[0])
   })
 
   macro("->", function (a) {
-    var args = a[1]
-      , body = a[2]
     return withLocalScope(function () {
       return withNewScope(function () {
+        var args = a[1]
+          , body = []
+
         setExternal("this", "this")
 
-        var w, x, u, r = []
-
-        //body = [box("return"), body] // TODO
+        var x, u, r = []
 
         for (var i = 0, iLen = args.length - 1; i <= iLen; ++i) {
-          w = args[i]
-          x = NINO.unwrap(w)
-          if (boxOrSym(w) && !wildcard(w)) {
-            r.push(symToBox(w))
-          } else if (Array.isArray(x) && isBox(x[0], "@")) {
+          x = args[i]
+          if (boxOrSym(x)) {
+            r.push(compile(symToBox(x)))
+          } else if (isFirst(x, "@")) {
             var y = symBypass("arguments")
 
             if (i !== iLen) {
-              u = makeUniq()
+              u = new n.Box()
+              body.push(patternMatch(u, y))
             } else {
               u = y
             }
+
+            body.push(patternMatch(x[1], slicer(u, i, args.length)))
 
             ;(function (i2) {
               var x
               while (i2 > i) {
                 x = args[i2]
-                body = patternMatch(x, [box("."), u,
-                                         [box("-"),
-                                           [box("."), u, NINO.op("string", "length")],
-                                           NINO.op("number", args.length - i2)]],
-                                       body)
+                body.push(patternMatch(x, lengther(u, args, i2)))
                 --i2
               }
             })(iLen)
-
-            body = patternMatch(x[1], slicer(u, i, args.length), body)
-
-            if (i !== iLen) {
-              body = [box("|"), [box("var"), [box("="), u, y]], body]// patternMatch(u, y, body)
-            }
             break
           } else {
-            u = makeUniq()
-            r.push(u)
-            body = patternMatch(w, u, body)
+            u = new n.Box()
+            r.push(compile(u))
+            body.push(patternMatch(x, u))
           }
         }
 
-        /*var i = args.length
-        while (i--) {
-          body = patternMatch(args[i], [box("."), symBypass("arguments"), NINO.op("number", i)], body)
-        }*/
+        body.push(a[2])
 
-        return NINO.enrich(NINO.op("function", NINO.opArray(",", r),
-                                     NINO.op("return", compile(body))),
-                           a[0])
+        body = [box("|")].concat(body)
+        body = compile(body)
+
+        return n.enrich(NINO.op("function", NINO.opArray(",", r),
+                                  NINO.op("return", body)),
+                        a[0])
       })
     })
   })
 
 
-  op(1, "~", "!")
-  op(1, "break", "break")
-  op(1, "throw", "throw")
-  op(1, "return", "return")
-  op(1, "num", "+")
+  op("~", "!")
+  op("break", "break")
+  op("throw", "throw")
+  op("return", "return")
+  op("num", "+")
 
-  op(2, ".", ".")
-  op(2, "mod", "%")
-  op(2, "while", "while")
+  op("mod", "%")
+  op("while", "while")
 
-  op(null, "==", "===")
-  op(null, "~=", "!==")
-  op(null, "<",  "<")
-  op(null, "=<", "<=")
-  op(null, ">",  ">")
-  op(null, ">=", ">=")
-  op(null, "&&", "&&")
-  op(null, "||", "||")
-  op(null, "+", "+")
-  op(null, "*", "*")
-  op(null, "-", "-")
-  op(null, "/", "/")
-  op(null, "|", ",")
-  op(null, "++", "++") // TODO 1 or 2 args
-  op(null, "--", "--") // TODO 1 or 2 args
-  op(null, "new", "new")
+  op("++", "++")
+  op("--", "--")
 
-  macro("<=", function (a) {
-    var w = a[1]
+  op("==", "===")
+  op("~=", "!==")
+  op("<",  "<")
+  op("=<", "<=")
+  op(">",  ">")
+  op(">=", ">=")
+  op("&&", "&&")
+  op("||", "||")
+  op("+", "+")
+  op("*", "*")
+  op("-", "-")
+  op("/", "/")
+  op("|", ",")
+  op("new", "new")
+
+  macro(".", function (a) {
+    var x = a[1]
       , y = a[2]
-      , x = NINO.unwrap(w)
-    if (x.op === "variable") {
-      w = getBox(w)
-      x = NINO.unwrap(w)
+      , f
+
+    if ((f = isString(y)) !== null) {
+      if (f[0] === "&") {
+        y = n.enrich(new n.String(f.slice(1)), y)
+      } else {
+        throw new n.Error(y, "property " + f + " does not exist")
+      }
     }
-    if (x.op === "unique" && x["&set"] != null) {
-      return NINO.enrich(x["&set"]([w, y]), w) // TODO
-    } else {
-      return NINO.enrich(NINO.op("=", compile(w), compile(y)), a[0])
-    }
+
+    return n.enrich(NINO.op(".", compile(x), compile(y)), a[0])
   })
 
-  var syntaxRuleGet = NINO.op(".", NINO.op("variable", "n"), NINO.op("string", "syntax-rules"))
+  macro("<=", function (a) {
+    var x = a[1]
+      , y = a[2]
+    if (boxOrSym(x)) {
+      x = getBox(x)
+      if (x.set != null) {
+        return compile(x.set([x, y]))
+      }
+    }
+    return n.enrich(NINO.op("=", compile(x), compile(y)), a[0])
+  })
+
+  var syntaxRulesGet = [box("."), symBypass("n"), "&syntaxRules"]
+  //NINO.op(".", NINO.op("variable", "n"), NINO.op("string", "syntaxRules"))
 
   // TODO: why does this need to use compileOnlyError?
   set("syntax-rules", {
-    "&get": function (a) {
+    get: function (a) {
       compileOnlyError(a[0])
-      return NINO.enrich(NINO.op("wrapper", syntaxRuleGet), a[0])
+      return syntaxRulesGet
+      //return n.enrich(NINO.op("wrapper", syntaxRuleGet), a[0])
     },
-    "&set": function (a) {
+    set: function (a) {
       compileOnlyError(a[0])
-      return NINO.enrich(NINO.op("=", syntaxRuleGet, compile(a[1])), a[0])
+      return [box("<="), syntaxRulesGet, a[1]]
+      //return n.enrich(NINO.op("=", syntaxRuleGet, compile(a[1])), a[0])
     }
   })
 
-  func("make-box", function (x) {
-    if (x == null) {
-      return NINO.op("unique")
-    } else {
-      return NINO.op("unique", x)
-    }
+  func("uniq", function (x) {
+    return new n.Box()
   })
 
   set("sym", {
-    "&value": function (x) {
-      return NINO.op("variable", x)
+    fn: function (x) {
+      return new n.Symbol(x)
     },
-    "&pattern": function (args, v, body) {
-      compileOnlyError(args[0])
+    pattern: function (a) {
+      var args = a[1]
+        , v    = a[2]
 
-      return [box("if"), [box("sym=="), v, args[1]],
-               body,
-                                                           // TODO
-               [box("&error"), v, [box("+"), "expected " + args[1] + "but got ", v]]]
+      compileOnlyError(a[0])
+
+      return [box("if"), [box("~"), [box("sym=="), v, args]],
+               [box("&error"), v, [box("+"), "expected " + args + "but got ", v]]]
     }
   })
 
   func("&error", function (x, y) {
-    throw new NINO.Error(x, y)
+    throw new n.Error(x, y)
   })
 
   func("&compile", function (x) {
     return compile(x)
   })
 
-  func("sym==", function (w, y) {
-    var x = NINO.unwrap(w)
-    return x.op === "variable" && x.args[0] === y
+  func("sym==", function (x, y) {
+    return x instanceof n.Symbol && x.value === y
   })
 
   macro("$eval", function (a) {
     var x = a[1]
     if (mode === "compile") {
-      return NINO.enrich(compile(x), a[0])
+      return compile(x)
     } else {
       return withMode("compile", function () {
         x = compile(x)
@@ -586,90 +790,114 @@ var NULAN = (function (n) {
         if (n.options.debug) {
           n.options.debug(x)
         }
-        return NINO.enrich(NINO.op("bypass", eval(x)), a[0])
+        return n.enrich(NINO.op("bypass", eval(x)), a[0])
       })
     }
   })
 
   // TODO should handle things like literals, etc.
   macro("&", function (a) {
-    var w    = a[1]
-      , x    = NINO.unwrap(w)
+    var x    = a[1]
       , args = [].slice.call(arguments, 1).map(compile)
-    if (!boxOrSym(w) && x.op !== "string") {
-      throw new NINO.Error(w, "expected variable or string but got " + NINO.print(w))
+      , f
+    if (boxOrSym(x)) {
+      f = x.value
+    } else if ((f = isString(x)) === null) {
+      throw new n.Error(x, "expected variable or string but got " + n.print(x))
     }
-    return NINO.enrich(NINO.opArray(x.args[0], args), a[0])
+    return n.enrich(NINO.opArray(f, args), a[0])
   })
 
   macro("w/new-scope", function (a) {
     var x = a[1]
     return withBlockScope(function () {
-      return NINO.enrich(compile(x), a[0])
+      return compile(x)
     })
   })
 
   macro("\"", function (a) {
-    var r = a.slice(1)
+    var r = a.slice(1).map(compile)
     r.unshift(NINO.op("string", ""))
-    return NINO.enrich(NINO.opArray("+", r), a[0])
+    return n.enrich(NINO.opArray("+", r), a[0])
   })
 
   macro("null?", function (a) {
     var x = a[1]
-    return NINO.enrich(NINO.op("==", compile(x), NINO.op("null")), a[0])
+    return n.enrich(NINO.op("==", compile(x), NINO.op("null")), a[0])
   })
 
   macro("finally", function (a) {
     var x = a[1]
       , y = a[2]
-    return NINO.enrich(NINO.op("try", compile(x), NINO.op("finally", compile(y))), a[0])
+    return n.enrich(NINO.op("try", compile(x), NINO.op("finally", compile(y))), a[0])
   })
 
   macro("del", function (a) {
-    var w = a[1]
-      , x = NINO.unwrap(w)
-      , y = compile(w)
-    // TODO: make it work with boxes too?
-    if (x.op === "variable") {
-      delete vars[x.args[0]]
-      return NINO.enrich(y, a[0])
+    var x = a[1]
+      , y = compile(x)
+    if (x instanceof n.Box) {
+      if (vars[x.value] === x.unique) {
+        delete vars[x.value]
+      } else {
+        throw new n.Error(x, "undefined variable")
+      }
+      return y
+    } else if (x instanceof n.Symbol) {
+      delete vars[x.value]
+      return y
     } else {
       var u = NINO.op("unique")
-      return NINO.enrich(NINO.op(",", NINO.op("var", NINO.op("=", u, y)),
-                                      NINO.op("delete", y),
-                                      u),
-                         a[0])
+      return n.enrich(NINO.op(",", NINO.op("var", NINO.op("=", u, y)),
+                                   NINO.op("delete", y),
+                                   u),
+                      a[0])
     }
   })
 
   macro("external", function (a) {
-    a.slice(1).forEach(function (w) {
-      var x = NINO.unwrap(w)
+    a.slice(1).forEach(function (x) {
       if (Array.isArray(x)) {
-        // TODO: use isSym ?
-        if (!isBox(x[0], "=")) {
-          throw new NINO.Error(x[0], "expected = but got " + NINO.print(x[0]))
-        }
+        checkAssign(x[0])
         symToExternal(x[1], x[2])
       } else {
-        symToExternal(w, w)
+        symToExternal(x, x)
       }
     })
-    return NINO.enrich(NINO.op("empty"), a[0])
+    return n.enrich(NINO.op("empty"), a[0])
+  })
+
+  macro("&builtin", function (a) {
+    a.slice(1).forEach(function (x) {
+      if (Array.isArray(x)) {
+        checkAssign(x[0])
+        x = symToExternal(x[1], x[2])
+      } else {
+        var y = x
+        if (boxOrSym(x)) {
+          x = n.enrich(new n.Symbol("&" + x.value), x)
+        }
+        x = symToExternal(x, y)
+      }
+      x.mode["run"]     = true
+      x.mode["compile"] = true
+    })
+    return n.enrich(NINO.op("empty"), a[0])
   })
 
 
   n.globals = {}
   n.options = {}
 
-  n.isMacro = function (w) {
-    var x = NINO.unwrap(w)
-    if (x.op === "variable") {
-      x = NINO.unwrap(getBox(w))
+  n.isMacro = function (x) {
+    if (x instanceof n.Symbol) {
+      x = getBox(x)
     }
-    if (x.op === "unique" && x["&macro"] != null) {
-      return x["&macro"]
+    if (x instanceof n.Box && x.macro != null) {
+      return function (a) {
+        return compile(x.macro(a))
+      }
+    } else if (x instanceof n.Box && x.builtin != null) {
+      return x.builtin
     } else {
       return false
     }
@@ -679,6 +907,22 @@ var NULAN = (function (n) {
     return withMode("run", function () {
       return compile(x)
     })
+  }
+
+  n.eval = function (s) {
+    try {
+      var o = n.tokenize(s)
+        , r = []
+      while (o.has()) {
+        r.push(NINO.traverse(n.compile(n.parse(o)), n.globals))
+      }
+      r = r.map(function (x) {
+        console.log(x)
+        return tap(NINO.compile(x, n.globals, "statement"))
+      })
+    } catch (e) {
+      console.error(e.message)
+    }
   }
 
   return n

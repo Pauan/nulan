@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <script src="../src/parse.js"></script>
+    <script>
+      /*function start(x) {
+        if (x) {
+          if (x.start) {
+            return x
+          } else {
+            return start(x[0])
+          }
+        } else {
+          return { start: {}, end: {} }
+        }
+      }
+
+      function end(x) {
+        if (x) {
+          if (x.end) {
+            return x
+          } else {
+            return end(x[x.length - 1])
+          }
+        } else {
+          return { start: {}, end: {} }
+        }
+      }
+
+      function merge(x, y) {
+        var o = { start: {}, end: {} }
+
+        if (x.start.line === y.start.line) {
+          o.start.line = x.start.line
+          o.start.column = Math.min(x.start.column, y.start.column)
+        } else if (x.start.line < y.start.line) {
+          o.start.line = x.start.line
+          o.start.column = x.start.column
+        } else {
+          o.start.line = y.start.line
+          o.start.column = y.start.column
+        }
+
+        if (x.end.line === y.end.line) {
+          o.end.line = x.end.line
+          o.end.column = Math.max(x.end.column, y.end.column)
+        } else if (x.end.line > y.end.line) {
+          o.end.line = x.end.line
+          o.end.column = x.end.column
+        } else {
+          o.end.line = y.end.line
+          o.end.column = y.end.column
+        }
+
+        return o
+      }*/
+
+      function test(a) {
+        a.forEach(function (x) {
+          try {
+            var o = NULAN.tokenize(x)
+            while (o.has()) {
+              console.log(NULAN.print(NULAN.parse(o)))
+            }
+          } catch (e) {
+            if (e instanceof NULAN.Error) {
+              console.error(e.message)
+            } else {
+              throw e
+            }
+          }
+        })
+      }
+
+      test([
+        "foobar",
+        "foobar quxcorge",
+        "1 + 2 * 3",
+        "1 * 2 + 3",
+
+        "\\foo bar qux",
+        "\\(foo bar qux",
+        "foo\\\\bar",
+        "foo\\ bar\\ qux corge",
+        "\\foo\\ bar\\ qux corge",
+        "\\ foo\\ bar\\ qux corge",
+        "(\\)test)yes",
+        "foo bar\n  qux corge\ntesting",
+        "foo bar\n  1 + 2\nyesno",
+        "foo bar\n  qux\n  corge",
+
+        "1 +\n  2",
+
+        "foo: bar",
+        "foo: bar qux corge",
+        "foo:\n  bar qux corge",
+        "foo: bar qux\n       corge",
+        "foo: bar       qux corge",
+        "foo: bar\n  qux corge",
+        "foo <= bar",
+        "foo <= bar qux corge",
+        "foo <= bar qux\n         corge\n  1 2",
+        "foo <= bar\n  qux corge",
+        "w/var foo = qux 1\n              2\n  test corge",
+        "foo = bar",
+        "foo = bar 2",
+        "foo <= bar <= qux",
+
+        "foo | bar\n    | qux\n    | corge",
+        "foo | bar 1\n    | qux 2\n    | corge 3",
+        "foo | bar 1\n        2 3\n    | qux 2\n        3 4\n    | corge 3\n        4 5",
+        "foo | bar\n    | qux\n   | corge",
+
+        "foo == bar + 2",
+        "foo && bar || qux && corge || nou",
+
+        "{ foo -> bar qux\n    1 + 2\n  test -> yes no\n    1 + 2 }",
+        "{ foo = 1\n  bar = 2 }",
+        "{ foo -> 1\n  bar -> 2 }",
+        "{ foo 1 bar 2 }",
+        "{ foo 1\n  bar 2 }",
+        "{ foo = 1 bar = 2 }",
+        "{ foo = 1\n  bar = 2 }",
+        "{ foo }",
+
+        "'foo",
+        "'{foo = 1 bar = 2}",
+        "'[foo 1 2 3]",
+        "'foo\n test",
+        "'foo\n  test",
+
+        "foo bar -> qux corge\n  testing",
+
+        "if null? 1\n   2\n   3",
+        "if: null? 1\n     2\n     3",
+        "if: null? 1\n    2\n    3",
+        "if: null? 1\n   2\n   3",
+        "if: null? 1\n  2\n  3",
+
+        "()",
+        "1 + ()",
+        "(1)",
+        "(1 2 3)",
+        "(1 2 3}",
+        "(1 2 3",
+        "1 2 3)",
+        "1 + \\(",
+        "1 + (\\()",
+        "1 + (()",
+        "1 + ())",
+        "(foo 1\nbar 2)",
+        "(foo 1\n bar 2)",
+        "(foo 1\n bar 2\n  qux 3)",
+        "(foo 1\n bar 2\n qux 3)",
+        "foo 1\n  bar 2\n  qux 3",
+        "(foo 1\n  bar 2\n  qux 3)",
+        "(foo 1\n  bar 2\n   qux 3)",
+        "(foo\n bar\n qux)",
+        "1 (foo\n bar\n qux) 2",
+
+        "[foo 1\n bar 2]",
+        "[foo 1 2 3]",
+        "[foo 1 + 2 3]",
+        "[foo\n1 2 3]",
+        "[1 2\n 3 4\n 5 6]",
+        "[foo\n1 + 2\n  3]",
+        "foo[1 2 3]",
+        "foo[1]",
+        "foo.bar",
+        "1.50",
+        "foo [1]",
+        "0.1.foo",
+        "0.foo",
+        "foo.\"bar\"",
+
+        "foo",
+        "foo;",
+
+        "~foo",
+        "~ foo",
+        "foo ~= bar",
+
+        "1#foo bar",
+        "#| foo",
+        "#| foo #| bar |#",
+        "#| foo #| bar",
+        "#| foo |#[1 2 3]",
+        "#| foo #| bar |#|#[1 2 3]",
+
+        "\"foo bar qux\"",
+        "\"foo @bar qux\"",
+        "\"foo @1 + 2 qux\"",
+        "\"foo @(1 + 2) qux\"",
+        "\"foo @(1 + 2 3 + 4) qux\"",
+        "\"foo @\"bar\" qux\"",
+        "\"foo @\"@bar\" qux\"",
+        "  \"foo bar\nqux corge\n   testing yes\n    yes\"",
+        "  \"foo bar\n   qux corge\n   testing yes\n    yes\"",
+        "\"@foo\"",
+        "\"foo\\\\bar\"",
+        "\"foo\\\nbar\"",
+        "\"foo\\\n bar\"",
+        "\"foo\\bbar\"",
+        "\"foo bar qux corge",
+        "\"foo\"[0]",
+        "\"foo\".0",
+
+        "if (var a = 1) a a",
+        "if (var a = 1)\n  a\n  a",
+
+        "-> [@b] 1",
+
+        "var _ = 1",
+        "_",
+
+        "$eval\n  | vars drop1 = -> f\n      -> [_ @args] (f @args)\n  | ()",
+        "$eval\n  | vars drop1 =\n      -> f\n        -> [_ @args] (f @args)\n  | ()",
+
+        "('$macs).&macro <= drop1 -> @args\n  '$eval",
+
+        "'(=)",
+        "'(\\=)",
+
+        "$mac words -> @args\n  '[,@(args.&map -> x \"@x\")]",
+        "$mac str -> @args\n  '\\\" ,@args",
+      ])
+    </script>
+  </body>
+</html>
