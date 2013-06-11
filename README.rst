@@ -47,7 +47,7 @@ Examples
 ::
 
   # This is a dictionary
-  box foo = [ bar 5 qux 10 ]
+  var foo = { bar 5 qux 10 }
 
   # Key lookup
   foo.bar
@@ -59,7 +59,7 @@ Examples
 
   # This is a function
   def set -> a
-    | box x = foo[a]  # Lookup by expression
+    | var x = foo[a]  # Lookup by expression
     | foo[a] <= 50    # Assign by expression
     | x
 
@@ -79,19 +79,19 @@ Examples
            | body
            | incr
 
-  for (box i = 0) (i < 10) (++ i)
+  for (var i = 0) (i < 10) (++ i)
     prn i
 
 ::
 
   # Simulating a `do..while` loop using a `while` loop
-  $mac do -> body {('while) test}
-    'while %t
+  $mac do -> body [('while) test]
+    'while true
        | body
        | if ~ test
-           &break;
+           break;
 
-  box i = 0
+  var i = 0
   do
     | prn i
     | ++ i
@@ -101,7 +101,7 @@ Examples
 
   # Infinite loop; be careful, the only way to stop it is to shut down the terminal!
   $mac 5ever -> body
-    'while %t
+    'while true
        body
 
   5ever
@@ -114,15 +114,15 @@ Examples
 ::
 
   # Macro to iterate over the elements of any list or string
-  $mac w/each -> {('=) x y} body
+  $mac w/each -> [('=) x y] body
     w/uniq i len
       w/complex y
-        'w/box len = y.length
-           for (box i = 0) (i ~= len) (++ i)
-             w/box x = y[i]
+        'w/var len = y.length
+           for (var i = 0) (i ~= len) (++ i)
+             w/var x = y[i]
                body
 
-  w/each x = {1 2 3}
+  w/each x = [1 2 3]
     | prn x
     | prn x + 5
     | prn;
@@ -130,15 +130,15 @@ Examples
 ::
 
   # Macro to iterate over the elements of any list or string in reverse order
-  $mac w/each-rev -> {('=) x y} body
+  $mac w/each-rev -> [('=) x y} bod]
     w/uniq i
       w/complex y
-        'w/box i = y.length
+        'w/var i = y.length
            while i
-             w/box x = y[-- i]
+             w/var x = y[-- i]
                body
 
-  w/each-rev x = {1 2 3}
+  w/each-rev x = [1 2 3]
     | prn x
     | prn x + 5
     | prn;
@@ -146,15 +146,15 @@ Examples
 ::
 
   # The built-in Array methods work very nicely with Nulan's -> syntax
-  {1 2 3}.for-each -> x
+  [1 2 3].forEach -> x
     | prn x
     | prn x + 5
     | prn;
 
-  {1 2 3}.map -> x
+  [1 2 3].map -> x
     x + 5
 
-  {1 2 3}.reduce -> x y
+  [1 2 3].reduce -> x y
     "(@x @y)"
 
 ::
@@ -162,10 +162,10 @@ Examples
   # An example of an unhygienic macro
   # Just like in Arc, it binds the symbol `it` to the test condition
   $mac aif -> test @rest
-    w/box it = sym "it"
-      'w/box it = test
+    w/sym it
+      'w/var it = test
          if it ,@:if rest.length >= 2
-                    w/box {x @rest} = rest
+                    w/var [x @rest] = rest
                       'x (aif ,@rest)
                     rest
 
@@ -173,7 +173,7 @@ Examples
     it
     it
 
-  aif %f
+  aif false
     it
     it
 
@@ -186,20 +186,20 @@ Examples
 
   1 foo 2    # Custom infix syntax
 
-  (foo) 1 2  # Wrapping in parens disables syntax
+  \foo 1 2   # Use \ to disable syntax
 
 ::
 
   # Array comprehensions
-  box in
+  var in
 
-  $mac for -> x {('in) n y}
+  $mac for -> x [('in) n y]
     'y.map -> n x
 
-  $syntax-infix for 0 [ order "right" ]
-  $syntax-infix in  0 [ order "right" ]
+  $syntax-infix for 0 { order "right" }
+  $syntax-infix in  0 { order "right" }
 
-  (x + 2) for x in {1 2 3}
+  (x + 2) for x in [1 2 3]
 
 ::
 
@@ -207,9 +207,9 @@ Examples
 
   # A shell script that creates a simple HTTP server
   # Taken from http://nodejs.org/
-  box net = require "net"
+  var net = require "net"
 
-  box server = net.create-server -> o
+  var server = net.create-server -> o
                  | o.write "Echo server\r\n"
                  | o.pipe o
 
@@ -286,5 +286,3 @@ FAQ
   ...because it's trying to use the *value* of the ``foo`` symbol, which doesn't exist at compile-time.
 
   In addition, if a *macro* is the first element of a list, it is evaluated at compile-time, which is why ``bar 10`` works. But ``prn bar 10`` would **not** work, because the macro ``bar`` isn't the first element of the list
-
-* **Q:**
