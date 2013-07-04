@@ -14,11 +14,11 @@ var NULAN = (function (n) {
     // TODO: change NINO to accept a single argument
     // TODO: should partial or transform come first?
     // NINO.transform()
-    return NINO.compile(NINO.partial(withExpression(function () {
+    return NINO.compileAll(withExpression(function () {
       return withBlock(function () {
         return mac(a)
       })
-    })))
+    }))
   }
 
 
@@ -45,67 +45,6 @@ var NULAN = (function (n) {
 
   var expression = true
     , statements
-
-  function isPure(x) {
-    if (Array.isArray(x)) {
-      switch (x[0]) {
-      case "empty":
-      case "name":
-      case "number":
-      case "boolean":
-      case "null":
-      case "regexp":
-      case "string":
-      case "function":
-        return true
-
-      case "id":
-      case "break":
-      case "continue":
-      case "debugger":
-      case "return":
-      case "throw":
-      case "var":
-      case "for":
-      case "while":
-      case "new":
-      case "call":
-      case "++":
-      case "--":
-      case "delete":
-      case "=":
-      case "+=":
-      case "-=":
-      case "*=":
-      case "/=":
-      case "%=":
-      case "<<=":
-      case ">>=":
-      case ">>>=":
-      case "&=":
-      case "^=":
-      case "|=":
-      case "function-statement":
-        return false
-
-      default:
-        return x.every(isPure)
-      }
-    } else {
-      return true
-    }
-  }
-
-  function isVoid(x) {
-    if (Array.isArray(x)) {
-      switch (x[0]) {
-      case "void":
-      case "empty":
-        return true
-      }
-    }
-    return false
-  }
 
   function withExpression(f) {
     var old = expression

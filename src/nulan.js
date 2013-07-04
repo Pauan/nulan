@@ -1,5 +1,35 @@
-var NULAN = (function (n) {
+define(["lib/nino/nino", "src/parse"], function (nino, parse) {
   "use strict"
+
+  // TODO not sure if this should be in here or nulan.js
+  function print(x) {
+    if (x instanceof Number) {
+      return "" + x.value
+    } else if (x instanceof Bypass) {
+      return print(x.value)
+    } else if (x instanceof Symbol || x instanceof Box) {
+      return x.value
+      /*return x.value.replace(/./g, function (s) {
+        var y
+        if ((y = syntaxRules[s]) && y.delimiter) {
+          return "\\" + s
+        } else {
+          return s
+        }
+      })*/
+    } else if (x instanceof String) {
+      return "\"" + x.value + "\"" // TODO
+    } else if (Array.isArray(x)) {
+      return "(" + x.map(print).join(" ") + ")"
+    } else {
+      return "" + x
+    }
+  }
+
+  var boxes = {} // Variable name -> Box
+    , vars  = {} // String        -> Variable name
+    , scope = "global"
+    , mode  = "compile"
 
   /**
    * Stable
@@ -13,17 +43,9 @@ var NULAN = (function (n) {
     return Array.isArray(x) && isBox(x[0], y)
   }
 
-  function wildcard(x) {
-    return isFirst(x, "_")
-  }
-
-  function isComplex(x) {
-    return Array.isArray(x) && !isBox(x[0], "_")
-  }
-
   function compileOnlyError(x) {
     if (mode !== "compile") {
-      throw new n.Error(x, "cannot use " + n.print(x) + " at " + mode + " time")
+      throw new parse.Error(x, "cannot use " + n.print(x) + " at " + mode + " time")
     }
   }
 
@@ -85,62 +107,6 @@ var NULAN = (function (n) {
 
   function boxOrSym(x) {
     return x instanceof n.Symbol || x instanceof n.Box
-  }
-
-  function slicer(v, i, iLen) {
-    var r = [[box("."),
-               [box("."), [box("[")], "&slice"],
-               "&call"],
-             v]
-    var i2 = i - iLen + 1
-    if (i2 !== 0 || i !== 0) {
-      r.push(i)
-    }
-    if (i2 !== 0) {
-      r.push(i2)
-    }
-    return r
-  }
-
-  function lengther(u, a, i) {
-    return [box("."), u,
-             [box("-"),
-               [box("."), u, "&length"],
-               a.length - i]]
-  }
-
-  function concater(l, r) {
-    if (l.length === 0) {
-      if (r.length === 1) {
-        return r[0]
-      } else {
-        return NINO.opArray("call", NINO.op(".", r[0], NINO.op("string", "concat")),
-                                    r.slice(1))
-      }
-    } else {
-      l = NINO.opArray("array", l)
-      if (r.length === 0) {
-        return l
-      } else {
-        return NINO.opArray("call", NINO.op(".", l, NINO.op("string", "concat")), r)
-      }
-    }
-  }
-
-  /**
-   * Box stuff
-   */
-  var boxes = {} // Variable name -> Box
-    , vars  = {} // String        -> Variable name
-    , scope = "global"
-    , mode  = "compile"
-
-  n.Box = function (s) {
-    this.value      = s
-    this.scope      = scope
-    this.mode       = {}
-    this.mode[mode] = true
-    this.toNino     = NINO.op("unique", s)
   }
 
   function withLocalScope(f) {
@@ -304,40 +270,16 @@ var NULAN = (function (n) {
     })
   }
 
-
-  function makeConcat(a, f) {
-    var r1 = []
-      , r2 = []
-      , seen
-    a.forEach(function (x) {
-      if (isFirst(x, "@")) {
-        seen = true
-        r2.push(compile(x[1]))
-      } else if (seen) {
-        r2.push(NINO.op("array", compile(x)))
-      } else {
-        r1.push(compile(x))
-      }
-    })
-    if (seen) {
-      return f(concater(r1, r2), seen)
-    } else {
-      return f(r1, seen)
-    }
-  }
-
   function functionCall(a) {
-    var f = compile(a[0])
-    return makeConcat(a.slice(1), function (r, seen) {
-      if (seen) {
-        return n.enrich(NINO.op("call", NINO.op(".", f, NINO.op("string", "apply")),
-                                        NINO.op("null"),
-                                        r),
-                        a[0])
+    var r = [compile(a[0])]
+    a.slice(1).forEach(function (x) {
+      if (isFirst(x, "@")) {
+        r.push(NINO.op("...", compile(x[1])))
       } else {
-        return n.enrich(NINO.opArray("call", f, r), a[0])
+        r.push(compile(x))
       }
     })
+    return n.enrich(NINO.opArray("call", r), a[0])
   }
 
   function patternMatch1(k, v) {
@@ -535,38 +477,58 @@ var NULAN = (function (n) {
 
   set("_", {
     pattern: function (a) {
-      //return a[2]
-      return []
+      return a[2]
     }
   })
+
+  function patternMatch(after, x, k, v) {
+    if (boxOrSym(k)) {
+      v = compile(v)
+      after.push(function () {
+        k = symToBox(k)
+        if (k.scope !== "local" && mode === "compile") {
+          return n.enrich(nino.op("=", compileValue(k), v), x)
+        } else {
+          return n.enrich(nino.op("var", nino.op("=", compile(k), v)), x)
+        }
+      })
+    } else if (Array.isArray(k)) {
+      var u
+      if (isFirst(k, "[")) {
+        v = compile(v)
+        after.push(function () {
+          k.slice(1).forEach(function (y) {
+            if (isFirst(y, "@")) {
+              patternMatch(after, x, y[1])
+            } else {
+
+            }
+          })
+          return n.enrich(nino.op("var", nino.op("array", )), x)
+        })
+      } else if (isFirst(k, "{")) {
+
+      } else if (isFirst(k, ".")) {
+        v = compile(v)
+        after.push(function () {
+          return n.enrich(nino.op("=", compile(k), v), x)
+        })
+      } else if (isFirst(k, "=")) {
+
+      } else {
+        throw new n.Error(k, "invalid pattern")
+      }
+    } else {
+      throw new n.Error(k, "invalid pattern")
+    }
+  }
 
   macro("vars", function (a) {
     var after = []
     a.slice(1).forEach(function anon(x) {
       if (Array.isArray(x)) {
         checkAssign(x[0])
-        var k = x[1]
-          , v = x[2]
-        if (boxOrSym(k)) {
-          v = compile(v)
-          after.push(function () {
-            k = symToBox(k)
-            if (k.scope !== "local" && mode === "compile") {
-              return n.enrich(NINO.op("=", compileValue(k), v), x[0])
-            } else {
-              k = compile(k)
-              return n.enrich(NINO.op("var", NINO.op("=", k, v)), x[0])
-            }
-          })
-        } else if (wildcard(k)) { // TODO kinda ew
-          v = compile(v)
-          after.push(function () {
-            return v
-          })
-        } else {
-          x = patternMatch(k, v)
-          eachVars(anon, x, after)
-        }
+        patternMatch(after, x[0], x[1], x[2])
       } else {
         after.push(function () {
           var k = symToBox(x)
@@ -583,39 +545,22 @@ var NULAN = (function (n) {
 
   set("[", {
     builtin: function (a) {
-      return makeConcat(a.slice(1), function (r, seen) {
-        if (seen) {
-          return n.enrich(r, a[0])
-        } else {
-          return n.enrich(NINO.opArray("array", r), a[0])
-        }
-      })
-    },
-    pattern: function (a) {
-      var args = a[1]
-        , v    = a[2]
-        , seen
-
-      args = args.map(function (x, i) {
+      var r = []
+      a.slice(1).forEach(function (x) {
         if (isFirst(x, "@")) {
-          seen = true
-          return [box("="), x[1], slicer(v, i, args.length)]
-        } else if (seen) {
-          return [box("="), x, lengther(v, args, i)]
+          r.push(NINO.op("...", compile(x[1])))
         } else {
-          return [box("="), x, [box("."), v, i]]
+          r.push(compile(x))
         }
       })
-
-      return [box("vars")].concat(args)
+      return n.enrich(NINO.opArray("array", r), a[0])
     }
   })
 
   macro("{", function (a) {
     var r = []
     a.slice(1).forEach(function (x) {
-      r.push(compile(x[0]))
-      r.push(compile(x[1]))
+      r.push(n.op("=", compile(x[0]), compile(x[1])))
     })
     return n.enrich(NINO.opArray("object", r), a[0])
   })
@@ -635,6 +580,8 @@ var NULAN = (function (n) {
           if (boxOrSym(x)) {
             r.push(compile(symToBox(x)))
           } else if (isFirst(x, "@")) {
+            r.push(n.op("...", x[1]))
+
             var y = symBypass("arguments")
 
             if (i !== iLen) {
@@ -888,6 +835,14 @@ var NULAN = (function (n) {
   n.globals = {}
   n.options = {}
 
+  n.Box = function (s) {
+    this.value      = s
+    this.scope      = scope
+    this.mode       = {}
+    this.mode[mode] = true
+    this.toNino     = NINO.op("unique", s)
+  }
+
   n.isMacro = function (x) {
     if (x instanceof n.Symbol) {
       x = getBox(x)
@@ -926,4 +881,4 @@ var NULAN = (function (n) {
   }
 
   return n
-})(NULAN || {})
+})

@@ -1,16 +1,20 @@
 <!DOCTYPE html>
 <html>
   <body>
+    <script src="../lib/requirejs/require.js"></script>
     <script src="../lib/nino/compile.js"></script>
     <script src="../src/parse.js"></script>
     <script src="../src/nulan.js"></script>
     <script>
+      require(["lib/nino/nino", "src/nulan"], function (nino, nulan) {
+
+      })
       // TODO move into nulan.js, probably
-      NINO.error = function (x, s) {
+      nino.error = function (x, s) {
         return new NULAN.Error(x, s)
       }
 
-      NULAN.options.debug = function (x) {
+      nulan.options.debug = function (x) {
         console.log(x)
       }
     </script>
