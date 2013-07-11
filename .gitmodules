@@ -1,6 +1,6 @@
 [submodule "lib/nuit"]
 	path = lib/nuit
-	url = git://github.com/Pauan/nuit.git
+	url = https://github.com/Pauan/nuit.git
 [submodule "lib/nino"]
 	path = lib/nino
 	url = git://github.com/Pauan/nino.git
@@ -13,3 +13,6 @@
 [submodule "node_modules/wordwrap"]
 	path = node_modules/wordwrap
 	url = https://github.com/substack/node-wordwrap.git
+[submodule "@"]
+	path = @
+	url = https://github.com/Pauan/util

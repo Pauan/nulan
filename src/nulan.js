@@ -1,5 +1,5 @@
-define(["lib/nino/nino", "src/parse"], function (nino, parse) {
-  "use strict"
+define(["./parse"], function (parse) {
+  "use strict";
 
   // TODO not sure if this should be in here or nulan.js
   function print(x) {
