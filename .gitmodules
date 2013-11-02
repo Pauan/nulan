@@ -13,6 +13,9 @@
 [submodule "node_modules/wordwrap"]
 	path = node_modules/wordwrap
 	url = https://github.com/substack/node-wordwrap.git
-[submodule "@"]
-	path = @
+[submodule "lib/util"]
+	path = lib/util
 	url = https://github.com/Pauan/util
+[submodule "lib/requirejs"]
+	path = lib/requirejs
+	url = https://github.com/jrburke/requirejs.git

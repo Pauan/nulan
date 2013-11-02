@@ -1,4 +1,4 @@
-define(["@/iter"], function (iter) {
+define(["../lib/util/buffer", "../lib/util/iter"], function (buffer, iter) {
   "use strict";
 
   /**
@@ -33,7 +33,7 @@ define(["@/iter"], function (iter) {
       delimiter: true,
       startAt: start
       /*parse: function (l, s, r) {
-        throw new NulanError(s, "missing starting " + start)
+        throw new buffer.Error(s, "missing starting " + start)
       }*/
     }
   }
@@ -68,11 +68,11 @@ define(["@/iter"], function (iter) {
           return l.concat([[s].concat(y)], r.slice(1))
         } else {
           if (l.length === 0) {
-            throw new NulanError(s, "nothing to the left")
+            throw new buffer.Error(s, "nothing to the left")
           }
-          var x = [enrich(new Symbol("."), s),
-                   l[l.length - 1],
-                   unwrap(y)]
+          var x = new Symbol(".")
+          x.loc = s.loc
+          x = [x, l[l.length - 1], unwrap(y)]
           return l.slice(0, -1).concat([x], r.slice(1))
         }
       }
@@ -142,7 +142,8 @@ define(["@/iter"], function (iter) {
           , y = r[0]
         if (x instanceof Number && y instanceof Number) {
           var i = (x.value + "." + y.value)
-          s = enrich(new Number(+i), x, y)
+          s = new Number(+i)
+          s.loc = buffer.loc(x.loc, y.loc)
         // TODO
         } else if (x === void 0) {
 
@@ -163,12 +164,14 @@ define(["@/iter"], function (iter) {
       order: "right",
       // TODO handle escapes with \ as well
       tokenize: function (o) {
-        var s = store(o)
+        var s = o.position()
           , a = [o.read()]
         if (o.peek() === "=") {
           a.push(o.read())
         }
-        return [enrich(new Symbol(a.join("")), s, o)]
+        var x = new Symbol(a.join(""))
+        x.loc = o.loc(s, o.position())
+        return [x]
       },
       parse: function (l, s, r) {
         var y = r[0]
@@ -274,7 +277,7 @@ define(["@/iter"], function (iter) {
       whitespace: true,
       endAt: "|#", // TODO: hacky, but it works
       tokenize: function (o) {
-        var s = store(o)
+        var s = o.position()
         o.read()
         if (o.peek() === "|") {
           o.read()
@@ -324,7 +327,8 @@ define(["@/iter"], function (iter) {
 
     o.read()
 
-    var x = enrich(new Symbol("#"), sFirst, o)
+    var x = new Symbol("#")
+    x.loc = buffer.loc(sFirst, o.position()) // TODO check this
     r.push(x)
 
     var s = store(o)
@@ -347,7 +351,7 @@ define(["@/iter"], function (iter) {
         if (o.peek() === "`") {
           o.read()
         } else {
-          throw new NulanError(enrichL(s2, 1), "missing ending `")
+          throw new buffer.Error(enrichL(s2, 1), "missing ending `")
         }
       } else {
         o.read()
@@ -362,7 +366,7 @@ define(["@/iter"], function (iter) {
   function tokenizeComment(o, sFirst) {
     while (true) {
       if (!o.has()) {
-        throw new NulanError(sFirst, "missing ending |#")
+        throw new buffer.Error(sFirst, "missing ending |#")
       }
       var c = o.peek()
       if (c === "|") {
@@ -426,7 +430,7 @@ define(["@/iter"], function (iter) {
     var c, s = store(o)
     while (i-- && o.has()) {
       if ((c = o.read()) !== " ") {
-        throw new NulanError(enrich({}, s, o), "expected space but got " + c)
+        throw new buffer.Error(enrich({}, s, o), "expected space but got " + c)
       }
     }
   }
@@ -472,7 +476,7 @@ define(["@/iter"], function (iter) {
             } else if (c === "\"" || c === "@" || c === "\\") {
               a.push(c)
             } else {
-              throw new NulanError(enrich({}, s, o), "expected \\ \\r \\n \\t \\\" \\@ \\\\ but got \\" + c)
+              throw new buffer.Error(enrich({}, s, o), "expected \\ \\r \\n \\t \\\" \\@ \\\\ but got \\" + c)
             }
           })(store(o))
         } else if (c === "@") {
@@ -487,7 +491,7 @@ define(["@/iter"], function (iter) {
           }
 
           o.read()
-          r.push(new Bypass(parse(tokenizeBrackets(iter))))
+          r.push(new Bypass(parse1(tokenizeBrackets(iter))))
           s = store(o)
         } else if (c === "\n") {
           a.push(o.read())
@@ -496,7 +500,7 @@ define(["@/iter"], function (iter) {
           a.push(o.read())
         }
       } else {
-        throw new NulanError(enrich({}, sFirst, sNext), "missing ending \"")
+        throw new buffer.Error(enrich({}, sFirst, sNext), "missing ending \"")
       }
     }
 
@@ -592,15 +596,15 @@ define(["@/iter"], function (iter) {
     var a = []
     // TODO code duplication
     if (y.indent) {
-      a.push(parse(o, x, stack, null))
+      a.push(parse1(o, x, stack, null))
     } else {
-      a = a.concat(parse(o, x, stack, null))
+      a = a.concat(parse1(o, x, stack, null))
     }
     while (o.has() && isVertical(x, o.peek())) {
       if (y.indent) {
-        a.push(parse(o, o.read(), stack, null))
+        a.push(parse1(o, o.read(), stack, null))
       } else {
-        a = a.concat(parse(o, o.read(), stack, null))
+        a = a.concat(parse1(o, o.read(), stack, null))
       }
     }
     return a
@@ -623,7 +627,7 @@ define(["@/iter"], function (iter) {
     }
   }
 
-  function tokenize(o, info) {
+  function tokenize1(o, info) {
     var a = []
       , i = 0
 
@@ -670,7 +674,7 @@ define(["@/iter"], function (iter) {
   }
 
   // Heavily modified Pratt parser, designed for lists of symbols rather than expressions
-  function parse(o, first, stack, i) {
+  function parse1(o, first, stack, i) {
     var l = []
       , y
 
@@ -701,7 +705,7 @@ define(["@/iter"], function (iter) {
           if (x instanceof Symbol && (y = syntaxRules[x.value])) {
             if (y.startAt != null) {
               checkStack(stack, o)
-              throw new NulanError(x, "missing starting " + y.startAt)
+              throw new buffer.Error(x, "missing starting " + y.startAt)
             }
             var pri = y.priority || 0
             if (i === null || pri > i) {
@@ -730,12 +734,12 @@ define(["@/iter"], function (iter) {
                       break
                     }
                     /*if (y.indent) {
-                      a.push(parse(o, o.peek(), stack, null))
+                      a.push(parse1(o, o.peek(), stack, null))
                     } else {*/
                     if (y.indent) {
-                      a.push(parse(o, o.peek(), stack, null))
+                      a.push(parse1(o, o.peek(), stack, null))
                     } else {
-                      a = a.concat(parse(o, o.peek(), stack, null)) // TODO use null for first ?
+                      a = a.concat(parse1(o, o.peek(), stack, null)) // TODO use null for first ?
                     }
                     //}
                     /*if (o.has() && isSym(o.peek(), y.endAt)) {
@@ -753,26 +757,26 @@ define(["@/iter"], function (iter) {
                     if (y.indent) {
 
                     } else {
-                      a = a.concat(parse(o, o.peek(), stack, null))
+                      a = a.concat(parse1(o, o.peek(), stack, null))
                     }
                   }*/
                   /*} else {
-                    r.push(parse(o, null, stack, null))
+                    r.push(parse1(o, null, stack, null))
                   }*/
                 }
                 if (y.vertical) {
                   r.push(vertical(x, y, o, first, stack))
                 } else if (y.indent && y.endAt == null) {
-                  r.push(parse(o, o.peek(), stack, null))
+                  r.push(parse1(o, o.peek(), stack, null))
                 }
-                r = r.concat(parse(o, first, stack, pri))
+                r = r.concat(parse1(o, first, stack, pri))
                 /*if (l.length === 0 && r.length === 0) {
                   return [x]
                 } else {*/
                 l = y.parse(l, x, r)
                 //}
               } else {
-                throw new NulanError(x, "\"" + x.value + "\" has a syntax rule but doesn't have a parse function")
+                throw new buffer.Error(x, "\"" + x.value + "\" has a syntax rule but doesn't have a parse function")
                 //l = [x].concat(l, r) // TODO test this
               }
             } else {
@@ -783,7 +787,7 @@ define(["@/iter"], function (iter) {
             l.push(x)
           }
         } else if (x.start.column > first.start.column) {
-          l.push(unwrap(parse(o, o.peek(), stack, null)))
+          l.push(unwrap(parse1(o, o.peek(), stack, null)))
         } else {
           break
         }
@@ -802,9 +806,9 @@ define(["@/iter"], function (iter) {
       var last = stack[stack.length - 1]
       if (o.has()) {
         var x = o.peek()
-        throw new NulanError(x, "expected " + last.endAt + " but got " + x.value)
+        throw new buffer.Error(x, "expected " + last.endAt + " but got " + x.value)
       } else {
-        throw new NulanError(last.symbol, "missing ending " + last.endAt)
+        throw new buffer.Error(last.symbol, "missing ending " + last.endAt)
       }
     }
   }
@@ -822,29 +826,49 @@ define(["@/iter"], function (iter) {
     return x
   }
 
+  function toArray(a) {
+    if (a instanceof List) {
+      return a.elements
+    } else {
+      return a
+    }
+  }
+
+  function List(a) {
+    this.elements = a
+  }
+  List.prototype.toString = function () {
+    return "(" + this.elements.map(function (x) {
+      return "" + x
+    }).join(" ") + ")"
+  }
+
   function Bypass(x) {
     this.value = x
   }
-
   function Symbol(x) {
     this.value = x
   }
-
   function Number(x) {
     this.value = x
   }
-
   function String(x) {
     this.value = x
   }
-
-  function tokenizeTop(x) {
-    return tokenize(stringBuffer(x), { whitespace: true })
+  Bypass.prototype.toString =
+  Symbol.prototype.toString =
+  Number.prototype.toString =
+  String.prototype.toString = function () {
+    return "" + this.value
   }
 
-  function parseTop(o) {
+  function tokenize(x) {
+    return tokenize1(new buffer.Buffer(x), { whitespace: true })
+  }
+
+  function parse(o) {
     var stack = []
-    var x = unwrap(parse(o, o.peek(), stack, null))
+    var x = unwrap(parse1(o, o.peek(), stack, null))
     //console.log(o.peek())
     //o.read()
     //checkStack(stack, o)
@@ -853,14 +877,15 @@ define(["@/iter"], function (iter) {
   }
 
   return {
-    store: store,
-    enrich: enrich,
-    Error: NulanError,
+    toArray: toArray,
+    unwrap: unwrap,
+    Error: buffer.Error,
+    List: List,
     Bypass: Bypass,
     Symbol: Symbol,
     Number: Number,
     String: String,
-    tokenize: tokenizeTop,
-    parse: parseTop,
+    tokenize: tokenize,
+    parse: parse,
   }
 })
