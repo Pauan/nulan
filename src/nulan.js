@@ -1,39 +1,9 @@
-define(["./parse"], function (parse) {
+define(["./data", "./scope", "./parse", "./box"], function (data, scope, parse, box) {
   "use strict";
 
-  // TODO not sure if this should be in here or nulan.js
-  function print(x) {
-    if (x instanceof Number) {
-      return "" + x.value
-    } else if (x instanceof Bypass) {
-      return print(x.value)
-    } else if (x instanceof Symbol || x instanceof Box) {
-      return x.value
-      /*return x.value.replace(/./g, function (s) {
-        var y
-        if ((y = syntaxRules[s]) && y.delimiter) {
-          return "\\" + s
-        } else {
-          return s
-        }
-      })*/
-    } else if (x instanceof String) {
-      return "\"" + x.value + "\"" // TODO
-    } else if (Array.isArray(x)) {
-      return "(" + x.map(print).join(" ") + ")"
-    } else {
-      return "" + x
-    }
-  }
-
-  var boxes = {} // Variable name -> Box
-    , vars  = {} // String        -> Variable name
-    , scope = "global"
+  var scope = "global"
     , mode  = "compile"
 
-  /**
-   * Stable
-   */
   function tap(x) {
     console.log(x)
     return x
@@ -153,44 +123,8 @@ define(["./parse"], function (parse) {
     }
   }
 
-  function box(s) {
-    if (boxes[s] == null) {
-      throw new Error("box " + s + " does not exist")
-    } else {
-      return boxes[s]
-    }
-  }
-
-  function isBox(x, s) {
-    if (x instanceof n.Symbol) {
-      x = getBox(x)
-    }
-    return x instanceof n.Box && x.unique === s
-  }
-
   function symBypass(s) {
     return new n.Bypass(NINO.op("variable", s))
-  }
-
-  function getBox(x) {
-    if (x instanceof n.Box) {
-      return x
-    } else if (x instanceof n.Symbol) {
-      var y = vars[x.value]
-      // TODO: not sure if this should enrich or not...
-      //       it mostly affects macros:
-      //
-      //         $mac foo ->
-      //           'sym "5"
-      //         foo;
-      if (y == null) {
-        throw new n.Error(x, "undefined variable")
-      } else {
-        return n.enrich(Object.create(boxes[y]), x)
-      }
-    } else {
-      throw new n.Error(x, "expected variable but got " + n.print(x))
-    }
   }
 
   function compileValue(x) {
