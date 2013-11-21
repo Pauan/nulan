@@ -212,6 +212,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
       indent: true,
       vertical: true,
       parse: function (l, s, r) {
+        return l.concat(r)
         // TODO a teensy bit hacky
         if (r[0].length === 1 && r[0][0].length === 0) {
           return l.concat([[s]], r.slice(1))
@@ -289,17 +290,15 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
       priority: 90,
       endAt: "]",
       parse: function (l, s, r) {
-        var y = r[0]
         if (s.whitespace) {
-          return l.concat([[s].concat(y)], r.slice(1))
+          return l.concat([[s].concat(r[0])], r.slice(1))
         } else {
           if (l.length === 0) {
-            throw new data.Error(s, "nothing to the left")
+            missingLeft(s)
           }
-          var x = new data.Symbol(".")
+          var x = new data.Symbol(".") // TODO use a box for this
           x.loc = s.loc
-          x = [x, l[l.length - 1], data.unwrap(y)]
-          return l.slice(0, -1).concat([x], r.slice(1))
+          return l.slice(0, -1).concat([[x, l[l.length - 1], data.unwrap(r[0])]], r.slice(1)) // TODO should this unwrap ?
         }
       }
     }
@@ -312,8 +311,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
       endAt: ")",
       indent: true,
       parse: function (l, s, r) {
-        l.push(data.unwrap(r[0].map(data.unwrap)))
-        return l.concat(r.slice(1))
+        return l.concat([data.unwrap(r[0])], r.slice(1))
       }
     }
   })
@@ -323,18 +321,8 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
       delimiter: true,
       priority: 90,
       endAt: "}",
-      indent: true,
+      //indent: true,
       parse: function (l, s, r) {
-        var y = r[0]
-          , a = [s]
-        
-        // TODO use "iter" module ?
-        y.forEach(function (x) {
-          x.forEach(function (x) {
-            a.push(x)
-          })
-        })
-
         /*y.forEach(function (x) {
           if (x.length > 2) {
             for (var i = 0, iLen = x.length; i < iLen; ++i) {
@@ -370,7 +358,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
           a2.push(y[i])
           a.push(a2)
         }*/
-        return l.concat([a], r.slice(1))
+        return l.concat([[s].concat(r[0])], r.slice(1))
         //return l.concat([a], r.slice(1))
       }
     }
@@ -488,6 +476,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
 
   set("=", {
     syntax: {
+      //priority: 10, // TODO why is this priority 10 ?
       indent: true,
       parse: function (l, s, r) {
         if (l.length === 0) {

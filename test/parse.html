@@ -83,6 +83,8 @@
         }
 
         test([
+          "1 * 2 + 3",
+
           " w/var\n   foo\n     1\n       2\n  bar\n  qux\ncorge",
           "w/var foo = qux 1 2 3\n             4 5\n      bar = test\n            1\n  uh huh",
           "w/var foo = bar 1 2 3\n             uh huh\n            testing",
@@ -93,6 +95,9 @@
           "foo =\n     1",
           "foo =\n     bar 1 2\n  qux",
           
+          "foo [ a\n b\n c\n] = testing\n  yesno",
+          "foo [ a\n b\n c\n] = testing\n      yesno",
+          
           "vars drop1 = -> f f 1 2 3",
           "vars drop1 = -> f\n  f 1 2 3",
           "vars drop1 = -> f\n               f 1 2 3",
@@ -100,6 +105,8 @@
           
           "vars foo = [1 2 3]",
           "vars foo = [\n  1\n  2\n  3\n]",
+          "vars foo = [\n  bar 1 2 3\n    testing 4\n  qux 2 3 4\n  yes no 5\n]",
+          "vars foo = [ foo 1 2 3\n            bar 2 3 4 ]",
 
           "1 - 2",
           "- 1",
@@ -175,6 +182,8 @@
           "[(foo (1 2)) 3 4]",
           "[1 (foo (2 3)) 4]",
 
+          "[-> a b c\n   qux corge\n testing]",
+
           "{}",
           "{ foo bar qux }",
           "{ foo = 1 }",
@@ -196,6 +205,7 @@
           "'foo'' 'bar' 'qux corge",
           "' 'foo' 'bar' 'qux corge",
           "'\n'foo'\n'bar'\n'qux corge",
+          "'\n' foo '\n' bar '\n' qux corge",
           "(')'test)yes",
           "foo bar\n  qux corge\ntesting",
           "foo bar\n  1 + 2\nyesno",
@@ -229,6 +239,7 @@
           "{ foo -> bar qux\n    1 + 2\n  test -> yes no\n    1 + 2 }",
           "{ foo = 1\n  bar = 2 }",
           "{ foo -> 1\n  bar -> 2 }",
+          "{ foo = -> 1\n  bar = -> 2 }",
           "{ foo 1 bar 2 }",
           "{ foo 1\n  bar 2 }",
           "{ foo = 1 bar = 2 }",

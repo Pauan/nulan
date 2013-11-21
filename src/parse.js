@@ -26,87 +26,138 @@ define(["./data", "./box"], function (data, box) {
   }
 
   // Heavily modified Pratt parser, designed for lists of symbols rather than expressions
-  function parse1(o, end, i) {
+  // TODO simulates an iterator using an object with an `array` and `index` property; should either use actual iterators, or something else
+  function parse1(o, pri1) {
     var l = []
 
-    //var l = getLeft(o, first)
-    while (o.has()) {
-      var x = o.peek()
+    while (o.index < o.array.length) {
+      var x = o.array[o.index]
+        , y
       if (x instanceof data.ParseBypass) {
-        o.read()
+        ++o.index
         l.push(x.value)
-      } else if (x instanceof data.ParseIndent) {
-        o.read()
-        l.push(data.unwrap(parse1(o, end, i)))
-      } else if (x instanceof data.ParseDedent) {
-        o.read()
-        break
-      } else {
-        if (end != null && data.isSym(o.peek(), end)) {
+      } else if (Array.isArray(x)) {
+        ++o.index
+        l.push(parse1({ array: x, index: 0 }, null))
+      } else if (x instanceof data.Symbol && (y = box.getSyntax(x.value)) !== null) {
+        var pri2 = y.priority || 0
+        if (pri1 === null || pri2 > pri1) {
+          ++o.index
+          if (y.associativity === "right") {
+            --pri2
+          }
+          l = y.parse(l, x, parse1(o, pri2))
+        } else {
           break
         }
-        var y
-        if (x instanceof data.Symbol && (y = box.getSyntax(x.value)) !== null) {
-          var pri = y.priority || 0
-          if (i === null || pri > i) {
-            o.read()
-            var r = []
-            if (y.endAt != null) {
-              var a = []
-              while (true) {
-                if (o.has()) {
-                  console.log(o.peek())
-                  if (data.isSym(o.peek(), y.endAt)) {
-                    o.read()
-                    break
-                  }
-                } else {
-                  break
-                }
-                /*if (y.indent) {
-                  a.push(parse1(o, stack, null))
-                } else {
-                  
-                }*/
-                a = a.concat(parse1(o, y.endAt, null))
-              }
-              r.push(a)
-            }
-            r = r.concat(parse1(o, end, pri))
-            l = y.parse(l, x, r)
-          } else {
-            break
-          }
-        } else {
-          o.read()
-          l.push(x)
-        }
+      } else {
+        ++o.index
+        l.push(x)
       }
     }
-
+    
+    return l
+  }
+  
+  function unwrap(x) {
+    if (x instanceof data.ParseBypass) {
+      return x.value
+    } else {
+      return x
+    }
+  }
+  
+  // TODO endAt syntax can't include things the same priority or lower
+  // e.g. [foo & bar] where & is the same priority or lower than [
+  function parse1(l, o, x, end) {
+    o.read()
+    l.push(x)
+    var y
+    if (x instanceof data.Symbol && (y = box.getSyntax(x.value)) !== null) {
+      if (y.startAt != null) {
+        if (end == null) {
+          throw new data.Error(x, "missing starting " + y.startAt)
+        } else {
+          //checkStack(stack, o)
+          throw new data.Error(x, "expected " + end + " but got " + x.value)
+        }
+      }
+      if (y.parse != null) {
+        if (y.endAt != null) {
+          var r = []
+          while (true) {
+            if (o.has()) {
+              if (data.isSym(o.peek(), y.endAt)) {
+                o.read()
+                //start = unwrap(o.peek())
+                break
+              } else {
+                if (y.indent) {
+                  r.push(data.unwrap(indent(o, o.peek(), y.endAt)))
+                } else {
+                  ;(function (end) {
+                    while (o.has()) {
+                      var x = o.peek()
+                      if (end != null && data.isSym(x, end)) {
+                        break
+                      } else {
+                        indent2(r, o, x, end)
+                      }
+                    }
+                  })(y.endAt)
+                  //indent1(r, o, o.peek(), y.endAt)
+                  //r = r.concat(indent(o, o.peek(), y.endAt))
+                }
+              }
+            } else {
+              throw new data.Error(x, "missing ending " + y.endAt)
+            }
+          }
+          l.push(r)
+          // TODO why doesn't this work ?
+          //l = l.concat(indent(o, o.peek(), end))
+          indent1(l, o, o.peek(), end)
+        } else {
+          if (y.indent) {
+            l.push(data.unwrap(indent(o, o.peek(), end)))
+          }
+        }
+      } else {
+        throw new data.Error(x, data.print(x) + " has a syntax rule but doesn't have a parse function")
+      }
+    }
+  }
+  
+  function indent1(l, o, start, end) {
+    start = unwrap(start)
+    while (o.has()) {
+      var x = o.peek()
+        , v = unwrap(x)
+      if (v.loc.start.line === start.loc.start.line) {
+        if (end != null && data.isSym(x, end)) {
+          break
+        } else {
+          indent2(l, o, x, end)
+        }
+      } else if (v.loc.start.column > start.loc.start.column) {
+        l.push(data.unwrap(indent(o, o.peek(), null)))
+      } else {
+        break
+      }
+    }
+  }
+  
+  function indent(o, start, end) {
+    var l = []
+    indent1(l, o, start, end)
     return l
   }
 
-  function checkStack(stack, o) {
-    if (stack.length) {
-      var last = stack[stack.length - 1]
-      if (o.has()) {
-        var x = o.peek()
-        throw new data.Error(x, "expected " + last.endAt + " but got " + x.value)
-      } else {
-        throw new data.Error(last.symbol, "missing ending " + last.endAt)
-      }
-    }
-  }
-
   function parse(o) {
-    console.assert(o.peek() instanceof data.ParseIndent)
-    o.read()
-    var x = data.unwrap(parse1(o, null, null))
-    //console.log(o.peek())
-    //o.read()
-    //checkStack(stack, o)
-    return x
+    var x = indent(o, o.peek(), null)
+    //return x
+    //console.log(data.print(x))
+    return data.unwrap(parse1({ array: x, index: 0 }, null))
   }
 
   return parse

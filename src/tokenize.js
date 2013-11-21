@@ -1,54 +1,6 @@
 define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
   "use strict";
   
-  var indentStack = []
-  
-  function pushIndent(i) {
-    var r = []
-    while (indentStack.length) {
-      var last = indentStack[indentStack.length - 1]
-      if (i > last) {
-        indentStack.push(i)
-        r.push(new data.ParseIndent())
-        break
-      } else {
-        indentStack.pop()
-        r.push(new data.ParseDedent())
-      }
-    }
-    // TODO code duplication
-    if (indentStack.length === 0) {
-      indentStack.push(i)
-      r.push(new data.ParseIndent())
-    }
-    return r
-  }
-
-  function indent(o) {
-    //var s = o.position()
-    var i = 0
-    while (o.peek() === " ") {
-      o.read()
-      ++i
-    }
-    
-    // Ignore lines that contain only whitespace
-    if (o.peek() === "\n") {
-      return []
-    } else {
-      return pushIndent(i)
-    }
-  }
-  
-  function deindent() {
-    var r = []
-    while (indentStack.length) {
-      indentStack.pop()
-      r.push(new data.ParseDedent())
-    }
-    return r
-  }
-  
   function isDelimiter(o, info) {
     if (o.has()) {
       var c = o.peek()
@@ -424,51 +376,24 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
   }
 
   function tokenize1(o, info) {
-    var a = indent(o)
+    var a = []
       , i = 0
 
     function init() {
-      if (i >= a.length && !o.has()) {
-        a = deindent()
-        i = 0
-      }
       while (i >= a.length && o.has()) {
         var c = o.peek()
           , x
-        if (c === " ") {
+        if (c === " " || c === "\n") {
           o.read()
           a = []
           info.whitespace = true
-        } else if (c === "\n") {
-          o.read()
-          a = indent(o)
-          info.whitespace = true
         // TODO: multi-character tokenize and delimiter
         } else if ((x = box.getSyntax(c)) !== null) {
-          var s1 = o.position()
           if (x.tokenize != null) {
             a = x.tokenize(o, info)
             info.whitespace = !!x.whitespace // TODO shouldn't this always be applied even if it doesn't have a tokenize method ?
           } else {
             a = [one(o, info)]
-          }
-          if (x.indent) {
-            //var s2 = o.position()
-            // TODO ew
-            while (o.peek() === " ") {
-              o.read()
-              info.whitespace = true
-            }
-            if (o.peek() !== "\n") {
-              a = a.concat(pushIndent(o.position().column))
-              // TODO is this correct ?
-              //indentStack.push(o.position().column)
-              //a.push(new data.ParseIndent())
-
-              /*x = {}
-              x.loc = o.loc(s1, s2)
-              throw new data.Error(x, "missing expression on the right side")*/
-            }
           }
         } else {
           a = [one(o, info)]
@@ -506,7 +431,7 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
   }
   
   function tokenize(x, filename) {
-    return tokenize1(new buffer.Buffer(x, filename), { whitespace: true })
+    return tokenize1(new buffer.Buffer(x, filename), { whitespace: true, endAt: [] })
   }
   
   return {
