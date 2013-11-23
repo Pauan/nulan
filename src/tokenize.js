@@ -28,50 +28,6 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
     }
   }
   
-  // TODO probably get rid of this
-  function tokenizeCommentDoc(o, sFirst) {
-    var seen, r = []
-
-    o.read()
-
-    var x = new data.Symbol("#")
-    x.loc = o.loc(sFirst, o.position()) // TODO check this
-    r.push(x)
-
-    var s = o.position()
-
-    while (o.has() && o.peek() !== "\n") {
-      if (o.peek() === "`") {
-        o.read()
-
-        var s2 = o.position()
-
-        r.push(new data.ParseBypass(data.unwrap(processUntil(o, "`"))))
-        /*  function (x) {
-          var s
-          if ((s = vars[x.value])) {
-            tokenUpdate(x, function (o) {
-              o.box = boxes[s]
-            })
-          }
-        } */
-        if (o.peek() === "`") {
-          o.read()
-        } else {
-          throw new data.Error(enrichL(s2, 1), "missing ending `")
-        }
-      } else {
-        o.read()
-      }
-    }
-    // TODO
-    o = enrichL(o, 2)
-    x = new data.Symbol("|#")
-    x.loc = data.loc(o, o)
-    r.push(x)
-    return r
-  }
-  
   function comment(o) {
     var s = o.position()
     o.read()
@@ -121,19 +77,6 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
       }
     }
   }
-
-  /*function iterStoreText(o) {
-    var a = []
-      , f = o.read
-    //o = Object.create(o)
-    o.textValue = a
-    o.read = function () {
-      var x = f.call(this)
-      a.push(x)
-      return x
-    }
-    return o
-  }*/
 
   function tokenizeBrackets(r, o) {
     var stack = []
@@ -413,7 +356,7 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
   }
   
   function tokenize(x, filename) {
-    return tokenize1(new buffer.Buffer(x, filename), { whitespace: true, endAt: [] })
+    return tokenize1(new buffer.Buffer(x, filename), { whitespace: true })
   }
   
   return {
