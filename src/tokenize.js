@@ -135,18 +135,15 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
     return o
   }*/
 
-  function tokenizeBrackets(o) {
+  function tokenizeBrackets(r, o) {
     var stack = []
-      , r     = []
-      , x
-
     while (o.has()) {
-      x = o.peek()
+      var x = o.peek()
       r.push(x)
-      if (x instanceof Symbol) {
+      if (x instanceof data.Symbol) {
         if (stack.length && x.value === stack[stack.length - 1]) {
           stack.pop()
-        } else if ((x = syntaxRules[x.value]) && x.endAt != null) {
+        } else if ((x = box.getSyntax(x.value)) !== null && x.endAt != null) {
           stack.push(x.endAt)
         }
       }
@@ -156,8 +153,6 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
         o.read()
       }
     }
-
-    return iterator(r)
   }
 
   function readIndentedString(i, o) {
@@ -194,16 +189,18 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
             x = new data.String(a.join(""))
             x.loc = o.loc(s, o.position())
             r.push(x)
+            a = []
           }
           x = new data.Symbol(q)
           x.loc = o.loc(sFirst, o.position())
           r.push(x)
 
-          if (r.length === 3 && r[1] instanceof data.String) {
+          /*if (r.length === 3 && r[1] instanceof data.String) {
             return [r[1]]
           } else {
-            return r
-          }
+            
+          }*/
+          return r
         } else if (c === "\\") {
           ;(function (s) {
             o.read()
@@ -224,13 +221,13 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
               throw new data.Error(x, "expected \\ \\r \\n \\t \\" + q + " \\@ \\\\ but got \\" + c)
             }
           })(o.position())
-        /* TODO
         } else if (c === "@") {
           //r[0] = enrich(r[0], s, o)
           //tokenUpdate(enrich({}, s, o), function (o) {
           //  o.type = "string"
           //})
 
+          // TODO code duplication
           if (a.length) {
             x = new data.String(a.join(""))
             x.loc = o.loc(s, o.position())
@@ -239,8 +236,11 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
           }
 
           o.read()
-          r.push(new data.ParseBypass(parse1(tokenizeBrackets(info))))
-          s = o.position()*/
+          r.push(new data.ParseIndent())
+          tokenizeBrackets(r, info.iterator)
+          r.push(new data.ParseDedent())
+          //r.push(new data.ParseBypass(parse1(tokenizeBrackets(info))))
+          s = o.position()
         } else if (c === "\n") {
           a.push(o.read())
           readIndentedString(sFirst.column, o)
@@ -323,41 +323,23 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
     var s = o.position()
       , r = []
       , x
-    while (o.has() && /^[0-9]$/.test(o.peek())) {
+    while (o.has() && !isDelimiter(o, info)) {
       r.push(o.read())
     }
-    if (isDelimiter(o, info)) {
-      r = +r.join("")
-      x = new data.Number(r)
-      x.loc = o.loc(s, o.position())
+    r = r.join("")
+    if (/^[0-9]+$/.test(r)) {
+      x = new data.Number(+r)
       x.whitespace = info.whitespace
       info.whitespace = false
     } else {
-      //var escaped
-      while (true) {
-        if (isDelimiter(o, info)) {
-          break
-        /*} else if (o.peek() === "\\") {
-          escaped = true
-          o.read()
-          r.push(o.read())*/
-        } else {
-          r.push(o.read())
-        }
-      }
-      r = r.join("")
       x = new data.Symbol(r)
-      x.loc = o.loc(s, o.position())
       x.whitespace = info.whitespace
       info.whitespace = isWhitespace(r)
-      /*if (escaped) {
-        x = new Bypass(x)
-      }*/
     }
+    x.loc = o.loc(s, o.position())
     return x
   }
   
-  // TODO: multi-character tokenize and delimiter
   function one(o, info) {
     if (!o.has()) {
       // TODO better error message; probably use SyntaxError
@@ -375,6 +357,16 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
     }
   }
 
+  // TODO multi-character tokenize and delimiter
+  // TODO insert Indent tokens based on the amount of spaces, like `new Indent(r.length)`
+  //      that way it's possible to check the indent level without needing to use `foo.loc.start.line`.
+  //      that way this problem can be fixed:
+  //
+  //      $var foo
+  //      $syntax! foo {
+  //        tokenize = ...
+  //      }
+  //      foo ...
   function tokenize1(o, info) {
     var a = []
       , i = 0
@@ -403,16 +395,6 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
     }
 
     info.iterator = {
-      /*location: function () {
-        return {
-          text: o.text,
-          start: {
-            line: o.line,
-            column: o.column - 1
-          },
-          end: o
-        }
-      },*/
       peek: function () {
         init()
         return a[i]
@@ -436,7 +418,7 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
   
   return {
     tokenize: tokenize,
-    one: one,
+    //one: one,
     comment: comment,
     string: string,
     symbol: symbol,

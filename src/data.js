@@ -36,6 +36,10 @@ define(["../lib/util/buffer"], function (buffer) {
     }
   }
   
+  function isComplex(x) {
+    return Array.isArray(x) && !isSym(x[0], "\"")
+  }
+  
   function printNormal(x) {
     if (x.length > 0) {
       var r = []
@@ -43,7 +47,7 @@ define(["../lib/util/buffer"], function (buffer) {
       withIndent(indent + 1, function () {
         r.push(print(x[0]))
         while (i < x.length) {
-          if (Array.isArray(x[i])) {
+          if (isComplex(x[i])) {
             break
           } else {
             r.push(print(x[i]))
@@ -68,9 +72,9 @@ define(["../lib/util/buffer"], function (buffer) {
     if (x.length > 1) {
       var r = [print(x[1])]
       var i = 2
-      if (!Array.isArray(x[1])) {
+      if (!isComplex(x[1])) {
         while (i < x.length) {
-          if (Array.isArray(x[i])) {
+          if (isComplex(x[i])) {
             break
           } else {
             r.push(print(x[i]))
@@ -89,10 +93,31 @@ define(["../lib/util/buffer"], function (buffer) {
     }
   }
   
+  function replaceString(x) {
+    return x.replace(/[\\"]/g, "\\$&").replace(/\n/g, "$&" + spaces(" "))
+  }
+  
+  function printString(x) {
+    var r = []
+    for (var i = 1, iLen = x.length; i < iLen; ++i) {
+      if (x[i] instanceof String) {
+        r.push(replaceString(x[i].value))
+      } else {
+        r.push("@")
+        withIndent(indent + r.join("").length + 1, function () {
+          r.push(print(x[i]))
+        })
+      }
+    }
+    return "\"" + r.join("") + "\""
+  }
+  
   // TODO move into a separate module
   function print(x) {
     if (Array.isArray(x)) {
-      if (isSym(x[0], "{")) {
+      if (isSym(x[0], "\"")) {
+        return printString(x)
+      } else if (isSym(x[0], "{")) {
         return withIndent(indent + 2, function () {
           return "{" + printSpecial(x) + "}"
         })
@@ -111,7 +136,7 @@ define(["../lib/util/buffer"], function (buffer) {
         return x.value
       }
     } else if (x instanceof String) {
-      return "\"" + x.value.replace(/[\\"]/g, "\\$&").replace(/\n/g, "$& ") + "\""
+      return "\"" + replaceString(x.value) + "\""
     } else if (x instanceof Number) {
       return "" + x.value
     } else if (x instanceof ParseIndent) {

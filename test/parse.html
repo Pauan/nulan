@@ -83,6 +83,31 @@
         }
 
         test([
+          "-----FIX-----",
+          
+          "[-> a b c\n   qux corge\n -> a b c\n   testing]",
+          
+          "vars drop1 = -> f\n  f 1 2 3",
+          
+          "| 1\n|\n| 2",
+          
+          "-----NORMAL-----",
+          
+          "foo 1 2; 3 4",
+          
+          "[:-> a b c\n   qux corge\n :-> a b c\n   testing]",
+          "[:-> a b c\n    qux corge\n :-> a b c\n    testing]",
+          "[:-> a b c\n   qux corge\n :-> a b c\n   testing\n]",
+          "[foo 1 + 2 bar]",
+          "[(foo 1 2\n    bar 3 4)\n test]",
+          "[| 1\n | 2\n | 3]",
+          "[`foo 1 2 3\n    4 5 6\n test]",
+          "[\n  foo = 1\n  bar = 2\n]",
+          
+          "[]",
+          "[1]",
+
+          "foo",
           "1 * 2 + 3",
 
           " w/var\n   foo\n     1\n       2\n  bar\n  qux\ncorge",
@@ -99,7 +124,6 @@
           "foo [ a\n b\n c\n] = testing\n      yesno",
           
           "vars drop1 = -> f f 1 2 3",
-          "vars drop1 = -> f\n  f 1 2 3",
           "vars drop1 = -> f\n               f 1 2 3",
           "vars drop1 =\n  -> f\n    f 1 2 3",
           
@@ -109,41 +133,18 @@
           "vars foo = [ foo 1 2 3\n            bar 2 3 4 ]",
 
           "1 - 2",
-          "- 1",
-          "1 -",
-          "1 + - 2",
-          "1 + 2 -",
-          
           "a = 1",
-          "= 1",
-          "a =",
-          "=",
-          
           "a <= 1",
-          "<= 1",
-          "a <=",
-          "<=",
-          
           "1;",
-          ";",
-          
           ":1",
-          ":",
-          
           "foo.bar",
-          ".bar",
-          "foo.",
-          
           "~foo",
-          "~",
-          
           "`foo",
-          "`",
           
           "->",
-          "|",
           "| 1 2",
           "| 1\n| 2",
+          "| 1 2\n| 3 4",
           
           "(1 2 3)",
           "(1\n 2\n 3)",
@@ -164,10 +165,13 @@
           "| vars ,@(args.map -> [x] x)\n| ,@args.map -> [x y]\n      `(`x).macex <= drop1 y\n| ()",
           "| vars ,@(args.map -> [x] x)\n| ,@:args.map -> [x y]\n      `(`x).macex <= drop1 y\n| ()",
           "| vars ,@(args.map -> [x] x)\n| ,@(args.map -> [x y]\n      `(`x).macex <= drop1 y)\n| ()",
-
+          
+          "import\n  { foo bar qux }\n  { corge yesno }",
           "import { foo bar qux } = \"qux\"",
+          "import { foo bar qux } = \"qux@2\"",
           "import { (foo2 = foo) bar (qux2 = qux) } = \"qux\"",
           "import { foo bar qux } = \"qux\"\n       { test }        = \"corge\"",
+          "import { foo bar qux } = \"qux@2\"\n       { test }        = \"corge\"",
           "import { foo2 = foo\n         bar\n         qux2 = qux } = \"qux\"\n       { test }       = \"corge\"",
 
           "foobar",
@@ -262,16 +266,12 @@
 
           "()",
           "1 + ()",
+          "1 + \"foo@bar\"",
+          "1 + | 2\n    | 3\n    | 4",
           "(1)",
           "(1 2 3)",
-          "(1 2 3}",
-          "(1 2 3",
-          "1 2 3)",
           "1 + '('",
           "1 + ('(')",
-          "1 + (()",
-          "1 + ())",
-          "1 + ())2",
           "((foo (qux 1 2)) (bar 2))",
           "(foo 1\nbar 2)",
           "(foo 1\n bar 2)",
@@ -306,9 +306,6 @@
           "foo ~= bar",
 
           "1#foo bar",
-          "#| foo",
-          "#| foo #| bar |#",
-          "#| foo #| bar",
           "#| foo |#[1 2 3]",
           "#| foo #| bar |#|#[1 2 3]",
           
@@ -323,26 +320,23 @@
           "\"foo @(1 + 2 3 + 4) qux\"",
           "\"foo @\"bar\" qux\"",
           "\"foo @\"@bar\" qux\"",
-          "  \"foo bar\nqux corge\n   testing yes\n    yes\"",
-          "  \"foo bar\n qux corge\n   testing yes\n    yes\"",
-          "  \"foo bar\n  qux corge\n   testing yes\n    yes\"",
+          "\"foo@\n test yesno\"",
+          "\"foo@\n (test 1\n   2 3) yesno\"",
+          "\"foo@(test 1\n       (2 3)) yesno\"",
           "  \"foo bar\n   qux corge\n   testing yes\n    yes\"",
+          "uh huh \"foo bar\n        qux corge\n        testing yes\n         yes\"",
           "\"@foo\"",
           "\"foo\\\"bar\"",
           "\"foo\\\\bar\"",
           "\"foo\\\n bar\"",
           "\"foo\\\n  bar\"",
-          "\"foo\\bbar\"",
-          "\"foo bar qux corge",
           "\"foo\"[0]",
           "\"foo\".0",
           
           "''",
           "'foo'",
-          "'foo",
           "'\\n'",
           "'\n'",
-          "'\\b'",
           "'\\\\'",
           "'\\''",
           "'\\\n'",
@@ -364,7 +358,6 @@
 
           "(`$macs).&macro <= drop1 -> @args\n  `$eval",
 
-          "`(=)",
           "`(\\=)",
           "`('=')",
           
@@ -372,6 +365,61 @@
 
           "$mac words -> @args\n  `[,@(args.&map -> x \"@x\")]",
           "$mac str -> @args\n  `'\"' ,@args",
+          
+          "|",
+          "| 1\n| 2\n|",
+          
+          "-----ERRORS-----",
+
+          "- 1",
+          "+ 1",
+          "1 -",
+          "1 + - 2",
+          "1 + 2 -",
+
+          "<= 1",
+          "a <=",
+          "<=",
+
+          ";",
+          ":",
+          
+          "= 1",
+          "a =",
+          "=",
+
+          ".bar",
+          "foo.",
+          
+          "~",
+          "`",
+          
+          "(1 2 3}",
+          "(1 2 3",
+          "1 2 3)",
+          
+          "1 + (()",
+          "1 + ())",
+          "1 + ())2",
+          
+          "#| foo",
+          "#| foo #| bar |#",
+          "#| foo #| bar",
+          
+          "`(=)",
+          
+          "\"foo\\bbar\"",
+          "\"foo bar qux corge",
+          "  \"foo bar\nqux corge\n   testing yes\n    yes\"",
+          "  \"foo bar\n qux corge\n   testing yes\n    yes\"",
+          "  \"foo bar\n  qux corge\n   testing yes\n    yes\"",
+          
+          "\"foo @+ qux\"",
+          "\"foo @(+ 2) qux\"",
+          "\"foo @(1 +) qux\"",
+          
+          "'foo",
+          "'\\b'",
         ])
       })
     </script>

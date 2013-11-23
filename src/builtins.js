@@ -26,8 +26,8 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
     }
     console.assert(o.priority == null)
     console.assert(o.parse == null)
-    if (o.order == null) {
-      o.order = "right"
+    if (o.associativity == null) {
+      o.associativity = "right"
     }
     o.priority = i
     o.parse = function (l, s, r) {
@@ -55,7 +55,8 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
     o.parse = function (l, s, r) {
       var y = r[0]
       if (l.length === 0) {
-        return [[s, y]].concat(r.slice(1))
+        missingLeft(s)
+        //return [[s, y]].concat(r.slice(1))
       } else if (r.length === 0) {
         missingRight(s)
       } else {
@@ -183,7 +184,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
     macex: opargs("!", 1),
     syntax: {
       priority: 80,
-      order: "right",
+      associativity: "right",
       // TODO handle escapes with \ as well
       tokenize: function (o) {
         var s = o.position()
@@ -201,23 +202,6 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
         } else {
           var y = r[0]
           return l.concat([[s, y]], r.slice(1))
-        }
-      }
-    }
-  })
-  
-  set("|", {
-    macex: opargsl(",", 1),
-    syntax: {
-      indent: true,
-      vertical: true,
-      parse: function (l, s, r) {
-        return l.concat(r)
-        // TODO a teensy bit hacky
-        if (r[0].length === 1 && r[0][0].length === 0) {
-          return l.concat([[s]], r.slice(1))
-        } else {
-          return l.concat([[s].concat(r[0].map(data.unwrap))], r.slice(1))
         }
       }
     }
@@ -243,7 +227,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
       }
     },
     syntax: {
-      order: "right",
+      associativity: "right",
       //indent: true,
       parse: function (l, s, r) {
         if (l.length === 0) {
@@ -283,11 +267,33 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
     }
   })
   
-  // TODO why are these priority 90 ?
+  set("|", {
+    macex: opargsl(",", 1),
+    syntax: {
+      indent: true,
+      vertical: true,
+      priority: Infinity,
+      parse: function (l, s, r) {
+        /*if (r[0].length === 0) {
+          missingRight(s)
+        }*/
+        return l.concat([[s].concat(r[0])], r.slice(1))
+        
+        /*
+        // TODO a teensy bit hacky
+        if (r[0].length === 1 && r[0][0].length === 0) {
+          return l.concat([[s]], r.slice(1))
+        } else {
+          return l.concat([[s].concat(r[0].map(data.unwrap))], r.slice(1))
+        }*/
+      }
+    }
+  })
+
   set("[", {
     syntax: {
       delimiter: true,
-      priority: 90,
+      priority: Infinity,
       endAt: "]",
       parse: function (l, s, r) {
         if (s.whitespace) {
@@ -307,7 +313,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
   set("(", {
     syntax: {
       delimiter: true,
-      priority: 90,
+      priority: Infinity,
       endAt: ")",
       indent: true,
       parse: function (l, s, r) {
@@ -319,7 +325,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
   set("{", {
     syntax: {
       delimiter: true,
-      priority: 90,
+      priority: Infinity,
       endAt: "}",
       //indent: true,
       parse: function (l, s, r) {
@@ -364,6 +370,30 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
     }
   })
   
+  set("\"", {
+    syntax: {
+      delimiter: true,
+      tokenize: tokenize.string,
+      priority: Infinity,
+      endAt: "\"",
+      parse: function (l, s, r) {
+        return l.concat([[s].concat(r[0])], r.slice(1))
+        /*var x = r[0]
+          , a = []
+        for (var i = 0, iLen = x.length; i < iLen; ++i) {
+          if (x[i] instanceof data.String) {
+            a.push(x[i].value)
+          } else {
+            return l.concat([[s].concat(x)], r.slice(1))
+          }
+        }
+        a = new data.String(a.join(""))
+        a.loc = s.loc
+        return l.concat([a], r.slice(1))*/
+      }
+    }
+  })
+  
   /*"_": {
     priority: Infinity,
     parse: function (l, s, r) {
@@ -379,8 +409,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
         if (l.length === 0) {
           missingLeft(s)
         } else {
-          l.push([l.pop()])
-          return l.concat(r)
+          return l.slice(0, -1).concat([[l[l.length - 1]]], r)
         }
       }
     }
@@ -451,8 +480,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
         if (r[0].length === 0) {
           missingRight(s)
         } else {
-          l.push([s, data.unwrap(r[0])])
-          return l.concat(r.slice(1))
+          return l.concat([[s, data.unwrap(r[0])]], r.slice(1))
         }
       }
     }
@@ -461,22 +489,21 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
   set("->", {
     syntax: {
       priority: 10,
-      order: "right",
+      associativity: "right",
       parse: function (l, s, r) {
         var args = r.slice(0, -1)
         if (r.length === 0) {
-          l.push([s, args, []])
+          return l.concat([[s, args, []]])
         } else {
-          l.push([s, args, r[r.length - 1]])
+          return l.concat([[s, args, r[r.length - 1]]])
         }
-        return l
       }
     }
   })
 
   set("=", {
     syntax: {
-      //priority: 10, // TODO why is this priority 10 ?
+      //priority: 100, // TODO why is this priority 10 ?
       indent: true,
       parse: function (l, s, r) {
         if (l.length === 0) {
@@ -508,19 +535,6 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
       tokenize: tokenize.symbol
     }
   })
-
-  set("\"", {
-    syntax: {
-      delimiter: true,
-      tokenize: tokenize.string,
-      priority: Infinity, // TODO eh
-      endAt: "\"",
-      parse: function (l, s, r) {
-        // TODO is the error checking correct ?
-        return l.concat([[s].concat(r[0])], r.slice(1))
-      }
-    }
-  })
   
   set("#", {
     syntax: {
@@ -528,7 +542,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
       whitespace: true,
       tokenize: tokenize.comment,
       //priority: 9001,
-      //order: "right",
+      //associativity: "right",
       
       /*endAt: "|#", // TODO: hacky, but it works
       // TODO: hacky, but it works
