@@ -3,79 +3,30 @@
   <body>
     <script src="../lib/requirejs/require.js"></script>
     <script>
-      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins"], function (data, parse, tokenize, builtins) {
-        /*function start(x) {
-          if (x) {
-            if (x.start) {
-              return x
-            } else {
-              return start(x[0])
-            }
-          } else {
-            return { start: {}, end: {} }
+      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print"], function (data, parse, tokenize, builtins, print) {
+        function tokens(o) {
+          var r = []
+          while (o.has()) {
+            r.push(o.read())
+          }
+          console.log(print.array(r))
+        }
+        
+        function parsed(o) {
+          while (o.has()) {
+            console.log(print.normal(parse.parse(parse.indent(o))))
           }
         }
-
-        function end(x) {
-          if (x) {
-            if (x.end) {
-              return x
-            } else {
-              return end(x[x.length - 1])
-            }
-          } else {
-            return { start: {}, end: {} }
-          }
-        }
-
-        function merge(x, y) {
-          var o = { start: {}, end: {} }
-
-          if (x.start.line === y.start.line) {
-            o.start.line = x.start.line
-            o.start.column = Math.min(x.start.column, y.start.column)
-          } else if (x.start.line < y.start.line) {
-            o.start.line = x.start.line
-            o.start.column = x.start.column
-          } else {
-            o.start.line = y.start.line
-            o.start.column = y.start.column
-          }
-
-          if (x.end.line === y.end.line) {
-            o.end.line = x.end.line
-            o.end.column = Math.max(x.end.column, y.end.column)
-          } else if (x.end.line > y.end.line) {
-            o.end.line = x.end.line
-            o.end.column = x.end.column
-          } else {
-            o.end.line = y.end.line
-            o.end.column = y.end.column
-          }
-
-          return o
-        }*/
 
         function test(a) {
           a.forEach(function (x) {
             var o = tokenize.tokenize(x, "parse.html")
             try {
-              if (0) {
-                var r = []
-                while (o.has()) {
-                  r.push(o.read())
-                }
-                console.log(data.print(r))
-              } else {
-                while (o.has()) {
-                  console.log(data.print(parse(o)))
-                }
-              }
+              parsed(o)
             } catch (e) {
               if (e instanceof data.Error) {
                 console.error(e.message)
               } else {
-              //} else if (!(e instanceof iter.StopIteration)) {
                 throw e
               }
             }
@@ -93,16 +44,28 @@
           
           "-----NORMAL-----",
           
+          "| 1\n  2\n| 3",
+          
+          "$mac foo -> (`'\"' \"foo\" bar)\n  qux",
+          "$mac foo -> (`\"@\"foo\"@bar\")\n  qux",
+          "$mac foo -> (`\"foo@bar\")\n  qux",
+          "$mac foo -> \"foo@bar\"\n  qux",
+          
+          "\"@\"foo\"@bar\"",
+          "\"@foo@bar\"",
+          
           "foo 1 2; 3 4",
           
           "[:-> a b c\n   qux corge\n :-> a b c\n   testing]",
           "[:-> a b c\n    qux corge\n :-> a b c\n    testing]",
           "[:-> a b c\n   qux corge\n :-> a b c\n   testing\n]",
           "[foo 1 + 2 bar]",
-          "[(foo 1 2\n    bar 3 4)\n test]",
           "[| 1\n | 2\n | 3]",
           "[`foo 1 2 3\n    4 5 6\n test]",
           "[\n  foo = 1\n  bar = 2\n]",
+          "[(foo 1 2\n    bar 3 4)\n test]",
+          
+          "((foo 1 2\n    bar 3 4)\n test)",
           
           "[]",
           "[1]",
@@ -333,6 +296,8 @@
           "\"foo\"[0]",
           "\"foo\".0",
           
+          "[ 1 2 \"foo bar\n       qux corge\n       testing yes\n        yes\" ]",
+          
           "''",
           "'foo'",
           "'\\n'",
@@ -365,6 +330,7 @@
 
           "$mac words -> @args\n  `[,@(args.&map -> x \"@x\")]",
           "$mac str -> @args\n  `'\"' ,@args",
+          "$mac str -> @args\n  `\"@(,@args)\"",
           
           "|",
           "| 1\n| 2\n|",

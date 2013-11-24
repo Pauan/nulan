@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <script src="../lib/requirejs/require.js"></script>
+    <script>
+      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print", "../lib/util/ui", "../src/macex", "../src/compile", "../src/options", "../src/eval", "../src/box", "../lib/util/iter"], function (data, parse, tokenize, builtins, print, ui, macex, compile, options, nulanEval, box, iter) {
+        "use strict";
+        
+        ui.normalize(document, function (e) {
+          //e.overflow("hidden")
+          
+          ui.horiz(function (e) {
+            e.height("100%")
+
+            var output = ui.box(function (e) {
+              e.scrollbars()
+              e.width("50%")
+              e.height("100%")
+              e.font(function (t) {
+                t.family("monospace")
+              })
+              e.padding(function (t) {
+                t.all("2px")
+                t.left("7px")
+              })
+            })
+
+            function display(s) {
+              var sCategories = [ "log"   , "tokenize" , "indent"  , "parse",
+                                  "$eval" , "macex"    , "compile" , "eval" ,
+                                  "error" ]
+              var oCategories = {}
+              
+              iter.each(sCategories, function (s) {
+                oCategories[s] = []
+              })
+
+              var old1 = console.log
+                , old2 = options.$eval
+
+              options.$eval = function (x) {
+                oCategories["$eval"].push(x)
+              }
+              
+              console.log = function () {
+                try {
+                  throw new Error()
+                } catch (e) {
+                  // TODO not very robust
+                  var a = e.stack.replace(/^(?! +at).+\n/gm, "")
+                  a = a.replace(/^ +at.+\/(.+?)\)?$/gm, "$1")
+                  a = a.split(/\n/)
+                }
+                oCategories["log"].push("(" + a[1] + ")  " + [].slice.call(arguments).map(function (x) {
+                  return print.normal(x)
+                }).join(" "))
+              }
+              
+              box.vars.push()
+              
+              try {
+                ;(function () {
+                  var o = tokenize.tokenize(s)
+                  var r = []
+                  while (o.has()) {
+                    r.push(o.read())
+                  }
+                  oCategories["tokenize"].push(print.array(r))
+                })()
+                
+                ;(function () {
+                  var o = tokenize.tokenize(s)
+                  while (o.has()) {
+                    var x = parse.indent(o)
+                    oCategories["indent"].push(print.simple(x))
+                    
+                    x = parse.parse(x)
+                    oCategories["parse"].push(print.normal(x))
+                    
+                    x = macex(x)
+                    oCategories["macex"].push(print.normal(x))
+                    
+                    x = compile.compile(compile.statement([x]))
+                    oCategories["compile"].push(x)
+                    
+                    x = nulanEval(x)
+                    oCategories["eval"].push(print.array(x))
+                  }
+                })()
+              } catch (e) {
+                if (e instanceof data.Error) {
+                  oCategories["error"].push(e.message)
+                } else {
+                  var s = e.stack
+                  s = s.replace(/^(  ) *at [^\(]+\(.+\/([^\/:]+:\d+:\d+)\)$/gm, "$1$2")
+                  //s = s.replace(/^( +at ).+\/([^\/:]+:\d+:\d+)$/gm, "$1($2)")
+                  oCategories["error"].push(s)
+                }
+              } finally {
+                console.log   = old1
+                options.$eval = old2
+                box.vars.pop()
+              }
+              
+              var r = []
+              
+              iter.each(sCategories, function (s) {
+                if (oCategories[s].length) {
+                  r.push(s + ":\n  " + oCategories[s].map(function (x) {
+                    return x.replace(/\n/g, "$&  ")
+                  }).join("\n  "))
+                }
+              })
+              
+              output.text(r.join("\n\n"))
+            }
+
+            var input = ui.textarea(function (e) {
+              e.autofocus()
+
+              e.width("50%")
+              e.height("100%")
+              
+              e.border(function (t) {
+                t.size("3px")
+                t.color("black")
+              })
+              
+              //e.display("block") // TODO
+              
+              e.padding(function (t) {
+                t.all("5px")
+              })
+
+              e.outline(function (t) {
+                t.remove()
+              })
+              
+              //console.log(localStorage["input.saved"])
+              //delete localStorage["input.saved"]
+
+              var saved = localStorage["input.saved"] || ""
+              e.value.set(saved)
+              display(e.value.get())
+              
+              e.event([e.value], function (x) {
+                localStorage["input.saved"] = x
+                display(x)
+              })
+            })
+
+            input.move(e)
+            output.move(e)
+          }).move(e)
+        })
+      })
+    </script>
+  </body>
+</html>

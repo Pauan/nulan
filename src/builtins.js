@@ -1,5 +1,24 @@
-define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex, tokenize) {
+define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", "./eval", "./error"], function (box, data, macex, tokenize, compile, options, nulanEval, error) {
   "use strict";
+
+  // TODO move this stuff somewhere else 
+  var mode = "run"
+
+  function withMode(x, f) {
+    var old = mode
+    mode = x
+    try {
+      return f()
+    } finally {
+      mode = old
+    }
+  }
+  
+  function compileOnlyError(x) {
+    if (mode !== "compile") {
+      error(x, "cannot use ", [x], " at " + mode + " time")
+    }
+  }
   
   // TODO syntax stuff, should probably be in a separate module ?
   function toString(x) {
@@ -13,11 +32,11 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
   }
   
   function missingLeft(s) {
-    throw new data.Error(s, "missing expression on the left side of " + data.print(s))
+    error(s, "missing expression on the left side of ", [s])
   }
   
   function missingRight(s) {
-    throw new data.Error(s, "missing expression on the right side of " + data.print(s))
+    error(s, "missing expression on the right side of ", [s])
   }
 
   function unary(i, o) {
@@ -73,7 +92,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
         delimiter: true,
         startAt: start
         /*parse: function (l, s, r) {
-          throw new data.Error(s, "missing starting " + start)
+          error(s, "missing starting " + start)
         }*/
       }
     })
@@ -102,7 +121,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
   var vars = {}
   
   function set(sName, f) {
-    var o = new box.Box(sName)
+    var o = box.make(sName)
     // TODO Object.keys ?
     for (var s in f) {
       o[s] = f[s]
@@ -126,13 +145,13 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
   
   function checkArguments(a, i) {
     if (a.length - 1 !== i) {
-      throw new data.Error(a[0], "expected " + i + " argument" + plural(i) + " but got " + (a.length - 1))
+      error(a[0], "expected " + i + " argument" + plural(i) + " but got " + (a.length - 1))
     }
   }
   
   function checkArgumentsl(a, i) {
     if (a.length - 1 < i) {
-      throw new data.Error(a[0], "expected at least " + i + " argument" + plural(i) + " but got " + (a.length - 1))
+      error(a[0], "expected at least " + i + " argument" + plural(i) + " but got " + (a.length - 1))
     }
   }
   
@@ -149,7 +168,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
     }
   }
   
-  function opargsl(s) {
+  function opargsl(s, i) {
     return function (a) {
       checkArgumentsl(a, i)
       return op(s, a[0], a.slice(1).map(macex))
@@ -216,11 +235,69 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
     }
   })*/
   
+  function compileEval(x) {
+    return withMode("compile", function () {
+      x = compile.compile(compile.expression([macex(x)]))
+      options.$eval(x)
+      return nulanEval(x)
+    })
+  }
+  
+  function makeBoxSetter(s) {
+    return function (a) {
+      checkArguments(a, 2)
+      // TODO destructuring ?
+      var x = box.toBox(a[1])
+        , f = compileEval(a[2])
+      x[s] = function () {
+        return macex(f.apply(this, arguments))
+      }
+      return macex([])
+    }
+  }
+  
+  set("$pattern!", { macex: makeBoxSetter("pattern") })
+  
+  set("$syntax!", {
+    macex: function (a) {
+      checkArguments(a, 2)
+      // TODO destructuring ?
+      var x = box.toBox(a[1])
+        , f = compileEval(a[2])
+      x.syntax = f
+      return macex([])
+    }
+  })
+  
+  set("$syntax-unary!", {
+    macex: function (a) {
+      // TODO checkArguments
+      // TODO destructuring ?
+      var x = box.toBox(a[1])
+        , i = compileEval(a[2])
+        , f = compileEval(a[3])
+      x.syntax = unary(i, f)
+      console.log(x.syntax)
+      return macex([])
+    }
+  })
+
+  set("$mac!",     { macex: makeBoxSetter("macex")   })
+  set("$get!",     { macex: makeBoxSetter("get")     })
+  set("$set!",     { macex: makeBoxSetter("set")     })
+  
+  set("$eval", {
+    macex: function (a) {
+      checkArguments(a, 1)
+      return macex(compileEval(a[1]))
+    }
+  })
+  
   set("<=", {
     macex: function (a) {
       checkArguments(a, 2)
       var x = box.toBox(a[1])
-      if (x instanceof box.Box && x.set != null) {
+      if (x instanceof data.Box && x.set != null) {
         return x.set([a[1], a[2]])
       } else {
         return op("=", a[0], a.slice(1).map(macex))
@@ -291,6 +368,28 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
   })
 
   set("[", {
+    macex: function (a) {
+      var left  = []
+        , right = []
+      // TODO use "iter" module ?
+      a.slice(1).forEach(function (x) {
+        if (Array.isArray(x) && box.isBox(x[0], get("@"))) {
+          right.push(macex(x[1]))
+        } else {
+          if (right.length) {
+            right.push(new data.Op("array", [macex(x)]))
+          } else {
+            left.push(macex(x))
+          }
+        }
+      })
+      if (right.length) {
+        return op("call", a[0], [op(".", a[0], [op("array", a[0], left),
+                                                new data.String("concat")])].concat(right))
+      } else {
+        return op("array", a[0], left)
+      }
+    },
     syntax: {
       delimiter: true,
       priority: Infinity,
@@ -310,6 +409,8 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
     }
   })
   
+  set("true", {}) // TODO
+
   set("(", {
     syntax: {
       delimiter: true,
@@ -323,6 +424,16 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
   })
   
   set("{", {
+    macex: function (a) {
+      return op("object", a[0], a.slice(1).map(function (x) {
+        if (Array.isArray(x)) {
+          box.check(x[0], get("="))
+          return op("=", x[0], [x[1]].concat(x.slice(2).map(macex)))
+        } else {
+          return macex(x)
+        }
+      }))
+    },
     syntax: {
       delimiter: true,
       priority: Infinity,
@@ -371,6 +482,32 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
   })
   
   set("\"", {
+    macex: function (a) {
+      var r = a.slice(1).map(function (x) {
+        return macex(x)
+      })
+      var every = r.every(function (x) {
+        return x instanceof data.String
+      })
+      if (every) {
+        r = r.map(function (x) {
+          return x.value
+        })
+        var s = new data.String(r.join(""))
+        s.loc = a[0].loc
+        return s
+      } else {
+        if (!(r[0] instanceof data.String)) {
+          var s = new data.String("")
+          s.loc = a[0].loc
+          // TODO inefficient ?
+          r.unshift(s)
+        }
+        return r.reduce(function (x, y) {
+          return op("+", a[0], [x, y])
+        })
+      }
+    },
     syntax: {
       delimiter: true,
       tokenize: tokenize.string,
@@ -378,18 +515,6 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
       endAt: "\"",
       parse: function (l, s, r) {
         return l.concat([[s].concat(r[0])], r.slice(1))
-        /*var x = r[0]
-          , a = []
-        for (var i = 0, iLen = x.length; i < iLen; ++i) {
-          if (x[i] instanceof data.String) {
-            a.push(x[i].value)
-          } else {
-            return l.concat([[s].concat(x)], r.slice(1))
-          }
-        }
-        a = new data.String(a.join(""))
-        a.loc = s.loc
-        return l.concat([a], r.slice(1))*/
       }
     }
   })
@@ -432,6 +557,7 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
   
   // TODO: update "Customizable syntax.rst" with the new definition of "."
   set(".", {
+    macex: opargs(".", 2),
     syntax: {
       delimiter: true,
       priority: 90,
@@ -470,7 +596,131 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
     })
   })
 
+/*
+  vars foo = 1
+  $eval
+    `foo + 1
+
+  `1 (2 + 2) 3
+  
+  ['[', 1, ['[', '+', 2, 2], 3]
+  
+
+  `1 ,(2 + 2) 3
+  
+  ['[', 1, 2 + 2, 3]
+
+
+  `1 ,@2 3
+  
+  ['[', 1, ['@', 2], 3]
+  
+  
+  `1 2
+     `3 4
+  
+  ['[', 1, 2, ['[', '`', 3, 4]]
+  
+  
+  `1 2
+     `,3 ,,4
+  
+  ['[', 1, 2, ['[', '`', ['[', ',', 3], 4]]
+  
+  
+  `1 2
+     `,2 ,@4
+  
+  ['[', 1, 2, ['[', '`', ['[', ',', 2], ['[', ',', ['[', '@', 4]]]]
+
+
+  `1 2
+     `,2 ,@,4
+  
+  ['[', 1, 2, ['[', '`', ['[', ',', 2], ['@', 4]]]
+  
+  
+  `1 2
+     `2 3
+        `,,4
+  
+  ['[', 1, 2, ['[', '`', 2, 3, ['[', '`'`, [',', 4]]]]
+  
+  
+  `1 2
+     ``,2 ,,@,4
+  
+  ['[' 1 2 ['[' ` ['[' ` ['[' , 2] ['[' , ['[' @ 4]]]]]
+  
+  
+  `1 2
+     ` `,2 ,,@,4
+  
+  `1 2
+     ` `,2 ,,,@4
+  
+  $eval
+    `1 2
+       `,2 ,@,[4 + 5]
+  
+  $eval
+    `1 2
+       `,2 ,@(4 + 5)
+*/
+  
+  var quasiquote = (function () {
+    function anon(x, depth, i) {
+      if (Array.isArray(x)) {
+        if (box.isBox(x[0], get("`"))) {
+          return [get("[")].concat(x.map(function (x) {
+            return anon(x, depth + 1, i)
+          }))
+        } else if (box.isBox(x[0], get(","))) {
+          if (i === depth) {
+            return x[1]
+          } else {
+            return [get("[")].concat(x.map(function (x) {
+              return anon(x, depth, i + 1)
+            }))
+          }
+        } else {
+          return [get("[")].concat(x.map(function (x) {
+            return anon(x, depth, i)
+          }))
+        }
+      } else if (x instanceof data.Box) {
+        return [[get("."), new data.MacexBypass(new data.Symbol("box")), new data.String("get")], new data.Number(x.id)]
+        // TODO if I used the . box I can get rid of MacexBypass
+        /*return new data.MacexBypass(new data.Op("call", [new data.Op(".", [,
+                                                                           ]),
+                                                         ]))*/
+      } else if (x instanceof data.Symbol) {
+        return anon(box.toBox(x), depth, i)
+      } else {
+        return x
+      }
+    }
+
+    return function (x) {
+      var first = x
+        , next  = first
+      if (Array.isArray(next) && box.isBox(next[0], get(","))) {
+        next = next[1]
+        if (Array.isArray(next) && box.isBox(next[0], get("@"))) {
+          error({ loc: data.loc(first[0].loc, next[0].loc) },
+                ",@ cannot be used immediately after `")
+        }
+      }
+      return anon(x, 1, 1)
+    }
+  })()
+      
   set("`", {
+    macex: function (a) {
+      checkArguments(a, 1)
+      compileOnlyError(a[0])
+      return macex(quasiquote(a[1]))
+    },
     syntax: {
       whitespace: true,
       delimiter: true,
@@ -487,6 +737,11 @@ define(["./box", "./data", "./macex", "./tokenize"], function (box, data, macex,
   })
 
   set("->", {
+    macex: function (a) {
+      return op("function", a[0],
+                  [op(",", a[0], []),
+                   op("return", a[0], [macex(a[2])])])
+    },
     syntax: {
       priority: 10,
       associativity: "right",

@@ -1,4 +1,4 @@
-define(["./data", "./scope"], function (data, scope) {
+define(["./data", "./scope", "./error"], function (data, scope, error) {
   "use strict";
   
   var boxId = 0
@@ -6,17 +6,12 @@ define(["./data", "./scope"], function (data, scope) {
 
   var vars = scope.make()
   
-  function Box(x) {
-    this.id    = boxId++
-    this.value = x
-    boxes[this.id] = this
-  }
-  Box.prototype.toString = function () {
-    if (this.value != null) {
-      return "#<box:" + this.id + ":" + this.value + ">"
-    } else {
-      return "#<box:" + this.id + ">"
-    }
+  function make(x) {
+    var o       = new data.Box()
+    o.id        = boxId++
+    o.value     = x
+    boxes[o.id] = o
+    return o
   }
   
   function get(i) {
@@ -34,45 +29,48 @@ define(["./data", "./scope"], function (data, scope) {
         //         $mac foo ->
         //           'sym "5"
         //         foo;
-        var o = Object.create(y)
+        y.loc = x.loc
+        return y
+        /*var o = Object.create(y)
         o.loc = x.loc
-        return o
+        return o*/
       } else {
-        throw new data.Error(x, "undefined symbol")
+        error(x, "undefined symbol: ", [x])
       }
     } else {
       return x
-      //throw new data.Error(x, "expected box or symbol but got " + data.print(x))
+      //error(x, "expected box or symbol but got ", [x])
     }
   }
   
   function isBox(x, s) {
-    console.assert(s instanceof Box)
+    x = toBox(x)
+    console.assert(s instanceof data.Box)
     /*if (x instanceof data.Symbol) {
       
     } else if (!(x instanceof Box)) {
-      throw new data.Error(x, "expected box or symbol but got " + data.print(x))
+      error(x, "expected box or symbol but got ", [x])
     }*/
-    return x instanceof Box && x.id === s.id
+    return x instanceof data.Box && x.id === s.id
   }
   
   function check(x, y) {
     // TODO: use isSym ?
     if (!isBox(toBox(x), y)) {
-      throw new data.Error(x, "expected " + y + " but got " + data.print(x))
+      error(x, "expected ", [y], " but got ", [x])
     }
   }
   
   function set(x) {
-    if (x instanceof Box) {
+    if (x instanceof data.Box) {
       return x
     } else if (x instanceof data.Symbol) {
-      var o = new Box(x.value)
+      var o = make(x.value)
       o.loc = x.loc
       vars.set(x.value, o)
       return o
     } else {
-      throw new data.Error(x, "expected symbol but got " + data.print(x))
+      error(x, "expected symbol but got ", [x])
     }
   }
   
@@ -80,7 +78,7 @@ define(["./data", "./scope"], function (data, scope) {
   function getSyntax(s) {
     if (vars.has(s)) {
       var x = vars.get(s)
-      console.assert(x instanceof Box)
+      console.assert(x instanceof data.Box)
       if (x.syntax != null) {
         return x.syntax
       }
@@ -91,7 +89,7 @@ define(["./data", "./scope"], function (data, scope) {
   return {
     vars: vars,
 
-    Box: Box,
+    make: make,
     get: get,
     toBox: toBox,
     isBox: isBox,

@@ -1,4 +1,4 @@
-define(["./data", "./box"], function (data, box) {
+define(["./data", "./box", "./error"], function (data, box, error) {
   "use strict";
 
   function isVertical(x, y) {
@@ -13,7 +13,7 @@ define(["./data", "./box"], function (data, box) {
     }
   }
   
-  function indent(o, start, end) {
+  function indent1(o, start, end) {
     var l = []
     start = unwrap(start)
     while (o.has()) {
@@ -22,17 +22,17 @@ define(["./data", "./box"], function (data, box) {
         , y
       if (end != null && data.isSym(x, end)) {
         break
-      } else if (x instanceof data.ParseDedent) {
+      } else if (x instanceof data.ParseEnd) {
         break
-      } else if (x instanceof data.ParseIndent) {
+      } else if (x instanceof data.ParseStart) {
         o.read()
         while (true) {
           if (o.has()) {
-            if (o.peek() instanceof data.ParseDedent) {
+            if (o.peek() instanceof data.ParseEnd) {
               o.read()
               break
             } else {
-              l.push(indent(o, o.peek(), null))
+              l.push(indent1(o, o.peek(), null))
             }
           } else {
             throw new Error("invalid indentation")
@@ -44,9 +44,9 @@ define(["./data", "./box"], function (data, box) {
         if (x instanceof data.Symbol && (y = box.getSyntax(x.value)) !== null) {
           if (y.startAt != null) {
             if (end == null) {
-              throw new data.Error(x, "missing starting " + y.startAt)
+              error(x, "missing starting " + y.startAt)
             } else {
-              throw new data.Error(x, "expected " + end + " but got " + x.value)
+              error(x, "expected " + end + " but got " + x.value)
             }
           }
           if (y.endAt != null) {
@@ -57,25 +57,25 @@ define(["./data", "./box"], function (data, box) {
                   break
                 } else {
                   if (y.indent) {
-                    a.push(data.unwrap(indent(o, o.peek(), y.endAt)))
+                    a.push(data.unwrap(indent1(o, o.peek(), y.endAt)))
                   } else {
-                    a = a.concat(indent(o, null, y.endAt))
+                    a = a.concat(indent1(o, null, y.endAt))
                   }
                 }
               } else {
-                throw new data.Error(x, "missing ending " + y.endAt)
+                error(x, "missing ending " + y.endAt)
               }
             }
             l.push(a)
-            l = l.concat(indent(o, o.read(), end))
+            l = l.concat(indent1(o, o.read(), end))
           } else if (y.vertical) {
             var a = []
             while (true) {
               if (y.indent) {
                 // TODO needs to check o.has()
-                a.push(data.unwrap(indent(o, o.peek(), end)))
+                a.push(data.unwrap(indent1(o, o.peek(), end)))
               } else {
-                a = a.concat(indent(o, null, end))
+                a = a.concat(indent1(o, null, end))
               }
               if (o.has() && isVertical(x, o.peek())) {
                 o.read()
@@ -87,14 +87,14 @@ define(["./data", "./box"], function (data, box) {
           } else {
             if (y.indent) {
               // TODO needs to check o.has()
-              l.push(data.unwrap(indent(o, o.peek(), end)))
+              l.push(data.unwrap(indent1(o, o.peek(), end)))
             } else {
-              l = l.concat(indent(o, start, end))
+              l = l.concat(indent1(o, start, end))
             }
           }
         }
       } else if (v.loc.start.column > start.loc.start.column) {
-        l.push(data.unwrap(indent(o, o.peek(), end)))
+        l.push(data.unwrap(indent1(o, x, end)))
       } else {
         break
       }
@@ -113,7 +113,7 @@ define(["./data", "./box"], function (data, box) {
     }
   }
   
-  // Heavily modified Pratt parser, designed for lists of symbols rather than expressions
+  // Heavily modified Pratt parser, designed for lists of symbols rather than expressions of tokens
   function parse1(o, pri) {
     var l = []
     while (o.index < o.array.length) {
@@ -142,7 +142,7 @@ define(["./data", "./box"], function (data, box) {
             r = r.concat(parse1(o, pri2))
             l = y.parse(l, x, r)
           } else {
-            throw new data.Error(x, data.print(x) + " has a syntax rule but doesn't have a parse function")
+            error(x, [x], " has a syntax rule but doesn't have a parse function")
           }
         } else {
           break
@@ -154,12 +154,17 @@ define(["./data", "./box"], function (data, box) {
     }
     return l
   }
+  
+  function indent(o) {
+    return indent1(o, o.peek(), null)
+  }
 
-  function parse(o) {
-    var x = indent(o, o.peek(), null, false)
-    //return x
+  function parse(x) {
     return data.unwrap(parse1({ array: x, index: 0 }, null))
   }
 
-  return parse
+  return {
+    parse: parse,
+    indent: indent,
+  }
 })

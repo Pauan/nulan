@@ -12,142 +12,11 @@ define(["../lib/util/buffer"], function (buffer) {
     this.name = s
     this.args = a
   }
-  Op.prototype.toString = function () {
-    return "(op " + this.name + " " + this.args.join(" ") + ")"
-  }
+  
+  function Box() {}
   
   function isSym(x, y) {
     return x instanceof Symbol && x.value === y
-  }
-  
-  var indent = 0
-  
-  function spaces(s) {
-    return new Array(indent + 1).join(" ") + s
-  }
-  
-  function withIndent(i, f) {
-    var old = indent
-    indent = i
-    try {
-      return f()
-    } finally {
-      indent = old
-    }
-  }
-  
-  function isComplex(x) {
-    return Array.isArray(x) && !isSym(x[0], "\"")
-  }
-  
-  function printNormal(x) {
-    if (x.length > 0) {
-      var r = []
-      var i = 1
-      withIndent(indent + 1, function () {
-        r.push(print(x[0]))
-        while (i < x.length) {
-          if (isComplex(x[i])) {
-            break
-          } else {
-            r.push(print(x[i]))
-          }
-          ++i
-        }
-        r = [r.join(" ")]
-      })
-      withIndent(indent + 2, function () {
-        while (i < x.length) {
-          r.push("\n" + spaces(print(x[i])))
-          ++i
-        }
-      })
-      return r.join("")
-    } else {
-      return ""
-    }
-  }
-  
-  function printSpecial(x) {
-    if (x.length > 1) {
-      var r = [print(x[1])]
-      var i = 2
-      if (!isComplex(x[1])) {
-        while (i < x.length) {
-          if (isComplex(x[i])) {
-            break
-          } else {
-            r.push(print(x[i]))
-          }
-          ++i
-        }
-        r = [r.join(" ")]
-      }
-      while (i < x.length) {
-        r.push("\n" + spaces(print(x[i])))
-        ++i
-      }
-      return " " + r.join("") + " "
-    } else {
-      return ""
-    }
-  }
-  
-  function replaceString(x) {
-    return x.replace(/[\\"]/g, "\\$&").replace(/\n/g, "$&" + spaces(" "))
-  }
-  
-  function printString(x) {
-    var r = []
-    for (var i = 1, iLen = x.length; i < iLen; ++i) {
-      if (x[i] instanceof String) {
-        r.push(replaceString(x[i].value))
-      } else {
-        r.push("@")
-        withIndent(indent + r.join("").length + 1, function () {
-          r.push(print(x[i]))
-        })
-      }
-    }
-    return "\"" + r.join("") + "\""
-  }
-  
-  // TODO move into a separate module
-  function print(x) {
-    if (Array.isArray(x)) {
-      if (isSym(x[0], "\"")) {
-        return printString(x)
-      } else if (isSym(x[0], "{")) {
-        return withIndent(indent + 2, function () {
-          return "{" + printSpecial(x) + "}"
-        })
-      } else if (isSym(x[0], "[")) {
-        return withIndent(indent + 2, function () {
-          return "[" + printSpecial(x) + "]"
-        })
-      } else {
-        return "(" + printNormal(x) + ")"
-      }
-    // TODO move this to Symbol.prototype.toString ?
-    } else if (x instanceof Symbol) {
-      if (/^[0-9]+$|^[0-9]+\.[0-9]+$|[\(\)\{\}\[\]\.\\\'" \n]/.test(x.value)) {
-        return "'" + x.value.replace(/['\\]/g, "\\$&").replace(/\n/g, "\\n") + "'"
-      } else {
-        return x.value
-      }
-    } else if (x instanceof String) {
-      return "\"" + replaceString(x.value) + "\""
-    } else if (x instanceof Number) {
-      return "" + x.value
-    } else if (x instanceof ParseIndent) {
-      return "<"
-    } else if (x instanceof ParseDedent) {
-      return ">"
-    } else if (x instanceof ParseBypass) {
-      return print(x.value)
-    } else {
-      return "" + x
-    }
   }
   
   // TODO generic
@@ -162,10 +31,13 @@ define(["../lib/util/buffer"], function (buffer) {
       end: y.end
     }
   }
-  
-  function ParseIndent() {}
-  function ParseDedent() {}
+
+  function ParseStart() {}
+  function ParseEnd() {}
   function ParseBypass(x) {
+    this.value = x
+  }
+  function MacexBypass(x) {
     this.value = x
   }
   function Symbol(x) {
@@ -182,12 +54,13 @@ define(["../lib/util/buffer"], function (buffer) {
     loc: loc,
     unwrap: unwrap,
     isSym: isSym,
-    print: print,
 
+    Box: Box,
     Error: Error,
     Op: Op,
-    ParseIndent: ParseIndent,
-    ParseDedent: ParseDedent,
+    MacexBypass: MacexBypass,
+    ParseStart: ParseStart,
+    ParseEnd: ParseEnd,
     ParseBypass: ParseBypass,
     Symbol: Symbol,
     Number: Number,

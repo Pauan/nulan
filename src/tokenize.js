@@ -1,4 +1,4 @@
-define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
+define(["../lib/util/buffer", "./data", "./box", "./error"], function (buffer, data, box, error) {
   "use strict";
   
   function isDelimiter(o, info) {
@@ -54,7 +54,7 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
   function commentBlock(o, sFirst) {
     while (true) {
       if (!o.has()) {
-        throw new data.Error(sFirst, "missing ending |#")
+        error(sFirst, "missing ending |#")
       }
       var c = o.peek()
       if (c === "|") {
@@ -81,7 +81,7 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
   function tokenizeBrackets(r, o) {
     var stack = []
     while (o.has()) {
-      var x = o.peek()
+      var x = o.read()
       r.push(x)
       if (x instanceof data.Symbol) {
         if (stack.length && x.value === stack[stack.length - 1]) {
@@ -92,8 +92,6 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
       }
       if (stack.length === 0) {
         break
-      } else {
-        o.read()
       }
     }
   }
@@ -106,7 +104,7 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
       if (c !== " ") {
         var x = {}
         x.loc = o.loc(s, o.position())
-        throw new data.Error(x, "expected space but got " + c)
+        error(x, "expected space but got " + c)
       }
     }
   }
@@ -161,7 +159,7 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
             } else {
               var x = {}
               x.loc = o.loc(s, o.position())
-              throw new data.Error(x, "expected \\ \\r \\n \\t \\" + q + " \\@ \\\\ but got \\" + c)
+              error(x, "expected \\ \\r \\n \\t \\" + q + " \\@ \\\\ but got \\" + c)
             }
           })(o.position())
         } else if (c === "@") {
@@ -179,9 +177,9 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
           }
 
           o.read()
-          r.push(new data.ParseIndent())
+          r.push(new data.ParseStart())
           tokenizeBrackets(r, info.iterator)
-          r.push(new data.ParseDedent())
+          r.push(new data.ParseEnd())
           //r.push(new data.ParseBypass(parse1(tokenizeBrackets(info))))
           s = o.position()
         } else if (c === "\n") {
@@ -193,7 +191,7 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
       } else {
         x = {}
         x.loc = o.loc(sFirst, sNext)
-        throw new data.Error(x, "missing ending " + q)
+        error(x, "missing ending " + q)
       }
     }
 
@@ -245,7 +243,7 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
             } else {
               var x = {}
               x.loc = o.loc(s, o.position())
-              throw new data.Error(x, "expected \\ \\r \\n \\t \\" + q + " \\\\ but got \\" + c)
+              error(x, "expected \\ \\r \\n \\t \\" + q + " \\\\ but got \\" + c)
             }
           })(o.position())
         // TODO should this readIndentedString ?
@@ -257,7 +255,7 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
       } else {
         x = {}
         x.loc = o.loc(s, sNext)
-        throw new data.Error(x, "missing ending " + q)
+        error(x, "missing ending " + q)
       }
     }
   }
@@ -347,7 +345,7 @@ define(["../lib/util/buffer", "./data", "./box"], function (buffer, data, box) {
         return a[i++]
       },
       has: function () {
-        init() // TODO is there a better way...?
+        init()
         return i < a.length || o.has()
       }
     }
