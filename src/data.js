@@ -19,6 +19,10 @@ define(["../lib/util/buffer"], function (buffer) {
     return x instanceof Symbol && x.value === y
   }
   
+  function boxOrSym(x) {
+    return x instanceof Box || x instanceof Symbol
+  }
+  
   // TODO generic
   function unwrap(x) {
     return x.length === 1 ? x[0] : x
@@ -54,6 +58,7 @@ define(["../lib/util/buffer"], function (buffer) {
     loc: loc,
     unwrap: unwrap,
     isSym: isSym,
+    boxOrSym: boxOrSym,
 
     Box: Box,
     Error: Error,

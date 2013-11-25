@@ -42,7 +42,7 @@
                 oCategories["$eval"].push(x)
               }
               
-              console.log = function () {
+              /*console.log = function () {
                 try {
                   throw new Error()
                 } catch (e) {
@@ -54,7 +54,7 @@
                 oCategories["log"].push("(" + a[1] + ")  " + [].slice.call(arguments).map(function (x) {
                   return print.normal(x)
                 }).join(" "))
-              }
+              }*/
               
               box.vars.push()
               
@@ -83,8 +83,8 @@
                     x = compile.compile(compile.statement([x]))
                     oCategories["compile"].push(x)
                     
-                    x = nulanEval(x)
-                    oCategories["eval"].push(print.array(x))
+                    /*x = nulanEval(x)
+                    oCategories["eval"].push(print.array(x))*/
                   }
                 })()
               } catch (e) {

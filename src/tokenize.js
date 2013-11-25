@@ -4,28 +4,28 @@ define(["../lib/util/buffer", "./data", "./box", "./error"], function (buffer, d
   function isDelimiter(o, info) {
     if (o.has()) {
       var c = o.peek()
-      if (c === " " || c === "\n") {
+      /*if (c === " " || c === "\n") {
         return true
-      } else {
-        var x = box.getSyntax(c)
-        return x !== null && x.delimiter
-      }
+      } else {*/
+      var x = box.getSyntax(c)
+      return x !== null && x.delimiter
+      //}
     } else {
       return true
     }
   }
   
   function isWhitespace(s) {
-    if (s === " " || s === "\n") {
+    /*if (s === " " || s === "\n") {
       return true
+    } else {*/
+    var x = box.getSyntax(s)
+    if (x !== null) {
+      return !!x.whitespace
     } else {
-      var x = box.getSyntax(s)
-      if (x !== null) {
-        return !!x.whitespace
-      } else {
-        return false
-      }
+      return false
     }
+    //}
   }
   
   function comment(o) {
@@ -83,11 +83,14 @@ define(["../lib/util/buffer", "./data", "./box", "./error"], function (buffer, d
     while (o.has()) {
       var x = o.read()
       r.push(x)
-      if (x instanceof data.Symbol) {
+      if (data.boxOrSym(x)) {
         if (stack.length && x.value === stack[stack.length - 1]) {
           stack.pop()
-        } else if ((x = box.getSyntax(x.value)) !== null && x.endAt != null) {
-          stack.push(x.endAt)
+        } else {
+          x = box.getSyntax(x)
+          if (x !== null && x.endAt != null) {
+            stack.push(x.endAt)
+          }
         }
       }
       if (stack.length === 0) {
@@ -101,6 +104,7 @@ define(["../lib/util/buffer", "./data", "./box", "./error"], function (buffer, d
     while (i-- && o.has()) {
       var s = o.position()
       var c = o.read()
+      // TODO don't hardcore " " ?
       if (c !== " ") {
         var x = {}
         x.loc = o.loc(s, o.position())
@@ -315,13 +319,9 @@ define(["../lib/util/buffer", "./data", "./box", "./error"], function (buffer, d
     function init() {
       while (i >= a.length && o.has()) {
         var c = o.peek()
-          , x
-        if (c === " " || c === "\n") {
-          o.read()
-          a = []
-          info.whitespace = true
+          , x = box.getSyntax(c)
         // TODO: multi-character tokenize and delimiter
-        } else if ((x = box.getSyntax(c)) !== null) {
+        if (x !== null) {
           if (x.tokenize != null) {
             a = x.tokenize(o, info)
             info.whitespace = !!x.whitespace // TODO shouldn't this always be applied even if it doesn't have a tokenize method ?

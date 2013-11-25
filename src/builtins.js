@@ -199,6 +199,28 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   inert("{", "}")
   inert("#|", "|#")
   
+  set(" ", {
+    syntax: whitespace()
+  })
+
+  set("\n", {
+    syntax: whitespace({
+      //priority: Infinity,
+      tokenize: function (o) {
+        while (o.has() && (o.peek() === " " || o.peek() === "\n")) {
+          o.read()
+        }
+        var s = o.position()
+        var x = new data.Symbol("\n")
+        x.loc = o.loc(s, o.position())
+        return [x]
+      },
+      parse: function (l, s, r) {
+        return l.concat(r)
+      }
+    })
+  })
+  
   set("~", {
     macex: opargs("!", 1),
     syntax: {
@@ -268,7 +290,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       return macex([])
     }
   })
-  
+
+  // TODO expose syntax-unary function and move this into core  
   set("$syntax-unary!", {
     macex: function (a) {
       // TODO checkArguments
@@ -277,7 +300,6 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
         , i = compileEval(a[2])
         , f = compileEval(a[3])
       x.syntax = unary(i, f)
-      console.log(x.syntax)
       return macex([])
     }
   })

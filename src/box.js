@@ -75,15 +75,18 @@ define(["./data", "./scope", "./error"], function (data, scope, error) {
   }
   
   // TODO not sure if this should be in here or not...
-  function getSyntax(s) {
-    if (vars.has(s)) {
-      var x = vars.get(s)
-      console.assert(x instanceof data.Box)
-      if (x.syntax != null) {
-        return x.syntax
-      }
+  function getSyntax(x) {
+    // TODO ew
+    if (typeof x === "string" && vars.has(x)) {
+      x = vars.get(x)
+    } else if (x instanceof data.Symbol && vars.has(x.value)) {
+      x = vars.get(x.value)
     }
-    return null
+    if (x instanceof data.Box && x.syntax != null) {
+      return x.syntax
+    } else {
+      return null
+    }
   }
   
   return {

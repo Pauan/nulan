@@ -2,7 +2,7 @@ define(["./data", "./box", "./error"], function (data, box, error) {
   "use strict";
 
   function isVertical(x, y) {
-    return y instanceof data.Symbol && y.value === x.value && y.loc.start.column === x.loc.start.column
+    return data.boxOrSym(y) && y.value === x.value && y.loc.start.column === x.loc.start.column
   }
   
   function unwrap(x) {
@@ -19,7 +19,6 @@ define(["./data", "./box", "./error"], function (data, box, error) {
     while (o.has()) {
       var x = o.peek()
         , v = unwrap(x)
-        , y
       if (end != null && data.isSym(x, end)) {
         break
       } else if (x instanceof data.ParseEnd) {
@@ -41,7 +40,8 @@ define(["./data", "./box", "./error"], function (data, box, error) {
       } else if (start === null || v.loc.start.line === start.loc.start.line) {
         o.read()
         l.push(x)
-        if (x instanceof data.Symbol && (y = box.getSyntax(x.value)) !== null) {
+        var y = box.getSyntax(x)
+        if (y !== null) {
           if (y.startAt != null) {
             if (end == null) {
               error(x, "missing starting " + y.startAt)
@@ -77,6 +77,7 @@ define(["./data", "./box", "./error"], function (data, box, error) {
               } else {
                 a = a.concat(indent1(o, null, end))
               }
+              console.log(o.peek())
               if (o.has() && isVertical(x, o.peek())) {
                 o.read()
               } else {
@@ -96,6 +97,9 @@ define(["./data", "./box", "./error"], function (data, box, error) {
       } else if (v.loc.start.column > start.loc.start.column) {
         l.push(data.unwrap(indent1(o, x, end)))
       } else {
+        if (data.boxOrSym(x) && x.value === "\n") {
+          o.read()
+        }
         break
       }
     }
@@ -118,38 +122,40 @@ define(["./data", "./box", "./error"], function (data, box, error) {
     var l = []
     while (o.index < o.array.length) {
       var x = o.array[o.index]
-        , y
       if (x instanceof data.ParseBypass) {
         ++o.index
         l.push(x.value)
       } else if (Array.isArray(x)) {
         l.push(parseArray(o, true))
-      } else if (x instanceof data.Symbol && (y = box.getSyntax(x.value)) !== null) {
-        var pri2 = y.priority
-        if (pri2 == null) {
-          pri2 = 0
-        }
-        if (pri === null || pri2 > pri) {
-          if (y.associativity === "right") {
-            --pri2
+      } else {
+        var y = box.getSyntax(x)
+        if (y !== null) {
+          var pri2 = y.priority
+          if (pri2 == null) {
+            pri2 = 0
           }
-          if (y.parse != null) {
-            ++o.index
-            var r = []
-            if (y.endAt != null || y.vertical) {
-              r.push(parseArray(o, false))
+          if (pri === null || pri2 > pri) {
+            if (y.associativity === "right") {
+              --pri2
             }
-            r = r.concat(parse1(o, pri2))
-            l = y.parse(l, x, r)
+            if (y.parse != null) {
+              ++o.index
+              var r = []
+              if (y.endAt != null || y.vertical) {
+                r.push(parseArray(o, false))
+              }
+              r = r.concat(parse1(o, pri2))
+              l = y.parse(l, x, r)
+            } else {
+              error(x, [x], " has a syntax rule but doesn't have a parse function")
+            }
           } else {
-            error(x, [x], " has a syntax rule but doesn't have a parse function")
+            break
           }
         } else {
-          break
+          ++o.index
+          l.push(x)
         }
-      } else {
-        ++o.index
-        l.push(x)
       }
     }
     return l
