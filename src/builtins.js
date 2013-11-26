@@ -27,48 +27,46 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     error(s, "missing expression on the right side of ", [s])
   }
 
-  function unary(i, o) {
+  function unary(o) {
     if (o == null) {
       o = {}
     }
-    console.assert(o.priority == null)
-    console.assert(o.parse == null)
     if (o.associativity == null) {
       o.associativity = "right"
     }
-    o.priority = i
-    o.parse = function (l, s, r) {
-      if (r.length === 0) {
-        missingRight(s)
-      } else {
-        var y = r[0]
-        if (o.indent) {
-          return l.concat([[s, data.unwrap(y)]], r.slice(1))
+    if (o.parse == null) {
+      o.parse = function (l, s, r) {
+        if (r.length === 0) {
+          missingRight(s)
         } else {
-          return l.concat([[s, y]], r.slice(1))
+          var y = r[0]
+          if (o.indent) {
+            return l.concat([[s, data.unwrap(y)]], r.slice(1))
+          } else {
+            return l.concat([[s, y]], r.slice(1))
+          }
         }
       }
     }
     return o
   }
 
-  function infix(i, o) {
+  function infix(o) {
     if (o == null) {
       o = {}
     }
-    console.assert(o.priority == null)
-    console.assert(o.parse == null)
-    o.priority = i
-    o.parse = function (l, s, r) {
-      var y = r[0]
-      if (l.length === 0) {
-        missingLeft(s)
-        //return [[s, y]].concat(r.slice(1))
-      } else if (r.length === 0) {
-        missingRight(s)
-      } else {
-        var x = l[l.length - 1]
-        return l.slice(0, -1).concat([[s, x, y]], r.slice(1))
+    if (o.parse == null) {
+      o.parse = function (l, s, r) {
+        var y = r[0]
+        if (l.length === 0) {
+          missingLeft(s)
+          //return [[s, y]].concat(r.slice(1))
+        } else if (r.length === 0) {
+          missingRight(s)
+        } else {
+          var x = l[l.length - 1]
+          return l.slice(0, -1).concat([[s, x, y]], r.slice(1))
+        }
       }
     }
     return o
@@ -164,19 +162,19 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   }
 
 
-  set("/",   { macex: opargs("/",    2), syntax: infix(70)    })
-  set("*",   { macex: opargs("*",    2), syntax: infix(70)    })
-  set("+",   { macex: opargs("+",    2), syntax: infix(60)    })
-  set("-",   { macex: opargs("-",    2), syntax: infix(60)    })
-  set("<",   { macex: opargs("<",    2), syntax: infix(50)    })
-  set("=<",  { macex: opargs("<=",   2), syntax: infix(50)    })
-  set(">",   { macex: opargs(">",    2), syntax: infix(50)    })
-  set(">=",  { macex: opargs(">=",   2), syntax: infix(50)    })
-  set("==",  { macex: opargs("===",  2), syntax: infix(40)    })
-  set("|=",  {                           syntax: infix(40)    })
-  set("~=",  { macex: opargs("!==",  2), syntax: infix(40)    })
-  set("&&",  { macex: opargs("&&",   2), syntax: infix(30)    })
-  set("||",  { macex: opargs("||",   2), syntax: infix(20)    })
+  set("/",   { macex: opargs("/",    2), syntax: infix({ priority: 70 })    })
+  set("*",   { macex: opargs("*",    2), syntax: infix({ priority: 70 })    })
+  set("+",   { macex: opargs("+",    2), syntax: infix({ priority: 60 })    })
+  set("-",   { macex: opargs("-",    2), syntax: infix({ priority: 60 })    })
+  set("<",   { macex: opargs("<",    2), syntax: infix({ priority: 50 })    })
+  set("=<",  { macex: opargs("<=",   2), syntax: infix({ priority: 50 })    })
+  set(">",   { macex: opargs(">",    2), syntax: infix({ priority: 50 })    })
+  set(">=",  { macex: opargs(">=",   2), syntax: infix({ priority: 50 })    })
+  set("==",  { macex: opargs("===",  2), syntax: infix({ priority: 40 })    })
+  set("|=",  {                           syntax: infix({ priority: 40 })    })
+  set("~=",  { macex: opargs("!==",  2), syntax: infix({ priority: 40 })    })
+  set("&&",  { macex: opargs("&&",   2), syntax: infix({ priority: 30 })    })
+  set("||",  { macex: opargs("||",   2), syntax: infix({ priority: 20 })    })
   set("num", { macex: opargs("+",    1)                       })
   set("sub", { macex: opargs("-",    1)                       })
   set("mod", { macex: opargs("%",    1)                       })
@@ -289,9 +287,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       // TODO checkArguments
       // TODO destructuring ?
       var x = box.toBox(a[1])
-        , i = compileEval(a[2])
-        , f = compileEval(a[3])
-      x.syntax = unary(i, f)
+        , f = compileEval(a[1])
+      x.syntax = unary(f)
       return macex.macex([])
     }
   })
@@ -301,9 +298,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       // TODO checkArguments
       // TODO destructuring ?
       var x = box.toBox(a[1])
-        , i = compileEval(a[2])
-        , f = compileEval(a[3])
-      x.syntax = infix(i, f)
+        , f = compileEval(a[2])
+      x.syntax = infix(f)
       return macex.macex([])
     }
   })
@@ -621,13 +617,15 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   })
 
   set(",", {
-    syntax: unary(80, {
+    syntax: unary({
+      priority: 80,
       delimiter: true
     })
   })
 
   set("@", {
-    syntax: unary(80, {
+    syntax: unary({
+      priority: 80,
       delimiter: true
     })
   })
@@ -785,6 +783,18 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
         } else {
           return l.concat([[s, args, r[r.length - 1]]])
         }
+      }
+    }
+  })
+  
+  set("w/new-scope", {
+    macex: function (a) {
+      checkArguments(a, 1)
+      box.vars.push()
+      try {
+        return macex.macex(a[1])
+      } finally {
+        box.vars.pop()
       }
     }
   })
