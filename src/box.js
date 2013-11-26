@@ -2,21 +2,34 @@ define(["./data", "./scope", "./error"], function (data, scope, error) {
   "use strict";
   
   var boxId = 0
-    , boxes = {}
-
-  var vars = scope.make()
+  
+  var boxes = scope.make()
+    , vars  = scope.make()
+  
+  function withNewEnvironment(f) {
+    var old1 = boxId
+    boxes.push()
+    vars.push()
+    try {
+      return f()
+    } finally {
+      boxId = old1
+      boxes.pop()
+      vars.pop()
+    }
+  }
   
   function make(x) {
-    var o       = new data.Box()
-    o.id        = boxId++
-    o.value     = x
-    boxes[o.id] = o
+    var o   = new data.Box()
+    o.id    = boxId++
+    o.value = x
+    boxes.set(o.id, o)
     return o
   }
   
   function get(i) {
-    console.assert(i in boxes)
-    return boxes[i]
+    console.assert(boxes.has(i))
+    return boxes.get(i)
   }
   
   function toBox(x) {
@@ -91,6 +104,7 @@ define(["./data", "./scope", "./error"], function (data, scope, error) {
   
   return {
     vars: vars,
+    withNewEnvironment: withNewEnvironment,
 
     make: make,
     get: get,

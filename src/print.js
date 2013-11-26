@@ -56,7 +56,7 @@ define(["./data"], function (data) {
   }
   
   function printNormal(mode, x, i) {
-    if (x.length > 0) {
+    if (x.length > i) {
       return nonComplex(mode, indent + 1, x, i)
     } else {
       return ""
@@ -64,7 +64,7 @@ define(["./data"], function (data) {
   }
   
   function printSpecial(mode, x, i) {
-    if (x.length > 1) {
+    if (x.length > i) {
       return " " + nonComplex(mode, indent + 2, x, i) + " "
     } else {
       return ""
@@ -74,17 +74,18 @@ define(["./data"], function (data) {
   function replaceString(x) {
     return x.replace(/[\\"]/g, "\\$&").replace(/\n/g, "$&" + spaces(" "))
   }
-  
+
   function printString(mode, x) {
     var r = []
     for (var i = 1, iLen = x.length; i < iLen; ++i) {
       if (x[i] instanceof data.String) {
         r.push(replaceString(x[i].value))
       } else {
-        r.push("@")
+        r.push("@(")
         withIndent(indent + r.join("").length + 1, function () {
           r.push(print1(mode, x[i]))
         })
+        r.push(")")
       }
     }
     return "\"" + r.join("") + "\""
@@ -171,7 +172,7 @@ define(["./data"], function (data) {
       return "" + x
 
     } else if (x == null) {
-      return print1(mode, [])
+      return "()"
     
     // TODO handle recursive objects ?
     // TODO use `object.isObject` from the "object" module

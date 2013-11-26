@@ -1,4 +1,4 @@
-define(["../lib/util/buffer", "./data", "./box", "./error"], function (buffer, data, box, error) {
+define(["../lib/util/buffer", "./data", "./box", "./error", "../lib/util/iter"], function (buffer, data, box, error, iter) {
   "use strict";
   
   function isDelimiter(o, info) {
@@ -78,25 +78,17 @@ define(["../lib/util/buffer", "./data", "./box", "./error"], function (buffer, d
     }
   }
 
-  function tokenizeBrackets(r, o) {
+  function tokenizeBrackets(o, info) {
     var stack = []
+      , r     = []
     while (o.has()) {
-      var x = o.read()
-      r.push(x)
-      if (data.boxOrSym(x)) {
-        if (stack.length && x.value === stack[stack.length - 1]) {
-          stack.pop()
-        } else {
-          x = box.getSyntax(x)
-          if (x !== null && x.endAt != null) {
-            stack.push(x.endAt)
-          }
-        }
-      }
+      // TODO is this correct ?
+      r = r.concat(getNext(o, info, stack))
       if (stack.length === 0) {
         break
       }
     }
+    return r
   }
 
   function readIndentedString(i, o) {
@@ -182,7 +174,7 @@ define(["../lib/util/buffer", "./data", "./box", "./error"], function (buffer, d
 
           o.read()
           r.push(new data.ParseStart())
-          tokenizeBrackets(r, info.iterator)
+          r = r.concat(tokenizeBrackets(o, info))
           r.push(new data.ParseEnd())
           //r.push(new data.ParseBypass(parse1(tokenizeBrackets(info))))
           s = o.position()
@@ -301,60 +293,87 @@ define(["../lib/util/buffer", "./data", "./box", "./error"], function (buffer, d
       return numOrSym(o, info)
     }
   }
+  
+  function findIndent(o, info) {
+    // TODO don't hardcode space and newline ?
+    while (o.has() && (o.peek() === " " || o.peek() === "\n")) {
+      o.read()
+      info.whitespace = true
+    }
+    return o.position()
+  }
+
+  // TODO hacky
+  // TODO is this correct ?
+  function popEndAt(y, endAt) {
+    var i = 0
+    while (endAt.length && i < y.length) {
+      var last = endAt[endAt.length - 1]
+      if (data.boxOrSym(y[i]) && y[i].value === last) {
+        endAt.pop()
+      }
+      ++i
+    }
+  }
+  
+  function getNext(o, info, endAt) {
+    var c = o.peek()
+      , x = box.getSyntax(c)
+      , y
+    // TODO: multi-character tokenize and delimiter
+    if (x !== null) {
+      if (x.tokenize != null) {
+        y = x.tokenize(o, info)
+      } else {
+        y = [one(o, info)]
+      }
+      if (x.endAt != null) {
+        endAt.push(x.endAt)
+      }
+      info.whitespace = !!x.whitespace
+    } else {
+      y = [one(o, info)]
+    }
+    popEndAt(y, endAt)
+    return y
+  }
 
   // TODO multi-character tokenize and delimiter
-  // TODO insert Indent tokens based on the amount of spaces, like `new Indent(r.length)`
-  //      that way it's possible to check the indent level without needing to use `foo.loc.start.line`.
-  //      that way this problem can be fixed:
-  //
-  //      $var foo
-  //      $syntax! foo {
-  //        tokenize = ...
-  //      }
-  //      foo ...
-  function tokenize1(o, info) {
+  function tokenize1(o) {
     var a = []
-      , i = 0
-
-    function init() {
-      while (i >= a.length && o.has()) {
-        var c = o.peek()
-          , x = box.getSyntax(c)
-        // TODO: multi-character tokenize and delimiter
-        if (x !== null) {
-          if (x.tokenize != null) {
-            a = x.tokenize(o, info)
-            info.whitespace = !!x.whitespace // TODO shouldn't this always be applied even if it doesn't have a tokenize method ?
-          } else {
-            a = [one(o, info)]
-          }
-        } else {
-          a = [one(o, info)]
-        }
-        i = 0
+    
+    var endAt = []
+      , info  = { whitespace: true }
+      , start = findIndent(o, info)
+    
+    while (o.has()) {
+      var next = findIndent(o, info)
+      if (start.line === next.line   ||
+          next.column > start.column ||
+          endAt.length) {
+        a = a.concat(getNext(o, info, endAt))
+      } else {
+        break
       }
     }
-
-    info.iterator = {
-      peek: function () {
-        init()
-        return a[i]
-      },
-      read: function () {
-        init()
-        return a[i++]
-      },
-      has: function () {
-        init()
-        return i < a.length || o.has()
-      }
-    }
-
-    return info.iterator
+    
+    return a
   }
   
   function tokenize(x, filename) {
-    return tokenize1(new buffer.Buffer(x, filename), { whitespace: true })
+    var o = new buffer.Buffer(x, filename)
+
+    var oIter = {}
+    oIter[iter.iterator] = function () {
+      return this
+    }
+    oIter.next = function () {
+      if (!o.has()) {
+        throw new iter.StopIteration()
+      } 
+      return tokenize1(o)
+    }
+    return oIter
   }
   
   return {

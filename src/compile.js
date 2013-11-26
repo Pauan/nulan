@@ -4,6 +4,15 @@ define(["./data", "./box", "./error"], function (data, box, error) {
   var priority   = 0
     , statements = []
   
+  function compileFn(x) {
+    //var x = unwrap(w)
+    if (x.op === "function" || x.op === "object") {
+      return "(" + compile(x) + ")"
+    } else {
+      return compile(x)
+    }
+  }
+  
   function get(s) {
     if (s in ops) {
       return ops[s]
@@ -186,6 +195,7 @@ define(["./data", "./box", "./error"], function (data, box, error) {
       return x
     },
     compile: function (x) {
+      return compile(new data.Op(";", x.args))
       return withPriority(5, function () {
         return x.args.map(function (x, i) {
           /*if (i === 0) {
@@ -195,7 +205,6 @@ define(["./data", "./box", "./error"], function (data, box, error) {
           //}
         }).join("," + minify(" "))
       })
-      return "," + 2
     }
   }
   
@@ -262,6 +271,7 @@ define(["./data", "./box", "./error"], function (data, box, error) {
     })
   }
   
+  // TODO use compileFn if I change this to accept a single argument rather than an array
   function compileTop(r) {
     return compile(new data.Op(";", r))
   }

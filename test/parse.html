@@ -3,7 +3,7 @@
   <body>
     <script src="../lib/requirejs/require.js"></script>
     <script>
-      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print"], function (data, parse, tokenize, builtins, print) {
+      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print", "../lib/util/iter"], function (data, parse, tokenize, builtins, print, iter) {
         function tokens(o) {
           var r = []
           while (o.has()) {
@@ -13,14 +13,14 @@
         }
         
         function parsed(o) {
-          while (o.has()) {
-            console.log(print.normal(parse.parse(parse.indent(o))))
-          }
+          iter.each(o, function (x) {
+            console.log(print.normal(parse.parse(parse.indent(x))))
+          })
         }
 
         function test(a) {
           a.forEach(function (x) {
-            var o = tokenize.tokenize(x, "parse.html")
+            var o = tokenize.tokenize(x)
             try {
               parsed(o)
             } catch (e) {
@@ -41,15 +41,19 @@
           "vars drop1 = -> f\n  f 1 2 3",
           
           "| 1\n|\n| 2",
-          
-          "1 2 3\n\n4 5 6\n\n\n7 8 9",
-          
-          "foo\n  | 1\n  | 2\n  | 3",
-          "foo\n  | 1\n\n  | 2\n  | 3",
+          "| 1\n| 2\n|",
           
           "-----NORMAL-----",
           
+          "1 2 3\n\n4 5 6\n\n\n7 8 9",
+          
+          "|",
           "| 1\n  2\n| 3",
+          "foo\n  | 1\n    2\n  | 3",
+          "foo\n  | 1\n     2\n  | 3",
+          
+          "foo\n  | 1\n  | 2\n  | 3",
+          "foo\n  | 1\n\n  | 2\n  | 3",
           
           "$mac foo -> (`'\"' \"foo\" bar)\n  qux",
           "$mac foo -> (`\"@\"foo\"@bar\")\n  qux",
@@ -336,9 +340,6 @@
           "$mac words -> @args\n  `[,@(args.&map -> x \"@x\")]",
           "$mac str -> @args\n  `'\"' ,@args",
           "$mac str -> @args\n  `\"@(,@args)\"",
-          
-          "|",
-          "| 1\n| 2\n|",
           
           "-----ERRORS-----",
 

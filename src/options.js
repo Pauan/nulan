@@ -2,7 +2,6 @@ define([], function () {
   "use strict";
   return {
     minify: false,
-    $eval: function (x) {
-    }
+    $eval: function (s) {},
   }
 })

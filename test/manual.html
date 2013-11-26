@@ -1,157 +1,293 @@
 <!DOCTYPE html>
 <html>
+  <head>
+    <link rel="stylesheet" href="../lib/codemirror/lib/codemirror.css">
+  </head>
   <body>
+    <script src="../lib/codemirror/lib/codemirror.js"></script>
     <script src="../lib/requirejs/require.js"></script>
     <script>
-      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print", "../lib/util/ui", "../src/macex", "../src/compile", "../src/options", "../src/eval", "../src/box", "../lib/util/iter"], function (data, parse, tokenize, builtins, print, ui, macex, compile, options, nulanEval, box, iter) {
+      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print", "../lib/util/ui", "../src/macex", "../src/compile", "../src/options", "../src/box", "../lib/util/iter", "../lib/util/cell"], function (data, parse, tokenize, builtins, print, ui, macex, compile, options, box, iter, cell) {
         "use strict";
         
         ui.normalize(document, function (e) {
           //e.overflow("hidden")
           
+          var debug = cell.dedupe(localStorage["debug.checked"], {
+            set: function (self, x) {
+              if (x) {
+                localStorage["debug.checked"] = 1
+              } else {
+                delete localStorage["debug.checked"]
+              }
+            }
+          })
+          
+          var input = cell.dedupe(localStorage["input.saved"] || "", {
+            set: function (self, x) {
+              if (x === "") {
+                delete localStorage["input.saved"]
+              } else {
+                localStorage["input.saved"] = x
+              }
+            }
+          })
+          
+          var sandbox = cell.value()
+          
+          var output = cell.dedupe()
+          
+          function withSandbox(f) {
+            ui.iframe(function (e) {
+              e.src("javascript:;") // TODO: hack needed for Firefox
+              e.width("100%")
+              e.height("100%")
+              //e.sandbox("allow-same-origin")
+              e.seamless()
+              sandbox.set(e)
+              ui.normalize(e.dom().contentDocument) // TODO remove this once seamless works
+              f(e.getWindow())
+            })
+          }
+          
           ui.horiz(function (e) {
             e.height("100%")
-
-            var output = ui.box(function (e) {
-              e.scrollbars()
+            
+            ui.box(function (e) {
               e.width("50%")
               e.height("100%")
-              e.font(function (t) {
-                t.family("monospace")
+              
+              e.border(function (t) {
+                t.right(function (t) {
+                  t.size("3px")
+                  t.color("black")
+                })
               })
-              e.padding(function (t) {
-                t.all("2px")
-                t.left("7px")
-              })
-            })
-
-            function display(s) {
-              var sCategories = [ "log"   , "tokenize" , "indent"  , "parse",
-                                  "$eval" , "macex"    , "compile" , "eval" ,
-                                  "error" ]
-              var oCategories = {}
               
-              iter.each(sCategories, function (s) {
-                oCategories[s] = []
-              })
-
-              var old1 = console.log
-                , old2 = options.$eval
-
-              options.$eval = function (x) {
-                oCategories["$eval"].push(x)
-              }
-              
-              /*console.log = function () {
-                try {
-                  throw new Error()
-                } catch (e) {
-                  // TODO not very robust
-                  var a = e.stack.replace(/^(?! +at).+\n/gm, "")
-                  a = a.replace(/^ +at.+\/(.+?)\)?$/gm, "$1")
-                  a = a.split(/\n/)
-                }
-                oCategories["log"].push("(" + a[1] + ")  " + [].slice.call(arguments).map(function (x) {
-                  return print.normal(x)
-                }).join(" "))
-              }*/
-              
-              box.vars.push()
-              
-              try {
-                ;(function () {
-                  var o = tokenize.tokenize(s)
-                  var r = []
-                  while (o.has()) {
-                    r.push(o.read())
+              // TODO ew
+              setTimeout(function () {
+                var cm = CodeMirror(e.dom(), {
+                  lineWrapping: true,
+                  lineNumbers: true,
+                  autofocus: true,
+                  extraKeys: {
+                    "Tab":       "indentMore",
+                    "Shift-Tab": "indentLess"
                   }
-                  oCategories["tokenize"].push(print.array(r))
-                })()
+                })
                 
-                ;(function () {
-                  var o = tokenize.tokenize(s)
-                  while (o.has()) {
-                    var x = parse.indent(o)
-                    oCategories["indent"].push(print.simple(x))
-                    
-                    x = parse.parse(x)
-                    oCategories["parse"].push(print.normal(x))
-                    
-                    x = macex(x)
-                    oCategories["macex"].push(print.normal(x))
-                    
-                    x = compile.compile(compile.statement([x]))
-                    oCategories["compile"].push(x)
-                    
-                    /*x = nulanEval(x)
-                    oCategories["eval"].push(print.array(x))*/
-                  }
-                })()
-              } catch (e) {
-                if (e instanceof data.Error) {
-                  oCategories["error"].push(e.message)
-                } else {
-                  var s = e.stack
-                  s = s.replace(/^(  ) *at [^\(]+\(.+\/([^\/:]+:\d+:\d+)\)$/gm, "$1$2")
-                  //s = s.replace(/^( +at ).+\/([^\/:]+:\d+:\d+)$/gm, "$1($2)")
-                  oCategories["error"].push(s)
-                }
-              } finally {
-                console.log   = old1
-                options.$eval = old2
-                box.vars.pop()
-              }
-              
-              var r = []
-              
-              iter.each(sCategories, function (s) {
-                if (oCategories[s].length) {
-                  r.push(s + ":\n  " + oCategories[s].map(function (x) {
-                    return x.replace(/\n/g, "$&  ")
-                  }).join("\n  "))
-                }
-              })
-              
-              output.text(r.join("\n\n"))
-            }
+                cm.setSize("100%", "100%")
+                cm.setValue(input.get())
 
-            var input = ui.textarea(function (e) {
+                cm.on("change", function (x) {
+                  input.set(x.getValue())
+                })
+              }, 0)
+            }).move(e)
+
+            /*ui.textarea(function (e) {
               e.autofocus()
 
               e.width("50%")
               e.height("100%")
               
-              e.border(function (t) {
-                t.size("3px")
-                t.color("black")
-              })
-              
               //e.display("block") // TODO
               
               e.padding(function (t) {
                 t.all("5px")
+                t.left("10px")
               })
 
               e.outline(function (t) {
                 t.remove()
               })
               
-              //console.log(localStorage["input.saved"])
-              //delete localStorage["input.saved"]
-
-              var saved = localStorage["input.saved"] || ""
-              e.value.set(saved)
-              display(e.value.get())
-              
-              e.event([e.value], function (x) {
-                localStorage["input.saved"] = x
-                display(x)
+              e.bind([input], function (x) {
+                e.value.set(x)
               })
-            })
+              e.event([e.value], function (x) {
+                input.set(x)
+              })
+            }).move(e)*/
+            
+            ui.vert(function (e) {
+              e.width("50%")
+              e.height("100%")
 
-            input.move(e)
-            output.move(e)
+              ui.box(function (e) {
+                e.padding(function (t) {
+                  t.top("2px")
+                  t.left("3px")
+                  t.bottom("1px")
+                })
+                e.font(function (t) {
+                  t.size("12px")
+                })
+                e.border(function (t) {
+                  t.bottom(function (t) {
+                    t.color("black")
+                    t.size("2px")
+                  })
+                })
+
+                ui.label(function (e) {
+                  ui.checkbox(function (e) {
+                    e.margin(function (e) {
+                      e.right("1px")
+                    })
+
+                    e.bind([debug], function (x) {
+                      e.checked.set(x)
+                    })
+                    e.event([e.changed], function (x) {
+                      debug.set(x)
+                    })
+                  }).move(e)
+                  
+                  e.addText("Debug mode")
+                }).move(e)
+              }).move(e)
+
+              ui.box(function (e) {
+                e.whitespace("pre")
+                e.scrollbars()
+                e.stretch()
+                e.padding(function (t) {
+                  t.top("3px")
+                  t.left("7px")
+                })
+                e.font(function (t) {
+                  t.family("monospace")
+                })
+                
+                e.event([output], function (x) {
+                  e.text(x)
+                })
+              }).move(e)
+              
+              ui.box(function (e) {
+                e.hide()
+                e.height("50%")
+                
+                e.border(function (t) {
+                  t.top(function (t) {
+                    t.color("black")
+                    t.size("2px")
+                  })
+                })
+
+                var old = null
+                e.event([sandbox], function (sandbox) {
+                  if (old !== null) {
+                    old.remove()
+                  }
+                  sandbox.move(e)
+                  old = sandbox
+                })
+              }).move(e)
+            }).move(e)
           }).move(e)
+          
+          
+          var sCategories = [ "error" , "eval"  , "compile" , "macex" 
+                            , "$eval" , "parse" , "indent"  , "tokenize" ]
+          
+          // TODO use actual nuit
+          e.bind([input, debug], function (value, debug) {
+            var oCategories = {}
+            
+            iter.each(sCategories, function (s) {
+              oCategories[s] = []
+            })
+            
+            /*console.log = function () {
+              try {
+                throw new Error()
+              } catch (e) {
+                // TODO not very robust
+                var a = e.stack.replace(/^(?! +at).+\n/gm, "")
+                a = a.replace(/^ +at.+\/(.+?)\)?$/gm, "$1")
+                a = a.split(/\n/)
+              }
+              oCategories["log"].push("(" + a[1] + ")  " + [].slice.call(arguments).map(function (x) {
+                return print.normal(x)
+              }).join(" "))
+            }*/
+            
+            box.withNewEnvironment(function () {
+              console.clear()
+
+              //var old1 = console.log
+              var old2 = options.$eval
+                , old3 = options.eval
+
+              options.$eval = function (x) {
+                oCategories["$eval"].push(x)
+              }
+            
+              try {
+                withSandbox(function (win) {
+                  win.box = box
+                  options.eval = win.eval
+
+                  var o = tokenize.tokenize(value)
+                  iter.each(o, function (x) {
+                    oCategories["tokenize"].push(print.array(x))
+
+                    x = parse.indent(x)
+                    oCategories["indent"].push(print.simple(x))
+                    
+                    x = parse.parse(x)
+                    oCategories["parse"].push(print.normal(x))
+                      
+                    x = macex.macex(x)
+                    oCategories["macex"].push(print.normal(x))
+                    
+                    x = compile.compile(compile.statement([x]))
+                    oCategories["compile"].push(x)
+
+                    x = win.eval(x)
+                    oCategories["eval"].push(print.array(x))
+                  })
+                })
+              } catch (e) {
+                ;(function () {
+                  if (e instanceof data.Error) {
+                    oCategories["error"].push(e.message)
+                  } else {
+                    var s = e.stack
+                    s = s.replace(/^(  ) *at [^\(]+\(.+\/([^\/:]+:\d+:\d+)\)$/gm, "$1$2")
+                    //s = s.replace(/^( +at ).+\/([^\/:]+:\d+:\d+)$/gm, "$1($2)")
+                    oCategories["error"].push(s)
+                  }
+                })()
+              } finally {
+                //console.log   = old1
+                options.$eval = old2
+                options.eval  = old3
+              }
+            })
+          
+            var r = []
+            if (debug) {
+              iter.each(sCategories, function (s) {
+                if (oCategories[s].length) {
+                  r.push("@" + s + "\n  " + oCategories[s].map(function (x) {
+                    return x.replace(/\n/g, "$&  ")
+                  }).join("\n  "))
+                }
+              })
+              output.set(r.join("\n\n"))
+            } else {
+              iter.each(oCategories["eval"], function (s) {
+                r.push(s)
+              })
+              iter.each(oCategories["error"], function (s) {
+                r.push(s)
+              })
+              output.set(r.join("\n"))
+            }
+          })
         })
       })
     </script>

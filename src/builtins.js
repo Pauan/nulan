@@ -1,20 +1,8 @@
-define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", "./eval", "./error"], function (box, data, macex, tokenize, compile, options, nulanEval, error) {
+define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", "./error", "./state"], function (box, data, macex, tokenize, compile, options, error, state) {
   "use strict";
-
-  // TODO move this stuff somewhere else 
-  var mode = "run"
-
-  function withMode(x, f) {
-    var old = mode
-    mode = x
-    try {
-      return f()
-    } finally {
-      mode = old
-    }
-  }
   
   function compileOnlyError(x) {
+    var mode = state.mode.get()
     if (mode !== "compile") {
       error(x, "cannot use ", [x], " at " + mode + " time")
     }
@@ -164,14 +152,14 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   function opargs(s, i) {
     return function (a) {
       checkArguments(a, i)
-      return op(s, a[0], a.slice(1).map(macex))
+      return op(s, a[0], a.slice(1).map(macex.macex))
     }
   }
   
   function opargsl(s, i) {
     return function (a) {
       checkArgumentsl(a, i)
-      return op(s, a[0], a.slice(1).map(macex))
+      return op(s, a[0], a.slice(1).map(macex.macex))
     }
   }
 
@@ -204,7 +192,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   })
 
   set("\n", {
-    syntax: whitespace({
+    syntax: whitespace()
+    /* {
       //priority: Infinity,
       tokenize: function (o) {
         while (o.has() && (o.peek() === " " || o.peek() === "\n")) {
@@ -218,7 +207,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       parse: function (l, s, r) {
         return l.concat(r)
       }
-    })
+    } */
   })
   
   set("~", {
@@ -258,10 +247,13 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   })*/
   
   function compileEval(x) {
-    return withMode("compile", function () {
-      x = compile.compile(compile.expression([macex(x)]))
+    return state.mode.set("compile", function () {
+      x = compile.compile(compile.expression([macex.macex(x)]))
       options.$eval(x)
-      return nulanEval(x)
+      if (typeof options.eval !== "function") {
+        throw new Error("Nulan requires `options::eval` to be set to a function")
+      }
+      return options.eval(x)
     })
   }
   
@@ -272,9 +264,9 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       var x = box.toBox(a[1])
         , f = compileEval(a[2])
       x[s] = function () {
-        return macex(f.apply(this, arguments))
+        return macex.macex(f.apply(this, arguments))
       }
-      return macex([])
+      return macex.macex([])
     }
   }
   
@@ -287,7 +279,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       var x = box.toBox(a[1])
         , f = compileEval(a[2])
       x.syntax = f
-      return macex([])
+      return macex.macex([])
     }
   })
 
@@ -300,7 +292,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
         , i = compileEval(a[2])
         , f = compileEval(a[3])
       x.syntax = unary(i, f)
-      return macex([])
+      return macex.macex([])
     }
   })
 
@@ -311,7 +303,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   set("$eval", {
     macex: function (a) {
       checkArguments(a, 1)
-      return macex(compileEval(a[1]))
+      return macex.macex(compileEval(a[1]))
     }
   })
   
@@ -322,7 +314,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       if (x instanceof data.Box && x.set != null) {
         return x.set([a[1], a[2]])
       } else {
-        return op("=", a[0], a.slice(1).map(macex))
+        return op("=", a[0], a.slice(1).map(macex.macex))
       }
     },
     syntax: {
@@ -339,6 +331,12 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       }
     }
   })
+  
+  set("prn", {
+    get: function (a) {
+      return op(".", a[0], [new data.Symbol("console"), new data.String("log")])
+    }
+  })
 
   set("vars", {
     macex: function (a) {
@@ -348,13 +346,17 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
           box.check(x[0], get("="))
           after.push(function () {
             var k = box.set(x[1])
-            return op("var", x[0], [op("=", x[0], [k, macex(x[2])])])
+            if (!k.local && state.mode.get() === "compile") {
+              return op("=", x[0], [macex.compileBoxValue(k), macex.macex(x[2])])
+            } else {
+              return op("var", x[0], [op("=", x[0], [k, macex.macex(x[2])])])
+            }
           })
           //patternMatch(after, x[0], x[1], x[2])
         } else {
           after.push(function () {
             var k = box.set(x)
-            if (k.scope !== "local"/* && mode === "compile"*/) {
+            if (!k.local && state.mode.get() === "compile") {
               return op("empty", x, [])
             } else {
               return op("var", x, [k]) // TODO compile(k) ?
@@ -396,12 +398,12 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       // TODO use "iter" module ?
       a.slice(1).forEach(function (x) {
         if (Array.isArray(x) && box.isBox(x[0], get("@"))) {
-          right.push(macex(x[1]))
+          right.push(macex.macex(x[1]))
         } else {
           if (right.length) {
-            right.push(new data.Op("array", [macex(x)]))
+            right.push(new data.Op("array", [macex.macex(x)]))
           } else {
-            left.push(macex(x))
+            left.push(macex.macex(x))
           }
         }
       })
@@ -450,9 +452,9 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       return op("object", a[0], a.slice(1).map(function (x) {
         if (Array.isArray(x)) {
           box.check(x[0], get("="))
-          return op("=", x[0], [x[1]].concat(x.slice(2).map(macex)))
+          return op("=", x[0], [x[1]].concat(x.slice(2).map(macex.macex)))
         } else {
-          return macex(x)
+          return macex.macex(x)
         }
       }))
     },
@@ -506,7 +508,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   set("\"", {
     macex: function (a) {
       var r = a.slice(1).map(function (x) {
-        return macex(x)
+        return macex.macex(x)
       })
       var every = r.every(function (x) {
         return x instanceof data.String
@@ -711,11 +713,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
           }))
         }
       } else if (x instanceof data.Box) {
-        return [[get("."), new data.MacexBypass(new data.Symbol("box")), new data.String("get")], new data.Number(x.id)]
-        // TODO if I used the . box I can get rid of MacexBypass
-        /*return new data.MacexBypass(new data.Op("call", [new data.Op(".", [,
-                                                                           ]),
-                                                         ]))*/
+        // TODO if I used the . box I can get rid of MacexBypass ?
+        return new data.MacexBypass(macex.compileBox(x))
       } else if (x instanceof data.Symbol) {
         return anon(box.toBox(x), depth, i)
       } else {
@@ -741,7 +740,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     macex: function (a) {
       checkArguments(a, 1)
       compileOnlyError(a[0])
-      return macex(quasiquote(a[1]))
+      return macex.macex(quasiquote(a[1]))
     },
     syntax: {
       whitespace: true,
@@ -762,7 +761,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     macex: function (a) {
       return op("function", a[0],
                   [op(",", a[0], []),
-                   op("return", a[0], [macex(a[2])])])
+                   op("return", a[0], [macex.macex(a[2])])])
     },
     syntax: {
       priority: 10,

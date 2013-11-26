@@ -1,4 +1,4 @@
-define(["./data", "./box", "./error"], function (data, box, error) {
+define(["./data", "./box", "./error", "./state"], function (data, box, error, state) {
   "use strict";
   
   function macex1(a) {
@@ -13,6 +13,16 @@ define(["./data", "./box", "./error"], function (data, box, error) {
       }
     }
   }
+  
+  function compileBox(x) {
+    return new data.Op("call", [new data.Op(".", [new data.Symbol("box"),
+                                                  new data.String("get")]),
+                                new data.Number(x.id)])
+  }
+  
+  function compileBoxValue(x) {
+    return new data.Op(".", [compileBox(x), new data.String("v")])
+  }
 
   function macex(x) {
     if (x == null) {
@@ -25,11 +35,11 @@ define(["./data", "./box", "./error"], function (data, box, error) {
       if (x.get != null) {
         return x.get([x])
       } else {
-        return x
-        // TODO
-        return new data.Op("call", [new data.Op(".", [new data.Symbol("box"),
-                                                      new data.String("get")]),
-                                    new data.Number(x.id)])
+        if (state.mode.get() === "run" || x.local) {
+          return x
+        } else {
+          return compileBoxValue(x)
+        }
       }
     } else if (x instanceof data.Symbol) {
       return macex(box.toBox(x))
@@ -44,5 +54,9 @@ define(["./data", "./box", "./error"], function (data, box, error) {
     }
   }
   
-  return macex
+  return {
+    macex: macex,
+    compileBox: compileBox,
+    compileBoxValue: compileBoxValue,
+  }
 })

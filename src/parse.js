@@ -1,5 +1,21 @@
 define(["./data", "./box", "./error"], function (data, box, error) {
   "use strict";
+  
+  // TODO generic
+  function arrayToIter(x) {
+    var i = 0
+    return {
+      has: function () {
+        return i < x.length
+      },
+      peek: function () {
+        return x[i]
+      },
+      read: function () {
+        return x[i++]
+      }
+    }
+  }
 
   function isVertical(x, y) {
     return data.boxOrSym(y) && y.value === x.value && y.loc.start.column === x.loc.start.column
@@ -31,6 +47,7 @@ define(["./data", "./box", "./error"], function (data, box, error) {
               o.read()
               break
             } else {
+              // TODO is this correct ?
               l.push(indent1(o, o.peek(), null))
             }
           } else {
@@ -72,12 +89,10 @@ define(["./data", "./box", "./error"], function (data, box, error) {
             var a = []
             while (true) {
               if (y.indent) {
-                // TODO needs to check o.has()
                 a.push(data.unwrap(indent1(o, o.peek(), end)))
               } else {
                 a = a.concat(indent1(o, null, end))
               }
-              console.log(o.peek())
               if (o.has() && isVertical(x, o.peek())) {
                 o.read()
               } else {
@@ -87,7 +102,6 @@ define(["./data", "./box", "./error"], function (data, box, error) {
             l.push(a)
           } else {
             if (y.indent) {
-              // TODO needs to check o.has()
               l.push(data.unwrap(indent1(o, o.peek(), end)))
             } else {
               l = l.concat(indent1(o, start, end))
@@ -97,9 +111,6 @@ define(["./data", "./box", "./error"], function (data, box, error) {
       } else if (v.loc.start.column > start.loc.start.column) {
         l.push(data.unwrap(indent1(o, x, end)))
       } else {
-        if (data.boxOrSym(x) && x.value === "\n") {
-          o.read()
-        }
         break
       }
     }
@@ -107,9 +118,7 @@ define(["./data", "./box", "./error"], function (data, box, error) {
   }
   
   function parseArray(o, unwrap) {
-    var x = o.array[o.index]
-    ++o.index
-    var y = parse1({ array: x, index: 0 }, null)
+    var y = parse1(arrayToIter(o.read()), null)
     if (unwrap) {
       return data.unwrap(y)
     } else {
@@ -120,10 +129,10 @@ define(["./data", "./box", "./error"], function (data, box, error) {
   // Heavily modified Pratt parser, designed for lists of symbols rather than expressions of tokens
   function parse1(o, pri) {
     var l = []
-    while (o.index < o.array.length) {
-      var x = o.array[o.index]
+    while (o.has()) {
+      var x = o.peek()
       if (x instanceof data.ParseBypass) {
-        ++o.index
+        o.read()
         l.push(x.value)
       } else if (Array.isArray(x)) {
         l.push(parseArray(o, true))
@@ -139,7 +148,7 @@ define(["./data", "./box", "./error"], function (data, box, error) {
               --pri2
             }
             if (y.parse != null) {
-              ++o.index
+              o.read()
               var r = []
               if (y.endAt != null || y.vertical) {
                 r.push(parseArray(o, false))
@@ -153,7 +162,7 @@ define(["./data", "./box", "./error"], function (data, box, error) {
             break
           }
         } else {
-          ++o.index
+          o.read()
           l.push(x)
         }
       }
@@ -161,12 +170,14 @@ define(["./data", "./box", "./error"], function (data, box, error) {
     return l
   }
   
-  function indent(o) {
+  function indent(x) {
+    var o = arrayToIter(x)
     return indent1(o, o.peek(), null)
   }
 
   function parse(x) {
-    return data.unwrap(parse1({ array: x, index: 0 }, null))
+    var o = arrayToIter(x)
+    return data.unwrap(parse1(o, null))
   }
 
   return {
