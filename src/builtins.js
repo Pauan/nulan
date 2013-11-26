@@ -295,6 +295,18 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       return macex.macex([])
     }
   })
+  
+  set("$syntax-infix!", {
+    macex: function (a) {
+      // TODO checkArguments
+      // TODO destructuring ?
+      var x = box.toBox(a[1])
+        , i = compileEval(a[2])
+        , f = compileEval(a[3])
+      x.syntax = infix(i, f)
+      return macex.macex([])
+    }
+  })
 
   set("$mac!",     { macex: makeBoxSetter("macex")   })
   set("$get!",     { macex: makeBoxSetter("get")     })
