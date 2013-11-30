@@ -1,9 +1,11 @@
-define(["./data", "./error", "./state"], function (data, error, state) {
+define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, error, state, uuid) {
   "use strict";
   
+  var boxId = 0
+
   function make(x) {
     var o   = new data.Box()
-    o.id    = state.boxId++
+    o.id    = uuid.v4().slice(0, -1) + (++boxId) // TODO use something other than uuid v4 ?
     o.value = x
     state.boxes.set(o.id, o)
     return o

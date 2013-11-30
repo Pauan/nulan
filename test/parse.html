@@ -6,7 +6,7 @@
   <body>
     <script src="../lib/requirejs/require.js"></script>
     <script>
-      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print", "../lib/util/iter"], function (data, parse, tokenize, builtins, print, iter) {
+      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print", "../lib/util/iter", "../src/state"], function (data, parse, tokenize, builtins, print, iter, state) {
         function tokens(o) {
           var r = []
           while (o.has()) {
@@ -22,17 +22,19 @@
         }
 
         function test(a) {
-          a.forEach(function (x) {
-            var o = tokenize.tokenize(x)
-            try {
-              parsed(o)
-            } catch (e) {
-              if (e instanceof data.Error) {
-                console.error(e.message)
-              } else {
-                throw e
+          state.vars.reset(builtins.vars, function () {
+            a.forEach(function (x) {
+              var o = tokenize.tokenize(x)
+              try {
+                parsed(o)
+              } catch (e) {
+                if (e instanceof data.Error) {
+                  console.error(e.message)
+                } else {
+                  throw e
+                }
               }
-            }
+            })
           })
         }
 

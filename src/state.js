@@ -1,8 +1,6 @@
 define(["./scope"], function (scope) {
   "use strict";
   
-  var boxId = 0
-  
   var boxes = scope.make()
     , vars  = scope.make()
 
@@ -25,7 +23,6 @@ define(["./scope"], function (scope) {
   })()
   
   return {
-    boxId: boxId,
     boxes: boxes,
     vars: vars,
     mode: mode,

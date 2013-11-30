@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="utf-8" />
     <link rel="stylesheet" href="../lib/codemirror/lib/codemirror.css">
   </head>
   <body>
@@ -216,8 +217,7 @@
 
             console.clear()
 
-            var old1 = state.boxId
-              , old2 = options.$eval
+            var old2 = options.$eval
               , old3 = options.eval
 
             options.$eval = function (x) {
@@ -267,7 +267,6 @@
                 }
               })()
             } finally {
-              state.boxId   = old1
               options.$eval = old2
               options.eval  = old3
             }
