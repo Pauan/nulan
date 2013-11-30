@@ -7,7 +7,7 @@
     <script src="../lib/codemirror/lib/codemirror.js"></script>
     <script src="../lib/requirejs/require.js"></script>
     <script>
-      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print", "../lib/util/ui", "../src/macex", "../src/compile", "../src/options", "../src/box", "../lib/util/iter", "../lib/util/cell"], function (data, parse, tokenize, builtins, print, ui, macex, compile, options, box, iter, cell) {
+      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print", "../lib/util/ui", "../src/macex", "../src/compile", "../src/options", "../src/box", "../lib/util/iter", "../lib/util/cell", "../src/state"], function (data, parse, tokenize, builtins, print, ui, macex, compile, options, box, iter, cell, state) {
         "use strict";
         
         ui.normalize(document, function (e) {
@@ -213,60 +213,64 @@
                 return print.normal(x)
               }).join(" "))
             }*/
-            
-            box.withNewEnvironment(function () {
-              console.clear()
 
-              //var old1 = console.log
-              var old2 = options.$eval
-                , old3 = options.eval
+            console.clear()
 
-              options.$eval = function (x) {
-                oCategories["$eval"].push(x)
-              }
-            
-              try {
-                withSandbox(function (win) {
-                  win.box = box
-                  options.eval = win.eval
+            var old1 = state.boxId
+              , old2 = options.$eval
+              , old3 = options.eval
 
-                  var o = tokenize.tokenize(value)
-                  iter.each(o, function (x) {
-                    oCategories["tokenize"].push(print.array(x))
-
-                    x = parse.indent(x)
-                    oCategories["indent"].push(print.simple(x))
-                    
-                    x = parse.parse(x)
-                    oCategories["parse"].push(print.normal(x))
-                      
-                    x = macex.macex(x)
-                    oCategories["macex"].push(print.normal(x))
-                    
-                    x = compile.compile(compile.statement([x]))
-                    oCategories["compile"].push(x)
-
-                    x = win.eval(x)
-                    oCategories["eval"].push(print.array(x))
+            options.$eval = function (x) {
+              oCategories["$eval"].push(x)
+            }
+          
+            try {
+              state.vars.reset(builtins.vars, function () {
+                state.boxes.push({}, function () {
+                  state.vars.push({}, function () {
+                    withSandbox(function (win) {
+                      win.box = box
+                      options.eval = win.eval
+    
+                      var o = tokenize.tokenize(value)
+                      iter.each(o, function (x) {
+                        oCategories["tokenize"].push(print.array(x))
+    
+                        x = parse.indent(x)
+                        oCategories["indent"].push(print.simple(x))
+                        
+                        x = parse.parse(x)
+                        oCategories["parse"].push(print.normal(x))
+                          
+                        x = macex.macex(x)
+                        oCategories["macex"].push(print.normal(x))
+                        
+                        x = compile.compile(compile.statement([x]))
+                        oCategories["compile"].push(x)
+    
+                        x = win.eval(x)
+                        oCategories["eval"].push(print.array(x))
+                      })
+                    })
                   })
                 })
-              } catch (e) {
-                ;(function () {
-                  if (e instanceof data.Error) {
-                    oCategories["error"].push(e.message)
-                  } else {
-                    var s = e.stack
-                    s = s.replace(/^(  ) *at [^\(]+\(.+\/([^\/:]+:\d+:\d+)\)$/gm, "$1$2")
-                    //s = s.replace(/^( +at ).+\/([^\/:]+:\d+:\d+)$/gm, "$1($2)")
-                    oCategories["error"].push(s)
-                  }
-                })()
-              } finally {
-                //console.log   = old1
-                options.$eval = old2
-                options.eval  = old3
-              }
-            })
+              })
+            } catch (e) {
+              ;(function () {
+                if (e instanceof data.Error) {
+                  oCategories["error"].push(e.message)
+                } else {
+                  var s = e.stack
+                  s = s.replace(/^(  ) *at [^\(]+\(.+\/([^\/:]+:\d+:\d+)\)$/gm, "$1$2")
+                  //s = s.replace(/^( +at ).+\/([^\/:]+:\d+:\d+)$/gm, "$1($2)")
+                  oCategories["error"].push(s)
+                }
+              })()
+            } finally {
+              state.boxId   = old1
+              options.$eval = old2
+              options.eval  = old3
+            }
           
             var r = []
             if (debug) {

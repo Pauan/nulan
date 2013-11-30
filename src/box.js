@@ -1,41 +1,23 @@
-define(["./data", "./scope", "./error"], function (data, scope, error) {
+define(["./data", "./error", "./state"], function (data, error, state) {
   "use strict";
-  
-  var boxId = 0
-  
-  var boxes = scope.make()
-    , vars  = scope.make()
-  
-  function withNewEnvironment(f) {
-    var old1 = boxId
-    boxes.push()
-    vars.push()
-    try {
-      return f()
-    } finally {
-      boxId = old1
-      boxes.pop()
-      vars.pop()
-    }
-  }
   
   function make(x) {
     var o   = new data.Box()
-    o.id    = boxId++
+    o.id    = state.boxId++
     o.value = x
-    boxes.set(o.id, o)
+    state.boxes.set(o.id, o)
     return o
   }
   
   function get(i) {
-    console.assert(boxes.has(i))
-    return boxes.get(i)
+    console.assert(state.boxes.has(i))
+    return state.boxes.get(i)
   }
   
   function toBox(x) {
     if (x instanceof data.Symbol) {
-      if (vars.has(x.value)) {
-        var y = vars.get(x.value)
+      if (state.vars.has(x.value)) {
+        var y = state.vars.get(x.value)
         // TODO: not sure if this should enrich or not...
         //       it mostly affects macros:
         //
@@ -80,7 +62,7 @@ define(["./data", "./scope", "./error"], function (data, scope, error) {
     } else if (x instanceof data.Symbol) {
       var o = make(x.value)
       o.loc = x.loc
-      vars.set(x.value, o)
+      state.vars.set(x.value, o)
       return o
     } else {
       error(x, "expected symbol but got ", [x])
@@ -90,10 +72,10 @@ define(["./data", "./scope", "./error"], function (data, scope, error) {
   // TODO not sure if this should be in here or not...
   function getSyntax(x) {
     // TODO ew
-    if (typeof x === "string" && vars.has(x)) {
-      x = vars.get(x)
-    } else if (x instanceof data.Symbol && vars.has(x.value)) {
-      x = vars.get(x.value)
+    if (typeof x === "string" && state.vars.has(x)) {
+      x = state.vars.get(x)
+    } else if (x instanceof data.Symbol && state.vars.has(x.value)) {
+      x = state.vars.get(x.value)
     }
     if (x instanceof data.Box && data.syntax in x) {
       return x[data.syntax]
@@ -103,9 +85,6 @@ define(["./data", "./scope", "./error"], function (data, scope, error) {
   }
   
   return {
-    vars: vars,
-    withNewEnvironment: withNewEnvironment,
-
     make: make,
     get: get,
     toBox: toBox,

@@ -6,12 +6,19 @@ define(["../lib/util/name"], function (name) {
   
   var deleted = {}
   
+  function checkScopes(a) {
+    if (a.length === 0) {
+      throw new Error("must call push before calling has/get/set/del")
+    }
+  }
+  
   function Scope() {
-    this[scopes] = [{}]
+    this[scopes] = [{}] // TODO I wish I could change this to []
   }
   Scope.prototype.has = function (s) {
     var a = this[scopes]
       , i = a.length
+    checkScopes(a)
     while (i--) {
       var x = a[i]
       if (s in x) {
@@ -27,6 +34,7 @@ define(["../lib/util/name"], function (name) {
   Scope.prototype.get = function (s) {
     var a = this[scopes]
       , i = a.length
+    checkScopes(a)
     while (i--) {
       var x = a[i]
       if (s in x) {
@@ -40,16 +48,28 @@ define(["../lib/util/name"], function (name) {
   }
   Scope.prototype.set = function (s, v) {
     var a = this[scopes]
+    checkScopes(a)
     a[a.length - 1][s] = v
   }
   Scope.prototype.del = function (s) {
     this.set(s, deleted)
   }
-  Scope.prototype.push = function () {
-    this[scopes].push({})
+  Scope.prototype.reset = function (x, f) {
+    var old = this[scopes]
+    this[scopes] = [x]
+    try {
+      return f()
+    } finally {
+      this[scopes] = old
+    }
   }
-  Scope.prototype.pop = function () {
-    this[scopes].pop()
+  Scope.prototype.push = function (x, f) {
+    this[scopes].push(x)
+    try {
+      return f()
+    } finally {
+      this[scopes].pop()
+    }
   }
   
   function make() {

@@ -109,7 +109,6 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   function set(sName, f) {
     var o = box.make(sName)
     f(o)
-    box.vars.set(sName, o)
     vars[sName] = o
   }
   
@@ -841,12 +840,9 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   set("w/new-scope", function (o) {
     o[data.macex] = function (a) {
       checkArguments(a, 1)
-      box.vars.push()
-      try {
+      return state.vars.push({}, function () {
         return macex.macex(a[1])
-      } finally {
-        box.vars.pop()
-      }
+      })
     }
   })
 
@@ -907,6 +903,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   })*/
 
   return {
+    vars: vars,
     unary: unary,
     infix: infix,
     whitespace: whitespace,

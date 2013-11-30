@@ -1,10 +1,14 @@
-define([], function () {
+define(["./scope"], function (scope) {
   "use strict";
-
-  var mode = "run"
   
-  return {
-    mode: {
+  var boxId = 0
+  
+  var boxes = scope.make()
+    , vars  = scope.make()
+
+  var mode = (function () {
+    var mode = "run"
+    return {
       get: function () {
         return mode
       },
@@ -18,5 +22,12 @@ define([], function () {
         }
       }
     }
+  })()
+  
+  return {
+    boxId: boxId,
+    boxes: boxes,
+    vars: vars,
+    mode: mode,
   }
 })
