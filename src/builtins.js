@@ -73,8 +73,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   }
 
   function inert(start, end) {
-    set(end, {
-      syntax: {
+    set(end, function (o) {
+      o[data.syntax] = {
         delimiter: true,
         startAt: start
         /*parse: function (l, s, r) {
@@ -108,10 +108,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   
   function set(sName, f) {
     var o = box.make(sName)
-    // TODO Object.keys ?
-    for (var s in f) {
-      o[s] = f[s]
-    }
+    f(o)
     box.vars.set(sName, o)
     vars[sName] = o
   }
@@ -162,35 +159,81 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   }
 
 
-  set("/",   { macex: opargs("/",    2), syntax: infix({ priority: 70 })    })
-  set("*",   { macex: opargs("*",    2), syntax: infix({ priority: 70 })    })
-  set("+",   { macex: opargs("+",    2), syntax: infix({ priority: 60 })    })
-  set("-",   { macex: opargs("-",    2), syntax: infix({ priority: 60 })    })
-  set("<",   { macex: opargs("<",    2), syntax: infix({ priority: 50 })    })
-  set("=<",  { macex: opargs("<=",   2), syntax: infix({ priority: 50 })    })
-  set(">",   { macex: opargs(">",    2), syntax: infix({ priority: 50 })    })
-  set(">=",  { macex: opargs(">=",   2), syntax: infix({ priority: 50 })    })
-  set("==",  { macex: opargs("===",  2), syntax: infix({ priority: 40 })    })
-  set("|=",  {                           syntax: infix({ priority: 40 })    })
-  set("~=",  { macex: opargs("!==",  2), syntax: infix({ priority: 40 })    })
-  set("&&",  { macex: opargs("&&",   2), syntax: infix({ priority: 30 })    })
-  set("||",  { macex: opargs("||",   2), syntax: infix({ priority: 20 })    })
-  set("num", { macex: opargs("+",    1)                       })
-  set("sub", { macex: opargs("-",    1)                       })
-  set("mod", { macex: opargs("%",    1)                       })
-  set("new", { macex: opargsl("new", 1)                       })
+  set("/", function (o) {
+    o[data.macex]  = opargs("/", 2)
+    o[data.syntax] = infix({ priority: 70 })
+  })
+  set("*", function (o) {
+    o[data.macex]  = opargs("*", 2)
+    o[data.syntax] = infix({ priority: 70 })
+  })
+  set("+", function (o) {
+    o[data.macex]  = opargs("+", 2)
+    o[data.syntax] = infix({ priority: 60 })
+  })
+  set("-", function (o) {
+    o[data.macex]  = opargs("-", 2)
+    o[data.syntax] = infix({ priority: 60 })
+  })
+  set("<", function (o) {
+    o[data.macex]  = opargs("<", 2)
+    o[data.syntax] = infix({ priority: 50 })
+  })
+  set("=<", function (o) {
+    o[data.macex]  = opargs("<=", 2)
+    o[data.syntax] = infix({ priority: 50 })
+  })
+  set(">", function (o) {
+    o[data.macex]  = opargs(">", 2)
+    o[data.syntax] = infix({ priority: 50 })
+  })
+  set(">=", function (o) {
+    o[data.macex]  = opargs(">=", 2)
+    o[data.syntax] = infix({ priority: 50 })
+  })
+  set("==", function (o) {
+    o[data.macex]  = opargs("===", 2)
+    o[data.syntax] = infix({ priority: 40 })
+  })
+  set("|=", function (o) {
+    o[data.syntax] = infix({ priority: 40 })
+  })
+  set("~=", function (o) {
+    o[data.macex]  = opargs("!==", 2)
+    o[data.syntax] = infix({ priority: 40 })
+  })
+  set("&&", function (o) {
+    o[data.macex]  = opargs("&&", 2)
+    o[data.syntax] = infix({ priority: 30 })
+  })
+  set("||", function (o) {
+    o[data.macex]  = opargs("||", 2)
+    o[data.syntax] = infix({ priority: 20 })
+  })
+  set("num", function (o) {
+    o[data.macex]  = opargs("+", 1)
+  })
+  set("sub", function (o) {
+    o[data.macex] = opargs("-", 1)
+  })
+  set("mod", function (o) {
+    o[data.macex] = opargs("%", 1)
+  })
+  set("new", function (o) {
+    o[data.macex] = opargsl("new", 1)
+  })
 
   inert("(", ")")
   inert("[", "]")
   inert("{", "}")
   inert("#|", "|#")
   
-  set(" ", {
-    syntax: whitespace()
+  set(" ", function (o) {
+    o[data.syntax] = whitespace()
   })
 
-  set("\n", {
-    syntax: whitespace()
+  set("\n", function (o) {
+    o[data.syntax] = whitespace()
     /* {
       //priority: Infinity,
       tokenize: function (o) {
@@ -208,9 +251,9 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     } */
   })
   
-  set("~", {
-    macex: opargs("!", 1),
-    syntax: {
+  set("~", function (o) {
+    o[data.macex]  = opargs("!", 1)
+    o[data.syntax] = {
       priority: 80,
       associativity: "right",
       // TODO handle escapes with \ as well
@@ -268,64 +311,72 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   }
   
-  set("$pattern!", { macex: makeBoxSetter("pattern") })
+  set("$pattern!", function (o) {
+    o[data.macex] = makeBoxSetter(data.pattern)
+  })
   
-  set("$syntax!", {
-    macex: function (a) {
+  set("$syntax!", function (o) {
+    o[data.macex] = function (a) {
       checkArguments(a, 2)
       // TODO destructuring ?
       var x = box.toBox(a[1])
         , f = compileEval(a[2])
-      x.syntax = f
+      x[data.syntax] = f
       return macex.macex([])
     }
   })
 
   // TODO expose syntax-unary function and move this into core  
-  set("$syntax-unary!", {
-    macex: function (a) {
+  set("$syntax-unary!", function (o) {
+    o[data.macex] = function (a) {
       // TODO checkArguments
       // TODO destructuring ?
       var x = box.toBox(a[1])
         , f = compileEval(a[1])
-      x.syntax = unary(f)
+      x[data.syntax] = unary(f)
       return macex.macex([])
     }
   })
   
-  set("$syntax-infix!", {
-    macex: function (a) {
+  set("$syntax-infix!", function (o) {
+    o[data.macex] = function (a) {
       // TODO checkArguments
       // TODO destructuring ?
       var x = box.toBox(a[1])
         , f = compileEval(a[2])
-      x.syntax = infix(f)
+      x[data.syntax] = infix(f)
       return macex.macex([])
     }
   })
 
-  set("$mac!",     { macex: makeBoxSetter("macex")   })
-  set("$get!",     { macex: makeBoxSetter("get")     })
-  set("$set!",     { macex: makeBoxSetter("set")     })
+  set("$mac!", function (o) {
+    o[data.macex] = makeBoxSetter(data.macex)
+  })
+  set("$get!", function (o) {
+    o[data.macex] = makeBoxSetter(data.get)
+  })
+  set("$set!", function (o) {
+    o[data.macex] = makeBoxSetter(data.set)
+  })
   
-  set("$eval", {
-    macex: function (a) {
+  set("$eval", function (o) {
+    o[data.macex] = function (a) {
       checkArguments(a, 1)
       return macex.macex(compileEval(a[1]))
     }
   })
   
-  set("<=", {
-    macex: function (a) {
+  set("<=", function (o) {
+    o[data.macex] = function (a) {
       checkArguments(a, 2)
       var x = box.toBox(a[1])
-      if (x instanceof data.Box && x.set != null) {
-        return x.set([a[1], a[2]])
+      if (x instanceof data.Box && data.set in x) {
+        return x[data.set]([a[1], a[2]])
       } else {
         return op("=", a[0], a.slice(1).map(macex.macex))
       }
-    },
-    syntax: {
+    }
+    o[data.syntax] = {
       associativity: "right",
       //indent: true,
       parse: function (l, s, r) {
@@ -340,14 +391,14 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
   
-  set("prn", {
-    get: function (a) {
+  set("prn", function (o) {
+    o[data.get] = function (a) {
       return op(".", a[0], [new data.Symbol("console"), new data.String("log")])
     }
   })
 
-  set("vars", {
-    macex: function (a) {
+  set("vars", function (o) {
+    o[data.macex] = function (a) {
       var after = []
       a.slice(1).forEach(function anon(x) {
         if (Array.isArray(x)) {
@@ -376,9 +427,9 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
   
-  set("|", {
-    macex: opargsl(",", 1),
-    syntax: {
+  set("|", function (o) {
+    o[data.macex]  = opargsl(",", 1)
+    o[data.syntax] = {
       indent: true,
       vertical: true,
       priority: Infinity,
@@ -399,8 +450,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
 
-  set("[", {
-    macex: function (a) {
+  set("[", function (o) {
+    o[data.macex] = function (a) {
       var left  = []
         , right = []
       // TODO use "iter" module ?
@@ -421,8 +472,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       } else {
         return op("array", a[0], left)
       }
-    },
-    syntax: {
+    }
+    o[data.syntax] = {
       delimiter: true,
       priority: Infinity,
       endAt: "]",
@@ -441,10 +492,10 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
   
-  set("true", {}) // TODO
+  set("true", function (o) {}) // TODO
 
-  set("(", {
-    syntax: {
+  set("(", function (o) {
+    o[data.syntax] = {
       delimiter: true,
       priority: Infinity,
       endAt: ")",
@@ -455,8 +506,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
   
-  set("{", {
-    macex: function (a) {
+  set("{", function (o) {
+    o[data.macex] = function (a) {
       return op("object", a[0], a.slice(1).map(function (x) {
         if (Array.isArray(x)) {
           box.check(x[0], get("="))
@@ -465,8 +516,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
           return macex.macex(x)
         }
       }))
-    },
-    syntax: {
+    }
+    o[data.syntax] = {
       delimiter: true,
       priority: Infinity,
       endAt: "}",
@@ -513,8 +564,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
   
-  set("\"", {
-    macex: function (a) {
+  set("\"", function (o) {
+    o[data.macex] = function (a) {
       var r = a.slice(1).map(function (x) {
         return macex.macex(x)
       })
@@ -539,8 +590,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
           return op("+", a[0], [x, y])
         })
       }
-    },
-    syntax: {
+    }
+    o[data.syntax] = {
       delimiter: true,
       tokenize: tokenize.string,
       priority: Infinity,
@@ -558,8 +609,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   },*/
 
-  set(";", {
-    syntax: {
+  set(";", function (o) {
+    o[data.syntax] = {
       delimiter: true,
       priority: 90,
       parse: function (l, s, r) {
@@ -572,8 +623,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
 
-  set(":", {
-    syntax: {
+  set(":", function (o) {
+    o[data.syntax] = {
       delimiter: true,
       priority: 90, // TODO: does this need to be 90?
       indent: true,
@@ -588,9 +639,9 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   })
   
   // TODO: update "Customizable syntax.rst" with the new definition of "."
-  set(".", {
-    macex: opargs(".", 2),
-    syntax: {
+  set(".", function (o) {
+    o[data.macex]  = opargs(".", 2)
+    o[data.syntax] = {
       delimiter: true,
       priority: 90,
       parse: function (l, s, r) {
@@ -616,15 +667,15 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
 
-  set(",", {
-    syntax: unary({
+  set(",", function (o) {
+    o[data.syntax] = unary({
       priority: 80,
       delimiter: true
     })
   })
 
-  set("@", {
-    syntax: unary({
+  set("@", function (o) {
+    o[data.syntax] = unary({
       priority: 80,
       delimiter: true
     })
@@ -746,13 +797,13 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })()
       
-  set("`", {
-    macex: function (a) {
+  set("`", function (o) {
+    o[data.macex] = function (a) {
       checkArguments(a, 1)
       compileOnlyError(a[0])
       return macex.macex(quasiquote(a[1]))
-    },
-    syntax: {
+    }
+    o[data.syntax] = {
       whitespace: true,
       delimiter: true,
       priority: 80, // TODO: 10
@@ -767,13 +818,13 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
 
-  set("->", {
-    macex: function (a) {
+  set("->", function (o) {
+    o[data.macex] = function (a) {
       return op("function", a[0],
                   [op(",", a[0], []),
                    op("return", a[0], [macex.macex(a[2])])])
-    },
-    syntax: {
+    }
+    o[data.syntax] = {
       priority: 10,
       associativity: "right",
       parse: function (l, s, r) {
@@ -787,8 +838,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
   
-  set("w/new-scope", {
-    macex: function (a) {
+  set("w/new-scope", function (o) {
+    o[data.macex] = function (a) {
       checkArguments(a, 1)
       box.vars.push()
       try {
@@ -799,8 +850,8 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
 
-  set("=", {
-    syntax: {
+  set("=", function (o) {
+    o[data.syntax] = {
       //priority: 100, // TODO why is this priority 10 ?
       indent: true,
       parse: function (l, s, r) {
@@ -827,15 +878,15 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })*/
   
-  set("'", {
-    syntax: {
+  set("'", function (o) {
+    o[data.syntax] = {
       delimiter: true,
       tokenize: tokenize.symbol
     }
   })
   
-  set("#", {
-    syntax: {
+  set("#", function (o) {
+    o[data.syntax] = {
       delimiter: true,
       whitespace: true,
       tokenize: tokenize.comment,

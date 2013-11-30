@@ -95,8 +95,8 @@ define(["./data", "./scope", "./error"], function (data, scope, error) {
     } else if (x instanceof data.Symbol && vars.has(x.value)) {
       x = vars.get(x.value)
     }
-    if (x instanceof data.Box && x.syntax != null) {
-      return x.syntax
+    if (x instanceof data.Box && data.syntax in x) {
+      return x[data.syntax]
     } else {
       return null
     }

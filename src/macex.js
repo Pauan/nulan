@@ -3,8 +3,8 @@ define(["./data", "./box", "./error", "./state"], function (data, box, error, st
   
   function macex1(a) {
     var x = box.toBox(a[0])
-    if (x instanceof data.Box && x.macex != null) {
-      return x.macex(a)
+    if (x instanceof data.Box && data.macex in x) {
+      return x[data.macex](a)
     } else {
       if (a.length === 0) {
         return new data.Op("empty", [])
@@ -32,8 +32,8 @@ define(["./data", "./box", "./error", "./state"], function (data, box, error, st
     } else if (x instanceof data.MacexBypass) {
       return x.value
     } else if (x instanceof data.Box) {
-      if (x.get != null) {
-        return x.get([x])
+      if (data.get in x) {
+        return x[data.get]([x])
       } else {
         if (state.mode.get() === "run" || x.local) {
           return x

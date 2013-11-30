@@ -1,6 +1,12 @@
-define(["../lib/util/buffer"], function (buffer) {
+define(["../lib/util/buffer", "../lib/util/name"], function (buffer, name) {
   "use strict";
-  
+
+  var macex   = new name.Name(),
+      get     = new name.Name(),
+      set     = new name.Name(),
+      pattern = new name.Name(),
+      syntax  = new name.Name()
+
   var Error = buffer.Error
   
   function Module() {
@@ -55,6 +61,12 @@ define(["../lib/util/buffer"], function (buffer) {
   }
   
   return {
+    macex: macex,
+    get: get,
+    set: set,
+    pattern: pattern,
+    syntax: syntax,
+
     loc: loc,
     unwrap: unwrap,
     isSym: isSym,
