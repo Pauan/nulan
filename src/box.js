@@ -5,7 +5,8 @@ define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, err
 
   function make(x) {
     var o   = new data.Box()
-    o.id    = uuid.v4().slice(0, -1) + (++boxId) // TODO use something other than uuid v4 ?
+    var i   = "" + (++boxId)
+    o.id    = uuid.v4().slice(0, -i.length) + i // TODO use something other than uuid v4 ?
     o.value = x
     state.boxes[o.id] = o
     return o

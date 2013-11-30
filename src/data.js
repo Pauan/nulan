@@ -9,9 +9,11 @@ define(["../lib/util/buffer", "../lib/util/name"], function (buffer, name) {
 
   var Error = buffer.Error
   
-  function Module() {
-    this.imports = []
-    this.exports = {}
+  function Module(name) {
+    this.name      = name
+    this.arguments = []
+    this.imports   = []
+    this.exports   = {}
   }
   
   function Op(s, a) {
@@ -72,6 +74,7 @@ define(["../lib/util/buffer", "../lib/util/name"], function (buffer, name) {
     isSym: isSym,
     boxOrSym: boxOrSym,
 
+    Module: Module,
     Box: Box,
     Error: Error,
     Op: Op,

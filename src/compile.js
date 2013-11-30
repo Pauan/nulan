@@ -290,9 +290,49 @@ define(["./data", "./box", "./error"], function (data, box, error) {
     }
   }
   
+  function withModule(m, f) {
+    var name    = (m.name == null ? null : new data.String(m.name))
+    var imports = new data.Op("array", m.imports)
+    var args    = new data.Op(",", m.arguments)
+    var exports = []
+    for (var s in m.exports) {
+      exports.push(new data.Op("=", [new data.Symbol(s), m.exports[s]]))
+    }
+    exports = new data.Op("return", [new data.Op("object", exports)])
+    return f(name, imports, args, exports)
+  }
+  
+  function moduleTop(m, r) {
+    return withModule(m, function (name, imports, args, exports) {
+      var a = []
+      a.push(new data.Symbol("define"))
+      if (name !== null) {
+        a.push(name)
+      }
+      a.push(imports)
+      a.push(new data.Op("function", [args, new data.Op(",", r.concat([exports]))]))
+      return statementTop([new data.Op("call", a)])
+    })
+  }
+  
+  function requireTop(m, r) {
+    return withModule(m, function (name, imports, args, exports) {
+      var a = []
+      a.push(new data.Symbol("require"))
+      if (name !== null) {
+        error(m, "expected no module name but got ", [name])
+      }
+      a.push(imports)
+      a.push(new data.Op("function", [args, new data.Op(",", r)]))
+      return statementTop([new data.Op("call", a)])
+    })
+  }
+  
   return {
     expression: expressionTop,
     statement: statementTop,
     compile: compileTop,
+    module: moduleTop,
+    require: requireTop,
   }
 })

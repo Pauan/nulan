@@ -365,6 +365,30 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
   
+  set("import", function (o) {
+    o[data.macex] = function (a) {
+      if (state.module.has()) {
+        var m = state.module.get()
+        // TODO "iter" module ?
+        var args = a.slice(1).map(function (x) {
+          if (Array.isArray(x)) {
+            box.check(x[0], get("="))
+            var u = box.make("a")
+            m.arguments.push(u)
+            m.imports.push(macex.macex(x[2])) // TODO
+            return [get("vars"), [get("="), x[1], u]]
+          } else {
+            // TODO better error message
+            error(x, "expected (foo = \"bar\") but got ", [x])
+          }
+        })
+        return macex.macex([get("|")].concat(args))
+      } else {
+        error(a[0], [a[0]], " can only be used inside of a module")
+      }
+    }
+  })
+  
   set("<=", function (o) {
     o[data.macex] = function (a) {
       checkArguments(a, 2)
@@ -399,6 +423,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   set("vars", function (o) {
     o[data.macex] = function (a) {
       var after = []
+      // TODO "iter" module ?
       a.slice(1).forEach(function anon(x) {
         if (Array.isArray(x)) {
           box.check(x[0], get("="))

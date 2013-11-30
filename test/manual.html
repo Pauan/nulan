@@ -215,7 +215,7 @@
               }).join(" "))
             }*/
 
-            console.clear()
+            //console.clear()
 
             var old2 = options.$eval
               , old3 = options.eval
@@ -227,29 +227,39 @@
             try {
               state.vars.reset(builtins.vars, function () {
                 state.vars.push({}, function () {
-                  withSandbox(function (win) {
-                    win.box = box
-                    options.eval = win.eval
-  
-                    var o = tokenize.tokenize(value)
-                    iter.each(o, function (x) {
-                      oCategories["tokenize"].push(print.array(x))
-  
-                      x = parse.indent(x)
-                      oCategories["indent"].push(print.simple(x))
-                      
-                      x = parse.parse(x)
-                      oCategories["parse"].push(print.normal(x))
+                  var m = new data.Module()
+                    , r = []
+
+                  state.module.set(m, function () {
+                    withSandbox(function (win) {
+                      win.box = box
+                      options.eval = win.eval
+    
+                      var o = tokenize.tokenize(value)
+                      iter.each(o, function (x) {
+                        oCategories["tokenize"].push(print.array(x))
+    
+                        x = parse.indent(x)
+                        oCategories["indent"].push(print.simple(x))
                         
-                      x = macex.macex(x)
-                      oCategories["macex"].push(print.normal(x))
-                      
-                      x = compile.compile(compile.statement([x]))
-                      oCategories["compile"].push(x)
-  
-                      x = win.eval(x)
-                      oCategories["eval"].push(print.array(x))
+                        x = parse.parse(x)
+                        oCategories["parse"].push(print.normal(x))
+                          
+                        x = macex.macex(x)
+                        oCategories["macex"].push(print.normal(x))
+                        r.push(x)
+                      })
                     })
+                  })
+
+                  r = compile.compile(compile.require(m, r))
+                  oCategories["compile"].push(r)
+
+                  withSandbox(function (win) {
+                    win.require = require
+                    win.define  = define
+                    r = win.eval(r)
+                    oCategories["eval"].push(print.array(r))
                   })
                 })
               })
