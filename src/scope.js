@@ -13,7 +13,7 @@ define(["../lib/util/name"], function (name) {
   }
   
   function Scope() {
-    this[scopes] = [{}] // TODO I wish I could change this to []
+    this[scopes] = [] // TODO I wish I could change this to []
   }
   Scope.prototype.has = function (s) {
     var a = this[scopes]

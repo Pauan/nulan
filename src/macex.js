@@ -17,7 +17,7 @@ define(["./data", "./box", "./error", "./state"], function (data, box, error, st
   function compileBox(x) {
     return new data.Op("call", [new data.Op(".", [new data.Symbol("box"),
                                                   new data.String("get")]),
-                                new data.Number(x.id)])
+                                new data.String(x.id)])
   }
   
   function compileBoxValue(x) {

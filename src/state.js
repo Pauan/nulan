@@ -1,7 +1,7 @@
 define(["./scope"], function (scope) {
   "use strict";
   
-  var boxes = scope.make()
+  var boxes = {}
     , vars  = scope.make()
 
   var mode = (function () {

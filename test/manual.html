@@ -226,31 +226,29 @@
           
             try {
               state.vars.reset(builtins.vars, function () {
-                state.boxes.push({}, function () {
-                  state.vars.push({}, function () {
-                    withSandbox(function (win) {
-                      win.box = box
-                      options.eval = win.eval
-    
-                      var o = tokenize.tokenize(value)
-                      iter.each(o, function (x) {
-                        oCategories["tokenize"].push(print.array(x))
-    
-                        x = parse.indent(x)
-                        oCategories["indent"].push(print.simple(x))
+                state.vars.push({}, function () {
+                  withSandbox(function (win) {
+                    win.box = box
+                    options.eval = win.eval
+  
+                    var o = tokenize.tokenize(value)
+                    iter.each(o, function (x) {
+                      oCategories["tokenize"].push(print.array(x))
+  
+                      x = parse.indent(x)
+                      oCategories["indent"].push(print.simple(x))
+                      
+                      x = parse.parse(x)
+                      oCategories["parse"].push(print.normal(x))
                         
-                        x = parse.parse(x)
-                        oCategories["parse"].push(print.normal(x))
-                          
-                        x = macex.macex(x)
-                        oCategories["macex"].push(print.normal(x))
-                        
-                        x = compile.compile(compile.statement([x]))
-                        oCategories["compile"].push(x)
-    
-                        x = win.eval(x)
-                        oCategories["eval"].push(print.array(x))
-                      })
+                      x = macex.macex(x)
+                      oCategories["macex"].push(print.normal(x))
+                      
+                      x = compile.compile(compile.statement([x]))
+                      oCategories["compile"].push(x)
+  
+                      x = win.eval(x)
+                      oCategories["eval"].push(print.array(x))
                     })
                   })
                 })
