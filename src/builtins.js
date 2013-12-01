@@ -373,10 +373,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
         var args = a.slice(1).map(function (x) {
           if (Array.isArray(x)) {
             box.check(x[0], get("="))
-            var u = box.make("a")
-            m.arguments.push(u)
-            m.imports.push(macex.macex(x[2])) // TODO
-            return [get("vars"), [get("="), x[1], u]]
+            return macex.moduleImport(m, x[1], compileEval(x[2]))
           } else {
             // TODO better error message
             error(x, "expected (foo = \"bar\") but got ", [x])

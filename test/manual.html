@@ -14,6 +14,9 @@
         ui.normalize(document, function (e) {
           //e.overflow("hidden")
           
+          var sCategories = [ "error" , "eval"  , "compile" , "macex" 
+                            , "$eval" , "parse" , "indent"  , "tokenize" ]
+          
           var debug = cell.dedupe(localStorage["debug.checked"], {
             set: function (self, x) {
               if (x) {
@@ -36,7 +39,7 @@
           
           var sandbox = cell.value()
           
-          var output = cell.dedupe()
+          var output = cell.value()
           
           function withSandbox(f) {
             ui.iframe(function (e) {
@@ -160,9 +163,29 @@
                 e.font(function (t) {
                   t.family("monospace")
                 })
-                
-                e.event([output], function (x) {
-                  e.text(x)
+
+                // TODO what if debug is changed when output isn't ready yet ?
+                e.event([output, debug], function (o, debug) {
+                  var r = []
+                  if (debug) {
+                    iter.each(sCategories, function (s) {
+                      if (o[s].length) {
+                        // TODO use actual nuit
+                        r.push("@" + s + "\n  " + o[s].map(function (x) {
+                          return x.replace(/\n/g, "$&  ")
+                        }).join("\n  "))
+                      }
+                    })
+                    e.text(r.join("\n\n"))
+                  } else {
+                    iter.each(o["eval"], function (s) {
+                      r.push(s)
+                    })
+                    iter.each(o["error"], function (s) {
+                      r.push(s)
+                    })
+                    e.text(r.join("\n"))
+                  }
                 })
               }).move(e)
               
@@ -188,18 +211,17 @@
               }).move(e)
             }).move(e)
           }).move(e)
-          
-          
-          var sCategories = [ "error" , "eval"  , "compile" , "macex" 
-                            , "$eval" , "parse" , "indent"  , "tokenize" ]
-          
-          // TODO use actual nuit
-          e.bind([input, debug], function (value, debug) {
+
+          e.bind([input], function (value) {
             var oCategories = {}
             
             iter.each(sCategories, function (s) {
               oCategories[s] = []
             })
+
+            function push(s, x) {
+              oCategories[s].push(x)
+            }
             
             /*console.log = function () {
               try {
@@ -221,7 +243,7 @@
               , old3 = options.eval
 
             options.$eval = function (x) {
-              oCategories["$eval"].push(x)
+              push("$eval", x)
             }
           
             try {
@@ -229,6 +251,11 @@
                 state.vars.push({}, function () {
                   var m = new data.Module()
                     , r = []
+                   
+                  function prn(x) {
+                    push("eval", print.array(x))
+                    output.set(oCategories)
+                  }
 
                   state.module.set(m, function () {
                     withSandbox(function (win) {
@@ -237,67 +264,50 @@
     
                       var o = tokenize.tokenize(value)
                       iter.each(o, function (x) {
-                        oCategories["tokenize"].push(print.array(x))
-    
+                        push("tokenize", print.array(x))
+
                         x = parse.indent(x)
-                        oCategories["indent"].push(print.simple(x))
-                        
+                        push("indent", print.simple(x))
+
                         x = parse.parse(x)
-                        oCategories["parse"].push(print.normal(x))
-                          
+                        push("parse", print.normal(x))
+
                         x = macex.macex(x)
-                        oCategories["macex"].push(print.normal(x))
-                        r.push(x)
+                        push("macex", print.normal(x))
+                        //r.push(x)
+                        r.push(new data.Op("call", [new data.Symbol("prn"), x]))
                       })
                     })
                   })
 
                   r = compile.compile(compile.require(m, r))
-                  oCategories["compile"].push(r)
+                  push("compile", r)
 
                   withSandbox(function (win) {
                     win.require = require
                     win.define  = define
-                    r = win.eval(r)
-                    oCategories["eval"].push(print.array(r))
+                    win.prn     = prn
+                    win.eval(r)
                   })
                 })
               })
             } catch (e) {
               ;(function () {
                 if (e instanceof data.Error) {
-                  oCategories["error"].push(e.message)
+                  push("error", e.message)
                 } else {
                   var s = e.stack
                   s = s.replace(/^(  ) *at [^\(]+\(.+\/([^\/:]+:\d+:\d+)\)$/gm, "$1$2")
                   //s = s.replace(/^( +at ).+\/([^\/:]+:\d+:\d+)$/gm, "$1($2)")
-                  oCategories["error"].push(s)
+                  push("error", s)
                 }
               })()
             } finally {
               options.$eval = old2
               options.eval  = old3
             }
-          
-            var r = []
-            if (debug) {
-              iter.each(sCategories, function (s) {
-                if (oCategories[s].length) {
-                  r.push("@" + s + "\n  " + oCategories[s].map(function (x) {
-                    return x.replace(/\n/g, "$&  ")
-                  }).join("\n  "))
-                }
-              })
-              output.set(r.join("\n\n"))
-            } else {
-              iter.each(oCategories["eval"], function (s) {
-                r.push(s)
-              })
-              iter.each(oCategories["error"], function (s) {
-                r.push(s)
-              })
-              output.set(r.join("\n"))
-            }
+            
+            output.set(oCategories)
           })
         })
       })

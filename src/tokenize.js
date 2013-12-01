@@ -368,10 +368,15 @@ define(["../lib/util/buffer", "./data", "./box", "./error", "../lib/util/iter"],
       return this
     }
     oIter.next = function () {
-      if (!o.has()) {
-        throw new iter.StopIteration()
-      } 
-      return tokenize1(o)
+      // TODO a little hacky
+      var x = []
+      while (x.length === 0) {
+        if (!o.has()) {
+          throw new iter.StopIteration()
+        }
+        x = tokenize1(o)
+      }
+      return x
     }
     return oIter
   }

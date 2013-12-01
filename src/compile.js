@@ -1,33 +1,80 @@
-define(["./data", "./box", "./error"], function (data, box, error) {
+define(["./data", "./box", "./error", "./options"], function (data, box, error, options) {
   "use strict";
+
+  var indent   = 0
+    , priority = 0
+    , scope    = { loop: false, function: false }
+    , statements
   
-  var priority   = 0
-    , statements = []
+  var ops = {}
   
-  function compileFn(x) {
-    //var x = unwrap(w)
-    if (x.op === "function" || x.op === "object") {
-      return "(" + compile(x) + ")"
+  var reserved = {}
+  
+  // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Reserved_Words
+  ;("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with " +
+    "class enum export extends import super " +
+    "implements interface let package private protected public static yield " +
+    "null true false").split(" ").forEach(function (s) {
+    reserved[s] = true
+  })
+
+  // TODO Unicode support
+  function isValidJS(x) {
+    return /^[$_a-zA-Z][$_a-zA-Z0-9]*$/.test(x)
+  }
+    
+  function mangle(s) {
+    if (reserved[s]) {
+      return "_" + s
     } else {
-      return compile(x)
+      s = options.mangle(s)
+      if (!isValidJS(s)) {
+        throw new Error("expected valid JavaScript identifier but got: " + s)
+      }
+      return s
     }
   }
   
-  function get(s) {
-    if (s in ops) {
-      return ops[s]
+  function unmangle(s) {
+    var x = /^_(.*)$/.exec(s)
+    console.log(x)
+    if (x && reserved[x[1]]) {
+      return x[1]
     } else {
-      throw new Error("unknown operator: " + s)
+      return options.unmangle(s)
     }
   }
   
-  function space() {
-    return "" // TODO
-    if (opt.minified) {
-      return ""
+  function jsProp(x) {
+    if (x instanceof data.String && isValidJS(x.value)) {
+      return x.value
     } else {
-      return new Array((indent * 2) + 1).join(" ")
+      return null
     }
+  }
+  
+  /*function propToString(x) {
+    if (x instanceof data.String || x instanceof data.Number) {
+      return x
+    } else if (x instanceof data.Symbol) {
+      return new data.String(x.value)
+    } else {
+      error(x, "expected number, string, or variable but got ", [x])
+    }
+  }*/
+  
+  function getNextUniq(s) {
+    var r = s.split("")
+      , i = r.length
+    while (i--) {
+      if (r[i] === "z") {
+        r[i] = "a"
+      } else {
+        r[i] = String.fromCharCode(r[i].charCodeAt(0) + 1)
+        return r.join("")
+      }
+    }
+    return r.join("") + "a"
   }
   
   function resetPriority(i, f) {
@@ -52,14 +99,165 @@ define(["./data", "./box", "./error"], function (data, box, error) {
     })
   }
   
+  function withIndent(i, f) {
+    var old = indent
+    indent = i
+    try {
+      return f()
+    } finally {
+      indent = old
+    }
+  }
+
+  function withScope(s, f) {
+    var old = scope[s]
+    scope[s] = true
+    try {
+      return f()
+    } finally {
+      scope[s] = old
+    }
+  }
+  
+  function space() {
+    if (options.minified) {
+      return ""
+    } else {
+      return new Array((indent * 2) + 1).join(" ")
+    }
+  }
+  
   function minify(s, s2) {
-    return s // TODO
-    if (opt.minified) {
+    if (options.minified) {
       return s2 || ""
     } else {
       return s
     }
   }
+
+  function get(s) {
+    if (s in ops) {
+      return ops[s]
+    } else {
+      throw new Error("unknown operator: " + s)
+    }
+  }
+
+  
+  function block(x) {
+    return withIndent(indent + 1, function () {
+      return space() + compileFn(x)
+    })
+  }
+  
+  function compile(x) {
+    if (x instanceof data.Op) {
+      var s = get(x.name).compile(x)
+      /*if (x.isUseless && options.warnings) {
+        if (/\n/.test(s)) {
+          console.warn("useless expression:\n" + space() + s)
+        } else {
+          console.warn("useless expression: " + s)
+        }
+      }*/
+      return s
+    } else if (x instanceof data.Box) {
+      // TODO
+      return x.value
+    } else if (x instanceof data.Symbol) {
+      return "" + x.value
+    } else if (x instanceof data.Number) {
+      return "" + x.value
+    } else if (x instanceof data.String) {
+      return "\"" + x.value.replace(/[\\"]/g, "\\$&").replace(/\n/g, "\\n") + "\""
+    } else {
+      error(x, "[compile.js] unknown data type: ", [x])
+    }
+  }
+  
+  function compileFn(x) {
+    if (x.name === "function" || x.name === "object") {
+      return "(" + compile(x) + ")"
+    } else {
+      return compile(x)
+    }
+  }
+  
+  function statement(x) {
+    if (x instanceof data.Op) {
+      var y = get(x.name)
+      if (y.statement != null) {
+        y.statement(x)
+      } else {
+        statements.push(y.expression(x))
+      }
+    } else {
+      statements.push(x)
+    }
+  }
+  
+  function expression(x) {
+    if (x instanceof data.Op) {
+      return get(x.name).expression(x)
+    } else {
+      return x
+    }
+  }
+  
+  function blockStatement(x) {
+    var old = statements
+    statements = []
+    try {
+      statement(x)
+      // TODO hacky
+      if (x.name === "top") {
+        return new data.Op("top", statements)
+      } else {
+        return new data.Op(";", statements)
+      }
+    } finally {
+      statements = old
+    }
+  }
+  
+  function compileSeparator(s) {
+    return function (x) {
+      var r   = []
+        , len = x.args.length - 1
+      x.args.forEach(function (x, i) {
+        r.push(compileFn(x))
+        if (i !== len) {
+          //if (!x.noSemicolon) {
+            r.push(";")
+          //}
+          r.push(minify(s) + space())
+        }
+      })
+      return r.join("")
+    }
+  }
+  
+  function braces(x) {
+    return "{" + minify("\n") + block(x) + minify("\n") + space() + "}"
+  }
+  
+  // TODO move into builtins.js probably
+  /*function argumentError(x, min, max) {
+    var len = x.args.length
+    if ((min != null && len < min) || (max != null && len > max)) {
+      if (max == null) {
+        throw opt.error(x, "expected at least " + min + " argument but got " + len)
+      } else if (min == null) {
+        throw opt.error(x, "expected at most " + max + " argument but got " + len)
+      }
+
+      if (min === max) {
+        throw opt.error(x, "expected " + min + " arguments but got " + len)
+      } else {
+        throw opt.error(x, "expected " + min + " to " + max + " arguments but got " + len)
+      }
+    }
+  }*/
   
   function unary(s) {
     return {
@@ -73,19 +271,21 @@ define(["./data", "./box", "./error"], function (data, box, error) {
     }
   }
   
-  function infix(s) {
+  function infix(s, pri) {
     return {
       expression: function (x) {
         x.args = x.args.map(expression)
         return x
       },
       compile: function (x) {
-        return compile(x.args[0]) + " " + s + " " + compile(x.args[1])
+        return withPriority(pri, function () {
+          // TODO should this be compileFn ?
+          return compileFn(x.args[0]) + minify(" ") + s + minify(" ") + compile(x.args[1])
+        })
       }
     }
   }
-  
-  var ops = {}
+
   
   ops["."] = {
     expression: function (x) {
@@ -153,127 +353,102 @@ define(["./data", "./box", "./error"], function (data, box, error) {
   }
   
   ops["empty"] = {
-    statement: function (x) {
-      statements.push(expression(x)) // TODO
-    },
+    statement: function (x) {},
     expression: function (x) {
-      return new data.Op("void", [new data.Number(0)])
+      return x
+    },
+    compile: function (x) {
+      return "void 0"
     }
   }
   
   ops["var"] = {
+    statement: function (x) {
+      x.args = x.args.map(expression)
+      statements.push(x)
+    },
     expression: function (x) {
       x.args = x.args.map(expression)
-      return x
+      var last = x.args[x.args.length - 1]
+      if (last.name === "=") {
+        last = last.args[0]
+      }
+      statements.push(x)
+      return last
     },
     compile: function (x) {
       return resetPriority(0, function () { // TODO test this
-        var s = minify(x.isInline ? " " : "\n" + space() + "    ")
+        var s = minify("\n" + space() + "    ")
+        //var s = minify(x.isInline ? " " : "\n" + space() + "    ")
         return "var " + x.args.map(compile).join("," + s)
       })
     }
   }
   
-  ops[";"] = {
-    compile: function (x) {
-      return x.args.map(compile).join(";\n")
-    }
-  }
-  
-  ops["void"] = unary("void ")
-  ops["return"] = unary("return ")
-  ops["+"]    = infix("+")
-  
-  ops[","] = {
+  ops["top"] = {
     statement: function (x) {
       x.args.forEach(function (x) {
         statement(x)
       })
     },
     expression: function (x) {
+      return expression(new data.Op(",", x.args))
+    },
+    compile: compileSeparator("\n\n")
+  }
+
+  ops[";"] = Object.create(ops["top"])
+  ops[";"].compile = compileSeparator("\n")
+
+  ops[","] = {
+    statement: ops["top"].statement,
+    expression: function (x) {
       x.args = x.args.map(expression)
       return x
     },
     compile: function (x) {
-      return compile(new data.Op(";", x.args))
       return withPriority(5, function () {
         return x.args.map(function (x, i) {
-          /*if (i === 0) {
+          if (i === 0) {
             return compileFn(x)
-          } else {*/
+          } else {
             return compile(x)
-          //}
+          }
         }).join("," + minify(" "))
       })
     }
   }
+
+  ops["return"] = unary("return ")
+
+  ops["+"]      = infix("+", 60)
+  ops["="]      = infix("=", 10)
   
   ops["function"] = {
     expression: function (x) {
-      x.args = x.args.map(expression)
+      x.args[0] = expression(x.args[0])
+      x.args[1] = blockStatement(x.args[1])
       return x
     },
     compile: function (x) {
-      return "(function(" + x.args[0].args.map(compile).join(", ") + "){" + compile(x.args[1]) + "})"
+      return resetPriority(0, function () {
+        return withScope("function", function () {
+          var args = x.args[0].args.map(compile).join("," + minify(" "))
+          return "function" + minify(" ") + "(" + args + ")" + minify(" ") + braces(x.args[1])
+        })
+      })
     }
   }
-  
-  ops["="] = {
-    expression: function (x) {
-      x.args = x.args.map(expression)
-      return x
-    },
-    compile: function (x) {
-      return compile(x.args[0]) + " = " + compile(x.args[1])
-    }
-  }
-  
-  function compile(x) {
-    if (x instanceof data.Op) {
-      return get(x.name).compile(x)
-    } else if (x instanceof data.Box) {
-      return x.value
-    } else if (x instanceof data.Symbol) {
-      return x.value
-    } else if (x instanceof data.Number) {
-      return "" + x.value
-    } else if (x instanceof data.String) {
-      return "\"" + x.value.replace(/[\\"]/g, "\\$&").replace(/\n/g, "\\n") + "\""
-    } else {
-      error(x, "unknown data type: " + x)
-    }
-  }
-  
-  function statement(x) {
-    if (x instanceof data.Op) {
-      var y = get(x.name)
-      if (y.statement != null) {
-        y.statement(x)
-      } else {
-        statements.push(y.expression(x))
-      }
-    } else {
-      statements.push(x)
-    }
-  }
-  
-  function expression(x) {
-    if (x instanceof data.Op) {
-      return get(x.name).expression(x)
-    } else {
-      return x
-    }
-  }
+
   
   function expressionTop(r) {
-    return r.map(function (x) {
+    return new data.Op(";", r.map(function (x) {
       return expression(x)
-    })
+    }))
   }
-  
-  // TODO use compileFn if I change this to accept a single argument rather than an array
-  function compileTop(r) {
-    return compile(new data.Op(";", r))
+
+  function compileTop(x) {
+    return compileFn(x)
   }
   
   function statementTop(r) {
@@ -284,7 +459,7 @@ define(["./data", "./box", "./error"], function (data, box, error) {
       r.forEach(function (x) {
         statement(x)
       })
-      return statements
+      return new data.Op("top", statements)
     } finally {
       statements = old
     }
@@ -310,7 +485,7 @@ define(["./data", "./box", "./error"], function (data, box, error) {
         a.push(name)
       }
       a.push(imports)
-      a.push(new data.Op("function", [args, new data.Op(",", r.concat([exports]))]))
+      a.push(new data.Op("function", [args, new data.Op("top", [new data.String("use strict")].concat(r, [exports]))]))
       return statementTop([new data.Op("call", a)])
     })
   }
@@ -323,7 +498,7 @@ define(["./data", "./box", "./error"], function (data, box, error) {
         error(m, "expected no module name but got ", [name])
       }
       a.push(imports)
-      a.push(new data.Op("function", [args, new data.Op(",", r)]))
+      a.push(new data.Op("function", [args, new data.Op("top", [new data.String("use strict")].concat(r))]))
       return statementTop([new data.Op("call", a)])
     })
   }

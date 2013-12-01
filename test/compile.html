@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body>
+    <script src="../lib/requirejs/require.js"></script>
+    <script>
+      require(["../src/options", "../src/box", "../src/compile", "../src/data"], function (options, box, compile, data) {
+        "use strict";
+
+        var a = box.make("a")
+          , b = box.make("b")
+          , c = box.make("c")
+
+        options.minified = false
+        options.warnings = false
+        
+        // TODO
+        function bypass(x) { return x }
+        var lineComment = bypass
+          , blockComment = bypass
+          , docComment = bypass
+        
+        function symbol(x) {
+          return new data.Symbol(x)
+        }
+        
+        function unique(x) {
+          return box.make(x)
+        }
+        
+        function fromJSON(x) {
+          if (Array.isArray(x)) {
+            return new data.Op(x[0], x.slice(1).map(fromJSON))
+          } else if (typeof x === "number") {
+            return new data.Number(x)
+          } else if (typeof x === "string") {
+            return new data.String(x)
+          } else if (x instanceof data.Box || x instanceof data.Symbol) {
+            return x
+          } else {
+            throw new Error()
+          }
+        }
+
+        function expr(a) {
+          a.forEach(function (x) {
+            x = fromJSON(x)
+            try {
+              console.log(compile.compile(compile.statement([x])))
+            } catch (e) {
+              console.error(e.message)
+            }
+          })
+        }
+
+        var ret = ["function", [",", c],
+                    [",", ["+", a, b, c],
+                          ["return", ["+", a, b, c]]]]
+
+        expr([
+          "foo\\\"\n\t\b\v\f\r",
+
+          ["&&", 1, 2, 3, 4],
+
+          ["===", 1, 2, 3],
+
+          ["===", 1, ["call", 2, 3], 4],
+
+          ["===", ["call", 1, 2], 2, 3],
+
+          ["===", ["call", 1, 2], ["call", 2, 3], 3],
+
+          ["===", ["call", 1, 2], ["call", 2, 3], ["call", 3, 4]],
+
+          ["===", ["call", 1, 2], ["call", 2, 3], ["call", 3, 4], ["call", 4, 5]],
+
+          ["<", 1, 2, 3],
+
+          ["<", ["call", 1, 2], 2, 3],
+
+          ["<", ["call", 1, 2], ["call", 2, 3], 3],
+
+          ["<", ["call", 1, 2], ["call", 2, 3], ["call", 3, 4]],
+
+          ["<", ["call", 1, 2], ["call", 2, 3], ["call", 3, 4], ["call", 4, 5]],
+
+          [",", ["+", 1, 2],
+                ["function", [",", a, b],
+                  [",", ["return", ret]]]],
+
+          [",", ["function", [",", a, b],
+                  [",", ["return", ret]]]],
+
+          ["+", 1, 2, 3, 4, 5],
+
+          ["+", 1, ["*", 2, 3]],
+
+          ["*", 1, ["+", 2, 3]],
+
+          ["+", ["-", 2, 3], 1],
+
+          ["+", 1, ["-", 2, 3]],
+
+          ["=", a, ["=", b, 1]],
+
+          ["=", ["=", b, 1], a],
+
+          ["+", ["=", a, 1], 2],
+
+          ["typeof", ["function", [","],
+                       ["+", ["=", a, 1], 2]]],
+
+          ["+", ["+", 1]],
+
+          ["-", ["-", 1]],
+
+          ["+", ["!", 1]],
+
+          ["+", ["-", 1]],
+
+          ["!", ["!", 1]],
+
+          ["typeof", ["typeof", 1]],
+
+          [","],
+
+          [",", 1],
+
+
+          ["<", 1, ["if", 2, 3, 4]],
+
+          ["if"],
+
+          ["if", 1],
+
+          ["if", 1, 2],
+
+          ["if", 1, [",", 2, 3]],
+
+          ["if", 1, 2, 3],
+
+          ["if", 1, 2, 3, 4],
+
+          ["if", 1, 2, 3, 4, 5],
+
+          ["if", 1, 2, 3, 4, 5, 6],
+
+          ["if", 1, ["function", [","], 2], ["function", [","], 3]],
+
+          ["if", 1, 2.5, [",", 3, 3.5]],
+
+          ["if", 1, [",", 2, 5, 2.5], 3.5],
+
+          ["if", 1, [",", 2, 5, 2.5], [",", 3, 3.5]],
+
+          ["if", ["+", a, 1], 2, 3],
+
+          ["if", ["=", a, 1], 2, 3],
+
+
+          [",", ["if", 1, 2, 3], 4],
+
+          [",", ["if", 1, [",", 2, 3], 5], 4],
+
+          [",", ["if", 1, 3, [",", 4, 5]], 4],
+
+          [",", ["if", 1, [",", 2, 3]], 4],
+
+          [",", ["if", 1, [",", 2, 3], [",", 4, 5]], 4],
+
+
+          ["+", 1, ["if", 1, 2]],
+
+          ["||", 1, ["if", 1, 2]],
+
+          ["+", ["if", 1, 2, 3], 4],
+
+          ["+", 4, ["if", 1, 2, 3]],
+
+          ["function", [","],
+            ["if", 1, 2, 3]],
+
+          ["function", [","],
+            ["if", ["var", ["=", a, 1]], ["var", ["=", b, 2]], ["var", ["=", c, 3]]]],
+
+          [",", ["var", ["=", a, 1]], ["var", ["=", b, 2]]],
+
+
+          ["while", 1, 2],
+
+          ["while", 1, ["var", ["=", a, ["break", 1]]]],
+
+          ["while", 1, ["var", ["=", a, 2]]],
+
+
+          [",", ["function", [","], 1]],
+
+          ["function", [","],
+            ["+", 1, ["return", 2]]],
+
+          ["function", [","],
+            ["+", ["call", 1, 2], ["call", 2, 3], ["return", 2], ["call", 3, 4]]],
+
+          ["function", [","],
+            ["function", [","], 3]],
+
+          ["++", ["++", 1]],
+
+          ["call", ["+", 1, 2], ["+", 2, 3]],
+
+          ["call", ["function", [","], 1], 2],
+
+          ["+", 1, ["var", a]],
+
+          [",", ["var", ["=", a, 1]], 2],
+
+          ["+", 1, ["var", ["=", a, 2]]],
+
+          ["+", 1, ["var", ["=", a, 2], ["=", b, 3]]],
+
+          ["+", 1, ["var", ["=", a, [",", ["var", b], 2, 3]]]],
+
+          [",", ["call", 3, 4], ["debugger"], ["call", 1, 2]],
+
+          [",", ["call", 3, 4], ["throw"], ["call", 1, 2]],
+
+          [",", ["+", 0, ["=", a, 1]], ["=", b, 2], 3, 4, 5],
+
+          ["+", 1, ["var", ["=", a, 2], ["=", b, 3], c]],
+
+          ["function", [","],
+            ["=", [",", 1, 2, 3], [",", 4, 5, 6]]],
+
+          ["function", [","],
+            ["+", [",", 1, 2, 3], [",", 4, 5, 6]]],
+
+          ["function", [","],
+            ["+", [",", 1, 2, 3]]],
+
+
+          ["var", ["=", c, 5],
+                  ["=", a, 10],
+                  ["=", a, ["function", [","], ["return", 3]]],
+                  ["=", c, 5],
+                  ["=", b, ["function", [","], ["return", 4]]]],
+
+          ["var", ["=", c, ["call", 5, 10]],
+                  ["=", a, ["delete", 10]],
+                  ["=", a, ["function", [","], ["return", 3]]],
+                  ["=", c, ["+", 5, 20]],
+                  ["=", b, ["function", [","], ["return", 4]]]],
+
+          ["var", ["=", a, 5],
+                  ["=", a, 10],
+                  ["=", a, ["function", [","], ["return", 3]]],
+                  ["=", b, 5],
+                  ["=", b, ["function", [","], ["return", 4]]]],
+
+          ["function", [","],
+            ["var", ["=", c, 5],
+                    ["=", a, 10],
+                    ["=", a, ["function", [","], ["return", 3]]],
+                    ["=", c, 5],
+                    ["=", b, ["function", [","], ["return", 4]]]]],
+
+          ["function", [","],
+            [",", a,
+                  ["var", ["=", a, 10]]]],
+
+          ["var", ["=", a, ["function", [","], ["return", unique("d")]]]],
+
+          [",", ["var", a],
+                ["=", a, ["function", [","], ["return", unique("d")]]]],
+
+          ["function-var", a, [","], ["return", unique("d")]],
+
+          ["try", 1, ["catch", a, 2], ["finally", 3]],
+
+          ["try", 1, ["catch", a, [",", 2, 3]], ["finally", [",", 3, 4]]],
+
+          ["function", [","],
+            ["try", 1, ["catch", a, 2], ["finally", 3]]],
+
+          ["function", [","],
+            ["return", ["try", 1, ["catch", a, 2], ["finally", 3]]]],
+
+          ["while", 1, ["=", a, ["break"]]],
+
+          ["var", ["=", a, [",", 1, 2, 3]]],
+
+          ["var", b, c, ["=", a, [",", b, c, 1, 2, 3]], ["=", c, [",", 4, 5, 6]]],
+
+          ["if", [",", 1, 2, 3], 4, 5],
+
+          [".", a, b],
+
+          [".", [",", a, b], c],
+
+          [".", a, "b"],
+
+          [".", a, "b^test aha"],
+
+          [".", 1, "foo"],
+
+          [".", 1.5, "foo"],
+
+          ["new", ["function", [","], 1], 2, 3, 4],
+
+          ["call", [",", a, b], 1, 2, 3],
+
+          ["new", [",", a, b], 1, 2, 3],
+
+          ["new", a, 1, 2, 3],
+
+          ["new", a, [",", 1, 2], 3],
+
+          ["for"],
+          ["for", 1],
+          ["for", 1, 2],
+          ["for", 1, 2, 3],
+          ["for", 1, 2, 3, 4],
+          ["for", ["empty"], ["empty"], ["empty"], 4],
+
+          ["for", 1, 2, 3, [",", 4, 5, 6]],
+
+          ["for", ["var", ["=", a, 1], ["=", b, 2]],
+                  ["<", a, 10],
+                  ["++", a],
+            [",", 4, 5, 6]],
+
+          ["for", [",", ["var", ["=", a, 1]], ["=", b, 2]],
+                  ["<", a, 10],
+                  ["++", a],
+            [",", 4, 5, 6]],
+
+          [",", ["var", ["=", a, 1]], ["=", b, 2]],
+
+          ["for-in", 1, 2, 3],
+
+          ["for-in", ["var", ["=", a, 1]], 2, 3],
+
+          ["for-in", ["var", a], 2],
+          ["for-in", ["var", a], 2, 3],
+
+          ["for-in", ["var", a], [",", 2, 3, 4], 5],
+
+          ["for-in", ["var", a], 2, [",", 3, 4, 5]],
+
+          ["for-in", ["var", a, b], 2, 3],
+
+          ["for-in", [",", ["=", b, 1], ["var", a]], 2, 3],
+
+          ["for-in", [",", ["=", b, 1], a], 2, 3],
+
+          ["array", 1, 2, 3, 4, 5],
+
+          ["array", 1, [",", 2, 3], 4, 5],
+
+          ["+", 3, ["object", ["=", "a", 1], ["=", "b", 2]]],
+
+          ["+", ["object", ["=", "a", 1], ["=", "b", 2]], 3],
+
+          ["object", ["=", "a", 1], ["=", "b", 2]],
+
+          ["object", ["=", "a", 1], ["=", "b", 2]],
+
+          ["object", ["=", "a", ["function", [","], 1]], ["=", "b", 2]],
+
+          ["object", ["=", "a", [",", 1, 2]], ["=", "b", 3]],
+
+          ["object", ["=", "a", ["object", ["=", "b", 2]]], ["=", "c", 3]],
+
+          ["object", ["=", "a^test aha", 1], ["=", "b", 2]],
+
+          ["object", symbol("a"), symbol("b")],
+
+          ["object", symbol("var"), symbol("b")],
+
+          ["object", "var", "b", 1, 5],
+
+          ["+", a, b],
+
+          ["+", symbol("hiya"), symbol("a")],
+
+          ["+", unique("a"), unique("b")],
+
+          (function () {
+            var a = unique("a")
+            return ["function", [",", a],
+                     ["+", a, symbol("a")]]
+          })(),
+
+          ["function", [",", symbol("b")],
+            ["+", unique("b"), symbol("b")]],
+
+          ["function", [",", symbol("a")],
+            ["return", ["function", [",", symbol("b")],
+                         ["+", symbol("a"), symbol("b")]]]],
+
+          ["function", [","],
+            [",", ["try", 1,
+                    ["catch", symbol("TEST"),
+                      ["var", ["=", symbol("yes"), 5]]]],
+                  ["+", unique("yes"), unique("TEST")]]],
+
+          ["function", [","],
+            [",", ["try", 1,
+                    ["catch", symbol("TEST"),
+                      unique("TEST")]],
+                  unique("TEST")]],
+
+          ["+", unique("b"), 1],
+
+          ["function-var", symbol("foo"), [","],
+            ["return", 1]],
+
+          ["+", unique("foo"), 1],
+
+          symbol("50fooBar-qux"),
+          symbol("foo&bar"),
+          symbol("foo_bar"),
+          symbol("break"),
+          symbol("NaN"),
+          symbol("arguments"),
+          unique("arguments"),
+          symbol("arguments2"),
+          symbol("_"),
+
+          [",", bypass("var YESNOTESTINGHAHAHA = 5"),
+                ["+", 5, 20]],
+
+          ["+", 1, ["var", ["=", symbol("a"), 2]]],
+
+          ["function", [","],
+            [",", ["return", 1], 2]],
+
+          ["function", [","],
+            ["return", ["if", 1, 2, 3]]],
+
+          ["function", [","],
+            ["return", ["if", ["return", 1], 2, 3]]],
+
+          ["function", [","],
+            ["return", ["if", 1, ["return", 2]]]],
+
+          ["function", [","],
+            ["return", ["if", 1, ["return", 2], ["return", 3]]]],
+
+          ["function", [","],
+            ["return", ["if", 1, ["try", 2, ["finally", 3]], 4]]],
+
+          ["function", [","],
+            ["if", 1, 2]],
+
+          ["function", [","],
+            ["if", 1, 2, 3]],
+
+          ["function", [","],
+            ["if", 1, ["throw", 2], ["throw", 3]]],
+
+          ["function", [","],
+            ["if", 1, ["throw", 2]]],
+
+          ["function", [","],
+            ["if", 1, ["try", 2, ["finally", 3]], 4]],
+
+          ["call", ["call", 1, 2], ["try", 3, ["finally", 4]], ["call", 5, 6]],
+
+
+          ["+", ["call", 1, 2], ["throw", 3]],
+          ["+", ["call", 1, 2], ["debugger"]],
+          ["+", ["call", 1, 2], ["try", 3, ["finally", 4]], ["throw", 3]],
+          ["+", ["call", 1, 2], ["try", 3, ["finally", 4]]],
+          ["+", ["call", 1, 2], ["while", 3, 4]],
+          ["+", ["call", 1, 2], ["var", ["=", symbol("a"), ["call", 3, 4]]]],
+
+          ["+", ["call", 1, 2], ["var", ["=", symbol("a"), ["function", [","], ["return", 3]]]]],
+
+          ["+", ["call", symbol("a")],
+                ["var", ["=", symbol("a"), 3]]],
+
+          ["+", ["+", ["call", symbol("b")], 2],
+                ["var", ["=", symbol("a"), ["call", 3, 4]]]],
+
+          ["+", symbol("a"),
+                ["var", ["=", symbol("a"), 3]]],
+
+          ["+", ["+", symbol("a"), 2],
+                ["var", ["=", symbol("a"), 3]]],
+
+          ["+", symbol("b"),
+                ["var", ["=", symbol("a"), 3]]],
+
+
+          ["=", a, ["=", b, ["=", c, 1]]],
+          ["=", a, b, c, 1],
+
+          lineComment("foobarquxcorge"),
+          blockComment("testing*/\ntesting\ntesting"),
+          docComment("testing*/\ntesting\ntesting"),
+
+          [",", blockComment("testing*/\ntesting\ntesting"),
+                ["call", 1, 2]],
+
+          ["function", [","],
+            [",", blockComment("documentation goes here"),
+                  lineComment("documentation goes here"),
+                  ["return", 2]]],
+
+          [",", 1, 2, ["empty"], 3],
+          [",", 1, 2, ["empty"]],
+          ["+", 1, ["empty"]],
+          ["+", [",", 1, 2, ["empty"], 3]],
+          ["+", [",", 1, 2, ["empty"]]],
+
+          ["function", [","],
+            ["return"]],
+
+          ["function", [","],
+            ["return", ["empty"]]],
+
+          ["function", [","],
+            ["return", ["void", 0]]],
+
+          ["function", [","],
+            [",", 2,
+                  ["return", ["void", 0]]]],
+
+          ["function", [","],
+            [",", 2,
+                  [",", 3,
+                        ["return", ["void", 0]]]]],
+
+          ["function", [","],
+            [",", ["return", ["void", 0]],
+                  2]],
+
+          ["function", [","],
+            ["return", ["void", ["=", a, 0]]]],
+
+          ["function", [","],
+            ["throw", ["empty"]]],
+
+          ["function", [","],
+            ["return", ["if", 1]]],
+
+          ["function", [","],
+            ["return", ["if", 1,
+                         ["var", ["=", a, 2]]]]],
+
+          ["function", [","],
+            [",", ["return", ["if", 1,
+                               ["var", ["=", a, 2]]]],
+                  3]],
+
+          ["function", [","],
+            ["return", ["if", 1,
+                         ["var", ["=", a, 2]],
+                         ["var", ["=", a, 3]]]]],
+
+          ["function", [","],
+            ["return", ["if", 1,
+                         ["var", ["=", a, 2]],
+                         3]]],
+
+          ["function", [","],
+            ["return", ["if", 1,
+                         2,
+                         ["var", ["=", a, 3]]]]],
+
+          ["function", [","],
+            ["return", ["if", 1, 2, 3]]],
+
+          ["function", [","],
+            ["return", ["try", 1,
+                         ["catch", a]]]],
+
+          ["function", [","],
+            [",", ["return", ["try", 1,
+                               ["catch", a]]],
+                  2]],
+
+          ["function", [","],
+            ["return", ["try", 1,
+                         ["catch", a, 2]]]],
+
+          ["function", [","],
+            ["return", ["try", 1,
+                         ["catch", a, 2],
+                         ["finally", 3]]]],
+
+
+          ["try", 1, ["catch", a, 2], ["catch", b, 3]],
+          ["try", 1, ["finally", 2], ["catch", b, 3]],
+          ["try", 1, ["finally", 2], ["finally", 3]],
+
+          ["call", 1, ["...", 2]],
+          ["call", 1, ["...", 2], 3],
+          ["call", 1, 2, ["...", 3]],
+          ["call", 1, 2, ["...", 3], 4],
+
+          ["array", ["...", 2]],
+          ["array", ["...", 1], 2],
+          ["array", 1, ["...", 2]],
+          ["array", 1, ["...", 2], 3],
+
+          ["var", ["=", ["object", symbol("a"), symbol("b")],
+                        ["object"]]],
+
+          ["var", ["=", ["object", "a", "b"],
+                        ["object"]]],
+
+          ["var", ["=", ["object", ["=", symbol("a"), symbol("b")],
+                                   ["=", "foo", symbol("bar")],
+                                   ["=", "he^llo", ["array", symbol("yes"), symbol("no")]]],
+                        ["object"]]],
+
+          ["var", ["=", ["array", symbol("a"), symbol("b")],
+                        ["array", 1, 2]]],
+
+          ["var", ["=", ["array", symbol("a"), ["empty"], symbol("b")],
+                        ["array", 1, 2, 3]]],
+
+          ["var", ["=", ["array", symbol("a"), ["...", symbol("b")]],
+                        ["array", 1, 2]]],
+
+          ["var", ["=", ["array", symbol("a"),
+                                  ["...", symbol("b")],
+                                  symbol("c")],
+                        ["array", 1, 2]]],
+
+          ["var", ["=", ["array", symbol("a"),
+                                  ["...", symbol("b")],
+                                  symbol("c"),
+                                  symbol("d")],
+                        ["array", 1, 2]]],
+
+          ["var", ["=", ["array", symbol("a"),
+                                  ["array", symbol("b"), symbol("c")]],
+                        ["array", 1, ["array", 2, 3]]]],
+
+          ["=", ["array", symbol("a"), symbol("b")],
+                ["array", 1, 2]],
+
+          ["=", ["array", ["array", symbol("a")], symbol("b")],
+                ["array", ["array", 1], 2]],
+
+          ["=", ["array", symbol("a"), ["array", symbol("b")]],
+                ["array", 1, ["array", 2]]],
+
+          ["function", [",", symbol("a"), ["empty"], symbol("b")]],
+          ["function", [",", symbol("a"), ["empty"], ["...", symbol("b")], ["empty"]]],
+          ["function", [",", symbol("a"), ["...", symbol("b")]]],
+          ["function", [",", symbol("a"), ["...", symbol("b")], symbol("c")]],
+          ["function", [",", symbol("a"), ["...", symbol("b")], symbol("c"), symbol("d")]],
+
+          ["function", [",", ["...", symbol("a")]]],
+
+          ["function", [",", ["array", symbol("a"), symbol("b")]]],
+          ["function", [",", ["array", symbol("a"), symbol("b")]], 1],
+
+          ["function", [",", unique(), unique()],
+            ["function", [",", unique(), unique()], ["empty"]]],
+
+          (function () {
+            var b = unique()
+            return ["function", [",", unique(), b],
+                     ["function", [",", unique(), unique()], b]]
+          })(),
+
+          (function () {
+            var b = unique()
+            return ["function", [",", unique(), b],
+                     ["function", [",", unique(), unique(), b], b]]
+          })(),
+
+          (function () {
+            var b = unique()
+            return ["function", [",", unique(), b],
+                     ["function", [",", unique(), unique(), b], ["empty"]]]
+          })(),
+
+          (function () {
+            var b = unique()
+            return ["function", [",", unique(), b],
+                     ["function", [",", unique(), unique()],
+                       [",", ["var", ["=", b, 1]],
+                             b]]]
+          })(),
+
+          (function () {
+            var a = unique("arguments")
+            return a
+          })(),
+
+          (function () {
+            var a = unique("arguments")
+            return [",", a,
+                         ["function", [","],
+                           a]]
+          })(),
+
+          ["+", ["-", 1]],
+          ["+", ["+", 1]],
+          ["+", 1, ["+", 2]],
+          ["+", ["+", 1], ["+", 2]],
+          ["+", ["+", 1, 2], ["+", 3, 4]],
+          ["+", ["+", ["+", 1], ["+", 2]]],
+          ["-", ["+", 1, ["+", 2]]],
+
+          ["function", [","], ["this"]],
+          ["function", [","], symbol("this")],
+
+          ["call", 1, 2, ["empty"], 3],
+
+          ["function", [",", symbol("foo"), symbol("bar")],
+            symbol("foo")],
+
+          ["var", ["=", [".", symbol("foo"), "bar"], 1]],
+          ["var", ["=", [".", symbol("foo"), "bar"], ["array", 1, 2]]],
+
+          ["=", [".", symbol("foo"), "bar"], 1],
+
+          ["var", ["=", ["=", symbol("a"), 1], 2]],
+          ["var", ["=", ["=", symbol("a"), ["array", 1, 2]], ["array", 2, 3]]],
+          ["var", ["=", ["=", ["array", symbol("a"), symbol("b")], ["array", 1, 2]], symbol("c")]],
+
+          ["function", [",", ["=", symbol("a"), 2]], 1],
+
+          ["function", [",", [".", symbol("a"), "b"]],
+            1],
+        ])
+
+        /*;(function () {
+          var scope = {}
+            , x = fromJSON([",", ["import", ["object", symbol("foo")], "./lib/foo"],
+                                 ["export", ["var", ["=", symbol("bar")], 1]]]])
+          x = nino.module(x)
+          x = nino.traverse(x, scope)
+          x = nino.replace(x, scope)
+          x = nino.compile(x)
+          console.log(x)
+        })()*/
+
+        /*parse([
+          "var a = 5",
+          "var a = function (x) { return 1 + (2 + 3) }; a(20)",
+          "var [a, b] = [1, 2]",
+          "(function ([a, ...b]) { return b })",
+          "var { a } = { a: 1 }",
+          "(function (...a, b) { return a })",
+          "[1, ...a, 2, 3]",
+          "foo(1, ...bar, 2)",
+          "{ x, y }",
+        ])*/
+
+        /*expr(["switch", 1,
+               ["case", 0, 2],
+               ["fallthru", 0, 5],
+               ["case", 0, 3],
+               ["default", 4]])
+
+        expr(["switch", 1,
+               ["case", 0, [",", 2, 3]],
+               ["fallthru", 0, 5],
+               ["case", 0, [",", 3, 4]],
+               ["default", 4]])
+
+        expr(["function", [","],
+               ["switch", 1,
+                 ["case", 0, [",", 2, 3]],
+                 ["fallthru", 0, 5],
+                 ["case", 0, [",", 3, 4]],
+                 ["default", 4]]])*/
+      })
+    </script>
+  </body>
+</html>

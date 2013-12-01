@@ -2,6 +2,7 @@ define(["./scope"], function (scope) {
   "use strict";
   
   var boxes = {}
+  var modules = {}
 
   var vars = scope.make()
   
@@ -53,6 +54,7 @@ define(["./scope"], function (scope) {
   })()
   
   return {
+    modules: modules,
     boxes: boxes,
     vars: vars,
     mode: mode,
