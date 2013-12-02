@@ -113,7 +113,11 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   }
   
   function get(s) {
-    console.assert(s in vars)
+    // TODO console.assert
+    if (!(s in vars)) {
+      throw new Error("builtin \"" + s + "\" does not exist")
+    }
+    //console.assert(s in vars)
     return vars[s]
   }
 
@@ -498,7 +502,6 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
             u = new data.MacexBypass(macex.macex(x[2]))
           }
           after.push(function () {
-            console.log(u)
             return macex.macex(patternMatch(x[1], u))
           })
         } else {
@@ -756,13 +759,6 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       }
     }
   })
-  
-  /*"_": {
-    priority: Infinity,
-    parse: function (l, s, r) {
-      return l.concat([[s]], r)
-    }
-  },*/
 
   set(";", function (o) {
     o[data.syntax] = {
@@ -972,12 +968,34 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       }
     }
   })
+  
+  set("_", function (o) {
+    o[data.pattern] = function (a) {
+      return macex.macex(a[2])
+    }
+    o[data.syntax] = {
+      priority: Infinity,
+      parse: function (l, s, r) {
+        return l.concat([[s]], r)
+      }
+    }
+  })
 
   set("->", function (o) {
     o[data.macex] = function (a) {
-      return op("function", a[0],
-                  [op(",", a[0], []),
-                   op("return", a[0], [macex.macex(a[2])])])
+      var args = []
+        , body = []
+      a[1].forEach(function (x) {
+        if (Array.isArray(x)) {
+          var u = box.make()
+          body.push(macex.macex(patternMatch(x, u)))
+          args.push(u)
+        } else {
+          args.push(box.set(x))
+        }
+      })
+      body.push(op("return", a[0], [macex.macex(a[2])]))
+      return op("function", a[0], [op(",", a[0], args), op(",", a[0], body)])
     }
     o[data.syntax] = {
       priority: 10,
@@ -993,6 +1011,25 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     }
   })
   
+  set("null?", function (o) {
+    o[data.macex] = function (a) {
+      checkArguments(a, 1)
+      return op("==", a[0], [macex.macex(a[1]), op("null", a[0], [])])
+    }
+  })
+  
+  set("if", function (o) {
+    o[data.macex] = function (a) {
+      //checkArguments(a, 1, 3) // TODO
+      return state.vars.push({}, function () {
+        var test = macex.macex(a[1])
+          , yes  = state.vars.push({}, function () { return macex.macex(a[2]) })
+          , no   = state.vars.push({}, function () { return macex.macex(a[3]) })
+        return op("if", a[0], [test, yes, no])
+      })
+    }
+  })
+
   set("w/new-scope", function (o) {
     o[data.macex] = function (a) {
       checkArguments(a, 1)
@@ -1003,6 +1040,11 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   })
 
   set("=", function (o) {
+    o[data.pattern] = function (a) {
+      var args = a[1]
+        , val  = a[2]
+      return macex.macex(patternMatch(args[0], [get("if"), [get("null?"), val], args[1], val]))
+    }
     o[data.syntax] = {
       //priority: 100, // TODO why is this priority 10 ?
       indent: true,

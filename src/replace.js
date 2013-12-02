@@ -1,6 +1,34 @@
 define(["./data", "./options", "./scope"], function (data, options, scope) {
   "use strict";
   
+  var reserved = {}
+  
+  // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Reserved_Words
+  ;("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with " +
+    "class enum export extends import super " +
+    "implements interface let package private protected public static yield " +
+    "null true false").split(" ").forEach(function (s) {
+    reserved[s] = true
+  })
+    
+  function mangle(s) {
+    if (reserved[s]) {
+      return "_" + s
+    } else {
+      return options.mangle(s)
+    }
+  }
+  
+  function unmangle(s) {
+    var x = /^_(.*)$/.exec(s)
+    console.log(x)
+    if (x && reserved[x[1]]) {
+      return x[1]
+    } else {
+      return options.unmangle(s)
+    }
+  }
+  
   var boxes = scope.make()
   
   function getNextUniq(s) {
@@ -24,10 +52,11 @@ define(["./data", "./options", "./scope"], function (data, options, scope) {
         s = getNextUniq(s)
       }
     } else {
-      var s = x.value
-        , i = 2
+      var orig = mangle(x.value)
+        , s    = orig
+        , i    = 2
       while (symbols[s]) {
-        s = x.value + i
+        s = orig + i
         ++i
       }
     }
@@ -55,8 +84,12 @@ define(["./data", "./options", "./scope"], function (data, options, scope) {
     if (x instanceof data.Box) {
       var y = boxToSym(x, symbols)
       boxes.set(x.id, y)
-      findSymbols(y, symbols)
+      setSym(y, symbols)
     }
+  }
+  
+  function setSym(x, symbols) {
+    symbols[x.value] = true
   }
   
   function findSymbols(x, symbols) {
@@ -65,10 +98,10 @@ define(["./data", "./options", "./scope"], function (data, options, scope) {
         findSymbols(x, symbols)
       })
     } else if (x instanceof data.Symbol) {
-      symbols[x.value] = true
+      symbols[mangle(x.value)] = true
     } else if (x instanceof data.Box) {
       if (boxes.has(x.id)) {
-        findSymbols(boxes.get(x.id), symbols)
+        setSym(boxes.get(x.id), symbols)
       }
     }
   }
@@ -94,6 +127,9 @@ define(["./data", "./options", "./scope"], function (data, options, scope) {
           return loop(x, symbols)
         }))
       }
+    } else if (x instanceof data.Symbol) {
+      // TODO loc
+      return new data.Symbol(mangle(x.value))
     } else if (x instanceof data.Box) {
       if (boxes.has(x.id)) {
         return boxes.get(x.id)

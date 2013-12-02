@@ -7,42 +7,12 @@ define(["./data", "./error", "./options"], function (data, error, options) {
     , statements
   
   var ops = {}
-  
-  var reserved = {}
-  
-  // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Reserved_Words
-  ;("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with " +
-    "class enum export extends import super " +
-    "implements interface let package private protected public static yield " +
-    "null true false").split(" ").forEach(function (s) {
-    reserved[s] = true
-  })
 
   // TODO Unicode support
+  // TODO it should check reserved
+  // TODO move name-related stuff into a separate module
   function isValidJS(x) {
     return /^[$_a-zA-Z][$_a-zA-Z0-9]*$/.test(x)
-  }
-    
-  function mangle(s) {
-    if (reserved[s]) {
-      return "_" + s
-    } else {
-      s = options.mangle(s)
-      if (!isValidJS(s)) {
-        throw new Error("expected valid JavaScript identifier but got: " + s)
-      }
-      return s
-    }
-  }
-  
-  function unmangle(s) {
-    var x = /^_(.*)$/.exec(s)
-    console.log(x)
-    if (x && reserved[x[1]]) {
-      return x[1]
-    } else {
-      return options.unmangle(s)
-    }
   }
   
   function jsProp(x) {
@@ -148,6 +118,9 @@ define(["./data", "./error", "./options"], function (data, error, options) {
       }*/
       return s
     } else if (x instanceof data.Symbol) {
+      if (!isValidJS(x.value)) {
+        throw new Error("expected valid JavaScript identifier but got: " + x.value)
+      }
       return "" + x.value
     } else if (x instanceof data.Number) {
       return "" + x.value
@@ -192,11 +165,28 @@ define(["./data", "./error", "./options"], function (data, error, options) {
     statements = []
     try {
       statement(x)
+      // TODO do the same optimization for statementTop
+      var a = []
+        , r = []
+      statements.forEach(function (x) {
+        if (x instanceof data.Op && x.name === "var") {
+          r = r.concat(x.args)
+        } else {
+          if (r.length) {
+            a.push(new data.Op("var", r))
+            r = []
+          }
+          a.push(x)
+        }
+      })
+      if (r.length) {
+        a.push(new data.Op("var", r))
+      }
       // TODO hacky
       if (x.name === "top") {
-        return new data.Op("top", statements)
+        return new data.Op("top", a)
       } else {
-        return new data.Op(";", statements)
+        return new data.Op(";", a)
       }
     } finally {
       statements = old
@@ -376,6 +366,39 @@ define(["./data", "./error", "./options"], function (data, error, options) {
     }
   }
   
+  ops["?:"] = {
+    expression: function (x) {
+      x.args = x.args.map(expression)
+      return x
+    },
+    compile: function (x) {
+      return withPriority(15, function () {
+        return minify("(") + compileFn(x.args[0]) + minify(" ") + "?" + minify(" ") +
+               compile(x.args[1])   + minify(" ") + ":" + minify(" ") +
+               compile(x.args[2]) + minify(")")
+      })
+    }
+  }
+  
+  ops["if"] = {
+    statement: function (x) {
+      x.args[0] = expression(x.args[0])
+      if (x.args.length > 1) {
+        x.args[1] = blockStatement(x.args[1])
+      }
+      if (x.args.length > 2) {
+        x.args[2] = blockStatement(x.args[2])
+      }
+      statements.push(x)
+    },
+    expression: function (x) {
+      return expression(new data.Op("?:", x.args))
+    },
+    compile: function (x) {
+      return "if" + minify(" ") + "(" + compile(x.args[0]) + ")" + minify(" ") + braces(x.args[1]) + minify(" ") + "else" + minify(" ") + braces(x.args[2])
+    }
+  }
+  
   ops["var"] = {
     statement: function (x) {
       x.args = x.args.map(expression)
@@ -384,7 +407,7 @@ define(["./data", "./error", "./options"], function (data, error, options) {
     expression: function (x) {
       x.args = x.args.map(expression)
       var last = x.args[x.args.length - 1]
-      if (last.name === "=") {
+      if (last instanceof data.Op && last.name === "=") {
         last = last.args[0]
       }
       statements.push(x)
@@ -392,9 +415,37 @@ define(["./data", "./error", "./options"], function (data, error, options) {
     },
     compile: function (x) {
       return resetPriority(0, function () { // TODO test this
-        var s = minify("\n" + space() + "    ")
+        var assigns = []
+          , empties = []
+
+        var max = 0
+        x.args.forEach(function (x) {
+          if (x instanceof data.Op && x.name === "=") {
+            var k = x.args[0]
+            if (!(k instanceof data.Symbol)) {
+              error(k, "expected symbol but got: ", [k])
+            }
+            max = Math.max(max, k.value.length)
+            assigns.push(x)
+          } else {
+            empties.push(x)
+          }
+        })
+        
+        if (assigns.length) {
+          assigns = assigns.map(function (x) {
+            var k = x.args[0]
+            return compile(k) + minify(new Array(max - k.value.length + 1).join(" ")) +
+                     minify(" ") + "=" + minify(" ") +
+                     compile(x.args[1])
+          })
+        }
+        if (empties.length) {
+          assigns.push(empties.map(compile).join("," + minify(" ")))
+        }
+
         //var s = minify(x.isInline ? " " : "\n" + space() + "    ")
-        return "var " + x.args.map(compile).join("," + s)
+        return "var " + assigns.join("," + minify("\n" + space() + "    "))
       })
     }
   }
@@ -441,7 +492,17 @@ define(["./data", "./error", "./options"], function (data, error, options) {
 
   ops["+"]      = infix("+", 60)
   ops["-"]      = infix("-", 60)
+  ops["=="]     = infix("==", 45)
   ops["="]      = infix("=", 10)
+  
+  ops["null"] = {
+    expression: function (x) {
+      return x
+    },
+    compile: function (x) {
+      return "null"
+    }
+  }
   
   ops["function"] = {
     expression: function (x) {

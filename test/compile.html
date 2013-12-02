@@ -63,6 +63,13 @@
           "foo\\\"\n\t\b\v\f\r",
           
           (function () {
+            var a = unique("_1")
+              , b = unique("__12")
+            return ["function", [",", a, b],
+                     ["return", ["+", ["+", a, b], symbol("_1")]]]
+          })(),
+          
+          (function () {
             var a = unique()
               , b = unique()
             return ["function", [",", a],
