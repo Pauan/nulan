@@ -71,15 +71,15 @@ define(["./data"], function (data) {
     }
   }
   
-  function replaceString(x) {
-    return x.replace(/[\\"]/g, "\\$&").replace(/\n/g, "$&" + spaces(" "))
+  function replaceString(s, x) {
+    return x.replace(new RegExp("\\\\" + s, "g"), "\\$&").replace(/\n/g, "$&" + spaces(" "))
   }
 
-  function printString(mode, x) {
+  function printString(s, mode, x) {
     var r = []
     for (var i = 1, iLen = x.length; i < iLen; ++i) {
       if (x[i] instanceof data.String) {
-        r.push(replaceString(x[i].value))
+        r.push(replaceString(s, x[i].value))
       } else {
         r.push("@(")
         withIndent(indent + r.join("").length + 1, function () {
@@ -88,7 +88,7 @@ define(["./data"], function (data) {
         r.push(")")
       }
     }
-    return "\"" + r.join("") + "\""
+    return s + r.join("") + s
   }
   
   function printObject(mode, x) {
@@ -128,7 +128,7 @@ define(["./data"], function (data) {
 
       } else if (mode === "normal") {
         if (data.isSym(x[0], "\"")) {
-          return printString(mode, x)
+          return printString("\"", mode, x)
         } else if (data.isSym(x[0], "{")) {
           return "{" + printSpecial(mode, x, 1) + "}"
         } else if (data.isSym(x[0], "[")) {
@@ -146,9 +146,9 @@ define(["./data"], function (data) {
       }
 
     } else if (typeof x === "string") {
-      return "\"" + replaceString(x) + "\""
+      return "\"" + replaceString("\"", x) + "\""
     } else if (x instanceof data.String) {
-      return "\"" + replaceString(x.value) + "\""
+      return "\"" + replaceString("\"", x.value) + "\""
     
     } else if (typeof x === "number") {
       return "" + x
@@ -169,7 +169,7 @@ define(["./data"], function (data) {
     
     } else if (x instanceof data.Box) {
       if (x.value != null) {
-        return "#(box " + x.id + " " + x.value + ")"
+        return "#(box " + x.id + " " + print1(mode, new data.Symbol(x.value)) + ")"
       } else {
         return "#(box " + x.id + ")"
       }

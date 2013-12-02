@@ -23,6 +23,19 @@ define(["./data", "./box", "./error", "./state"], function (data, box, error, st
   function compileBoxValue(x) {
     return new data.Op(".", [compileBox(x), new data.String("v")])
   }
+  
+  function macexBox(x, y) {
+    if (data.get in x) {
+      return x[data.get]([x])
+    } else {
+      box.checkMode(x, y)
+      if (state.mode.get() === "run" || x.local) {
+        return x
+      } else {
+        return compileBoxValue(x)
+      }
+    }
+  }
 
   function macex(x) {
     if (x == null) {
@@ -32,17 +45,10 @@ define(["./data", "./box", "./error", "./state"], function (data, box, error, st
     } else if (x instanceof data.MacexBypass) {
       return x.value
     } else if (x instanceof data.Box) {
-      if (data.get in x) {
-        return x[data.get]([x])
-      } else {
-        if (state.mode.get() === "run" || x.local) {
-          return x
-        } else {
-          return compileBoxValue(x)
-        }
-      }
+      return macexBox(x, x)
     } else if (x instanceof data.Symbol) {
-      return macex(box.toBox(x))
+      return macexBox(box.toBox(x), x)
+      //return macex(box.toBox(x))
     } else if (x instanceof data.Number || x instanceof data.String) {
       return x
     } else if (typeof x === "number") {

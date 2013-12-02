@@ -91,16 +91,21 @@ define(["../lib/util/buffer", "./data", "./box", "./error", "../lib/util/iter"],
     return r
   }
 
-  function readIndentedString(i, o) {
+  function readIndentedString(q, i, o) {
     ++i
     while (i-- && o.has()) {
-      var s = o.position()
-      var c = o.read()
+      var c = o.peek()
       // TODO don't hardcore " " ?
-      if (c !== " ") {
-        var x = {}
-        x.loc = o.loc(s, o.position())
-        error(x, "expected space but got " + c)
+      if (c === q) {
+        break
+      } else {
+        var s = o.position()
+        o.read()
+        if (c !== " ") {
+          var x = {}
+          x.loc = o.loc(s, o.position())
+          error(x, "expected space but got " + c)
+        }
       }
     }
   }
@@ -143,7 +148,7 @@ define(["../lib/util/buffer", "./data", "./box", "./error", "../lib/util/iter"],
             o.read()
             var c = o.read()
             if (c === "\n") {
-              readIndentedString(sFirst.column, o)
+              readIndentedString(q, sFirst.column, o)
             } else if (c === "r") {
               a.push("\r")
             } else if (c === "n") {
@@ -180,7 +185,7 @@ define(["../lib/util/buffer", "./data", "./box", "./error", "../lib/util/iter"],
           s = o.position()
         } else if (c === "\n") {
           a.push(o.read())
-          readIndentedString(sFirst.column, o)
+          readIndentedString(q, sFirst.column, o)
         } else {
           a.push(o.read())
         }
@@ -203,7 +208,7 @@ define(["../lib/util/buffer", "./data", "./box", "./error", "../lib/util/iter"],
       o.type = "string"
     })*/
   }
-  
+/*
   // TODO code duplication with string
   function symbol(o, info) {
     var s = o.position()
@@ -254,7 +259,7 @@ define(["../lib/util/buffer", "./data", "./box", "./error", "../lib/util/iter"],
         error(x, "missing ending " + q)
       }
     }
-  }
+  }*/
 
   function numOrSym(o, info) {
     var s = o.position()
@@ -386,6 +391,5 @@ define(["../lib/util/buffer", "./data", "./box", "./error", "../lib/util/iter"],
     //one: one,
     comment: comment,
     string: string,
-    symbol: symbol,
   }
 })

@@ -12,7 +12,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   function toString(x) {
     if (x instanceof data.Symbol) {
       var o = new data.String(x.value)
-      o.loc = data.loc(x, x)
+      o.loc = x.loc // data.loc(x, x)
       return o
     } else {
       return x
@@ -154,6 +154,45 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
     return function (a) {
       checkArgumentsl(a, i)
       return op(s, a[0], a.slice(1).map(macex.macex))
+    }
+  }
+  
+  // TODO so much data.MacexBypass ...
+  // TODO I don't like the reliance on state.assign
+  function patternMatch(x, val) {
+    if (Array.isArray(x)) {
+      var k = box.toBox(x[0])
+      console.assert(k instanceof data.Box)
+      if (data.pattern in k) {
+        return new data.MacexBypass(k[data.pattern]([x[0], x.slice(1), val]))
+      } else {
+        error(x[0], [x[0]], " does not have a pattern property")
+      }
+    } else {
+      var k = (state.assign.get()
+                ? box.toBox(x)
+                : box.set(x))
+      if (k instanceof data.Box && data.set in k) {
+        return new data.MacexBypass([data.set]([x, val]))
+      } else {
+        if (state.mode.get() === "compile" && !k.local) {
+          if (val == null) {
+            return new data.MacexBypass(op("empty", x, []))
+          } else {
+            return new data.MacexBypass(op("=", x, [macex.compileBoxValue(k), macex.macex(val)]))
+          }
+        } else {
+          if (val == null) {
+            return new data.MacexBypass(op("var", x, [k])) // TODO compile(k) ?
+          } else {
+            if (state.assign.get()) {
+              return new data.MacexBypass(op("=", x, [k, macex.macex(val)]))
+            } else {
+              return new data.MacexBypass(op("var", x, [op("=", x, [k, macex.macex(val)])]))
+            }
+          }
+        }
+      }
     }
   }
 
@@ -303,8 +342,9 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       // TODO destructuring ?
       var x = box.toBox(a[1])
         , f = compileEval(a[2])
-      x[s] = function () {
-        return macex.macex(f.apply(this, arguments))
+      x[s] = function (a) {
+        a = a.slice(1)
+        return macex.macex(f.apply(this, a))
       }
       return macex.macex([])
     }
@@ -405,12 +445,20 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   set("<=", function (o) {
     o[data.macex] = function (a) {
       checkArguments(a, 2)
-      var x = box.toBox(a[1])
-      if (x instanceof data.Box && data.set in x) {
-        return x[data.set]([a[1], a[2]])
+      // TODO code duplication
+      var u, r = []
+      if (Array.isArray(a[2])) {
+        u = box.make()
+        // TODO code duplication
+        r.push(op("var", a[0], [op("=", a[0], [u, macex.macex(a[2])])]))
       } else {
-        return op("=", a[0], a.slice(1).map(macex.macex))
+        u = a[2]
       }
+      // TODO not a fan of this
+      state.assign.set(true, function () {
+        r.push(macex.macex(patternMatch(a[1], u)))
+      })
+      return op(",", a[0], r)
     }
     o[data.syntax] = {
       associativity: "right",
@@ -440,23 +488,22 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       a.slice(1).forEach(function anon(x) {
         if (Array.isArray(x)) {
           box.check(x[0], get("="))
+          var u
+          if (Array.isArray(x[2])) {
+            u = box.make()
+            after.push(function () {
+              return op("var", x[0], [op("=", x[0], [u, macex.macex(x[2])])])
+            })
+          } else {
+            u = new data.MacexBypass(macex.macex(x[2]))
+          }
           after.push(function () {
-            var k = box.set(x[1])
-            if (!k.local && state.mode.get() === "compile") {
-              return op("=", x[0], [macex.compileBoxValue(k), macex.macex(x[2])])
-            } else {
-              return op("var", x[0], [op("=", x[0], [k, macex.macex(x[2])])])
-            }
+            console.log(u)
+            return macex.macex(patternMatch(x[1], u))
           })
-          //patternMatch(after, x[0], x[1], x[2])
         } else {
           after.push(function () {
-            var k = box.set(x)
-            if (!k.local && state.mode.get() === "compile") {
-              return op("empty", x, [])
-            } else {
-              return op("var", x, [k]) // TODO compile(k) ?
-            }
+            return macex.macex(patternMatch(x, null))
           })
         }
       })
@@ -488,6 +535,39 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   })
 
   set("[", function (o) {
+    o[data.pattern] = function (a) {
+      var args = a[1]
+        , val  = a[2]
+
+      var r    = []
+        , seen = false
+      args.forEach(function (x, i) {
+        if (Array.isArray(x) && box.isBox(x[0], get("@"))) {
+          if (seen) {
+            error(x[0], "[] pattern cannot have more than one @")
+          } else {
+            seen = true
+            var s = [[get("."), val, "slice"]]
+              , n = i - args.length + 1
+            if (i !== 0) {
+              s.push(i)
+            }
+            if (n !== 0) {
+              s.push(n)
+            }
+            r.push(patternMatch(x[1], s))
+          }
+        } else {
+          if (seen) {
+            r.push(patternMatch(x, [get("."), val, [get("-"), [get("."), val, "length"], args.length - i]]))
+          } else {
+            r.push(patternMatch(x, [get("."), val, i]))
+          }
+        }
+      })
+
+      return macex.macex([get("|")].concat(r))
+    }
     o[data.macex] = function (a) {
       var left  = []
         , right = []
@@ -544,14 +624,27 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   })
   
   set("{", function (o) {
+    o[data.pattern] = function (a) {
+      var args = a[1]
+        , val  = a[2]
+
+      var r = []
+      args.forEach(function (x) {
+        if (Array.isArray(x)) {
+          box.check(x[0], get("="))
+          r.push(patternMatch(x[1], [get("."), val, toString(x[2])]))
+        } else {
+          r.push(patternMatch(x, [get("."), val, toString(x)]))
+        }
+      })
+        
+      return macex.macex([get("|")].concat(r))
+    }
     o[data.macex] = function (a) {
       return op("object", a[0], a.slice(1).map(function (x) {
         if (Array.isArray(x)) {
           box.check(x[0], get("="))
-          console.assert(x[1] instanceof data.Symbol)
-          // TODO
-          var l = new data.String(x[1].value)
-          return op("=", x[0], [l].concat(x.slice(2).map(macex.macex)))
+          return op("=", x[0], [toString(x[1])].concat(x.slice(2).map(macex.macex)))
         } else {
           return macex.macex(x)
         }
@@ -600,6 +693,28 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
         }*/
         return l.concat([[s].concat(r[0])], r.slice(1))
         //return l.concat([a], r.slice(1))
+      }
+    }
+  })
+  
+  set("'", function (o) {
+    o[data.syntax] = {
+      delimiter: true,
+      tokenize: tokenize.string,
+      priority: Infinity,
+      endAt: "'",
+      parse: function (l, s, r) {
+        var a = r[0]
+        var every = a.every(function (x) {
+          return x instanceof data.String
+        })
+        if (every) {
+          var x = new data.Symbol(a.map(function (x) { return x.value }).join(""))
+          x.loc = s.loc
+          return l.concat([x], r.slice(1))
+        } else {
+          error(s, "cannot use @ with '")
+        }
       }
     }
   })
@@ -914,13 +1029,6 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       }
     }
   })*/
-  
-  set("'", function (o) {
-    o[data.syntax] = {
-      delimiter: true,
-      tokenize: tokenize.symbol
-    }
-  })
   
   set("#", function (o) {
     o[data.syntax] = {

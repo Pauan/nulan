@@ -34,30 +34,35 @@ define(["./scope"], function (scope) {
       }*/
     }
   })()
-
-  var mode = (function () {
-    var mode = "run"
+  
+  function makeSetter(value) {
     return {
       get: function () {
-        return mode
+        return value
       },
       set: function (x, f) {
-        var old = mode
-        mode = x
+        var old = value
+        value = x
         try {
           return f()
         } finally {
-          mode = old
+          value = old
         }
       }
     }
-  })()
+  }
+  
+  var local  = makeSetter(false)
+    , mode   = makeSetter("compile")
+    , assign = makeSetter(false)
   
   return {
     modules: modules,
     boxes: boxes,
     vars: vars,
     mode: mode,
+    local: local,
     module: module,
+    assign: assign,
   }
 })

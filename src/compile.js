@@ -276,7 +276,25 @@ define(["./data", "./error", "./options"], function (data, error, options) {
       return x
     },
     compile: function (x) {
-      return compile(x.args[0]) + "." + x.args[1].value
+      return withPriority(85, function () {
+        return resetPriority(0, function () { // TODO check this, also tests
+          var y = jsProp(x.args[1])
+          if (y !== null) {
+            x = x.args[0]
+                                      // TODO not sure how efficient this is...
+                                      // TODO does this work correctly for non-number literals?
+            if (x instanceof data.Number && Math.round(x.value) === x.value) {
+              x = compile(x) + "."
+            } else {
+              x = compile(x)
+            }
+            return x + "." + y
+          } else {
+            // TODO shouldn't this be compileFn ?
+            return compile(x.args[0]) + "[" + compile(x.args[1]) + "]"
+          }
+        })
+      })
     }
   }
   
@@ -422,6 +440,7 @@ define(["./data", "./error", "./options"], function (data, error, options) {
   ops["return"] = unary("return ")
 
   ops["+"]      = infix("+", 60)
+  ops["-"]      = infix("-", 60)
   ops["="]      = infix("=", 10)
   
   ops["function"] = {

@@ -8,6 +8,8 @@ define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, err
     var i   = "" + (++boxId)
     o.id    = uuid.v4().slice(0, -i.length) + i // TODO use something other than uuid v4 ?
     o.value = x
+    o.mode  = state.mode.get()
+    o.local = state.local.get()
     state.boxes[o.id] = o
     return o
   }
@@ -15,6 +17,12 @@ define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, err
   function get(i) {
     console.assert(i in state.boxes)
     return state.boxes[i]
+  }
+  
+  function checkMode(x, y) {
+    if (x.mode !== state.mode.get()) {
+      error(y, "undefined symbol: ", [y], " (but it exists at " + x.mode + " time)")
+    }
   }
   
   function toBox(x) {
@@ -93,6 +101,7 @@ define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, err
     toBox: toBox,
     isBox: isBox,
     check: check,
+    checkMode: checkMode,
     set: set,
     getSyntax: getSyntax,
   }
