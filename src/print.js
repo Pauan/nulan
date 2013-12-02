@@ -92,15 +92,28 @@ define(["./data"], function (data) {
   }
   
   function printObject(mode, x) {
-    var r = [new data.Symbol("{")]
+    var max = 0
+      , r   = []
+    //withIndent(0, function () {
     for (var s in x) {
-      r.push([ new data.Symbol("="),
-               (typeof s === "string"
-                 ? new data.Symbol(s)
-                 : s),
-               x[s] ])
+      var s2 = print1(mode, new data.Symbol(s))
+      max = Math.max(max, s2.length)
+      r.push([ s2, x[s] ])
     }
-    return print1(mode, r)
+    //})
+    return withIndent(indent + 2, function () {
+      return "{ " + r.map(function (x, i) {
+        var s = x[0] + new Array((max - x[0].length) + 1).join(" ") + " = "
+        var y = withIndent(indent + s.length, function () {
+          return print1(mode, x[1])
+        })
+        if (i === 0) {
+          return s + y
+        } else {
+          return spaces(s + y)
+        }  
+      }).join("\n") + " }"
+    })
   }
   
   // TODO RegExp ?

@@ -8,14 +8,14 @@
     <script src="../lib/codemirror/lib/codemirror.js"></script>
     <script src="../lib/requirejs/require.js"></script>
     <script>
-      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print", "../lib/util/ui", "../src/macex", "../src/compile", "../src/options", "../src/box", "../lib/util/iter", "../lib/util/cell", "../src/state"], function (data, parse, tokenize, builtins, print, ui, macex, compile, options, box, iter, cell, state) {
+      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print", "../lib/util/ui", "../src/macex", "../src/compile", "../src/options", "../src/box", "../lib/util/iter", "../lib/util/cell", "../src/state", "../src/replace"], function (data, parse, tokenize, builtins, print, ui, macex, compile, options, box, iter, cell, state, replace) {
         "use strict";
         
         ui.normalize(document, function (e) {
           //e.overflow("hidden")
           
-          var sCategories = [ "error" , "eval"  , "compile" , "macex" 
-                            , "$eval" , "parse" , "indent"  , "tokenize" ]
+          var sCategories = [ "error" , "eval"  , "compile" , "transform" , "macex" 
+                            , "$eval" , "parse" , "indent"  , "tokenize"  ]
           
           var debug = cell.dedupe(localStorage["debug.checked"], {
             set: function (self, x) {
@@ -239,6 +239,7 @@
 
             //console.clear()
 
+            // TODO override options.warn
             var old2 = options.$eval
               , old3 = options.eval
 
@@ -273,14 +274,19 @@
                         push("parse", print.normal(x))
 
                         x = macex.macex(x)
-                        push("macex", print.normal(x))
+                        //push("macex", print.normal(x))
+
                         //r.push(x)
                         r.push(new data.Op("call", [new data.Symbol("prn"), x]))
                       })
                     })
                   })
 
-                  r = compile.compile(compile.require(m, r))
+                  r = compile.require(m, r)
+                  r = replace.replace(r, {})
+                  push("transform", print.simple(r))
+
+                  r = compile.compile(r)
                   push("compile", r)
 
                   withSandbox(function (win) {

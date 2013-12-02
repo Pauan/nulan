@@ -367,18 +367,34 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
   
   set("import", function (o) {
     o[data.macex] = function (a) {
+      var names = ["b", "a"]
+
       if (state.module.has()) {
         var m = state.module.get()
         // TODO "iter" module ?
         var args = a.slice(1).map(function (x) {
           if (Array.isArray(x)) {
             box.check(x[0], get("="))
-            return macex.moduleImport(m, x[1], compileEval(x[2]))
+            return (function () {
+              var u = box.make(names.pop())
+                , s = compileEval(x[2])
+              var a = /^js!(.*)$/.exec(s)
+              if (a !== null) {
+                console.log(a)
+                s = new data.String(a[1])
+              } else {
+                s = new data.String(s)
+              }
+              m.arguments.push(u)
+              m.imports.push(s)
+              return [get("vars"), [get("="), x[1], u]]
+            })()
           } else {
             // TODO better error message
             error(x, "expected (foo = \"bar\") but got ", [x])
           }
         })
+        args.push([])
         return macex.macex([get("|")].concat(args))
       } else {
         error(a[0], [a[0]], " can only be used inside of a module")
@@ -532,7 +548,10 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       return op("object", a[0], a.slice(1).map(function (x) {
         if (Array.isArray(x)) {
           box.check(x[0], get("="))
-          return op("=", x[0], [x[1]].concat(x.slice(2).map(macex.macex)))
+          console.assert(x[1] instanceof data.Symbol)
+          // TODO
+          var l = new data.String(x[1].value)
+          return op("=", x[0], [l].concat(x.slice(2).map(macex.macex)))
         } else {
           return macex.macex(x)
         }

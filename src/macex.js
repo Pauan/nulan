@@ -1,21 +1,6 @@
 define(["./data", "./box", "./error", "./state"], function (data, box, error, state) {
   "use strict";
   
-  function moduleImport(m, x, s) {
-    var u = box.make("a")
-    var a = /^js!(.*)$/.exec(s)
-    if (a !== null) {
-      console.log(a)
-      s = new data.String(a[1])
-    } else {
-
-    }
-    console.log(s)
-    m.arguments.push(u)
-    m.imports.push(new data.String(s))
-    return macex([get("vars"), [get("="), x, u]])
-  }
-  
   function macex1(a) {
     var x = box.toBox(a[0])
     if (x instanceof data.Box && data.macex in x) {
@@ -65,7 +50,7 @@ define(["./data", "./box", "./error", "./state"], function (data, box, error, st
     } else if (typeof x === "string") {
       return new data.String(x)
     } else {
-      error(x, "unexpected datatype: ", [x])
+      error(x, "[macex.js] unexpected datatype: ", [x])
     }
   }
   
@@ -73,6 +58,5 @@ define(["./data", "./box", "./error", "./state"], function (data, box, error, st
     macex: macex,
     compileBox: compileBox,
     compileBoxValue: compileBoxValue,
-    moduleImport: moduleImport,
   }
 })

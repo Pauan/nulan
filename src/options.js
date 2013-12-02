@@ -1,9 +1,11 @@
 define([], function () {
   "use strict";
   return {
-    warnings: false,
     minified: false,
     $eval: function (s) {},
+    warn: function (s) {
+      console.warn(s)
+    },
     mangle: function (s) {
       return s.replace(/^[0-9]/, "_$&").replace(/[^$a-zA-Z0-9]/g, function (s) {
         return s === "_" ? "__" : "_" + s.charCodeAt(0) + "_"

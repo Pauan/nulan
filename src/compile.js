@@ -1,9 +1,9 @@
-define(["./data", "./box", "./error", "./options"], function (data, box, error, options) {
+define(["./data", "./error", "./options"], function (data, error, options) {
   "use strict";
 
   var indent   = 0
     , priority = 0
-    , scope    = { loop: false, function: false }
+    , inside   = { loop: false, function: false }
     , statements
   
   var ops = {}
@@ -63,20 +63,6 @@ define(["./data", "./box", "./error", "./options"], function (data, box, error, 
     }
   }*/
   
-  function getNextUniq(s) {
-    var r = s.split("")
-      , i = r.length
-    while (i--) {
-      if (r[i] === "z") {
-        r[i] = "a"
-      } else {
-        r[i] = String.fromCharCode(r[i].charCodeAt(0) + 1)
-        return r.join("")
-      }
-    }
-    return r.join("") + "a"
-  }
-  
   function resetPriority(i, f) {
     var old = priority
     priority = i
@@ -109,13 +95,13 @@ define(["./data", "./box", "./error", "./options"], function (data, box, error, 
     }
   }
 
-  function withScope(s, f) {
-    var old = scope[s]
-    scope[s] = true
+  function withInside(s, f) {
+    var old = inside[s]
+    inside[s] = true
     try {
       return f()
     } finally {
-      scope[s] = old
+      inside[s] = old
     }
   }
   
@@ -153,17 +139,14 @@ define(["./data", "./box", "./error", "./options"], function (data, box, error, 
   function compile(x) {
     if (x instanceof data.Op) {
       var s = get(x.name).compile(x)
-      /*if (x.isUseless && options.warnings) {
+      /*if (x.isUseless) {
         if (/\n/.test(s)) {
-          console.warn("useless expression:\n" + space() + s)
+          options.warn("useless expression:\n" + space() + s)
         } else {
-          console.warn("useless expression: " + s)
+          options.warn("useless expression: " + s)
         }
       }*/
       return s
-    } else if (x instanceof data.Box) {
-      // TODO
-      return x.value
     } else if (x instanceof data.Symbol) {
       return "" + x.value
     } else if (x instanceof data.Number) {
@@ -304,8 +287,7 @@ define(["./data", "./box", "./error", "./options"], function (data, box, error, 
     },
     compile: function (x) {
       return withPriority(80, function () {
-               // TODO compileFn
-        return compile(x.args[0]) + "(" +
+        return compileFn(x.args[0]) + "(" +
                // TODO: don't hardcode 6
                resetPriority(6, function () {
                  return x.args.slice(1).map(compile).join("," + minify(" "))
@@ -323,17 +305,31 @@ define(["./data", "./box", "./error", "./options"], function (data, box, error, 
       // TODO don't hardcode 6
       return resetPriority(6, function () {
         var r = []
-        x.args.forEach(function (x) {
-          if (x.name === "=") {
-            r.push(minify("\n") + space() +
-                   compile(x.args[0]) + ":" + minify(" ") +
-                   compile(x.args[1]))
-          }
+        withIndent(indent + 1, function () {
+          x.args.forEach(function (x) {
+            if (x.name === "=") {
+              var y = jsProp(x.args[0])
+              console.assert(x.args[0] instanceof data.String)
+              if (y === null) {
+                y = compile(x.args[0])
+              }
+              r.push(minify("\n") + space() +
+                     y + ":" + minify(" ") +
+                     compile(x.args[1]))
+            } else {
+              console.assert(x instanceof data.String)
+              var y = jsProp(x)
+              if (y === null) {
+                y = compile(x)
+              }
+              r.push(minify("\n") + space() + y + ":" + minify(" ") + compile(x))
+            }
+          })
         })
         if (r.length) {
-          return "({" + r.join(",") + minify("\n") + space() + "})"
+          return "{" + r.join(",") + minify("\n") + space() + "}"
         } else {
-          return "({})"
+          return "{}"
         }
       })
     }
@@ -404,7 +400,11 @@ define(["./data", "./box", "./error", "./options"], function (data, box, error, 
     statement: ops["top"].statement,
     expression: function (x) {
       x.args = x.args.map(expression)
-      return x
+      if (x.args.length === 1) {
+        return x.args[0]
+      } else {
+        return x
+      }
     },
     compile: function (x) {
       return withPriority(5, function () {
@@ -426,13 +426,13 @@ define(["./data", "./box", "./error", "./options"], function (data, box, error, 
   
   ops["function"] = {
     expression: function (x) {
-      x.args[0] = expression(x.args[0])
-      x.args[1] = blockStatement(x.args[1])
+      x.args[0].args = x.args[0].args.map(expression)
+      x.args[1]      = blockStatement(x.args[1])
       return x
     },
     compile: function (x) {
       return resetPriority(0, function () {
-        return withScope("function", function () {
+        return withInside("function", function () {
           var args = x.args[0].args.map(compile).join("," + minify(" "))
           return "function" + minify(" ") + "(" + args + ")" + minify(" ") + braces(x.args[1])
         })

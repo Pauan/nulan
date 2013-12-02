@@ -6,7 +6,7 @@
   <body>
     <script src="../lib/requirejs/require.js"></script>
     <script>
-      require(["../src/options", "../src/box", "../src/compile", "../src/data"], function (options, box, compile, data) {
+      require(["../src/options", "../src/box", "../src/compile", "../src/data", "../src/replace"], function (options, box, compile, data, replace) {
         "use strict";
 
         var a = box.make("a")
@@ -48,7 +48,7 @@
           a.forEach(function (x) {
             x = fromJSON(x)
             try {
-              console.log(compile.compile(compile.statement([x])))
+              console.log(compile.compile(replace.replace(compile.statement([x]), {})))
             } catch (e) {
               console.error(e.message)
             }
@@ -61,6 +61,46 @@
 
         expr([
           "foo\\\"\n\t\b\v\f\r",
+          
+          (function () {
+            var a = unique()
+              , b = unique()
+            return ["function", [",", a],
+                     ["return", ["function", [",", b],
+                                  ["+", a, b]]]]
+          })(),
+          
+          (function () {
+            var a = unique()
+              , b = unique()
+            return ["function", [",", a],
+                     ["return", ["function", [",", b],
+                                  ["+", ["+", a, b], symbol("a")]]]]
+          })(),
+          
+          (function () {
+            var a = unique()
+              , b = unique()
+            return ["function", [",", a],
+                     [",", ["function", [",", b], b],
+                           ["return", ["+", symbol("a"), a]]]]
+          })(),
+          
+          (function () {
+            var a = unique()
+              , b = unique()
+            return ["function", [","],
+                     [",", ["call", symbol("foo"), ["function", [",", b],
+                                                     ["+", a, b]]],
+                           ["var", ["=", a, 1]]]]
+          })(),
+          
+          (function () {
+            var a = unique()
+              , b = unique()
+            return ["function", [",", a],
+                     ["return", ["function", [",", b], b]]]
+          })(),
 
           ["&&", 1, 2, 3, 4],
 
