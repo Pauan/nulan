@@ -11,6 +11,10 @@ define(["./data", "./box", "./error"], function (data, box, error) {
       peek: function () {
         return x[i]
       },
+      // TODO super hacky
+      unpeek: function () {
+        return x[i - 2]
+      },
       read: function () {
         return x[i++]
       }
@@ -73,8 +77,10 @@ define(["./data", "./box", "./error"], function (data, box, error) {
                 if (data.isSym(o.peek(), y.endAt)) {
                   break
                 } else {
-                  if (y.indent) {
+                  if (y.indent === "right") {
                     a.push(data.unwrap(indent1(o, o.peek(), y.endAt)))
+                  } else if (y.indent === "left") {
+                    a.push(data.unwrap(indent1(o, o.unpeek(), y.endAt)))
                   } else {
                     a = a.concat(indent1(o, null, y.endAt))
                   }
@@ -88,8 +94,10 @@ define(["./data", "./box", "./error"], function (data, box, error) {
           } else if (y.vertical) {
             var a = []
             while (true) {
-              if (y.indent) {
+              if (y.indent === "right") {
                 a.push(data.unwrap(indent1(o, o.peek(), end)))
+              } else if (y.indent === "left") {
+                a.push(data.unwrap(indent1(o, o.unpeek(), end)))
               } else {
                 a = a.concat(indent1(o, null, end))
               }
@@ -101,8 +109,10 @@ define(["./data", "./box", "./error"], function (data, box, error) {
             }
             l.push(a)
           } else {
-            if (y.indent) {
+            if (y.indent === "right") {
               l.push(data.unwrap(indent1(o, o.peek(), end)))
+            } else if (y.indent === "left") {
+              l.push(data.unwrap(indent1(o, o.unpeek(), end)))
             } else {
               l = l.concat(indent1(o, start, end))
             }

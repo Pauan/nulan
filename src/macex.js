@@ -1,4 +1,4 @@
-define(["./data", "./box", "./error", "./state"], function (data, box, error, state) {
+define(["./data", "./box", "./error", "./state", "./module"], function (data, box, error, state, module) {
   "use strict";
   
   function macex1(a) {
@@ -29,6 +29,7 @@ define(["./data", "./box", "./error", "./state"], function (data, box, error, st
       return x[data.get]([x])
     } else {
       box.checkMode(x, y)
+      module.importBox(x)
       if (state.mode.get() === "run" || x.local) {
         return x
       } else {

@@ -7,6 +7,10 @@ define(["./data", "./error", "./options"], function (data, error, options) {
     , statements
   
   var ops = {}
+  
+  function isComplex(x) {
+    return x instanceof data.Op
+  }
 
   // TODO Unicode support
   // TODO it should check reserved
@@ -79,7 +83,7 @@ define(["./data", "./error", "./options"], function (data, error, options) {
     if (options.minified) {
       return ""
     } else {
-      return new Array((indent * 2) + 1).join(" ")
+      return new Array(indent + 1).join(" ")
     }
   }
   
@@ -101,7 +105,7 @@ define(["./data", "./error", "./options"], function (data, error, options) {
 
   
   function block(x) {
-    return withIndent(indent + 1, function () {
+    return withIndent(indent + 2, function () {
       return space() + compileFn(x)
     })
   }
@@ -131,8 +135,12 @@ define(["./data", "./error", "./options"], function (data, error, options) {
     }
   }
   
+  function isOp(x, s) {
+    return x instanceof data.Op && x.name === s
+  }
+  
   function compileFn(x) {
-    if (x.name === "function" || x.name === "object") {
+    if (isOp(x, "object") || isOp(x, "function")) {
       return "(" + compile(x) + ")"
     } else {
       return compile(x)
@@ -147,8 +155,12 @@ define(["./data", "./error", "./options"], function (data, error, options) {
       } else {
         statements.push(y.expression(x))
       }
-    } else {
+    // TODO better checking
+    // TODO hacky
+    } else if (isComplex(x) || (x instanceof data.String && x.value === "use strict")) {
       statements.push(x)
+    } else {
+      options.warn(x)
     }
   }
   
@@ -168,45 +180,42 @@ define(["./data", "./error", "./options"], function (data, error, options) {
       // TODO do the same optimization for statementTop
       var a = []
         , r = []
-      statements.forEach(function (x) {
-        if (x instanceof data.Op && x.name === "var") {
-          r = r.concat(x.args)
+      var len = statements.length - 1
+      statements.forEach(function (x, i) {
+        if (isOp(x, "var")) {
+          x.args.forEach(function (x) {
+            if (x instanceof data.Op) {
+              var y = x.args[1]
+              if (isOp(y, "object") && !options.minified) {
+                if (r.length) {
+                  a.push(new data.Op("var", r))
+                  r = []
+                }
+                a.push(new data.Op("var", [x]))
+              } else {
+                r.push(x)
+              }
+            } else {
+              r.push(x)
+            }
+          })
         } else {
           if (r.length) {
             a.push(new data.Op("var", r))
             r = []
           }
           a.push(x)
+          if (i !== len && !isOp(x, "var-function")) {
+            a.push(new data.Op("\n", []))
+          }
         }
       })
       if (r.length) {
         a.push(new data.Op("var", r))
       }
-      // TODO hacky
-      if (x.name === "top") {
-        return new data.Op("top", a)
-      } else {
-        return new data.Op(";", a)
-      }
+      return new data.Op(";", a)
     } finally {
       statements = old
-    }
-  }
-  
-  function compileSeparator(s) {
-    return function (x) {
-      var r   = []
-        , len = x.args.length - 1
-      x.args.forEach(function (x, i) {
-        r.push(compileFn(x))
-        if (i !== len) {
-          //if (!x.noSemicolon) {
-            r.push(";")
-          //}
-          r.push(minify(s) + space())
-        }
-      })
-      return r.join("")
     }
   }
   
@@ -256,6 +265,14 @@ define(["./data", "./error", "./options"], function (data, error, options) {
           return compileFn(x.args[0]) + minify(" ") + s + minify(" ") + compile(x.args[1])
         })
       }
+    }
+  }
+  
+  function noSemicolon(x) {
+    if (x instanceof data.Op) {
+      return !!get(x.name).noSemicolon
+    } else {
+      return false
     }
   }
 
@@ -313,9 +330,9 @@ define(["./data", "./error", "./options"], function (data, error, options) {
       // TODO don't hardcode 6
       return resetPriority(6, function () {
         var r = []
-        withIndent(indent + 1, function () {
+        withIndent(indent + 2, function () {
           x.args.forEach(function (x) {
-            if (x.name === "=") {
+            if (isOp(x, "=")) {
               var y = jsProp(x.args[0])
               console.assert(x.args[0] instanceof data.String)
               if (y === null) {
@@ -399,18 +416,28 @@ define(["./data", "./error", "./options"], function (data, error, options) {
     }
   }
   
+  function statementVar(x) {
+    x.args.forEach(function (x) {
+      if (isOp(x, "=") && isOp(x.args[1], "function")) {
+        statements.push(new data.Op("var-function", x.args))
+      } else {
+        statements.push(new data.Op("var", [x]))
+      }
+    })
+  }
+  
   ops["var"] = {
     statement: function (x) {
       x.args = x.args.map(expression)
-      statements.push(x)
+      statementVar(x)
     },
     expression: function (x) {
       x.args = x.args.map(expression)
       var last = x.args[x.args.length - 1]
-      if (last instanceof data.Op && last.name === "=") {
+      if (isOp(last, "=")) {
         last = last.args[0]
       }
-      statements.push(x)
+      statementVar(x)
       return last
     },
     compile: function (x) {
@@ -420,7 +447,7 @@ define(["./data", "./error", "./options"], function (data, error, options) {
 
         var max = 0
         x.args.forEach(function (x) {
-          if (x instanceof data.Op && x.name === "=") {
+          if (isOp(x, "=")) {
             var k = x.args[0]
             if (!(k instanceof data.Symbol)) {
               error(k, "expected symbol but got: ", [k])
@@ -435,9 +462,17 @@ define(["./data", "./error", "./options"], function (data, error, options) {
         if (assigns.length) {
           assigns = assigns.map(function (x) {
             var k = x.args[0]
-            return compile(k) + minify(new Array(max - k.value.length + 1).join(" ")) +
+              , v = x.args[1]
+            // TODO code duplication
+            if (isOp(v, "object") || isOp(v, "function")) {
+              return compile(k) +
                      minify(" ") + "=" + minify(" ") +
-                     compile(x.args[1])
+                     compile(v)
+            } else {
+              return compile(k) + minify(new Array(max - k.value.length + 1).join(" ")) +
+                     minify(" ") + "=" + minify(" ") +
+                     compile(v)
+            }
           })
         }
         if (empties.length) {
@@ -450,25 +485,51 @@ define(["./data", "./error", "./options"], function (data, error, options) {
     }
   }
   
-  ops["top"] = {
+  ops["\n"] = {
+    noSemicolon: true,
+    expression: function (x) {
+      return x
+    },
+    compile: function () {
+      return ""
+      //return minify("\n")
+    }
+  }
+
+  ops[";"] = {
     statement: function (x) {
-      x.args.forEach(function (x) {
+      x.args.forEach(function (x, i) {
         statement(x)
       })
     },
-    expression: function (x) {
-      return expression(new data.Op(",", x.args))
-    },
-    compile: compileSeparator("\n\n")
+    compile: function (x) {
+      var r   = []
+        , len = x.args.length - 1
+      x.args.forEach(function (x, i) {
+        r.push(compileFn(x))
+        if (i !== len) {
+          if (options.minify && !noSemicolon(x)) {
+            r.push(";")
+          }
+          r.push(minify("\n") + space())
+        }
+      })
+      return r.join("")
+    }
   }
 
-  ops[";"] = Object.create(ops["top"])
-  ops[";"].compile = compileSeparator("\n")
-
   ops[","] = {
-    statement: ops["top"].statement,
+    statement: ops[";"].statement,
     expression: function (x) {
-      x.args = x.args.map(expression)
+      var r = []
+      var len = x.args.length - 1
+      x.args.forEach(function (x, i) {
+        x = expression(x)
+        if (i === len || isComplex(x)) {
+          r.push(x)
+        }
+      })
+      x.args = r
       if (x.args.length === 1) {
         return x.args[0]
       } else {
@@ -519,6 +580,26 @@ define(["./data", "./error", "./options"], function (data, error, options) {
       })
     }
   }
+  
+  ops["var-function"] = {
+    noSemicolon: true,
+    /*
+    // TODO is this correct ?
+    statement: function (x) {
+      x.args = x.args.map(expression)
+      statements.push(x)
+    },*/
+    compile: function (x) {
+      console.assert(isOp(x.args[1], "function"))
+      var y = x.args[1]
+      return resetPriority(0, function () {
+        return withInside("function", function () {
+          var args = y.args[0].args.map(compile).join("," + minify(" "))
+          return "function " + compile(x.args[0]) + "(" + args + ")" + minify(" ") + braces(y.args[1])
+        })
+      })
+    }
+  }
 
   
   function expressionTop(r) {
@@ -532,53 +613,44 @@ define(["./data", "./error", "./options"], function (data, error, options) {
   }
   
   function statementTop(r) {
-    var old = statements
-    statements = []
-    try {
-      // TODO use iter module ?
-      r.forEach(function (x) {
-        statement(x)
-      })
-      return new data.Op("top", statements)
-    } finally {
-      statements = old
-    }
+    return blockStatement(new data.Op(",", r))
   }
   
   function withModule(m, f) {
     var name    = (m.name == null ? null : new data.String(m.name))
     var imports = new data.Op("array", m.imports)
     var args    = new data.Op(",", m.arguments)
+    var assigns = new data.Op(",", m.assigns)
     var exports = []
     for (var s in m.exports) {
       exports.push(new data.Op("=", [new data.Symbol(s), m.exports[s]]))
     }
-    exports = new data.Op("return", [new data.Op("object", exports)])
-    return f(name, imports, args, exports)
+    exports = [new data.Op("return", [new data.Op("object", exports)])]
+    return f(name, imports, args, assigns, exports)
   }
   
   function moduleTop(m, r) {
-    return withModule(m, function (name, imports, args, exports) {
+    return withModule(m, function (name, imports, args, assigns, exports) {
       var a = []
       a.push(new data.Symbol("define"))
       if (name !== null) {
         a.push(name)
       }
       a.push(imports)
-      a.push(new data.Op("function", [args, new data.Op("top", [new data.String("use strict")].concat(r, [exports]))]))
+      a.push(new data.Op("function", [args, new data.Op(",", [new data.String("use strict")].concat(assigns, r, exports))]))
       return statementTop([new data.Op("call", a)])
     })
   }
   
   function requireTop(m, r) {
-    return withModule(m, function (name, imports, args, exports) {
+    return withModule(m, function (name, imports, args, assigns, exports) {
       var a = []
       a.push(new data.Symbol("require"))
       if (name !== null) {
         error(m, "expected no module name but got ", [name])
       }
       a.push(imports)
-      a.push(new data.Op("function", [args, new data.Op("top", [new data.String("use strict")].concat(r))]))
+      a.push(new data.Op("function", [args, new data.Op(",", [new data.String("use strict")].concat(assigns, r))]))
       return statementTop([new data.Op("call", a)])
     })
   }

@@ -1,0 +1,51 @@
+vars foo = prn 1 2 3
+
+vars foo = -> a b a + b
+
+vars foo = -> a b
+       a + b
+  testing
+
+foo <= prn 1 2 3
+  prn 4 5 6
+
+vars foo = -> a b
+       a + b
+     bar = -> a b
+       a + b
+  testing
+
+vars foo = -> a b
+       a + b
+     bar = -> a b
+       a + b
+     testing
+
+vars foo = -> a b (a + b)
+     bar = -> a b (a + b)
+
+vars foo = {
+  qux = -> a b
+          a + b
+  corge = -> a b
+            a + b
+}
+
+vars foo = {
+  qux = -> a b
+    a + b
+  corge = -> a b
+    a + b
+}
+
+vars foo = { qux = 50 }
+     bar = { qux = 200 }
+
+vars foo = { qux = 1 }
+
+vars foo = { qux   = 1
+             corge = 2 }
+
+vars foo = { (qux = 1) (corge = 2) }
+
+#vars foo = { qux = 1 corge = 2 }

@@ -1,0 +1,43 @@
+vars foo bar
+
+[foo] <= [1]
+
+[foo @bar] <= [1 2 3]
+
+vars [foo] = [1]
+     bar   = foo
+
+vars [foo [bar]] = [1 [2]]
+
+vars [foo @bar qux]       = [1 2 3 4 5]
+vars [foo @bar qux corge] = [1 2 3 4 5]
+
+[foo [bar]] <= [1 [2]]
+
+-> [foo] foo
+
+-> a a
+
+-> a b a + b
+
+#-> @a a
+#-> @a b a
+
+-> _ 1
+
+-> _ a 1
+
+vars _ = [1 2 3]
+
+-> (foo = 1) foo
+
+vars (a = 1) = 1
+(a = 1) <= 2
+
+vars _       = [1 2]
+vars [_ foo] = [1 2]
+
+vars { foo bar }         = { (foo = 1) (bar = 2) (qux = 3) }
+vars { (foo = bar) qux } = { (foo = 1) (bar = 2) (qux = 3) }
+vars { [foo bar] = foo } = { foo = [1 2] }
+#vars { [foo bar] }       = { foo = [1 2] }

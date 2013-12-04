@@ -1,10 +1,10 @@
-define([], function () {
+define(["./print"], function (print) {
   "use strict";
   return {
     minified: false,
     $eval: function (s) {},
     warn: function (s) {
-      console.warn(s)
+      console.warn(print.array(s))
     },
     mangle: function (s) {
       return s.replace(/^[0-9]/, "_$&").replace(/[^$a-zA-Z0-9]/g, function (s) {

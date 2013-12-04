@@ -175,7 +175,7 @@ define(["./data"], function (data) {
       }
 
     } else if (typeof x === "function") {
-      if (x.name == null) {
+      if (x.name == null || x.name === "") {
         return "#(function)"
       } else {
         return "#(function " + x.name + ")"

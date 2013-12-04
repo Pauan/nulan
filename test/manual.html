@@ -7,9 +7,29 @@
   <body>
     <script src="../lib/codemirror/lib/codemirror.js"></script>
     <script src="../lib/requirejs/require.js"></script>
+    <!--
+      import { each                   } = "js!../lib/util/iter"
+             { dedupe value           } = "js!../lib/util/cell"
+             { make                   } = "../src/module"
+             { Op Symbol Error        } = "../src/data"
+             { indent parse           } = "../src/parse"
+             { tokenize               } = "../src/tokenize"
+             { vars                   } = "../src/builtins"
+             { normal array simple    } = "../src/print"
+             { macex                  } = "../src/macex"
+             { require compile        } = "../src/compile"
+             { $eval eval             } = "../src/options"
+             { vars mode module       } = "../src/state"
+             { replace                } = "../src/replace"
+             ui                         = "js!../lib/util/ui"
+             box                        = "../src/box"
+    -->
     <script>
-      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print", "../lib/util/ui", "../src/macex", "../src/compile", "../src/options", "../src/box", "../lib/util/iter", "../lib/util/cell", "../src/state", "../src/replace"], function (data, parse, tokenize, builtins, print, ui, macex, compile, options, box, iter, cell, state, replace) {
+      require(["../src/data", "../src/parse", "../src/tokenize", "../src/builtins", "../src/print", "../lib/util/ui", "../src/macex", "../src/compile", "../src/options", "../src/box", "../lib/util/iter", "../lib/util/cell", "../src/state", "../src/replace", "../src/module"], function (data, parse, tokenize, builtins, print, ui, macex, compile, options, box, iter, cell, state, replace, module) {
         "use strict";
+        
+        //options.minified = true
+        options.basedir = location.pathname.replace(/\/[^\/]*$/, "")
         
         ui.normalize(document, function (e) {
           //e.overflow("hidden")
@@ -244,14 +264,14 @@
               , old3 = options.eval
 
             options.$eval = function (x) {
-              push("$eval", x)
+              //push("$eval", x)
             }
           
             try {
               state.vars.reset(builtins.vars, function () {
                 state.vars.push({}, function () {
                   state.mode.set("run", function () {
-                    var m = new data.Module()
+                    var m = module.make()
                       , r = []
                      
                     function prn(x) {
@@ -277,12 +297,12 @@
                           x = macex.macex(x)
                           push("macex", print.normal(x))
   
-                          r.push(x)
-                          //r.push(new data.Op("call", [new data.Symbol("prn"), x]))
+                          //r.push(x)
+                          r.push(new data.Op("call", [new data.Symbol("prn"), x]))
                         })
                       })
                     })
-  
+
                     r = compile.require(m, r)
                     r = replace.replace(r, {})
                     push("transform", print.simple(r))

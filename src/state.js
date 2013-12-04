@@ -2,7 +2,7 @@ define(["./scope"], function (scope) {
   "use strict";
   
   var boxes = {}
-  var modules = {}
+  var moduleCache = {}
 
   var vars = scope.make()
   
@@ -52,17 +52,15 @@ define(["./scope"], function (scope) {
     }
   }
   
-  var local  = makeSetter(false)
-    , mode   = makeSetter("compile")
-    , assign = makeSetter(false)
+  var local = makeSetter(false)
+    , mode  = makeSetter("compile")
   
   return {
-    modules: modules,
+    moduleCache: moduleCache,
     boxes: boxes,
     vars: vars,
     mode: mode,
     local: local,
     module: module,
-    assign: assign,
   }
 })

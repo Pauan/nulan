@@ -9,12 +9,7 @@ define(["../lib/util/buffer", "../lib/util/name"], function (buffer, name) {
 
   var Error = buffer.Error
   
-  function Module(name) {
-    this.name      = name
-    this.arguments = []
-    this.imports   = []
-    this.exports   = {}
-  }
+  function Module() {}
   
   function Op(s, a) {
     this.name = s

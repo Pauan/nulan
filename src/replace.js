@@ -1,4 +1,4 @@
-define(["./data", "./options", "./scope"], function (data, options, scope) {
+define(["./data", "./options", "./scope", "./error"], function (data, options, scope, error) {
   "use strict";
   
   var reserved = {}
@@ -65,7 +65,11 @@ define(["./data", "./options", "./scope"], function (data, options, scope) {
   
   function set(x, symbols) {
     if (x instanceof data.Op) {
-      if (x.name === "var") {
+      if (x.name === "var-function") {
+        setBox(x.args[0], symbols)
+        // TODO this is probably unnecessary
+        set(x.args[1], symbols)
+      } else if (x.name === "var") {
         x.args.forEach(function (x) {
           if (x instanceof data.Op && x.name === "=") {
             x = x.args[0]
@@ -134,7 +138,7 @@ define(["./data", "./options", "./scope"], function (data, options, scope) {
       if (boxes.has(x.id)) {
         return boxes.get(x.id)
       } else {
-        throw new Error()
+        error(x, [x])
       }
     } else {
       return x

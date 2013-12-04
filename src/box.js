@@ -4,12 +4,13 @@ define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, err
   var boxId = 0
 
   function make(x) {
-    var o   = new data.Box()
-    var i   = "" + (++boxId)
-    o.id    = uuid.v4().slice(0, -i.length) + i // TODO use something other than uuid v4 ?
-    o.value = x
-    o.mode  = state.mode.get()
-    o.local = state.local.get()
+    var o    = new data.Box()
+    var i    = "" + (++boxId)
+    o.id     = uuid.v4().slice(0, -i.length) + i // TODO use something other than uuid v4 ?
+    o.value  = x
+    o.mode   = state.mode.get()
+    o.local  = state.local.get()
+    o.module = state.module.get()
     state.boxes[o.id] = o
     return o
   }
@@ -60,9 +61,14 @@ define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, err
     return x instanceof data.Box && x.id === s.id
   }
   
+  // TODO replace with generic equals check
   function check(x, y) {
     // TODO: use isSym ?
     if (!isBox(toBox(x), y)) {
+      // TODO is this good ?
+      if (y instanceof data.Box) {
+        y = new data.Symbol(y.value)
+      }
       error(x, "expected ", [y], " but got ", [x])
     }
   }
@@ -76,7 +82,7 @@ define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, err
       state.vars.set(x.value, o)
       return o
     } else {
-      error(x, "expected symbol but got ", [x])
+      error(x, "expected symbol but got: ", [x])
     }
   }
   
