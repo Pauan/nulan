@@ -184,7 +184,7 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
           return patternMatch1(k, x, val, info)
         }
       } else {
-        error(x[0], [x[0]], " does not have a pattern property")
+        error(x[0], [x[0]], " is not a pattern")
       }
     } else {
       var k = (info.wrapVar
@@ -556,6 +556,22 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       }
     }
   })
+  
+  function slicer(val, i, len) {
+    var s = [[get("."), [get("."), [get("[")], "slice"], "call"], val]
+      , n = i - len
+    if (n !== 0) {
+      s.push(i)
+      s.push(n)
+    } else if (i !== 0) {
+      s.push(i)
+    }
+    return s
+  }
+  
+  function slicerLast(val, i, len) {
+    return [get("."), val, [get("-"), [get("."), val, "length"], (len + 1) - i]]
+  }
 
   set("[", function (o) {
     o[data.pattern] = function (a) {
@@ -565,25 +581,18 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
 
       var r    = []
         , seen = false
+        , len  = args.length - 1
       args.forEach(function (x, i) {
         if (Array.isArray(x) && box.isBox(x[0], get("@"))) {
           if (seen) {
             error(x[0], "[] pattern cannot have more than one @")
           } else {
             seen = true
-            var s = [[get("."), val, "slice"]]
-              , n = i - args.length + 1
-            if (i !== 0) {
-              s.push(i)
-            }
-            if (n !== 0) {
-              s.push(n)
-            }
-            r.push(patternMatch(x[1], s, info))
+            r.push(patternMatch(x[1], slicer(val, i, len), info))
           }
         } else {
           if (seen) {
-            r.push(patternMatch(x, [get("."), val, [get("-"), [get("."), val, "length"], args.length - i]], info))
+            r.push(patternMatch(x, slicerLast(val, i, len), info))
           } else {
             r.push(patternMatch(x, [get("."), val, i], info))
           }
@@ -1003,19 +1012,49 @@ define(["./box", "./data", "./macex", "./tokenize", "./compile", "./options", ".
       }
     }
   })
+  
+  function bypassSym(x) {
+    return new data.MacexBypass(new data.Symbol(x))
+  }
 
   set("->", function (o) {
     o[data.macex] = function (a) {
       var args = []
         , body = []
+        , seen = false
+        , len  = a[1].length - 1
       // TODO local
-      a[1].forEach(function (x) {
+      a[1].forEach(function (x, i) {
         if (Array.isArray(x)) {
-          var u = box.make()
-          body.push(macex.macex(patternMatch(x, u, { wrapVar: true })))
-          args.push(u)
+          if (box.isBox(x[0], get("@"))) {
+            if (seen !== false) {
+              error(x[0], "-> cannot have more than one @")
+            } else {
+              console.log(i, len)
+              if (i === len) {
+                seen = bypassSym("arguments")
+              } else {
+                seen = box.make()
+                body.push(macex.macex(patternMatch(seen, bypassSym("arguments"), { wrapVar: true })))
+              }
+              body.push(macex.macex(patternMatch(x[1], slicer(seen, i, len), { wrapVar: true })))
+            }
+          } else {
+            var u = box.make()
+            if (seen !== false) {
+              u = slicerLast(seen, i, len)
+            } else {
+              u = box.make()
+              args.push(u)
+            }
+            body.push(macex.macex(patternMatch(x, u, { wrapVar: true })))
+          }
         } else {
-          args.push(box.set(x))
+          if (seen !== false) {
+            body.push(macex.macex(patternMatch(x, slicerLast(seen, i, len), { wrapVar: true })))
+          } else {
+            args.push(box.set(x))
+          }
         }
       })
       body.push(op("return", a[0], [macex.macex(a[2])]))

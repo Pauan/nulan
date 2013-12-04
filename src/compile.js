@@ -172,6 +172,12 @@ define(["./data", "./error", "./options"], function (data, error, options) {
     }
   }
   
+  function pushNewline(a, i, len) {
+    if (i !== len/* && !isOp(x, "var-function")*/) {
+      a.push(new data.Op("\n", []))
+    }
+  }
+  
   function blockStatement(x) {
     var old = statements
     statements = []
@@ -188,10 +194,13 @@ define(["./data", "./error", "./options"], function (data, error, options) {
               var y = x.args[1]
               if (isOp(y, "object") && !options.minified) {
                 if (r.length) {
+                  pushNewline(a, i, len)
                   a.push(new data.Op("var", r))
                   r = []
                 }
+                pushNewline(a, i, len)
                 a.push(new data.Op("var", [x]))
+                pushNewline(a, i, len)
               } else {
                 r.push(x)
               }
@@ -201,16 +210,16 @@ define(["./data", "./error", "./options"], function (data, error, options) {
           })
         } else {
           if (r.length) {
+            pushNewline(a, i, len)
             a.push(new data.Op("var", r))
+            pushNewline(a, i, len)
             r = []
           }
           a.push(x)
-          if (i !== len && !isOp(x, "var-function")) {
-            a.push(new data.Op("\n", []))
-          }
         }
       })
       if (r.length) {
+        pushNewline(a, 0, 1)
         a.push(new data.Op("var", r))
       }
       return new data.Op(";", a)
