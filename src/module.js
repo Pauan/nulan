@@ -1,6 +1,6 @@
 define(["./data", "./options", "./state", "./box"], function (data, options, state, box) {
   "use strict";
-  
+
   function relToAbs(abs, rel) {
     var a1 = (rel[0] === "/"
                ? []
@@ -19,7 +19,7 @@ define(["./data", "./options", "./state", "./box"], function (data, options, sta
     })
     return a1.join("/")
   }
-  
+
   function importBox(x) {
     var m = state.module.get()
     if (m.importArguments[x.module.path] == null) {
@@ -28,25 +28,25 @@ define(["./data", "./options", "./state", "./box"], function (data, options, sta
       //m.arguments.push(x.module.importBox)
       //m.imports.push(new data.String(s))
     }
-    
+
     //if (x.mode === "run") {
     //m.assigns.push(op("var", x, [op("=", x, [o, op(".", x, [x.module.importBox, new data.String(x.value)])])]))
     //}
   }
-  
+
   function make() {
     var o = new data.Module()
     o.importArguments = {}
     o.assigns         = []
     o.arguments       = []
     o.imports         = []
-    
+
     // TODO global and runtime ?
     o.exportBox       = box.make()
     o.exports         = {}
     return o
   }
-  
+
   function getBox(m, s, y) {
     var o = m.exports[y.value]
     if (m.isJavaScript) {
@@ -62,13 +62,13 @@ define(["./data", "./options", "./state", "./box"], function (data, options, sta
     }
     return o
   }
-  
+
   function fromPath(s) {
     var a = /^js!(.*)$/.exec(s)
     if (a !== null) {
       s = a[1]
     }
-              
+
     if (options.basedir == null) {
       throw new Error("options::basedir must be set")
     }
@@ -82,7 +82,7 @@ define(["./data", "./options", "./state", "./box"], function (data, options, sta
     }
     return imp
   }
-  
+
   return {
     importBox: importBox,
     make: make,

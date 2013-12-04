@@ -1,6 +1,6 @@
 define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, error, state, uuid) {
   "use strict";
-  
+
   var boxId = 0
 
   function make(x) {
@@ -14,18 +14,18 @@ define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, err
     state.boxes[o.id] = o
     return o
   }
-  
+
   function get(i) {
     console.assert(i in state.boxes)
     return state.boxes[i]
   }
-  
+
   function checkMode(x, y) {
     if (x.mode !== state.mode.get()) {
       error(y, "undefined symbol: ", [y], " (but it exists at " + x.mode + " time)")
     }
   }
-  
+
   function toBox(x) {
     if (x instanceof data.Symbol) {
       if (state.vars.has(x.value)) {
@@ -49,18 +49,18 @@ define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, err
       //error(x, "expected box or symbol but got ", [x])
     }
   }
-  
+
   function isBox(x, s) {
     x = toBox(x)
     console.assert(s instanceof data.Box)
     /*if (x instanceof data.Symbol) {
-      
+
     } else if (!(x instanceof Box)) {
       error(x, "expected box or symbol but got ", [x])
     }*/
     return x instanceof data.Box && x.id === s.id
   }
-  
+
   // TODO replace with generic equals check
   function check(x, y) {
     // TODO: use isSym ?
@@ -72,7 +72,7 @@ define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, err
       error(x, "expected ", [y], " but got ", [x])
     }
   }
-  
+
   function set(x) {
     if (x instanceof data.Box) {
       return x
@@ -85,7 +85,7 @@ define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, err
       error(x, "expected symbol but got: ", [x])
     }
   }
-  
+
   // TODO not sure if this should be in here or not...
   function getSyntax(x) {
     // TODO ew
@@ -100,7 +100,7 @@ define(["./data", "./error", "./state", "../lib/util/uuid"], function (data, err
       return null
     }
   }
-  
+
   return {
     make: make,
     get: get,
