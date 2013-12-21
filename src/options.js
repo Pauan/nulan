@@ -1,11 +1,10 @@
-define(["./print"], function (print) {
+define([], function () {
   "use strict";
+
   return {
+    warn: true,
     minified: false,
-    $eval: function (s) {},
-    warn: function (s) {
-      console.warn(print.array(s))
-    },
+    $eval: function (s) {}, // TODO
     mangle: function (s) {
       return s.replace(/^[0-9]/, "_$&").replace(/[^$a-zA-Z0-9]/g, function (s) {
         return s === "_" ? "__" : "_" + s.charCodeAt(0) + "_"

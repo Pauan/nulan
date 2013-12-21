@@ -1,204 +1,66 @@
 #! /usr/bin/env node
 "use strict";
 
-// http://stackoverflow.com/a/8808162/449477
-var vm = require("vm")
-var fs = require("fs")
-function load(path, context) {
-  var data = fs.readFileSync(path, "utf8")
-  vm.runInContext(data, context, path)
-}
+var requirejs = require("./lib/r")
 
-// https://github.com/joyent/node/blob/master/lib/repl.js#L
-// TODO: include NULAN, NINO, and NUIT, or get rid of them in the context
-var o = (function () {
-  var x = vm.createContext()
+requirejs.config({
+  nodeRequire: require
+})
 
-  for (var s in global) {
-    x[s] = global[s]
+requirejs(["./lib/util/iter",
+           "./src/options",
+           "./src/builtins",
+           "./src/print",
+           "./src/0 data/vars",
+           "./src/1 parse/tokenize",
+           "./src/1 parse/indent",
+           "./src/1 parse/parse",
+           "./src/2 macex/macex",
+           "./src/3 compile/module",
+           "./src/3 replace/replace",
+           "./src/3 compile/compile"], function (iter, options, a, b, c, d, e, f, g, h, i, j) {
+
+  var builtins = a.builtins
+    , print    = b.print
+    , vars     = c.vars
+    , tokenize = d.tokenize
+    , indent   = e.indent
+    , parse    = f.parse
+    , macex    = g.macex
+    , module   = h.module
+    , replace  = i.replace
+    , compile  = j.compile
+
+  options.cwd = process.cwd()
+
+  options.readFile = function (s) {
+    return fs.readFileSync(s, "utf8")
   }
-  x.global = x
-  x.global.global = x // TODO: is this needed?
 
-  x.console = console //new Console(this.outputStream)
-  x.module  = module
-  x.require = require
+  function macex1(s) {
+    var o = tokenize(s)
+      , r = []
 
-  //if (f) f(x)
-  return x
-})()
+    iter.each(o, function (x) {
+      x = indent(x)
+      x = parse(x)
+      //x = macex(x)
+      r.push(x)
+    })
 
-var path = require("path")
-
-load(path.resolve(__dirname, "src/NULAN.parse.js"), o)
-
-load(path.resolve(__dirname, "lib/nino/compile.js"), o)
-//load("./lib/nino/transform.js", o)
-load(path.resolve(__dirname, "lib/nino/partial.js"), o)
-
-load(path.resolve(__dirname, "src/NULAN.js"), o)
-
-load(path.resolve(__dirname, "lib/nuit/parse.js"), o)
-load(path.resolve(__dirname, "lib/nuit/serialize.js"), o)
-/*
-NULAN.readFile = function (s) {
-  return fs.readFileSync(s, "utf8")
-}*/
-
-/*NULAN.vars["prn"]     = "prn"
-NULAN.values["prn"]   = prn*/
-
-
-//NULAN.from("Node.js").to("browser")
-//NULAN.from("Node.js").to("Chrome Extension")
-
-
-var opt  = require("optimist")
-  , args = opt.argv
-
-if (args.d) {
-  o.NULAN.options.debug = function (x) {
-    print(["compile-eval", x])
-    console.log()
+    return r
   }
-}
 
-/*
-var args = process.argv.slice(2).filter(function (x) {
-  // TODO: better cli parsing
-  if (x === "-d") {
-    NULAN.options.debug = true
-    return false
-  } else {
-    return true
+  function fromString(s) {
+    return vars.reset(builtins, function () {
+      return print(macex1(s))
+      var r = macex1(s)
+      r = module(r)
+      r = replace(r)
+      r = compile(r)
+      return r
+    })
   }
-})*/
 
-
-//var globals = {}
-
-/*NULAN.vars["require"] = "require"
-NULAN.vars["&src"]    = "&src"
-NULAN.vars["&args"]   = "&args"*/
-
-function print(a) {
-  console.log(o.NUIT.serialize([a], { multiline: true }))
-}
-
-function pretty(x) {
-  return util.inspect(x, false, null, false)
-}
-
-function printTokens(a) {
-  return a.map(function (x) {
-    x = x.name
-    if (x instanceof o.NULAN.Box) {
-      return x.value
-    } else {
-      return x
-    }
-  }).join(" ")
-}
-
-
-function evalFile(s, o) {
-  o.NULAN.eval(fs.readFileSync(s, "utf8"), function (x) {
-    vm.runInContext(x, o, s)
-  })
-}
-
-/*function (o) {
-  NULAN.builtin("load-file", "loadFile")
-  o.loadFile = function (x) {
-    vm.runInContext(fs.readFileSync(x, "utf8"), o)
-  }
-}*/
-
-//o.NULAN.from("Node.js").to("Node.js")
-
-try {
-  load(path.resolve(__dirname, "src/NULAN.macros.js"), o)
-  load(path.resolve(__dirname, "src/modes/node.js"), o)
-  //evalFile("NULAN.macros", o)
-  //evalFile("modes/Node.js", o)
-} catch (e) {
-  console.error("" + e)
-}
-
-// TODO: "nulan playlist -d 1 2 3" should not consume -d
-if (args._.length) {
-  var x = args._[0]
-  // TODO: include the script's name
-  process.argv = args._.slice(1).map(function (x) { return "" + x }) // TODO: a little hacky
-
-  try {
-    evalFile(x, o)
-  } catch (e) {
-    console.error("" + e)
-  }
-  /*args._.forEach(function (x) {
-    evalFile(x, o)
-  })*/
-} else {
-  var util = require("util")
-
-  var rl = require("./lib/cli").create({
-    completer: function (s) {
-      var a = Object.keys(o.NULAN.vars).filter(function (s2) {
-        return s2.indexOf(s) === 0
-      }).sort(function (l, r) {
-        if (l[0] === "&" && r[0] !== "&") {
-          return 1
-        } else if (l[0] !== "&" && r[0] === "&") {
-          return -1
-        } else {
-          return l.localeCompare(r)
-          //return l < r ? -1 : l > r ? 1 : 0
-        }
-      })
-      return [a, s]
-    }
-  })
-
-  rl.on("input", function (s) {
-    try {
-      var x = o.NULAN.tokenize(s)
-      /*if (o.NULAN.options.debug) {
-        print(["tokenize", printTokens(x)])
-        console.log()
-      }*/
-
-      o.NULAN.parseRaw(x, function (err, x) {
-        if (o.NULAN.options.debug) {
-          print(["parse", pretty(o.NULAN.toJSON(x))])
-          //print(["parse"].concat(NULAN.toJSON(x).map(pretty)))
-          console.log()
-        }
-
-        x = o.NULAN.compile(x)
-        if (o.NULAN.options.debug) {
-          print(["compile", x])
-          console.log()
-        }
-
-        //console.log("@compile\n" + x.replace(/^/gm, "  "))
-
-        x = vm.runInContext(x, o)
-        if (o.NULAN.options.debug) {
-          print(["eval", pretty(x)])
-        } else {
-          console.log(pretty(x))
-        }
-      })
-      //console.log("@eval\n" + ("" + x).replace(/^/gm, "  "))
-    } catch (e) {
-      if (o.NULAN.options.debug) {
-        console.trace(e)
-      } else {
-        console.error("" + e)
-      }
-    }
-
-    console.log()
-  })
-}
+  console.log(fromString("import bar\nvars foo = 1\n\nprn foo bar"))
+})

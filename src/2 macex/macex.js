@@ -1,6 +1,6 @@
 define(["./data", "./box", "./error", "./state", "./module"], function (data, box, error, state, module) {
   "use strict";
-  
+
   function macex1(a) {
     var x = box.toBox(a[0])
     if (x instanceof data.Box && data.macex in x) {
@@ -13,13 +13,13 @@ define(["./data", "./box", "./error", "./state", "./module"], function (data, bo
       }
     }
   }
-  
+
   function compileBox(x) {
     return new data.Op("call", [new data.Op(".", [new data.Symbol("box"),
                                                   new data.String("get")]),
                                 new data.String(x.id)])
   }
-  
+
   function compileBoxValue(x) {
     return new data.Op(".", [compileBox(x), new data.String("v")])
   }

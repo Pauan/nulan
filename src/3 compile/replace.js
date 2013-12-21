@@ -145,7 +145,8 @@ define(["./data", "./options", "./scope", "./error"], function (data, options, s
     }
   }
 
-  function replace(x, symbols) {
+  function replace(x) {
+    var symbols = {}
     return boxes.reset({}, function () {
       findSymbols(x, symbols)
       set(x, symbols)
@@ -153,7 +154,5 @@ define(["./data", "./options", "./scope", "./error"], function (data, options, s
     })
   }
 
-  return {
-    replace: replace,
-  }
+  return replace
 })

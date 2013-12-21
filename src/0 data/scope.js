@@ -1,8 +1,8 @@
-// Move to lib/utils
-define(["../lib/util/name"], function (name) {
+// Move to lib/utils ?
+define(["../../lib/util/key"], function (key) {
   "use strict";
   
-  var scopes = new name.Name()
+  var scopes = new key.Key()
   
   var deleted = {}
   
@@ -72,11 +72,7 @@ define(["../lib/util/name"], function (name) {
     }
   }
   
-  function make() {
-    return new Scope()
-  }
-  
   return {
-    make: make,
+    Scope: Scope,
   }
 })
