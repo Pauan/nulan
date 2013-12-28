@@ -1,204 +1,97 @@
 // TODO proper "isComplex" function
-define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/string", "./0 data/number", "./0 data/array", "./0 data/macex", "./2 macex/macex"], function (options, a, b, c, d, e, f, g, h) {
-  // tokenize, compile, state, module
-  // data macex
+define(["./options", "./util/print", "./util/data", "./util/util", "./2 macex/macex", "./util/tokenize", "./util/module"], function (options, a, b, c, d, e, f) {
   "use strict";
 
-  var error     = a.error
+  var error            = a.error
+    , warn             = a.warn
 
-    , Box       = b.Box
-    , toBox     = b.toBox
-    , setBox    = b.setBox
-    , checkBox  = b.checkBox
-    , isBox     = b.isBox
+    , Box              = b.Box
+    , toBox            = b.toBox
+    , Symbol           = b.Symbol
+    , String           = b.String
+    , Number           = b.Number
+    , isGet            = b.isGet
+    , isSet            = b.isSet
+    , isMacro          = b.isMacro
+    , isPattern        = b.isPattern
+    , isSyntax         = b.isSyntax
+    , mode             = b.mode
+    , local            = b.local
+    , external         = b.external
+    , vars             = b.vars
+    , op               = b.op
+    , opApply          = b.opApply
 
-    , Symbol    = c.Symbol
-    , String    = d.String
-    , Number    = e.Number
-    , unwrap    = f.unwrap
+    , setBox           = c.setBox
+    , checkBox         = c.checkBox
+    , isBox            = c.isBox
+    , unwrap           = c.unwrap
+    , bypass           = c.bypass
+    , opargs           = c.opargs
+    , makeBoxSetter    = c.makeBoxSetter
+    , checkArguments   = c.checkArguments
+    , compileEval      = c.compileEval
+    , toString         = c.toString
+    , compileOnlyError = c.compileOnlyError
+    , withNewScope     = c.withNewScope
+    , loc              = c.loc
+
+    , macex            = d.macex
+
+    , string           = e.string
+    , comment          = e.comment
+    , unary            = e.unary
+    , infix            = e.infix
+    , whitespace       = e.whitespace
+    , missingLeft      = e.missingLeft
+    , missingRight     = e.missingRight
     
-    , isGet     = g.isGet
-    , isSet     = g.isSet
-    , isMacro   = g.isMacro
-    , isPattern = g.isPattern
-    , isSyntax  = g.isSyntax
-    , mode      = g.mode
+    , getModule        = f.getModule
 
-    , macex     = h.macex
-
-  function withNewScope(f) {
-    return state.vars.push({}, f)
-  }
-
-  function compileOnlyError(x) {
-    var s = mode.get()
-    if (s !== "compile") {
-      error(x, "cannot use ", [x], " at " + s + " time")
-    }
-  }
-  
-  // TODO syntax stuff, should probably be in a separate module ?
-  function toString(x) {
-    if (x instanceof Symbol) {
-      var o = new String(x.value)
-      o.loc = x.loc // data.loc(x, x)
-      return o
-    } else {
-      return x
-    }
-  }
-  
-  function missingLeft(s) {
-    error(s, "missing expression on the left side of ", [s])
-  }
-  
-  function missingRight(s) {
-    error(s, "missing expression on the right side of ", [s])
-  }
-
-  function unary(o) {
-    if (o == null) {
-      o = {}
-    }
-    if (o.associativity == null) {
-      o.associativity = "right"
-    }
-    if (o.parse == null) {
-      o.parse = function (l, s, r) {
-        if (r.length === 0) {
-          missingRight(s)
-        } else {
-          var y = r[0]
-          // TODO is this correct ?
-          if (o.indent) {
-            return l.concat([[s, unwrap(y)]], r.slice(1))
-          } else {
-            return l.concat([[s, y]], r.slice(1))
-          }
-        }
-      }
-    }
-    return o
-  }
-
-  function infix(o) {
-    if (o == null) {
-      o = {}
-    }
-    if (o.parse == null) {
-      o.parse = function (l, s, r) {
-        var y = r[0]
-        if (l.length === 0) {
-          missingLeft(s)
-          //return [[s, y]].concat(r.slice(1))
-        } else if (r.length === 0) {
-          missingRight(s)
-        } else {
-          var x = l[l.length - 1]
-          return l.slice(0, -1).concat([[s, x, y]], r.slice(1))
-        }
-      }
-    }
-    return o
-  }
 
   function inert(start, end) {
     set(end, function (o) {
       o[isSyntax] = {
         delimiter: true,
         startAt: start
-        /*parse: function (l, s, r) {
-          error(s, "missing starting " + start)
-        }*/
       }
     })
   }
-  
-  function whitespace(x) {
-    if (x == null) {
-      x = {}
-    }
-    if (x.delimiter == null) {
-      x.delimiter = true
-    }
-    if (x.whitespace == null) {
-      x.whitespace = true
-    }
-    if (x.tokenize == null) {
-      x.tokenize = function (o) {
-        o.read()
-        return []
-      }
-    }
-    return x
-  }
 
   
-  var vars = {}
+  var builtins = {}
 
   function set(sName, f) {
     var o = new Box(sName)
     f(o)
-    vars[sName] = o
+    builtins[sName] = o
   }
   
   function get(s) {
     // TODO console.assert
-    if (!(s in vars)) {
+    if (!(s in builtins)) {
       throw new Error("builtin \"" + s + "\" does not exist")
     }
     //console.assert(s in vars)
-    return vars[s]
+    return builtins[s]
   }
 
-  function plural(i) {
-    if (i === 1) {
-      return ""
-    } else {
-      return "s"
-    }
-  }
-  
-  function checkArguments(a, i) {
-    if (a.length - 1 !== i) {
-      error(a[0], "expected " + i + " argument" + plural(i) + " but got " + (a.length - 1))
-    }
-  }
-  
-  function checkArgumentsl(a, i) {
-    if (a.length - 1 < i) {
-      error(a[0], "expected at least " + i + " argument" + plural(i) + " but got " + (a.length - 1))
-    }
-  }
-  
+/*
   function op(s, loc, args) {
     var o = new data.Op(s, args)
     o.loc = loc.loc
     return o
-  }
-  
-  function opargs(s, i) {
-    return function (a) {
-      checkArguments(a, i)
-      return op(s, a[0], a.slice(1).map(macex))
-    }
-  }
-  
-  function opargsl(s, i) {
-    return function (a) {
-      checkArgumentsl(a, i)
-      return op(s, a[0], a.slice(1).map(macex))
-    }
-  }
-  
+  }*/
+
   function patternMatch1(k, x, val, info) {
-    return new MacexBypass(k[isPattern]([x[0], x.slice(1), val, info]))
+    return bypass(k[isPattern]([x[0], x.slice(1), val, info]))
   }
-  
-  // TODO so much MacexBypass ...
+
+  // TODO so much bypass ...
   function patternMatch(x, val, info) {
+    var k
     if (Array.isArray(x)) {
-      var k = toBox(x[0])
+      k = toBox(x[0])
       console.assert(k instanceof Box)
       if (isPattern in k) {
         // TODO isComplex
@@ -215,26 +108,26 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
         error(x[0], [x[0]], " is not a pattern")
       }
     } else {
-      var k = (info.wrapVar
-                ? setBox(x)
-                : toBox(x))
+      k = (info.wrapVar
+            ? setBox(x)
+            : toBox(x))
       if (k instanceof Box && isSet in k) {
-        return new MacexBypass(k[isSet]([x, val]))
+        return bypass(k[isSet]([x, val]))
       } else {
         if (mode.get() === "compile" && !k.local) {
           if (val == null) {
-            return new MacexBypass(op("empty", x, []))
+            return bypass(op("empty", x))
           } else {
-            return new MacexBypass(op("=", x, [macex.compileBoxValue(k), macex(val)]))
+            return bypass(op("=", x, macex.compileBoxValue(k), macex(val)))
           }
         } else {
           if (val == null) {
-            return new MacexBypass(op("var", x, [k])) // TODO compile(k) ?
+            return bypass(op("var", x, k)) // TODO compile(k) ?
           } else {
             if (info.wrapVar) {
-              return new MacexBypass(op("var", x, [op("=", x, [k, macex(val)])]))
+              return bypass(op("var", x, op("=", x, k, macex(val))))
             } else {
-              return new MacexBypass(op("=", x, [k, macex(val)]))
+              return bypass(op("=", x, k, macex(val)))
             }
           }
         }
@@ -242,69 +135,132 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
     }
   }
 
+  function slicer(val, i, len) {
+    var s = [[get("."), [get("."), [get("[")], "slice"], "call"], val]
+      , n = i - len
+    if (n !== 0) {
+      s.push(i)
+      s.push(n)
+    } else if (i !== 0) {
+      s.push(i)
+    }
+    return s
+  }
+  
+  function slicerLast(val, i, len) {
+    return [get("."), val, [get("-"), [get("."), val, "length"], (len + 1) - i]]
+  }
+
+  var quasiquote = (function () {
+    function anon(x, depth, i) {
+      if (Array.isArray(x)) {
+        if (isBox(x[0], get("`"))) {
+          return [get("[")].concat(x.map(function (x) {
+            return anon(x, depth + 1, i)
+          }))
+        } else if (isBox(x[0], get(","))) {
+          if (i === depth) {
+            return x[1]
+          } else {
+            return [get("[")].concat(x.map(function (x) {
+              return anon(x, depth, i + 1)
+            }))
+          }
+        } else {
+          return [get("[")].concat(x.map(function (x) {
+            return anon(x, depth, i)
+          }))
+        }
+      } else if (x instanceof Box) {
+        // TODO if I used the . box I can get rid of bypass ?
+        return bypass(macex.compileBox(x))
+      } else if (x instanceof Symbol) {
+        return anon(toBox(x), depth, i)
+      } else {
+        return x
+      }
+    }
+
+    return function (x) {
+      var first = x
+        , next  = first
+      if (Array.isArray(next) && isBox(next[0], get(","))) {
+        next = next[1]
+        if (Array.isArray(next) && isBox(next[0], get("@"))) {
+          error({ loc: loc(first[0].loc, next[0].loc) },
+                ",@ cannot be used immediately after `")
+        }
+      }
+      return anon(x, 1, 1)
+    }
+  })()
+
 
   set("/", function (o) {
-    o[isMacro]  = opargs("/", 2)
+    o[isMacro]  = opargs("/", 2, 2)
     o[isSyntax] = infix({ priority: 70 })
   })
   set("*", function (o) {
-    o[isMacro]  = opargs("*", 2)
+    o[isMacro]  = opargs("*", 2, 2)
     o[isSyntax] = infix({ priority: 70 })
   })
   set("+", function (o) {
-    o[isMacro]  = opargs("+", 2)
+    o[isMacro]  = opargs("+", 2, 2)
     o[isSyntax] = infix({ priority: 60 })
   })
   set("-", function (o) {
-    o[isMacro]  = opargs("-", 2)
+    o[isMacro]  = opargs("-", 2, 2)
     o[isSyntax] = infix({ priority: 60 })
   })
   set("<", function (o) {
-    o[isMacro]  = opargs("<", 2)
+    o[isMacro]  = opargs("<", 2, 2)
     o[isSyntax] = infix({ priority: 50 })
   })
   set("=<", function (o) {
-    o[isMacro]  = opargs("<=", 2)
+    o[isMacro]  = opargs("<=", 2, 2)
     o[isSyntax] = infix({ priority: 50 })
   })
   set(">", function (o) {
-    o[isMacro]  = opargs(">", 2)
+    o[isMacro]  = opargs(">", 2, 2)
     o[isSyntax] = infix({ priority: 50 })
   })
   set(">=", function (o) {
-    o[isMacro]  = opargs(">=", 2)
+    o[isMacro]  = opargs(">=", 2, 2)
     o[isSyntax] = infix({ priority: 50 })
   })
   set("==", function (o) {
-    o[isMacro]  = opargs("===", 2)
+    o[isMacro]  = opargs("===", 2, 2)
     o[isSyntax] = infix({ priority: 40 })
   })
   set("|=", function (o) {
     o[isSyntax] = infix({ priority: 40 })
   })
   set("~=", function (o) {
-    o[isMacro]  = opargs("!==", 2)
+    o[isMacro]  = opargs("!==", 2, 2)
     o[isSyntax] = infix({ priority: 40 })
   })
   set("&&", function (o) {
-    o[isMacro]  = opargs("&&", 2)
+    o[isMacro]  = opargs("&&", 2, 2)
     o[isSyntax] = infix({ priority: 30 })
   })
   set("||", function (o) {
-    o[isMacro]  = opargs("||", 2)
+    o[isMacro]  = opargs("||", 2, 2)
     o[isSyntax] = infix({ priority: 20 })
   })
   set("num", function (o) {
-    o[isMacro]  = opargs("+", 1)
+    o[isMacro]  = opargs("+", 1, 1)
   })
   set("sub", function (o) {
-    o[isMacro] = opargs("-", 1)
+    o[isMacro] = opargs("-", 1, 1)
   })
   set("mod", function (o) {
-    o[isMacro] = opargs("%", 1)
+    o[isMacro] = opargs("%", 2, 2)
   })
   set("new", function (o) {
-    o[isMacro] = opargsl("new", 1)
+    o[isMacro] = opargs("new", 1, null)
+  })
+  set("except", function (o) {
+    o[isSyntax] = infix()
   })
 
   inert("(", ")")
@@ -336,7 +292,7 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
   })
   
   set("~", function (o) {
-    o[isMacro]  = opargs("!", 1)
+    o[isMacro]  = opargs("!", 1, 1)
     o[isSyntax] = {
       priority: 80,
       associativity: "right",
@@ -371,38 +327,13 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
     }
   })*/
   
-  function compileEval(x) {
-    return mode.set("compile", function () {
-      x = compile.compile(compile.expression([macex(x)]))
-      options.$eval(x)
-      if (typeof options.eval !== "function") {
-        throw new Error("Nulan requires `options::eval` to be set to a function")
-      }
-      return options.eval(x)
-    })
-  }
-  
-  function makeBoxSetter(s) {
-    return function (a) {
-      checkArguments(a, 2)
-      // TODO destructuring ?
-      var x = toBox(a[1])
-        , f = compileEval(a[2])
-      x[s] = function (a) {
-        a = a.slice(1)
-        return macex(f.apply(this, a))
-      }
-      return macex([])
-    }
-  }
-  
   set("$pattern!", function (o) {
     o[isMacro] = makeBoxSetter(isPattern)
   })
   
   set("$syntax!", function (o) {
     o[isMacro] = function (a) {
-      checkArguments(a, 2)
+      checkArguments(a, 2, 2)
       // TODO destructuring ?
       var x = toBox(a[1])
         , f = compileEval(a[2])
@@ -414,18 +345,18 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
   // TODO expose syntax-unary function and move this into core  
   set("$syntax-unary!", function (o) {
     o[isMacro] = function (a) {
-      // TODO checkArguments
+      checkArguments(a, 1, 2)
       // TODO destructuring ?
       var x = toBox(a[1])
-        , f = compileEval(a[1])
+        , f = compileEval(a[2])
       x[isSyntax] = unary(f)
       return macex([])
     }
   })
-  
+
   set("$syntax-infix!", function (o) {
     o[isMacro] = function (a) {
-      // TODO checkArguments
+      checkArguments(a, 1, 2)
       // TODO destructuring ?
       var x = toBox(a[1])
         , f = compileEval(a[2])
@@ -446,68 +377,97 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
   
   set("$eval", function (o) {
     o[isMacro] = function (a) {
-      checkArguments(a, 1)
+      // TODO should accept 1 or more args
+      checkArguments(a, 1, 1)
       return macex(compileEval(a[1]))
     }
   })
-  
+
   set("$import", function (o) {
     // TODO generic
-    function checkSym(x) {
+    function checkSymbol(x) {
       if (!(x instanceof Symbol)) {
         error(x, "expected symbol but got ", [x])
       }
     }
 
-    o[isMacro] = function (a) {
-      if (state.module.has()) {
-        var m = state.module.get()
-        // TODO "iter" module ?
-        a.slice(1).forEach(function (x) {
-          if (Array.isArray(x)) {
-            checkBox(x[0], get("="))
-            return (function () {
-              var s = compileEval(x[2])
-                , m = module.fromPath(s)
-              
-              var k = x[1]
-              if (Array.isArray(k)) {
-                checkBox(k[0], get("{"))
-                k.slice(1).forEach(function (k) {
-                  var x, y
-                  if (Array.isArray(k)) {
-                    checkBox(k[0], get("="))
-                    x = k[1]
-                    y = k[2]
-                  } else {
-                    x = k
-                    y = k
-                  }
-                  checkSym(x)
-                  checkSym(y)
-                  state.vars.set(x.value, module.getBox(m, s, y))
-                })
-              } else {
-                checkSym(k)
-                k = setBox(k)
-                module.importBox(m, k)
-                m.assigns.push(op("var", k, [op("=", k, m.exportBox)]))
-              }
-            })()
-          } else {
-            error(x, "expected (... = \"...\") but got ", [x])
+    function importBoxes(a, s, module, renames) {
+      for (var k in module) {
+        var v = module[k]
+        if (k in renames) {
+          if (renames[k] !== null) {
+            vars.set(renames[k], v)
           }
-        })
-        return macex([])
-      } else {
-        error(a[0], [a[0]], " can only be used inside of a module")
+        } else {
+          if (vars.has(k)) {
+            warn(a[0], "path ", [s], " is shadowing the symbol ", [new Symbol(k)])
+          }
+          vars.set(k, v)
+        }
       }
+    }
+
+    // TODO a bit hacky, but it works okay...
+    o[isMacro] = function (a) {
+      checkArguments(a, 1, null)
+      a.slice(1).forEach(function (x) {
+        var module, s, renames = {}
+
+        if (Array.isArray(x) && isBox(x[0], get("except"))) {
+          s = compileEval(x[1])
+          module = getModule(s)
+
+          var keys = x[2]
+          checkBox(keys[0], get("{"))
+          keys.slice(1).forEach(function (x) {
+            if (Array.isArray(x)) {
+              checkBox(x[0], get("="))
+              checkSymbol(x[1])
+              checkSymbol(x[2])
+              renames[x[1].value] = x[2].value
+            } else {
+              checkSymbol(x)
+              renames[x.value] = null
+            }
+          })
+        } else {
+          s = compileEval(x)
+          module = getModule(s)
+        }
+
+        importBoxes(a, s, module, renames)
+      })
+      return macex([])
     }
   })
   
+  set("$require", function (o) {
+    o[isMacro] = function (a) {
+      checkArguments(a, 1, null)
+
+      var r = []
+      a.slice(1).forEach(function (x) {
+        if (Array.isArray(x)) {
+          checkBox(x[0], get("="))
+          var path = compileEval(x[2])
+          if (typeof path !== "string") {
+            error(x[2], "expected string but got ", [path])
+          }
+          // TODO unnamed boxes shouldn't be set to external
+          external.set(true, function () {
+            r.push(macex(patternMatch(x[1], bypass(op("require", x[0], new String(path))), { wrapVar: true })))
+          })
+        } else {
+          error(x, "expected (... = \"...\") but got ", [x])
+        }
+      })
+      return opApply(",", a[0], r)
+    }
+  })
+
   set("<=", function (o) {
     o[isMacro] = function (a) {
-      checkArguments(a, 2)
+      checkArguments(a, 2, 2)
       return macex(patternMatch(a[1], a[2], { wrapVar: false }))
     }
     o[isSyntax] = {
@@ -527,12 +487,14 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
   
   set("prn", function (o) {
     o[isGet] = function (a) {
-      return op(".", a[0], [new Symbol("console"), new String("log")])
+      return op(".", a[0], new Symbol("console"), new String("log"))
     }
   })
 
   set("vars", function (o) {
     o[isMacro] = function (a) {
+      checkArguments(a, 1, null)
+
       var after = []
       // TODO "iter" module ?
       a.slice(1).forEach(function anon(x) {
@@ -544,10 +506,10 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
           if (Array.isArray(x[1]) && Array.isArray(x[2])) {
             u = new Box()
             after.push(function () {
-              return op("var", x[0], [op("=", x[0], [u, macex(x[2])])])
+              return op("var", x[0], op("=", x[0], u, macex(x[2])))
             })
           } else {
-            u = new MacexBypass(macex(x[2]))
+            u = bypass(macex(x[2]))
           }
           after.push(function () {
             return macex(patternMatch(x[1], u, { wrapVar: true }))
@@ -558,12 +520,12 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
           })
         }
       })
-      return op(",", a[0], after.map(function (f) { return f() }))
+      return opApply(",", a[0], after.map(function (f) { return f() }))
     }
   })
   
   set("|", function (o) {
-    o[isMacro]  = opargsl(",", 1)
+    o[isMacro]  = opargs(",", 1, null)
     o[isSyntax] = {
       indent: "right",
       vertical: true,
@@ -584,22 +546,6 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
       }
     }
   })
-  
-  function slicer(val, i, len) {
-    var s = [[get("."), [get("."), [get("[")], "slice"], "call"], val]
-      , n = i - len
-    if (n !== 0) {
-      s.push(i)
-      s.push(n)
-    } else if (i !== 0) {
-      s.push(i)
-    }
-    return s
-  }
-  
-  function slicerLast(val, i, len) {
-    return [get("."), val, [get("-"), [get("."), val, "length"], (len + 1) - i]]
-  }
 
   set("[", function (o) {
     o[isPattern] = function (a) {
@@ -630,6 +576,7 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
       return macex([get("|")].concat(r))
     }
     o[isMacro] = function (a) {
+      checkArguments(a, 0, null)
       var left  = []
         , right = []
       // TODO use "iter" module ?
@@ -638,17 +585,16 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
           right.push(macex(x[1]))
         } else {
           if (right.length) {
-            right.push(new data.Op("array", [macex(x)]))
+            right.push(op("array", a[0], macex(x)))
           } else {
             left.push(macex(x))
           }
         }
       })
       if (right.length) {
-        return op("call", a[0], [op(".", a[0], [op("array", a[0], left),
-                                                new String("concat")])].concat(right))
+        return opApply("call", a[0], [op(".", a[0], opApply("array", a[0], left), new String("concat"))].concat(right))
       } else {
-        return op("array", a[0], left)
+        return opApply("array", a[0], left)
       }
     }
     o[isSyntax] = {
@@ -670,7 +616,7 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
     }
   })
   
-  set("true", function (o) {}) // TODO
+  set("true", function () {}) // TODO
 
   set("(", function (o) {
     o[isSyntax] = {
@@ -704,10 +650,11 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
       return macex([get("|")].concat(r))
     }
     o[isMacro] = function (a) {
-      return op("object", a[0], a.slice(1).map(function (x) {
+      checkArguments(a, 0, null)
+      return opApply("object", a[0], a.slice(1).map(function (x) {
         if (Array.isArray(x)) {
           checkBox(x[0], get("="))
-          return op("=", x[0], [toString(x[1])].concat(x.slice(2).map(macex)))
+          return opApply("=", x[0], [toString(x[1])].concat(x.slice(2).map(macex)))
         } else {
           return macex(x)
         }
@@ -763,7 +710,7 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
   set("'", function (o) {
     o[isSyntax] = {
       delimiter: true,
-      tokenize: tokenize.string,
+      tokenize: string,
       priority: Infinity,
       endAt: "'",
       parse: function (l, s, r) {
@@ -784,34 +731,36 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
   
   set("\"", function (o) {
     o[isMacro] = function (a) {
+      checkArguments(a, 0, null)
       var r = a.slice(1).map(function (x) {
         return macex(x)
       })
       var every = r.every(function (x) {
         return x instanceof String
       })
+      var s
       if (every) {
         r = r.map(function (x) {
           return x.value
         })
-        var s = new String(r.join(""))
+        s = new String(r.join(""))
         s.loc = a[0].loc
         return s
       } else {
         if (!(r[0] instanceof String)) {
-          var s = new String("")
+          s = new String("")
           s.loc = a[0].loc
           // TODO inefficient ?
           r.unshift(s)
         }
         return r.reduce(function (x, y) {
-          return op("+", a[0], [x, y])
+          return op("+", a[0], x, y)
         })
       }
     }
     o[isSyntax] = {
       delimiter: true,
-      tokenize: tokenize.string,
+      tokenize: string,
       priority: Infinity,
       endAt: "\"",
       parse: function (l, s, r) {
@@ -851,7 +800,7 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
   
   // TODO: update "Customizable syntax.rst" with the new definition of "."
   set(".", function (o) {
-    o[isMacro]  = opargs(".", 2)
+    o[isMacro]  = opargs(".", 2, 2)
     o[isSyntax] = {
       delimiter: true,
       priority: 90,
@@ -867,7 +816,7 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
           if (x instanceof Number && y instanceof Number) {
             var i = (x.value + "." + y.value)
             s = new Number(+i)
-            s.loc = data.loc(x.loc, y.loc)
+            s.loc = loc(x.loc, y.loc)
           } else {
             s = [s, x, toString(y)]
           }
@@ -963,54 +912,10 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
     `1 2
        `,2 ,@(4 + 5)
 */
-  
-  var quasiquote = (function () {
-    function anon(x, depth, i) {
-      if (Array.isArray(x)) {
-        if (isBox(x[0], get("`"))) {
-          return [get("[")].concat(x.map(function (x) {
-            return anon(x, depth + 1, i)
-          }))
-        } else if (isBox(x[0], get(","))) {
-          if (i === depth) {
-            return x[1]
-          } else {
-            return [get("[")].concat(x.map(function (x) {
-              return anon(x, depth, i + 1)
-            }))
-          }
-        } else {
-          return [get("[")].concat(x.map(function (x) {
-            return anon(x, depth, i)
-          }))
-        }
-      } else if (x instanceof Box) {
-        // TODO if I used the . box I can get rid of MacexBypass ?
-        return new MacexBypass(macex.compileBox(x))
-      } else if (x instanceof Symbol) {
-        return anon(toBox(x), depth, i)
-      } else {
-        return x
-      }
-    }
-
-    return function (x) {
-      var first = x
-        , next  = first
-      if (Array.isArray(next) && isBox(next[0], get(","))) {
-        next = next[1]
-        if (Array.isArray(next) && isBox(next[0], get("@"))) {
-          error({ loc: data.loc(first[0].loc, next[0].loc) },
-                ",@ cannot be used immediately after `")
-        }
-      }
-      return anon(x, 1, 1)
-    }
-  })()
       
   set("`", function (o) {
     o[isMacro] = function (a) {
-      checkArguments(a, 1)
+      checkArguments(a, 1, 1)
       compileOnlyError(a[0])
       return macex(quasiquote(a[1]))
     }
@@ -1040,53 +945,58 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
       }
     }
   })
-  
-  function bypassSym(x) {
-    return new MacexBypass(new Symbol(x))
-  }
 
+  // TODO multiple-body version ?
   set("->", function (o) {
     o[isMacro] = function (a) {
-      var args = []
-        , body = []
-        , seen = false
-        , len  = a[1].length - 1
-      // TODO local
-      a[1].forEach(function (x, i) {
-        if (Array.isArray(x)) {
-          if (isBox(x[0], get("@"))) {
-            if (seen !== false) {
-              error(x[0], "-> cannot have more than one @")
-            } else {
-              console.log(i, len)
-              if (i === len) {
-                seen = bypassSym("arguments")
+      checkArguments(a, 0, null)
+      
+      return local.set(true, function () {
+        return withNewScope(function () {
+          var args = []
+            , body = []
+            , seen = false
+            , len  = a[1].length - 1
+
+          a[1].forEach(function (x, i) {
+            if (Array.isArray(x)) {
+              if (isBox(x[0], get("@"))) {
+                if (seen !== false) {
+                  error(x[0], "-> cannot have more than one @")
+                } else {
+                  console.log(i, len)
+                  if (i === len) {
+                    seen = bypass(new Symbol("arguments"))
+                  } else {
+                    seen = new Box()
+                    body.push(macex(patternMatch(seen, bypass(new Symbol("arguments")), { wrapVar: true })))
+                  }
+                  body.push(macex(patternMatch(x[1], slicer(seen, i, len), { wrapVar: true })))
+                }
               } else {
-                seen = new Box()
-                body.push(macex(patternMatch(seen, bypassSym("arguments"), { wrapVar: true })))
+                var u = new Box()
+                if (seen !== false) {
+                  u = slicerLast(seen, i, len)
+                } else {
+                  u = new Box()
+                  args.push(u)
+                }
+                body.push(macex(patternMatch(x, u, { wrapVar: true })))
               }
-              body.push(macex(patternMatch(x[1], slicer(seen, i, len), { wrapVar: true })))
-            }
-          } else {
-            var u = new Box()
-            if (seen !== false) {
-              u = slicerLast(seen, i, len)
             } else {
-              u = new Box()
-              args.push(u)
+              if (seen !== false) {
+                body.push(macex(patternMatch(x, slicerLast(seen, i, len), { wrapVar: true })))
+              } else {
+                args.push(setBox(x))
+              }
             }
-            body.push(macex(patternMatch(x, u, { wrapVar: true })))
-          }
-        } else {
-          if (seen !== false) {
-            body.push(macex(patternMatch(x, slicerLast(seen, i, len), { wrapVar: true })))
-          } else {
-            args.push(setBox(x))
-          }
-        }
+          })
+
+          body.push(op("return", a[0], macex(a[2])))
+
+          return op("function", a[0], opApply(",", a[0], args), opApply(",", a[0], body))
+        })
       })
-      body.push(op("return", a[0], [macex(a[2])]))
-      return op("function", a[0], [op(",", a[0], args), op(",", a[0], body)])
     }
     o[isSyntax] = {
       priority: 10,
@@ -1105,28 +1015,32 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
   
   set("null?", function (o) {
     o[isMacro] = function (a) {
-      checkArguments(a, 1)
-      return op("==", a[0], [macex(a[1]), op("null", a[0], [])])
+      checkArguments(a, 1, 1)
+      return op("==", a[0], macex(a[1]), op("null", a[0]))
     }
   })
   
   set("if", function (o) {
     o[isMacro] = function (a) {
-      //checkArguments(a, 1, 3) // TODO
+      checkArguments(a, 2, 3)
       return withNewScope(function () {
-        var test = macex(a[1])
-          , yes  = withNewScope(function () { return macex(a[2]) })
-          , no   = withNewScope(function () { return macex(a[3]) })
-        return op("if", a[0], [test, yes, no])
+        var args = [macex(a[1])]
+        if (a.length > 2) {
+          args.push(withNewScope(function () { return macex(a[2]) }))
+        }
+        if (a.length > 3) {
+          args.push(withNewScope(function () { return macex(a[3]) }))
+        }
+        return opApply("if", a[0], args)
       })
     }
   })
 
   set("w/new-scope", function (o) {
     o[isMacro] = function (a) {
-      checkArguments(a, 1)
+      checkArguments(a, 1, null)
       return withNewScope(function () {
-        return macex(a[1])
+        return opApply(",", a[0], a.slice(1).map(macex))
       })
     }
   })
@@ -1170,7 +1084,7 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
     o[isSyntax] = {
       delimiter: true,
       whitespace: true,
-      tokenize: tokenize.comment,
+      tokenize: comment,
       //priority: 9001,
       //associativity: "right",
       
@@ -1188,9 +1102,6 @@ define(["./options", "./print", "./0 data/box", "./0 data/symbol", "./0 data/str
   })*/
 
   return {
-    vars: vars,
-    unary: unary,
-    infix: infix,
-    whitespace: whitespace,
+    builtins: builtins,
   }
 })

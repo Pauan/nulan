@@ -1,5 +1,13 @@
-define(["../data", "../error"], function (data, error) {
+define(["./print", "./data", "./util", "../1 parse/tokenize"], function (a, b, c, d) {
   "use strict";
+
+  var error            = a.error
+    , Symbol           = b.Symbol
+    , String           = b.String
+    , ParseStart       = b.ParseStart
+    , ParseEnd         = b.ParseEnd
+    , unwrap           = c.unwrap
+    , tokenizeBrackets = d.tokenizeBrackets
 
   function comment(o) {
     var s = o.position()
@@ -51,19 +59,6 @@ define(["../data", "../error"], function (data, error) {
     }
   }
 
-  function tokenizeBrackets(o, info) {
-    var stack = []
-      , r     = []
-    while (o.has()) {
-      // TODO is this correct ?
-      r = r.concat(getNext(o, info, stack))
-      if (stack.length === 0) {
-        break
-      }
-    }
-    return r
-  }
-
   function readIndentedString(q, i, o) {
     ++i
     while (i-- && o.has()) {
@@ -86,7 +81,7 @@ define(["../data", "../error"], function (data, error) {
   function string(o, info) {
     var s = o.position()
       , q = o.read()
-      , r = [new data.Symbol(q)]
+      , r = [new Symbol(q)]
       , a = []
       , x
 
@@ -101,12 +96,12 @@ define(["../data", "../error"], function (data, error) {
 
           r[0].loc = o.loc(sFirst, o.position())
           if (a.length) {
-            x = new data.String(a.join(""))
+            x = new String(a.join(""))
             x.loc = o.loc(s, o.position())
             r.push(x)
             a = []
           }
-          x = new data.Symbol(q)
+          x = new Symbol(q)
           x.loc = o.loc(sFirst, o.position())
           r.push(x)
 
@@ -144,16 +139,16 @@ define(["../data", "../error"], function (data, error) {
 
           // TODO code duplication
           if (a.length) {
-            x = new data.String(a.join(""))
+            x = new String(a.join(""))
             x.loc = o.loc(s, o.position())
             r.push(x)
             a = []
           }
 
           o.read()
-          r.push(new data.ParseStart())
+          r.push(new ParseStart())
           r = r.concat(tokenizeBrackets(o, info))
-          r.push(new data.ParseEnd())
+          r.push(new ParseEnd())
           //r.push(new data.ParseBypass(parse1(tokenizeBrackets(info))))
           s = o.position()
         } else if (c === "\n") {
@@ -233,9 +228,90 @@ define(["../data", "../error"], function (data, error) {
       }
     }
   }*/
+  
+  
+  // TODO not really specific to tokenize
+  function missingLeft(s) {
+    error(s, "missing expression on the left side of ", [s])
+  }
+  
+  function missingRight(s) {
+    error(s, "missing expression on the right side of ", [s])
+  }
+
+  function unary(o) {
+    if (o == null) {
+      o = {}
+    }
+    if (o.associativity == null) {
+      o.associativity = "right"
+    }
+    if (o.parse == null) {
+      o.parse = function (l, s, r) {
+        if (r.length === 0) {
+          missingRight(s)
+        } else {
+          var y = r[0]
+          // TODO is this correct ?
+          if (o.indent) {
+            return l.concat([[s, unwrap(y)]], r.slice(1))
+          } else {
+            return l.concat([[s, y]], r.slice(1))
+          }
+        }
+      }
+    }
+    return o
+  }
+
+  function infix(o) {
+    if (o == null) {
+      o = {}
+    }
+    if (o.parse == null) {
+      o.parse = function (l, s, r) {
+        var y = r[0]
+        if (l.length === 0) {
+          missingLeft(s)
+          //return [[s, y]].concat(r.slice(1))
+        } else if (r.length === 0) {
+          missingRight(s)
+        } else {
+          var x = l[l.length - 1]
+          return l.slice(0, -1).concat([[s, x, y]], r.slice(1))
+        }
+      }
+    }
+    return o
+  }
+  
+  function whitespace(x) {
+    if (x == null) {
+      x = {}
+    }
+    if (x.delimiter == null) {
+      x.delimiter = true
+    }
+    if (x.whitespace == null) {
+      x.whitespace = true
+    }
+    if (x.tokenize == null) {
+      x.tokenize = function (o) {
+        o.read()
+        return []
+      }
+    }
+    return x
+  }
 
   return {
     comment: comment,
     string: string,
+    
+    missingLeft: missingLeft,
+    missingRight: missingRight,
+    unary: unary,
+    infix: infix,
+    whitespace: whitespace,
   }
 })

@@ -7,60 +7,35 @@ requirejs.config({
   nodeRequire: require
 })
 
-requirejs(["./lib/util/iter",
-           "./src/options",
+requirejs(["./src/options",
            "./src/builtins",
-           "./src/print",
-           "./src/0 data/vars",
-           "./src/1 parse/tokenize",
-           "./src/1 parse/indent",
-           "./src/1 parse/parse",
-           "./src/2 macex/macex",
-           "./src/3 compile/module",
-           "./src/3 replace/replace",
-           "./src/3 compile/compile"], function (iter, options, a, b, c, d, e, f, g, h, i, j) {
+           "./src/util/parse",
+           "./src/util/module",
+           "./src/util/data",
+           "./src/util/print"], function (options, a, b, c, d, e) {
 
-  var builtins = a.builtins
-    , print    = b.print
-    , vars     = c.vars
-    , tokenize = d.tokenize
-    , indent   = e.indent
-    , parse    = f.parse
-    , macex    = g.macex
-    , module   = h.module
-    , replace  = i.replace
-    , compile  = j.compile
-
-  options.cwd = process.cwd()
-
-  options.readFile = function (s) {
-    return fs.readFileSync(s, "utf8")
-  }
-
-  function macex1(s) {
-    var o = tokenize(s)
-      , r = []
-
-    iter.each(o, function (x) {
-      x = indent(x)
-      x = parse(x)
-      //x = macex(x)
-      r.push(x)
-    })
-
-    return r
-  }
+  var builtins      = a.builtins
+    , parseString   = b.parseString
+    , Module        = c.Module
+    , moduleImport  = c.moduleImport
+    , moduleCompile = c.moduleCompile
+    , moduleMacex   = c.moduleMacex
+    , withNewEval   = d.withNewEval
+    , simple        = e.simple
 
   function fromString(s) {
-    return vars.reset(builtins, function () {
-      return print(macex1(s))
-      var r = macex1(s)
-      r = module(r)
-      r = replace(r)
-      r = compile(r)
-      return r
+    var m = new Module()
+    moduleImport(m, builtins, {})
+    return withNewEval(function () {
+      return moduleCompile(moduleMacex(m, parseString(s)))
     })
   }
 
-  console.log(fromString("import bar\nvars foo = 1\n\nprn foo bar"))
+  console.log(fromString("$import \"test/test\"\nbar 1"))
+
+  //console.log(fromString("$require { resolve } = \"path\"\nvars a = 1\nvars a = 2"))
+  
+  //console.log(fromString("$require { resolve } = \"path\"\nresolve 1\n$import \"bar\" \"qux\"\nbar qux bar2\nvars foo = -> a a + 1\nfoo 1\nvars corge"))
+
+  //console.log(fromString("vars bar qux\n$import \"bar\" except { bar = qux }\nvars foo = -> a a + 1\n\nprn foo qux"))
 })

@@ -1,11 +1,11 @@
-define(["../../lib/util/buffer", "../lib/util/name"], function (a, b) {
+define(["../../lib/util/buffer", "../../lib/util/key"], function (a, b) {
   "use strict";
 
   var Error = a.Error
-    , Name  = b.Name
+    , Key   = b.Key
 
-  var isPrint   = new Name()
-    , isComplex = new Name()
+  var isPrint   = Key("print?")
+    , isComplex = Key("complex?")
 
   var mode   = "normal"
     , indent = 0
@@ -31,55 +31,71 @@ define(["../../lib/util/buffer", "../lib/util/name"], function (a, b) {
   }
   
   function spaces(i) {
+    if (i == null) {
+      i = indent
+    }
     return new Array(i + 1).join(" ")
   }
 
   function isComplex1(x) {
-    return //(Array.isArray(x) && !isSymbol(x[0], "\"")) ||
+    // TODO
+    return Array.isArray(x) ||
+           //(Array.isArray(x) && !isSymbol(x[0], "\"")) ||
            // TODO use `object.isObject` from the "object" module
            (Object(x) === x && x[isComplex])
   }
 
-  function nonComplex(iFirst, a, i) {
-    var r = []
-      , x = a[i]
-    ++i
-    var s = print(x, iFirst)
-    r.push(s)
-    var iTemp = iFirst + s.length + 1
-    if (!isComplex1(x)) {
-      while (i < a.length) {
-        if (isComplex1(a[i])) {
-          break
-        } else {
-          var s = print(a[i], iTemp)
-          r.push(s)
-          iTemp += s.length + 1
-        }
-        ++i
+  // TODO move into util/iter
+  function partitionWhile(a, f) {
+    var l = []
+    for (var i = 0; i < a.length; ++i) {
+      if (f(a[i])) {
+        l.push(a[i])
+      } else {
+        return [l, a.slice(i)]
       }
-      r = [r.join(" ")]
     }
-    while (i < a.length) {
-      r.push("\n" + spaces(indent + 2) + print(a[i], indent + 2))
-      ++i
-    }
-    return r.join("")
+    return [l, []]
   }
 
-  function printNormal(x, i) {
-    if (x.length > i) {
-      return nonComplex(indent + 1, x, i)
-    } else {
-      return ""
-    }
+  function nonComplex(i, a) {
+    var x = partitionWhile(a, function (x) {
+      return !isComplex1(x)
+    })
+
+    var l = x[0]
+      , r = x[1]
+
+    l = l.reduce(function (x, y) {
+      return withIndent(indent + i + x.length, function () {
+        if (x.length === 0) {
+          return print(y)
+        } else {
+          return x + " " + print(y)
+        }
+      })
+    }, "")
+
+    withIndent(indent + 2, function () {
+      r = r.map(function (x) {
+        return "\n" + spaces() + print(a[i])
+      })
+    })
+
+    return l + r.join("")
   }
 
-  function printSpecial(x, i) {
-    if (x.length > i) {
-      return " " + nonComplex(indent + 2, x, i) + " "
+  function printNormal(l, a, r) {
+    var s = nonComplex(l.length, a)
+    return l + s + r
+  }
+
+  function printSpecial(l, a, r) {
+    var s = nonComplex(l.length + 1, a)
+    if (s === "") {
+      return l + r
     } else {
-      return ""
+      return l + " " + s + " " + r
     }
   }
 
@@ -111,15 +127,14 @@ define(["../../lib/util/buffer", "../lib/util/name"], function (a, b) {
       r.push([ s2, x[s] ])
     }
     //})
-    return "{ " + r.map(function (x, i) {
-      var s = x[0] + new Array((max - x[0].length) + 1).join(" ") + " = "
-      s += print(x[1], indent + 2 + s.length)
-      if (i === 0) {
-        return s
-      } else {
-        return spaces(indent + 2) + s
-      }
-    }).join("\n") + " }"
+    return withIndent(indent + 2, function () {
+      return "{ " + r.map(function (x, i) {
+        var s = x[0] + new Array((max - x[0].length) + 1).join(" ") + " = "
+        return withIndent(indent + s.length, function () {
+          return s + print(x[1])
+        })
+      }).join("\n" + spaces()) + " }"
+    })
   }
 
 
@@ -135,20 +150,20 @@ define(["../../lib/util/buffer", "../lib/util/name"], function (a, b) {
 
         } else if (Array.isArray(x)) {
           if (mode === "simple") {
-            return "(" + printNormal(x, 0) + ")"
+            return printNormal("(", x, ")")
 
           /*} else if (mode === "array") {
-            return "[" + printSpecial(x, 0) + "]"*/
+            return printSpecial("[", x, "]")*/
 
           } else if (mode === "normal") {
             /*if (isSymbol(x[0], "\"")) {
               return printString("\"", x)
             } else if (isSymbol(x[0], "{")) {
-              return "{" + printSpecial(x, 1) + "}"
+              return printSpecial("{", x.slice(1), "}")
             } else if (isSymbol(x[0], "[")) {
-              return "[" + printSpecial(x, 1) + "]"
+              return printSpecial("[", x.slice(1), "]")
             } else {*/
-              return "[" + printSpecial(x, 0) + "]"
+              return printSpecial("[", x, "]")
             //}
           }
         
@@ -159,7 +174,7 @@ define(["../../lib/util/buffer", "../lib/util/name"], function (a, b) {
           if (mode === "simple") {
             return "#(date " + (+x) + ")"
           } else {
-            return "#(date " + print("" + x, i) + ")"
+            return "#(date " + print("" + x) + ")"
           }
 
         } else if (typeof x === "function") {
@@ -198,7 +213,6 @@ define(["../../lib/util/buffer", "../lib/util/name"], function (a, b) {
   function error2(a) {
     return a.reduce(function (x, y) {
       if (Array.isArray(y)) {
-        console.log(x.length)
         return x + print(y[0], x.length)
       } else {
         return x + y
@@ -207,15 +221,18 @@ define(["../../lib/util/buffer", "../lib/util/name"], function (a, b) {
   }
 
   function error1(a) {
-    return new Error(a[0], error2([].slice.call(a, 1)))
+    // TODO
+    return withMode("simple", function () {
+      return new Error(a[0], error2([].slice.call(a, 1)))
+    })
   }
 
   function error() {
-    throw parse(arguments)
+    throw error1(arguments)
   }
 
   function warn() {
-    console.warn(parse(arguments).message)
+    console.warn("warning: " + error1(arguments).message)
   }
 
   /*function array(x, i) {

@@ -1,16 +1,14 @@
-define(["../../lib/util/buffer", "../../lib/util/iter", "../0 data/number", "../0 data/symbol", "../0 data/box", "../util/print"], function (a, b, c, d, e, f) {
+define(["../../lib/util/buffer", "../../lib/util/iter", "../util/data", "../util/util"], function (a, b, c, d) {
   "use strict";
-  
-  var Buffer        = a.Buffer
-    , iterator      = b.iterator
-    , StopIteration = b.StopIteration
-    , Number        = c.Number
-    , Symbol        = d.Symbol
-    , getSyntax     = e.getSyntax
-    , isBoxOrSym    = e.isBoxOrSym
-    , error         = f.error
 
-  function isDelimiter(o, info) {
+  var Buffer     = a.Buffer
+    , iterator   = b.iterator
+    , Number     = c.Number
+    , Symbol     = c.Symbol
+    , getSyntax  = d.getSyntax
+    , isBoxOrSym = d.isBoxOrSym
+
+  function isDelimiter(o) {
     if (o.has()) {
       var c = o.peek()
       /*if (c === " " || c === "\n") {
@@ -153,16 +151,30 @@ define(["../../lib/util/buffer", "../../lib/util/iter", "../0 data/number", "../
       var x = []
       while (x.length === 0) {
         if (!o.has()) {
-          throw new StopIteration()
+          return { done: true }
         }
         x = tokenize1(o)
       }
-      return x
+      return { value: x }
     }
     return oIter
   }
+  
+  function tokenizeBrackets(o, info) {
+    var stack = []
+      , r     = []
+    while (o.has()) {
+      // TODO is this correct ?
+      r = r.concat(getNext(o, info, stack))
+      if (stack.length === 0) {
+        break
+      }
+    }
+    return r
+  }
 
   return {
-    tokenize: tokenize
+    tokenize: tokenize,
+    tokenizeBrackets: tokenizeBrackets,
   }
 })

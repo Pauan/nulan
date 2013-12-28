@@ -1,15 +1,15 @@
-define(["../0 data/symbol", "../0 data/array", "../0 data/parse", "../0 data/box", "../util/print"], function (a, b, c, d, e) {
+define(["../util/data", "../util/util", "../util/print"], function (a, b, c) {
   "use strict";
 
-  var isSymbol    = a.isSymbol
+  var ParseBypass = a.ParseBypass
+    , ParseStart  = a.ParseStart
+    , ParseEnd    = a.ParseEnd
+    , isSymbol    = b.isSymbol
     , unwrap      = b.unwrap
     , arrayToIter = b.arrayToIter
-    , ParseBypass = c.ParseBypass
-    , ParseStart  = c.ParseStart
-    , ParseEnd    = c.ParseEnd
-    , getSyntax   = d.getSyntax
-    , isBoxOrSym  = d.isBoxOrSym
-    , error       = e.error
+    , getSyntax   = b.getSyntax
+    , isBoxOrSym  = b.isBoxOrSym
+    , error       = c.error
 
   function isVertical(x, y) {
     return isBoxOrSym(y) && y.value === x.value && y.loc.start.column === x.loc.start.column
@@ -60,8 +60,9 @@ define(["../0 data/symbol", "../0 data/array", "../0 data/parse", "../0 data/box
               error(x, "expected " + end + " but got " + x.value)
             }
           }
+          var a
           if (y.endAt != null) {
-            var a = []
+            a = []
             while (true) {
               if (o.has()) {
                 if (isSymbol(o.peek(), y.endAt)) {
@@ -82,7 +83,7 @@ define(["../0 data/symbol", "../0 data/array", "../0 data/parse", "../0 data/box
             l.push(a)
             l = l.concat(indent1(o, o.read(), end))
           } else if (y.vertical) {
-            var a = []
+            a = []
             while (true) {
               if (y.indent === "right") {
                 a.push(unwrap(indent1(o, o.peek(), end)))

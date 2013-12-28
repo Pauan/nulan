@@ -1,11 +1,11 @@
-define(["../0 data/array", "../0 data/parse", "../0 data/box", "../util/print"], function (a, b, c, d) {
+define(["../util/data", "../util/util", "../util/print"], function (a, b, c) {
   "use strict";
 
-  var arrayToIter = a.arrayToIter
-    , unwrap      = a.unwrap
-    , ParseBypass = b.ParseBypass
-    , getSyntax   = c.getSyntax
-    , error       = d.error
+  var ParseBypass = a.ParseBypass
+    , arrayToIter = b.arrayToIter
+    , unwrap      = b.unwrap
+    , getSyntax   = b.getSyntax
+    , error       = c.error
 
   function parseArray(o, isUnwrap) {
     var y = parse1(arrayToIter(o.read()), null)

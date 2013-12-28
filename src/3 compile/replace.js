@@ -1,8 +1,14 @@
-define(["./data", "./options", "./scope", "./error"], function (data, options, scope, error) {
+define(["../options", "../../lib/scope", "../util/data", "../util/print"], function (options, a, b, c) {
   "use strict";
-  
+
+  var Scope  = a.Scope
+    , Symbol = b.Symbol
+    , Box    = b.Box
+    , Op     = b.Op
+    , error  = c.error
+
   var reserved = {}
-  
+
   // https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Reserved_Words
   ;("break case catch continue debugger default delete do else finally for function if in instanceof new return switch this throw try typeof var void while with " +
     "class enum export extends import super " +
@@ -19,7 +25,7 @@ define(["./data", "./options", "./scope", "./error"], function (data, options, s
     }
   }
   
-  function unmangle(s) {
+  /*function unmangle(s) {
     var x = /^_(.*)$/.exec(s)
     console.log(x)
     if (x && reserved[x[1]]) {
@@ -27,9 +33,9 @@ define(["./data", "./options", "./scope", "./error"], function (data, options, s
     } else {
       return options.unmangle(s)
     }
-  }
+  }*/
   
-  var boxes = scope.make()
+  var boxes = new Scope()
   
   function getNextUniq(s) {
     var r = s.split("")
@@ -46,32 +52,34 @@ define(["./data", "./options", "./scope", "./error"], function (data, options, s
   }
 
   function boxToSym(x, symbols) {
+    var s
     if (x.value == null || options.minified) {
-      var s = "a"
+      //return x
+      s = "a"
       while (symbols[s]) {
         s = getNextUniq(s)
       }
     } else {
       var orig = mangle(x.value)
-        , s    = orig
         , i    = 2
+      s = orig
       while (symbols[s]) {
         s = orig + i
         ++i
       }
     }
-    return new data.Symbol(s)
+    return new Symbol(s)
   }
   
   function set(x, symbols) {
-    if (x instanceof data.Op) {
+    if (x instanceof Op) {
       if (x.name === "var-function") {
         setBox(x.args[0], symbols)
         // TODO this is probably unnecessary
         set(x.args[1], symbols)
       } else if (x.name === "var") {
         x.args.forEach(function (x) {
-          if (x instanceof data.Op && x.name === "=") {
+          if (x instanceof Op && x.name === "=") {
             x = x.args[0]
           }
           setBox(x, symbols)
@@ -85,7 +93,7 @@ define(["./data", "./options", "./scope", "./error"], function (data, options, s
   }
   
   function setBox(x, symbols) {
-    if (x instanceof data.Box) {
+    if (x instanceof Box) {
       var y = boxToSym(x, symbols)
       boxes.set(x.id, y)
       setSym(y, symbols)
@@ -97,13 +105,13 @@ define(["./data", "./options", "./scope", "./error"], function (data, options, s
   }
   
   function findSymbols(x, symbols) {
-    if (x instanceof data.Op) {
+    if (x instanceof Op) {
       x.args.forEach(function (x) {
         findSymbols(x, symbols)
       })
-    } else if (x instanceof data.Symbol) {
+    } else if (x instanceof Symbol) {
       symbols[mangle(x.value)] = true
-    } else if (x instanceof data.Box) {
+    } else if (x instanceof Box) {
       if (boxes.has(x.id)) {
         setSym(boxes.get(x.id), symbols)
       }
@@ -111,7 +119,7 @@ define(["./data", "./options", "./scope", "./error"], function (data, options, s
   }
 
   function loop(x, symbols) {
-    if (x instanceof data.Op) {
+    if (x instanceof Op) {
       if (x.name === "function") {
         return boxes.push({}, function () {
           symbols = {}
@@ -122,19 +130,19 @@ define(["./data", "./options", "./scope", "./error"], function (data, options, s
             setBox(x, symbols)
           })
           set(x.args[1], symbols)
-          return new data.Op(x.name, x.args.map(function (x) {
+          return new Op(x.name, x.args.map(function (x) {
             return loop(x, symbols)
           }))
         })
       } else {
-        return new data.Op(x.name, x.args.map(function (x) {
+        return new Op(x.name, x.args.map(function (x) {
           return loop(x, symbols)
         }))
       }
-    } else if (x instanceof data.Symbol) {
+    } else if (x instanceof Symbol) {
       // TODO loc
-      return new data.Symbol(mangle(x.value))
-    } else if (x instanceof data.Box) {
+      return new Symbol(mangle(x.value))
+    } else if (x instanceof Box) {
       if (boxes.has(x.id)) {
         return boxes.get(x.id)
       } else {
@@ -154,5 +162,7 @@ define(["./data", "./options", "./scope", "./error"], function (data, options, s
     })
   }
 
-  return replace
+  return {
+    replace: replace,
+  }
 })

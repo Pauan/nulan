@@ -1,7 +1,17 @@
-define(["./data", "./options", "./state", "./box"], function (data, options, state, box) {
+define(["../options", "../../lib/util/iter", "../1 parse/tokenize", "../1 parse/indent", "../1 parse/parse", "../2 macex/macex", "./data", "../filesystem"], function (options, iter, a, b, c, d, e, f) {
   "use strict";
 
-  function relToAbs(abs, rel) {
+  var tokenize = a.tokenize
+    , indent   = b.indent
+    , parse    = c.parse
+    , macex    = d.macex
+    , vars     = e.vars
+    , local    = e.local
+    , path     = e.path
+    , relToAbs = f.relToAbs
+    , readFile = f.readFile
+
+  /*function relToAbs(abs, rel) {
     var a1 = (rel[0] === "/"
                ? []
                : abs.split(/\//))
@@ -18,75 +28,49 @@ define(["./data", "./options", "./state", "./box"], function (data, options, sta
       }
     })
     return a1.join("/")
+  }*/
+
+  var moduleCache = {}
+
+  function getModulePath(s) {
+    return relToAbs(s)
   }
 
-  function importBox(x) {
-    var m = state.module.get()
-    if (m.importArguments[x.module.path] == null) {
-      // TODO global and runtime ?
-      m.importArguments[x.module.path] = x.module.importBox
-      //m.arguments.push(x.module.importBox)
-      //m.imports.push(new data.String(s))
-    }
-
-    //if (x.mode === "run") {
-    //m.assigns.push(op("var", x, [op("=", x, [o, op(".", x, [x.module.importBox, new data.String(x.value)])])]))
-    //}
-  }
-
-  function make() {
-    var o = new data.Module()
-    o.importArguments = {}
-    o.assigns         = []
-    o.arguments       = []
-    o.imports         = []
-
-    // TODO global and runtime ?
-    o.exportBox       = box.make()
-    o.exports         = {}
-    return o
-  }
-
-  function getBox(m, s, y) {
-    var o = m.exports[y.value]
-    if (m.isJavaScript) {
-      // TODO needs to be both global and runtime
-      if (o == null) {
-        o = m.exports[y.value] = box.make(y.value)
-        o.loc = y.loc
-      }
-    } else {
-      if (o == null) {
-        error(y, "module ", [s], "does not have an export for variable ", [y])
-      }
+  function getModule(s) {
+    s = getModulePath(s)
+    var o = moduleCache[s]
+    if (o == null) {
+      o = moduleCache[s] = {}
+      // TODO should reset mode to "run" ?
+      // TODO better resetting
+      local.set(false, function () {
+        path.set(s, function () {
+          vars.push(o, function () {
+            macexString(readFile(s))
+          })
+        })
+      })
     }
     return o
   }
 
-  function fromPath(s) {
-    var a = /^js!(.*)$/.exec(s)
-    if (a !== null) {
-      s = a[1]
-    }
+  function macexString(s) {
+    var o = tokenize(s)
+      , r = []
 
-    if (options.basedir == null) {
-      throw new Error("options::basedir must be set")
-    }
-    var abs = relToAbs(options.basedir, s)
+    iter.each(o, function (x) {
+      x = indent(x)
+      x = parse(x)
+      x = macex(x)
+      r.push(x)
+    })
 
-    var imp = state.moduleCache[abs]
-    if (imp == null) {
-      imp = state.moduleCache[abs] = make()
-      imp.isJavaScript = (a !== null)
-      imp.path         = abs
-    }
-    return imp
+    return r
   }
 
   return {
-    importBox: importBox,
-    make: make,
-    fromPath: fromPath,
-    getBox: getBox,
+    moduleCache: moduleCache,
+    getModule: getModule,
+    macexString: macexString,
   }
 })

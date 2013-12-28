@@ -1,69 +1,45 @@
-define(["./data", "./box", "./error", "./state", "./module"], function (data, box, error, state, module) {
+define(["../util/print", "../util/data"], function (a, b) {
   "use strict";
 
+  var error   = a.error
+    , toBox   = b.toBox
+    , isMacro = b.isMacro
+    , isMacex = b.isMacex
+    , op      = b.op
+    , opApply = b.opApply
+    , Number  = b.Number
+    , String  = b.String
+
   function macex1(a) {
-    var x = box.toBox(a[0])
-    if (x instanceof data.Box && data.macex in x) {
-      return x[data.macex](a)
+    if (a.length === 0) {
+      return op("empty", null)
     } else {
-      if (a.length === 0) {
-        return new data.Op("empty", [])
+      var x = toBox(a[0])
+      if (isMacro in x) {
+        return x[isMacro](a)
       } else {
-        return new data.Op("call", a.map(macex))
-      }
-    }
-  }
-
-  function compileBox(x) {
-    return new data.Op("call", [new data.Op(".", [new data.Symbol("box"),
-                                                  new data.String("get")]),
-                                new data.String(x.id)])
-  }
-
-  function compileBoxValue(x) {
-    return new data.Op(".", [compileBox(x), new data.String("v")])
-  }
-  
-  function macexBox(x, y) {
-    if (data.get in x) {
-      return x[data.get]([x])
-    } else {
-      box.checkMode(x, y)
-      module.importBox(x)
-      if (state.mode.get() === "run" || x.local) {
-        return x
-      } else {
-        return compileBoxValue(x)
+        return opApply("call", null, a.map(macex))
       }
     }
   }
 
   function macex(x) {
-    if (x == null) {
-      return new data.Op("empty", [])
-    } else if (Array.isArray(x)) {
+    /*if (x == null) {
+      return macex([])
+    } else */if (Array.isArray(x)) {
       return macex1(x)
-    } else if (x instanceof data.MacexBypass) {
-      return x.value
-    } else if (x instanceof data.Box) {
-      return macexBox(x, x)
-    } else if (x instanceof data.Symbol) {
-      return macexBox(box.toBox(x), x)
-      //return macex(box.toBox(x))
-    } else if (x instanceof data.Number || x instanceof data.String) {
-      return x
     } else if (typeof x === "number") {
-      return new data.Number(x)
+      return new Number(x)
     } else if (typeof x === "string") {
-      return new data.String(x)
+      return new String(x)
+    } else if (isMacex in x) {
+      return x[isMacex](x)
     } else {
       error(x, "[macex.js] unexpected datatype: ", [x])
     }
   }
-  
+
   return {
     macex: macex,
-    compileBox: compileBox,
-    compileBoxValue: compileBoxValue,
   }
 })

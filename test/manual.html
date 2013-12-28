@@ -280,10 +280,7 @@
                     }
   
                     state.module.set(m, function () {
-                      withSandbox(function (win) {
-                        win.box = box
-                        options.eval = win.eval
-      
+                      context.set(newContext(), function () {
                         var o = tokenize.tokenize(value)
                         iter.each(o, function (x) {
                           push("tokenize", print.array(x))
