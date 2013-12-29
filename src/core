@@ -1,0 +1,244 @@
+# (compile/run-time-module "foo" ...)
+
+#|
+(module "foo"
+  (js/builtins foo)
+  (js/depends "foo")
+  (js/require { foo } = "foo")
+  (js/globals { foo } = "foo"))
+|#
+
+#|  (chain "foo"
+         .split
+         .test
+         )|#
+
+#|  (or-is (type x)
+      "[object Object]"
+      "[object Arguments]"
+      "[object JSON]"
+      "[object Math]")|#
+
+
+(module "nulan:core"
+  (js/depends "../lib/util/key")
+
+  (js/require { list? = array?
+                dict? regexp? boolean? date? error? function? number? string? object? is isnt } = "../lib/util/object")
+
+  (js/require { len map filter foldl foldr each some every join pair partition-while } = "../lib/util/iter")
+
+  ($eval:do (var $do)
+            ($mac! $do -> @args
+              `($eval:do ,@args ()))
+            ())
+
+  ($do (var $mac)
+       ($mac! $mac -> n v
+         `($do (var n)
+               ($mac! n v))))
+
+  ($mac $var -> @args
+    `($do:var ,@args))
+
+  ($mac def -> n v
+    `(do (var n)
+         (set! n v)))
+
+  ($mac let -> @args body
+    `(w/new-scope
+       (var ,@args)
+       body))
+
+  ($mac w/var! -> @args body
+    (let args = (map args -> `x = y
+                  [(uniq) x y])
+      `(finally
+         (do ,@(map args -> [u x]
+                 `(var u = x))
+             ,@(map args -> [_ x y]
+                 `(set! x y))
+             body)
+         (do ,@(map args -> [u x]
+                 `(set! x u))))))
+
+  (export { keys n-chars re/replace }
+    (js/require { Key } = "../lib/util/key")
+
+    (js/builtins Array RegExp)
+
+    ($mac keys -> @args
+      `(var ,@(map args -> x
+                `x = (Key ,"@x"))))
+
+    (def n-chars -> s i
+      (join s (js/new Array (+ i 1))))
+
+    ($mac re/replace -> x @args
+      (foldl x (pair args) -> l [x y]
+        `((js/prop l "replace") (js/new RegExp x "g") y))))
+)
+
+(module "nulan:print"
+  (export { print? simple error warn print prn }
+    (js/builtins console)
+
+    (js/require { Error } = "../lib/util/buffer")
+
+    (import "nulan:core")
+
+    (keys print?)
+
+    (var mode   = "normal"
+         indent = 0)
+
+    (def spaces -> (i = indent)
+      (n-chars " " i))
+
+    (def replace-string -> s x
+      (let x = (re/replace x "\\\\@s" "\\$&"
+                             "\\n"    "$&@(spaces) ")
+        "@s@x@s"))
+
+    (def complex? -> x
+      (list? x))
+
+    (defer print)
+
+    # Print the not-complex stuff on the same line, separated by a space
+    # TODO use join rather than fold ?
+    (def not-complex -> l
+      (foldl "" l -> [x y]
+        (let l = (len x)
+          (w/var! indent = (+ indent l)
+            (let y = (print y)
+              (if (is l 0)
+                y
+                "@x @y"))))))
+
+    # Print the complex stuff with a new line
+    (def complex -> r
+      (join ""
+        (w/var! indent = (+ indent 2)
+          (map r -> x
+            "\n@(spaces)@(print x)"))))
+
+    (def print-list -> a i
+      (let [l r] = (partition-while a ->
+                     (not:complex? x))
+           l     = (w/var! indent = (+ indent i)
+                     (not-complex l))
+           r     = (complex r)
+        "@l@r"))
+
+    (def print-normal -> l a r
+      (let s = (print-list a (len l))
+        "@l@s@r"))
+
+    (def print-special -> l a r
+      (let s = (print-list a (+ (len l) 1))
+        (if (is s "")
+          "@l@r"
+          "@l @s @r")))
+
+    (def print-dict -> x
+      (let i = 0
+
+           # Find the length of the longest key
+           a = (map (entries x) -> [s x]
+                 (let s = (print s)
+                   (set! i (max i (len s)))
+                   [s x]))
+
+           # Pad the keys with spaces and add " = "
+           a = (map a -> [s x]
+                 (let p = (n-chars " " (- i (len s)))
+                   ["@s@p = " x]))
+
+           # Print the values
+           a = (join "\n@(spaces)"
+                 (map a -> [s x]
+                   (w/var! indent = (+ indent (len s))
+                     "@s@(print x)")))
+
+        "{ @a }"))
+
+    (def error1 -> loc @args
+      (w/var! mode = "simple"
+        (let s = (foldl "" args -> [x y]
+                   (if (list? y)
+                     # TODO feels hacky
+                     (let [y] = y
+                       (w/var! indent = (len x)
+                         "@x@(print y)"))
+                     "@x@y"))
+          (js/new Error loc s))))
+
+    (def simple -> x i
+      (w/var! mode = "simple"
+        (print x i)))
+
+    (def error -> loc @args
+      (js/throw:error1 loc @args))
+
+    (def warn -> loc @args
+      (let e = (js/prop (error1 loc @args) "message")
+        ((js/prop console "warn") "warning: @e")))
+
+    (def print -> x (i = indent)
+      (w/var! indent = i
+        (if (dict? x)
+              (if (exists? x print?)
+                (x.print? x i)
+                # TODO handle recursive dicts ?
+                (print-dict x))
+
+            (list? x)
+              (if (is mode "simple")
+                    (print-normal "(" x ")")
+                  (is mode "normal")
+                    (print-special "[" x "]"))
+
+            (regexp? x)
+              "#(re @x)"
+
+            (date? x)
+              (if (is mode "simple")
+                "#(date @(num x))"
+                "#(date @(print "@x"))")
+
+            (function? x)
+              # TODO use empty?
+              (iflet n = (js/prop x "name")
+                "#(function @n)"
+                "#(function)")
+
+            (error? x)
+              (let n = (iflet n = (js/prop x "name")
+                         "#(error @n "
+                         "#(error ")
+                (w/var! indent = indent + (len n)
+                  (let s = (print:js/prop x "message")
+                    "@n@s)")))
+
+            (string? x)
+              (replace-string "\"" x)
+
+            (or (number? x)
+                (boolean? x))
+              "@x"
+
+            (null? x)
+              "()"
+
+            (js/throw:js/new Error x "unknown data type: @x")))))
+
+    ($mac prn -> @args
+      (w/uniq [u]
+        `((js/prop console "log")
+           (let u = ""
+             (do ,@(map args -> x
+                     `(set! u (print x (len u)))))))))))
+
+(import "nulan:core")
+(import "nulan:print")
