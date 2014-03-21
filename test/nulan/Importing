@@ -1,0 +1,21 @@
+@compile
+  > vars bar qux
+    $import "bar" except { bar = qux }
+    vars foo = 1
+    prn foo qux
+  > vars bar qux
+    $import "bar" except { bar }
+    vars foo = 1
+    prn foo bar
+  > vars bar qux
+    $import "bar" except {}
+    vars foo = 1
+    prn foo bar
+  > vars bar qux
+    $import "bar"
+    vars foo = 1
+    prn foo bar
+
+@macex
+  > ->
+      $import "bar"

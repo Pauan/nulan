@@ -1,0 +1,360 @@
+# (compile/run-time-module "foo" ...)
+
+#|
+(module "foo"
+  (js/depends "foo")
+  (export:js/builtins foo)
+  (export:js/require { foo } = "foo")
+  (export:js/globals { foo } = "foo"))
+|#
+
+#|
+(let x = [1 2 3 4 5]
+     y = [6 7 8 9 10]
+  (mapzip [x y] -> [x y]
+    [(+ x 1) (+ y 2)]))
+
+
+(let x = [1 2 3 4 5]
+     y = [6 7 8 9 10]
+  (unzip:map (zip x y) -> [x y]
+    [(+ x 1) (+ y 2)]))
+
+
+var x = [1, 2, 3, 4, 5]
+  , y = [6, 7, 8, 9, 10]
+
+var r = []
+console.assert(x.length === y.length)
+for (var i = 0; i < x.length; ++i) {
+  r.push([x[i] + 1, y[i] + 2])
+}
+return r
+|#
+
+#|
+
+    (<< "foo"
+        .split
+        .test)
+
+    (<< [1 2 3]
+        (map -> x (+ x 2))
+        len)
+
+    (>> [1 2 3]
+        (map -> x (+ x 2))
+        len)
+
+
+    (<< [1 2 3] len (+ 2))
+    (+ (len [1 2 3]) 2)
+
+
+    (<< 5 (+ 3) (/ 2) (- 1))
+    (- (/ (+ 5 3) 2) 1)
+
+
+    (>> 5 (+ 3) (/ 2) (- 1))
+    (- 1 (/ 2 (+ 3 5)))
+
+|#
+
+#|  (or-is (type x)
+      "[object Object]"
+      "[object Arguments]"
+      "[object JSON]"
+      "[object Math]")|#
+
+#|
+($var in)
+($mac for -> x `(in n a)
+  `(map a -> n x))
+
+($syntax-infix! for { priority = 0 })
+($syntax-infix! in  { priority = 10 })
+
+x for x in [1 2 3]
+
+(for x (in x [1 2 3]))
+
+(map [1 2 3] -> x x)
+
+(<< [1 2 3] (map -> x x))
+
+(map x y -> args
+  (+ x y))
+
+(foldl x y -> "" args
+  (+ x y))
+
+(each x -> args
+  (+ x y))
+
+($syntax ->
+  (fn [first @x] s [@y body]
+    `(first @y (fn [,@x] body))))
+
+(map (fn [x y] (+ x y)) args)
+
+(callback x -> args
+  (+ x 1))
+
+(get-json x -> "foo"
+  (prn x))
+
+(get-json "foo" -> x
+  (prn x))
+
+(get-json "foo" :fn [x]
+  (prn x))
+
+(callback args (fn [x] (+ x 1)))
+
+(callback args -> x
+  (+ x 1))
+
+(map [1 2 3] (fn x y (+ x y))
+             (fn x y (+ x y)))
+
+-> @[x y] (+ x y)
+
+(def foo -> x y
+  (+ x y))
+
+|#
+
+
+# box-scope
+# module
+#   name
+#   globals
+#   exports
+#   conflicts
+
+# (import "nulan:axiom"  include { foo }
+#         "nulan:ffi/js" exclude { foo }
+#         "nulan:ffi/js" exclude { foo } rename { foo = bar }
+#         "testing"      prefix "js/")
+
+(module "nulan:ffi/js" :export
+  (import "nulan:axiom/ffi/js")
+
+  (require { array? array-like? dict? regexp? date? error? } = "../lib/util/object")
+  (require { ->array all-keys all-values all-entries keys values entries } = "../lib/util/iter")
+  (require { Key } = "../lib/util/key")
+)
+
+# Defines the bare minimum of core stuff that requires interfacing with the native platform (in this case, JavaScript)
+(module "nulan:core/ffi"
+  (import "nulan:axiom"
+          "nulan:ffi/js")
+
+  :export
+
+  (require { has? = has boolean? function? number? string? object? is isnt } = "../lib/util/object")
+  (require { str = ->string list? ->cons cons car cdr nil
+             len some partition-while foldl foldr map filter take chunk
+             range deep-flatten flatten intersperse zip-min zip-max zip
+             unzip product n-of join every dedupe mapzip } = "../lib/util/iter")
+
+
+# Defines everything else in core
+(module "nulan:core"
+  (import "nulan:axiom"
+          "nulan:core/ffi")
+
+  :export
+
+  ($mac keys -> @args
+    `(var ,@(map args -> x
+              `x = (Key ,"@x"))))
+
+  ($mac w/complex -> x body
+    (w/uniq u v
+      `(if (list? x)
+         (w/uniq u v
+           (let v = x
+                x = u
+             `(let u = v
+                ,body)))
+         (let body))))
+
+  ($mac w/uniq -> @args body
+    `(let ,@(map args -> x
+              `x = (uniq))
+       body)))
+
+
+(module "nulan:core/print"
+  (import "nulan:core/ffi"
+          "nulan:core"
+          "nulan:ffi/js")
+
+  (require { Error } = "../lib/util/buffer")
+
+  (export:keys %print)
+
+  (var mode   = "normal"
+       indent = 0)
+
+  (def spaces -> (i = indent)
+    (n-of i " "))
+
+  (def replace-string -> s x
+    (let x = (<< x (replace "\\@s" -> x "\\@x")
+                   (replace "\n"   -> x "@x@(spaces) "))
+      "@s@x@s"))
+
+  (def complex? -> x
+    (list? x))
+
+  # TODO defer ?
+  (var print)
+
+  # Print the not-complex stuff on the same line, separated by a space
+  # TODO use intersperse rather than fold ?
+  (def not-complex -> l
+    (foldl "" l -> [x y]
+      (let l = (len x)
+        (w/var indent = (+ indent l)
+          (let y = (print y)
+            (if (is l 0)
+              y
+              "@x @y"))))))
+
+  # Print the complex stuff with a new line
+  (def complex -> r
+    (w/var indent = (+ indent 2)
+      (str:map r -> x
+        "\n@(spaces)@(print x)")))
+
+  (def print-list -> a i
+    (let [l r] = (partition-while a ->
+                   (not:complex? x))
+         l     = (w/var indent = (+ indent i)
+                   (not-complex l))
+         r     = (complex r)
+      "@l@r"))
+
+  (def print-normal -> l a r
+    (let s = (print-list a (len l))
+      "@l@s@r"))
+
+  (def print-special -> l a r
+    (let s = (print-list a (+ (len l) 1))
+      (if (is s "")
+        "@l@r"
+        "@l @s @r")))
+
+  (def print-dict -> a
+    (let a = (map (entries a) -> [s x]
+               (let s = (print s)
+                 [s x]))
+
+         # Find the length of the longest key
+         i = (foldl 0 a -> i [s]
+               (max i (len s)))
+
+         # Pad the keys with spaces and add " = "
+         a = (map a -> [s x]
+               (let p = (spaces (- i (len s)))
+                 ["@s@p = " x]))
+
+         # Print the values
+         a = (str:intersperse "\n@(spaces)"
+               (map a -> [s x]
+                 (w/var indent = (+ indent (len s))
+                   "@s@(print x)")))
+
+      (if (is a "")
+        "{}"
+        "{ @a }")))
+
+  (def error1 -> loc @args
+    (w/var mode = "simple"
+      (let s = (foldl "" args -> [x y]
+                 (if (list? y)
+                   (let [y] = y
+                     (w/var indent = (len x)
+                       "@x@(print y)"))
+                   "@x@y"))
+        (new Error loc s))))
+
+  (export:def simple -> x i
+    (w/var mode = "simple"
+      (print x i)))
+
+  (export:def error -> loc @args
+    (throw:error1 loc @args))
+
+  (export:def warn -> loc @args
+    (let e = (get (error1 loc @args) "message")
+      ((get console "warn") "warning: @e")))
+
+  (export:set! print -> x (i = indent)
+    (w/var indent = i
+      (if (dict? x)
+            (if (has? x %print)
+              (x.%print x i)
+              # TODO handle recursive dicts ?
+              (print-dict x))
+
+          (list? x)
+            (if (is mode "simple")
+                  (print-normal "(" x ")")
+                (is mode "normal")
+                  (print-special "[" x "]"))
+
+          (regexp? x)
+            "#(re @x)"
+
+          (date? x)
+            (if (is mode "simple")
+              "#(date @(num x))"
+              "#(date @(print "@x"))")
+
+          (function? x)
+            # TODO use empty?
+            (if-let n = (get x "name")
+              "#(function @n)"
+              "#(function)")
+
+          (error? x)
+            (let n = (if-let n = (get x "name")
+                       "#(error @n "
+                       "#(error ")
+              (w/var indent = indent + (len n)
+                (let s = (print:get x "message")
+                  "@n@s)")))
+
+          (string? x)
+            (replace-string "\"" x)
+
+          (or (number? x)
+              (boolean? x))
+            "@x"
+
+          (null? x)
+            "()"
+
+          (throw:new Error x "unknown data type: @x"))))
+
+  #|
+    (w/uniq u
+      `(let u = ""
+         (do ,@(map args -> x
+                 `(+= u (print x (len u))))
+             )))
+  |#
+  (export:def prn -> @args
+    ((get console "log")
+      (foldl "" args -> x y
+        (+ x (print y (len x))))))
+)
+
+(module "nulan:main"
+  (export:import "nulan:axiom"
+                 "nulan:core/ffi"
+                 "nulan:core"
+                 "nulan:print"))

@@ -1,0 +1,330 @@
+function Lazy(f) {
+  this.thunk  = f
+  this.cached = false
+}
+Lazy.prototype.toString = function () {
+  return "" + force(this)
+}
+
+function force(x) {
+  while (x instanceof Lazy) {
+    if (!x.cached) {
+      x.thunk  = x.thunk()
+      x.cached = true
+    }
+    x = x.thunk
+  }
+  return x
+}
+
+function cons(x, y) {
+  return new Cons(x, y)
+}
+
+// TODO should use the same extension method as toCons ?
+function isList(f1) {
+  var x = force(f1)
+  return isNull(x) || x instanceof Cons || x instanceof Tree || isArrayLike(x)
+}
+
+function car(f1) {
+  var x = force(f1)
+  if (!(x instanceof Cons)) {
+    throw new TypeError("expected cons but got " + x)
+  }
+  return x.car
+}
+
+function cdr(f1) {
+  var x = force(f1)
+  if (!(x instanceof Cons)) {
+    throw new TypeError("expected cons but got " + x)
+  }
+  return x.cdr
+}
+
+// TODO make this extensible
+function toCons(f1) {
+  var x = force(f1)
+  if (isNull(x)) {
+    return x
+  } else if (x instanceof Cons) {
+    return x
+  } else if (x instanceof Tree) {
+    // TODO replace with foldr ?
+    return (function anon(x, init) {
+      // TODO pretty sure this Lazy hurts performance for no gain!
+      return new Lazy(function () {
+        if (isNull(x)) {
+          return init
+        } else {
+          return anon(x.left, cons(cons(x.key, cons(x.value, void 0)), anon(x.right, init)))
+        }
+      })
+    })(x, void 0)
+  } else if (isArrayLike(x)) {
+    return arrayToCons(x, 0)
+  } else {
+    // TODO should this be a TypeError ?
+    throw new TypeError("can't convert to cons: " + x)
+  }
+}
+
+function len(f1) {
+  var x = force(f1)
+  if (isNull(x)) {
+    return 0
+  } else if (x instanceof Tree) {
+    return x.length
+  } else if (x instanceof Cons) {
+    var i = 0
+    do {
+      ++i
+      x = cdr(x)
+    } while (!isNull(x))
+    return i
+  } else {
+    throw new TypeError("cannot use len on " + x)
+  }
+}
+
+// TODO
+function lt(x, y) {
+  return force(x) < force(y)
+}
+
+function is(f1, f2) {
+  var x = force(f1)
+    , y = force(f2)
+  if (x === y) {
+    return true
+  } else if (isNull(x) && isNull(y)) {
+    return true
+  } else if (x instanceof Cons) {
+    if (y instanceof Cons) {
+      return is(car(x), car(y)) &&
+             is(cdr(x), cdr(y))
+    } else {
+      return false
+    }
+  } else if (x instanceof Tree) {
+    if (y instanceof Tree) {
+      // TODO I don't think this is correct
+      return is(x.length, y.length) &&
+             is(x.key, y.key) &&
+             is(x.value, y.value) &&
+             is(x.left, y.left) &&
+             is(x.right, y.right)
+    } else {
+      return false
+    }
+  } else {
+    // NaN !== NaN, but they are identical.
+    // NaNs are the only non-reflexive value, i.e., if x !== x,
+    // then x is a NaN.
+    // isNaN is broken: it converts its argument to number, so
+    // isNaN("foo") => true
+    return x !== x && y !== y
+  }
+}
+
+
+function place(f1, key, f) {
+  var x = force(f1)
+  if (isNull(x)) {
+    return f(void 0, false)
+  } else if (x instanceof Tree) {
+    if (is(key, x.key)) {
+      return f(x.value, true)
+    } else if (lt(key, x.key)) {
+      return place(x.left, key, f)
+    } else {
+      return place(x.right, key, f)
+    }
+  } else {
+    throw new TypeError("expected dict but got " + x)
+  }
+}
+
+function set(f1, key, value) {
+  var x = force(f1)
+  if (isNull(x)) {
+    return new Tree(1, x, x, key, value)
+  } else if (x instanceof Tree) {
+    if (is(key, x.key)) {
+      return new Tree(x.length, x.left, x.right, x.key, value)
+    } else if (lt(key, x.key)) {
+      return btree(x, set(x.left, key, value), x.right)
+    } else {
+      return btree(x, x.left, set(x.right, key, value))
+    }
+  } else {
+    throw new TypeError("expected dict but got " + x)
+  }
+}
+
+function rem(f1, key) {
+  var x = force(f1)
+  if (isNull(x)) {
+    return x
+  } else if (x instanceof Tree) {
+    if (is(key, x.key)) {
+      return rem1(x.left, x.right)
+    } else if (lt(key, x.key)) {
+      return btree(x, rem(x.left, key), x.right)
+    } else {
+      return btree(x, x.left, rem(x.right, key))
+    }
+  } else {
+    throw new TypeError("expected dict but got " + x)
+  }
+}
+
+
+function foldr(x, init, f) {
+  // TODO I don't think this should be lazy...?
+  return new Lazy(function () {
+    if (isNull(x)) {
+      return init
+    } else {
+      return foldr(x.left, f([x.key, x.value], foldr(x.right, init, f)), f)
+    }
+  })
+}
+
+function treeFold(init, x, f) {
+  // TODO I don't think this should be lazy...?
+  return new Lazy(function () {
+    if (isNull(x)) {
+      return init
+    } else {
+      return f(x, treeFold(init, x.left, f), treeFold(init, x.right, f))
+    }
+  })
+}
+
+
+
+function Cons(x, y) {
+  this.car = x
+  this.cdr = y
+}
+Cons.prototype.toString = function () {
+  return "[ " + toArray(this).join(" ") + " ]"
+}
+
+function arrayToCons(a, i) {
+  if (i < a.length) {
+    return cons(a[i], arrayToCons(a, i + 1))
+  } else {
+    return
+  }
+}
+
+// http://groups.csail.mit.edu/mac/users/adams/BB/
+function Tree(length, left, right, key, value) {
+  this.length = length
+  this.left   = left
+  this.right  = right
+  this.key    = key
+  this.value  = value
+}
+Tree.prototype.toString = function () {
+  return "{ " + foldr(this, "", function (x, y) {
+    if (y === "") {
+      return x
+    } else {
+      return x[0] + " = " + x[1] + "\n  " + y
+    }
+  }) + " }"
+}
+
+function tree(x, left, right) {
+  return new Tree(1 + len(left) + len(right), left, right, x.key, x.value)
+}
+
+// (tree A Al (B Bl Br))
+function singleLeft(A, Al, B) {
+  var Bl = B.left
+    , Br = B.right
+  return tree(B, tree(A, Al, Bl), Br)
+}
+
+// (tree A (B Bl Br) Ar)
+function singleRight(A, B, Ar) {
+  var Bl = B.left
+    , Br = B.right
+  return tree(B, Bl, tree(A, Br, Ar))
+}
+
+// (tree A Al (tree B (tree C Cl Cr) Br))
+function doubleLeft(A, Al, B) {
+  var C  = B.left
+    , Cl = C.left
+    , Cr = C.right
+    , Br = B.right
+  return tree(C, tree(A, Al, Cl), tree(B, Cr, Br))
+}
+
+// (tree A (tree B Bl (tree C Cl Cr)) Ar)
+function doubleRight(A, B, Ar) {
+  var Bl = B.left
+    , C  = B.right
+    , Cl = C.left
+    , Cr = C.right
+  return tree(C, tree(B, Bl, Cl), tree(A, Cr, Ar))
+}
+
+// Lower values are more balanced, higher values are less balanced
+var weight = 4
+
+// Balanced tree, not b-tree
+function btree(x, left, right) {
+  var ln = len(left)
+    , rn = len(right)
+  if ((ln + rn) < 2) {
+    return tree(x, left, right)
+  // Right side is too big
+  } else if (rn > (weight * ln)) {
+    if (len(right.left) < len(right.right)) {
+      return singleLeft(x, left, right)
+    } else {
+      return doubleLeft(x, left, right)
+    }
+  // Left side is too big
+  } else if (ln > (weight * rn)) {
+    if (len(left.right) < len(left.left)) {
+      return singleRight(x, left, right)
+    } else {
+      return doubleRight(x, left, right)
+    }
+  } else {
+    return tree(x, left, right)
+  }
+}
+
+function min(x) {
+  if (isNull(x.left)) {
+    return x
+  } else {
+    return min(x.left)
+  }
+}
+
+function remMin(x) {
+  if (isNull(x.left)) {
+    return x.right
+  } else {
+    return btree(x, remMin(x.left), x.right)
+  }
+}
+
+function rem1(left, right) {
+  if (isNull(left)) {
+    return right
+  } else if (isNull(right)) {
+    return left
+  } else {
+    return btree(min(right), left, remMin(right))
+  }
+}

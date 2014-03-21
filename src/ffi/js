@@ -1,0 +1,38 @@
+($module "nulan:ffi/js"
+  (export:$import "nulan:private/ffi/js")
+
+  ($mac builtins -> @args
+    `(do ,@(map args -> x
+             `(do ($var ,x)
+                  ($get! ,x ->
+                    (bypass:sym ,"@x"))))))
+
+  # https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
+  # TODO InternalError StopIteration Uint8ClampedArray Iterator Intl Intl.Collator Intl.DateTimeFormat Intl.NumberFormat
+  (export:builtins Infinity NaN undefined eval isFinite isNaN parseFloat parseInt decodeURI decodeURIComponent
+                   encodeURI encodeURIComponent Object Function Boolean Symbol Error EvalError RangeError
+                   ReferenceError SyntaxError TypeError URIError Number Math Date String RegExp Array Float32Array
+                   Float64Array Int16Array Int32Array Int8Array Uint16Array Uint32Array Uint8Array Map Set WeakMap
+                   WeakSet ArrayBuffer DataView JSON Generator Promise Reflect Proxy arguments this))
+
+($module "nulan:re"
+  ($import "nulan:ffi/js")
+  (builtins RegExp)
+
+  (export:def re/test -> x y
+    ((new RegExp y).test x))
+
+  (export:def re/replace -> x y z
+    ("".replace.call x (new RegExp y "g") z))
+
+  (export:def re/get-all -> x y
+    # (or-null ("".match.call x (new RegExp y "g")) [])
+    (loop y = (new RegExp y "g") :lazy
+      (let a = (y.exec x)
+        (if (null? a)
+          nil
+          (cons a (recur y)))))))
+
+($import "nulan:ffi/js")
+
+(alias prn = console.log)

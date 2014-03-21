@@ -9,6 +9,34 @@ define(["./print", "./data", "./util", "../1 parse/tokenize"], function (a, b, c
     , unwrap           = c.unwrap
     , tokenizeBrackets = d.tokenizeBrackets
 
+  function endAt(sEnd) {
+    return function (s, a, info) {
+      a = toIter(a)
+
+      var r = []
+      while (true) {
+        var o = step(a)
+        if (o) {
+          o = value(o)
+          if (isBoxOrSym(o.value) && o.value.value === sEnd) {
+            break
+          } else {
+            r.push(tokenize1(o, a, info))
+          }
+        } else {
+          error(s, "missing ending " + sEnd)
+        }
+      }
+      return [s, r]
+    }
+  }
+
+  function startAt(sStart) {
+    return function (s, a, info) {
+      error(s, "missing starting " + sStart)
+    }
+  }
+
   function comment(o) {
     var s = o.position()
     o.read()
@@ -292,9 +320,9 @@ define(["./print", "./data", "./util", "../1 parse/tokenize"], function (a, b, c
     if (x.delimiter == null) {
       x.delimiter = true
     }
-    if (x.whitespace == null) {
+    /*if (x.whitespace == null) {
       x.whitespace = true
-    }
+    }*/
     if (x.tokenize == null) {
       x.tokenize = function (o) {
         o.read()

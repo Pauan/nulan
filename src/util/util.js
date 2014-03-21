@@ -17,14 +17,6 @@ define(["../options", "../../lib/util/object", "./data", "./print", "../2 macex/
     , evalString = e.evalString
     , compile    = f.compile
   
-  function loc(x, y) {
-    return {
-      source: x.source,
-      start: x.start,
-      end: y.end
-    }
-  }
-  
   
   // symbol
   function isSymbol(x, y) {
@@ -57,10 +49,6 @@ define(["../options", "../../lib/util/object", "./data", "./print", "../2 macex/
       },
       peek: function () {
         return x[i]
-      },
-      // TODO super hacky
-      unpeek: function () {
-        return x[i - 2]
       },
       read: function () {
         return x[i++]
@@ -144,29 +132,6 @@ define(["../options", "../../lib/util/object", "./data", "./print", "../2 macex/
       return o
     } else {
       return x
-    }
-  }
-  
-  function plural(i) {
-    if (i === 1) {
-      return ""
-    } else {
-      return "s"
-    }
-  }
-
-  function checkArguments(a, min, max) {
-    var len = a.length - 1
-    if ((min != null && len < min) || (max != null && len > max)) {
-      if (max == null) {
-        error(a[0], "expected at least " + min + " argument" + plural(min) + " but got " + len)
-      } else if (min == null) {
-        error(a[0], "expected at most " + max + " argument" + plural(max) + " but got " + len)
-      } else if (min === max) {
-        error(a[0], "expected " + min + " argument" + plural(min) + " but got " + len)
-      } else {
-        error(a[0], "expected " + min + " to " + max + " arguments but got " + len)
-      }
     }
   }
   

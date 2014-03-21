@@ -1,244 +1,243 @@
-# (compile/run-time-module "foo" ...)
+:export
 
-#|
-(module "foo"
-  (js/builtins foo)
-  (js/depends "foo")
-  (js/require { foo } = "foo")
-  (js/globals { foo } = "foo"))
-|#
+($eval:do (var $do)
+          ($mac! $do -> @args
+            `($eval:do ,@args ()))
+          ())
 
-#|  (chain "foo"
-         .split
-         .test
-         )|#
+($do (var $mac)
+     ($mac! $mac -> n v
+       `($do (var n)
+             ($mac! n v))))
 
-#|  (or-is (type x)
-      "[object Object]"
-      "[object Arguments]"
-      "[object JSON]"
-      "[object Math]")|#
+($mac $var -> @args
+  `($do:var ,@args))
+
+($mac def -> n v
+  `(do (var n)
+       (set! n v)))
+
+($mac let -> @args body
+  `(w/new-scope
+     (var ,@args)
+     body))
+
+($mac lazy -> body
+  `(lazy-thunk -> body))
+
+#|(def has? -> x key
+  (place x key -> _ has has))
+
+(def get -> x key
+  (place x key -> value value))|#
 
 
-(module "nulan:core"
-  (js/depends "../lib/util/key")
 
-  (js/require { list? = array?
-                dict? regexp? boolean? date? error? function? number? string? object? is isnt } = "../lib/util/object")
+(def foldl -> init a f
+  ((foldr a (-> x x) -> x y
+     (-> init
+       (y (f init x))))
+   init))
 
-  (js/require { len map filter foldl foldr each some every join pair partition-while } = "../lib/util/iter")
+(def foldr -> a init f
+  ((foldl (-> x x) a -> x y
+     (-> init
+       (x (f y init))))
+   init))
 
-  ($eval:do (var $do)
-            ($mac! $do -> @args
-              `($eval:do ,@args ()))
-            ())
 
-  ($do (var $mac)
-       ($mac! $mac -> n v
-         `($do (var n)
-               ($mac! n v))))
+(def nil? -> x
+  (is x nil))
 
-  ($mac $var -> @args
-    `($do:var ,@args))
+(def foldl -> init a f
+  (let a = (->cons a)
+    (if (nil? a)
+      init
+      (foldl (f init (car a)) (cdr a) f))))
 
-  ($mac def -> n v
-    `(do (var n)
-         (set! n v)))
+(def foldr -> a init f
+  (let a = (->cons a)
+    (if (nil? a)
+      init
+      (f (car a) (foldr (cdr a) init f)))))
 
-  ($mac let -> @args body
+(def iterate -> a f :lazy
+  (let a = (->cons a)
+    (if (nil? a)
+      nil
+      (f (car a) (iterate (cdr a) f)))))
+
+(def map -> a f
+  (iterate a -> x y
+    (cons (f x) y)))
+
+(def keep -> a f
+  (iterate a -> x y
+    (if (f x)
+      (cons x y)
+      y)))
+
+(def range -> (>= min 0) (max = infinity) (step = 1) :lazy
+  (if (< min max)
+        (cons min (range (+ min step) max step))
+      (> min max)
+        (cons min (range (- min step) max step))
+      nil))
+
+
+(def into -> x y
+  (foldl x y -> x y
+    (push x y)))
+
+
+
+($mac w/sym -> @args body
+  `(let ,@(map args -> x
+            `(x = (sym ,"@x")))
+     body))
+
+($mac w/uniq -> @args body
+  `(let ,@(map args -> x
+            `(x = (uniq)))
+     body))
+
+($mac and -> x @args
+  (w/uniq u
+    (if (len? args)
+      `(let u = x
+         (if u (and ,@args) u))
+      x)))
+
+($mac or -> x @args
+  (w/uniq u
+    (if (len? args)
+      `(let u = x
+         (if u u (or ,@args)))
+      x)))
+
+($mac if-let -> `(x = y) yes no
+  (w/uniq u
+    `(let u = y
+       (if u (let x = u yes) no))))
+
+($mac keys -> @args
+  `(var ,@(map args -> x
+            `(x = (key ,"@x")))))
+
+($mac w/var -> @args body
+  (let args = (map args -> `(x = y)
+                [(uniq) x y])
+    `(let ,@(map args -> [u x]
+              `(u = x))
+       (do ,@(map args -> [_ x y]
+               `(set! x y))
+           (ensure-cleanup
+             body
+             (do ,@(map args -> [u x]
+                     `(set! x u))))))))
+
+# Taken from Clojure's -> operator
+# http://clojuredocs.org/clojure_core/clojure.core/-%3E
+($mac << -> x @args
+  (foldl x args -> x y
+    (if (list? y)
+      (let [y @rest] = y
+        `(y x ,@rest))
+      `(y x))))
+
+# Taken from Clojure's ->> operator
+# http://clojuredocs.org/clojure_core/clojure.core/-%3E%3E
+($mac >> -> x @args
+  (foldl x args -> x y
+    (if (list? y)
+      `(,@y x)
+      `(y x))))
+
+($mac alias -> @args
+  `(do ,@(map args -> `(x = y)
+           `(do ($var x)
+                ($get! x -> `y)))))
+
+($mac loop -> @args body
+  (w/sym recur
     `(w/new-scope
-       (var ,@args)
-       body))
+       (def recur -> ,@(map args -> `(l = r) l)
+         body)
+       (recur ,@(map args -> `(l = r) r)))))
 
-  ($mac w/var! -> @args body
-    (let args = (map args -> `x = y
-                  [(uniq) x y])
-      `(finally
-         (do ,@(map args -> [u x]
-                 `(var u = x))
-             ,@(map args -> [_ x y]
-                 `(set! x y))
-             body)
-         (do ,@(map args -> [u x]
-                 `(set! x u))))))
-
-  (export { keys n-chars re/replace }
-    (js/require { Key } = "../lib/util/key")
-
-    (js/builtins Array RegExp)
-
-    ($mac keys -> @args
-      `(var ,@(map args -> x
-                `x = (Key ,"@x"))))
-
-    (def n-chars -> s i
-      (join s (js/new Array (+ i 1))))
-
-    ($mac re/replace -> x @args
-      (foldl x (pair args) -> l [x y]
-        `((js/prop l "replace") (js/new RegExp x "g") y))))
+($mac if-has? -> `(n = (get o k)) yes no
+  (w/uniq u v
+    `(place o k -> u v
+       (if v
+         (let n = u
+           yes)
+         no)))
+  #|(w/uniq u
+    `(let u = k
+       (if (has? o u)
+         (let n = (get o u)
+           yes)
+         no)))|#
 )
 
-(module "nulan:print"
-  (export { print? simple error warn print prn }
-    (js/builtins console)
+# TODO
+($mac case -> x @args last
+  (w/uniq u
+    `(let u = x
+       ,(foldr args last -> x y
+          `(if-let x = u
+             y)))))
 
-    (js/require { Error } = "../lib/util/buffer")
 
-    (import "nulan:core")
+($module "nulan:lib/buffer"
+  (export:keys value loc)
 
-    (keys print?)
+  (export:def merge -> (obj value = x
+                            loc   = loc1)
+                       (obj value = y
+                            loc   = loc2)
+    (obj value = "@x@y"
+         loc   = { source = (or loc1.source
+                                loc2.source)
+                   start  = loc1.start
+                   end    = loc2.end })))
 
-    (var mode   = "normal"
-         indent = 0)
 
-    (def spaces -> (i = indent)
-      (n-chars " " i))
+(if (match? x `n = v)
+      (let `n = v x
+        ...)
+    (if (match? x n)
+          (let n = x
+            ...)
+        (error "foo")))
 
-    (def replace-string -> s x
-      (let x = (re/replace x "\\\\@s" "\\$&"
-                             "\\n"    "$&@(spaces) ")
-        "@s@x@s"))
+if (type.isArray(x) && array.len(x) === 3) {
 
-    (def complex? -> x
-      (list? x))
+}
 
-    (defer print)
 
-    # Print the not-complex stuff on the same line, separated by a space
-    # TODO use join rather than fold ?
-    (def not-complex -> l
-      (foldl "" l -> [x y]
-        (let l = (len x)
-          (w/var! indent = (+ indent l)
-            (let y = (print y)
-              (if (is l 0)
-                y
-                "@x @y"))))))
+($mac match -> top @args
+  (w/complex top
+    (loop [x y @args] = args
+      `(if (match? top x)
+         (let x = top
+           y)
+         ,(if (len? args)
+            (recur args)
+            `(error "no patterns matched"))))))
 
-    # Print the complex stuff with a new line
-    (def complex -> r
-      (join ""
-        (w/var! indent = (+ indent 2)
-          (map r -> x
-            "\n@(spaces)@(print x)"))))
+($mac match -> top @args
+  (w/complex top
+    (foldr (pair args) `(error "no patterns matched") -> [n x] y
+      `(if (match? top n)
+         (let n = top
+           x)
+         y))))
 
-    (def print-list -> a i
-      (let [l r] = (partition-while a ->
-                     (not:complex? x))
-           l     = (w/var! indent = (+ indent i)
-                     (not-complex l))
-           r     = (complex r)
-        "@l@r"))
-
-    (def print-normal -> l a r
-      (let s = (print-list a (len l))
-        "@l@s@r"))
-
-    (def print-special -> l a r
-      (let s = (print-list a (+ (len l) 1))
-        (if (is s "")
-          "@l@r"
-          "@l @s @r")))
-
-    (def print-dict -> x
-      (let i = 0
-
-           # Find the length of the longest key
-           a = (map (entries x) -> [s x]
-                 (let s = (print s)
-                   (set! i (max i (len s)))
-                   [s x]))
-
-           # Pad the keys with spaces and add " = "
-           a = (map a -> [s x]
-                 (let p = (n-chars " " (- i (len s)))
-                   ["@s@p = " x]))
-
-           # Print the values
-           a = (join "\n@(spaces)"
-                 (map a -> [s x]
-                   (w/var! indent = (+ indent (len s))
-                     "@s@(print x)")))
-
-        "{ @a }"))
-
-    (def error1 -> loc @args
-      (w/var! mode = "simple"
-        (let s = (foldl "" args -> [x y]
-                   (if (list? y)
-                     # TODO feels hacky
-                     (let [y] = y
-                       (w/var! indent = (len x)
-                         "@x@(print y)"))
-                     "@x@y"))
-          (js/new Error loc s))))
-
-    (def simple -> x i
-      (w/var! mode = "simple"
-        (print x i)))
-
-    (def error -> loc @args
-      (js/throw:error1 loc @args))
-
-    (def warn -> loc @args
-      (let e = (js/prop (error1 loc @args) "message")
-        ((js/prop console "warn") "warning: @e")))
-
-    (def print -> x (i = indent)
-      (w/var! indent = i
-        (if (dict? x)
-              (if (exists? x print?)
-                (x.print? x i)
-                # TODO handle recursive dicts ?
-                (print-dict x))
-
-            (list? x)
-              (if (is mode "simple")
-                    (print-normal "(" x ")")
-                  (is mode "normal")
-                    (print-special "[" x "]"))
-
-            (regexp? x)
-              "#(re @x)"
-
-            (date? x)
-              (if (is mode "simple")
-                "#(date @(num x))"
-                "#(date @(print "@x"))")
-
-            (function? x)
-              # TODO use empty?
-              (iflet n = (js/prop x "name")
-                "#(function @n)"
-                "#(function)")
-
-            (error? x)
-              (let n = (iflet n = (js/prop x "name")
-                         "#(error @n "
-                         "#(error ")
-                (w/var! indent = indent + (len n)
-                  (let s = (print:js/prop x "message")
-                    "@n@s)")))
-
-            (string? x)
-              (replace-string "\"" x)
-
-            (or (number? x)
-                (boolean? x))
-              "@x"
-
-            (null? x)
-              "()"
-
-            (js/throw:js/new Error x "unknown data type: @x")))))
-
-    ($mac prn -> @args
-      (w/uniq [u]
-        `((js/prop console "log")
-           (let u = ""
-             (do ,@(map args -> x
-                     `(set! u (print x (len u)))))))))))
-
-(import "nulan:core")
-(import "nulan:print")
+($mac use -> @args
+  `(do ,@(map args -> x
+           (match x
+             `n = v
+               `(alias n = (sym->external v))
+             n
+               `(alias ,(external->var n) = (sym->external n))))))

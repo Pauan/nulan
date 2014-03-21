@@ -44,9 +44,6 @@ define(["../../lib/util/key", "../../lib/util/uuid", "../../lib/util/object", ".
 
 
   // number
-  function Number(x) {
-    this.value = x
-  }
   Number.prototype[isPrint] = function (x, i) {
     return print(x.value, i)
   }
@@ -78,9 +75,6 @@ define(["../../lib/util/key", "../../lib/util/uuid", "../../lib/util/object", ".
 
 
   // symbol
-  function Symbol(x) {
-    this.value = x
-  }
   Symbol.prototype[isPrint] = function (x) {
     var s = x.value
     if (/^[0-9]+$|^[0-9]+\.[0-9]+$|[\(\)\{\}\[\]\.\\\'" \n]/.test(s)) {
@@ -131,101 +125,6 @@ define(["../../lib/util/key", "../../lib/util/uuid", "../../lib/util/object", ".
 
   function op(s, x) {
     return opApply(s, x, [].slice.call(arguments, 2))
-  }
-
-
-  // box
-  var boxId = 0
-
-  var boxes = {}
-
-  function Box(x) {
-    var i       = "" + (++boxId)
-    // TODO should be a part of util/uuid
-    this.id     = v4().slice(0, -i.length) + i // TODO use something other than uuid v4 ?
-    this.value  = x
-    this.mode   = mode.get()
-    this.local  = local.get()
-    this.module = module.get()
-    boxes[this.id] = this
-  }
-  Box.prototype[isPrint] = function (x, i) {
-    if (x.value != null) {
-      var s = "#(box " + x.id + " "
-      return s + print(new Symbol(x.value), i + s.length) + ")"
-    } else {
-      return "#(box " + x.id + ")"
-    }
-  }
-  Box.prototype[isMacex] = function (x) {
-    return macexBox(x, x)
-  }
-  Box.prototype[isIs] = function (x, y) {
-    return x instanceof Box &&
-           y instanceof Box &&
-           is(x.id, y.id)
-  }
-
-  function getBox(i) {
-    console.assert(i in boxes)
-    return boxes[i]
-  }
-
-  function compileBox(x) {
-    // TODO figure out some way to not use the symbol nulan
-    //      maybe do it like this: require("$eval").getBox()
-    return op("call", x, op(".", x, new Symbol("nulan"),
-                                    new String("getBox")),
-                         new String(x.id))
-  }
-
-  function compileBoxValue(x) {
-    // TODO should use a key rather than the string "v"
-    return op(".", x, compileBox(x), new String("v"))
-  }
-
-  function toBox(x) {
-    if (x instanceof Box) {
-      return x
-    } else if (x instanceof Symbol) {
-      if (vars.has(x.value)) {
-        var y = vars.get(x.value)
-        // TODO: not sure if this should enrich or not...
-        //       it mostly affects macros:
-        //
-        //         $mac foo ->
-        //           'sym "5"
-        //         foo;
-        y.loc = x.loc
-        return y
-        /*var o = Object.create(y)
-        o.loc = x.loc
-        return o*/
-      } else {
-        error(x, "undefined symbol: ", [x])
-      }
-    } else {
-      error(x, "expected box or symbol but got ", [x])
-    }
-  }
-
-  function checkMode(x, y) {
-    if (x.mode !== mode.get()) {
-      error(y, "undefined symbol: ", [y], " (but it exists at " + x.mode + " time)")
-    }
-  }
-
-  function macexBox(x, y) {
-    if (isGet in x) {
-      return x[isGet]([x])
-    } else {
-      checkMode(x, y)
-      if (mode.get() === "run" || x.local) {
-        return x
-      } else {
-        return compileBoxValue(x)
-      }
-    }
   }
 
 

@@ -1,0 +1,29 @@
+(js/require { bar = { bar2 } } = "bar")
+
+var a = require("./bar")
+  , b = a.bar
+b.bar2
+
+(var { (+ bar 2) = bar2 } = { (+ bar 2) = 5 })
+
+var a = {}
+a[bar + 2] = 5
+var bar2 = a[bar + 2]
+
+(alias bar = (get u "bar"))
+{ bar = bar }
+((get [1 2 3] "map") -> x (+ x 1))
+(var foo = 1)
+(+ foo 2)
+(var foo = 5)
+(-> foo (+ foo 1))
+(+ 1)
+(+ foo 1 2 3 4 5)
+(- 1)
+(/ 1 2 3 4)
+(not 1)
+(not (not 5))
+(do 1)
+(do 1 2 3 4 5)
+(+ foo bar)
+(set! bar 20)
