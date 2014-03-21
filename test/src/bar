@@ -1,3 +1,0 @@
-(var bar = 5)
-(+ bar 10)
-(throw 20)

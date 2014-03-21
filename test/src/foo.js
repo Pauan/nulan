@@ -1,1 +1,0 @@
-var r=require("./bar");[1,2,3].map(function(r){return r+1});var a=1,o=5;!function(r){return r+1}(),o+r.bar,r.bar=20;
