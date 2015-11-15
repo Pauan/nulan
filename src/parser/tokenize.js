@@ -1,5 +1,6 @@
 import { symbol, integer } from "./types";
-import { format_error, crash } from "./error";
+import { format_error } from "./error";
+import { crash } from "../node-js";
 
 
 const peek = (a, i) => {

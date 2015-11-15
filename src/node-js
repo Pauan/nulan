@@ -1,0 +1,4 @@
+export const crash = (x) => {
+  console["error"](x);
+  process["exit"](1);
+};

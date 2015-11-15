@@ -32,8 +32,3 @@ export const format_error = (x, message) =>
 
 export const format_warning = (x, message) =>
   format_message("Warning", x, message);
-
-export const crash = (x) => {
-  console["error"](x);
-  process["exit"](1);
-};
