@@ -1,6 +1,6 @@
 import { symbol, integer } from "./types";
 import { format_error } from "./error";
-import { crash } from "../node-js";
+import { crash } from "../node";
 
 
 const peek = (a, i) => {
@@ -58,6 +58,19 @@ const tokenize_symbol = (output, file, lines, line, column) => {
       value += char;
       column += 1;
     }
+  }
+};
+
+
+const tokenize_string = (output, file, lines, line, column) => {
+  const start = { line, column };
+
+  const char = lines[line][column];
+
+  column += 1;
+
+  for (;;) {
+
   }
 };
 
@@ -125,8 +138,29 @@ const specials = {
     crash(format_error(symbol("\t", file, lines, start, end), "tabs (U+0009) are not allowed"));
   },
 
-  " ": (output, file, lines, line, column) =>
-    tokenize1(output, file, lines, line, column + 1),
+  " ": (output, file, lines, line, column) => {
+    const start = { line, column };
+
+    const chars = lines[line];
+
+    column += 1;
+
+    for (;;) {
+      const char = peek(chars, column);
+
+      if (char === " ") {
+        column += 1;
+
+      } else if (char === null) {
+        const end = { line, column };
+
+        crash(format_error(symbol(" ", file, lines, start, end), "spaces (U+0020) are not allowed at the end of the line"));
+
+      } else {
+        return tokenize1(output, file, lines, line, column);
+      }
+    }
+  },
 
   "#": (output, file, lines, line, column) => {
     const chars = lines[line];
@@ -142,8 +176,7 @@ const specials = {
     }
   },
 
-  "\"": (output, file, lines, line, column) => {
-  },
+  "\"": tokenize_string,
 
   "(": tokenize_syntax,
   ")": tokenize_syntax,
@@ -185,8 +218,8 @@ const tokenize1 = (output, file, lines, line, column) => {
 };
 
 export const tokenize = (string, file) => {
-  // TODO handle \r
-  const lines = string["split"](/\n/);
+  // TODO is it necessary to handle \r or \r\n ?
+  const lines = string["split"](/\r\n|[\r\n]/);
 
   return tokenize1([], file, lines, 0, 0);
 };
@@ -194,7 +227,7 @@ export const tokenize = (string, file) => {
 
 const x = tokenize("1 1.5 1,5 (foo bar qux) u@q\nqux\n(nou)\n~\n~foo\n~@foo", "NUL");
 
-console.log(x);
+//console.log(x);
 
 
 /*console.log(format_error(tokenize("\n  a\n\n", "maybe.nul")[0], "undefined variable foo"));
@@ -203,5 +236,7 @@ console.log(format_error(tokenize("\n  abc\n\n", "maybe.nul")[0], "undefined var
 console.log(format_error(tokenize("\n    abcd\n\n", "maybe.nul")[0], "undefined variable foo"));
 */
 
-console.log(tokenize("\n\n    \t  \n", "foo.nul"));
-console.log(tokenize("#/hiya#/#/#/#/1", "foo.nul"));
+//console.log(tokenize("   a\n \n", "foo.nul"));
+//console.log(tokenize("   a     ", "foo.nul"));
+//console.log(tokenize("\n\n    a\ta  \n", "foo.nul"));
+console.log(tokenize("  #/hiya\n\n\n\n  1", "foo.nul"));

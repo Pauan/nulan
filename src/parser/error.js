@@ -1,9 +1,12 @@
+import { eol } from "../node";
+
+
 const repeat = (s, i) =>
   new Array(i + 1)["join"](s);
 
 const format_line = (x) => {
   if (x.start.column === x.end.column) {
-    return "";
+    return repeat(" ", x.start.column) + "^";
 
   } else if (x.start.column < x.end.column) {
     return repeat(" ", x.start.column) + "^" +
@@ -11,7 +14,7 @@ const format_line = (x) => {
 
   } else {
     return repeat(" ", x.end.column) +
-           repeat("-", x.start.column - x.end.column - 1) + "^";
+           repeat("-", x.start.column - x.end.column) + "^";
   }
 };
 
@@ -24,7 +27,8 @@ const format_message = (header, x, message) => {
          "  (" + x.filename +
          " " + (x.start.line + 1) +
          ":" + (x.start.column + 1) +
-         ")\n  " + lines["join"]("\n  ");
+         ")" + eol +
+         "  " + lines["join"](eol + "  ");
 };
 
 export const format_error = (x, message) =>
