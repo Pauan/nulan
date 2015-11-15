@@ -1,4 +1,4 @@
-import { symbol, integer, number } from "./types";
+import { symbol, integer } from "./types";
 import { format_error, crash } from "./error";
 
 
@@ -30,10 +30,6 @@ const tokenize_symbol1 = (value, file, lines, start, end) => {
   // TODO a tiny bit hacky
   if (/^[0-9]+$/["test"](value)) {
     return integer(+value, file, lines, start, end);
-
-  // TODO a tiny bit hacky
-  } else if (/^[0-9]+\.[0-9]+$/["test"](value)) {
-    return number(+value, file, lines, start, end);
 
   } else {
     return symbol(value, file, lines, start, end);
@@ -148,33 +144,16 @@ const specials = {
   "\"": (output, file, lines, line, column) => {
   },
 
-  "~": (output, file, lines, line, column) => {
-    const chars = lines[line];
-
-    const next = peek(chars, column + 1);
-
-    if (next === "@") {
-      const start = { line, column };
-
-      column += 2;
-
-      const end = { line, column };
-
-      output["push"](symbol("~@", file, lines, start, end));
-
-      return tokenize1(output, file, lines, line, column);
-
-    } else {
-      return tokenize_syntax(output, file, lines, line, column);
-    }
-  },
-
   "(": tokenize_syntax,
   ")": tokenize_syntax,
   "[": tokenize_syntax,
   "]": tokenize_syntax,
+  "{": tokenize_syntax,
+  "}": tokenize_syntax,
   "&": tokenize_syntax,
-  "@": tokenize_syntax
+  "~": tokenize_syntax,
+  "@": tokenize_syntax,
+  ".": tokenize_syntax
 };
 
 
@@ -212,7 +191,9 @@ export const tokenize = (string, file) => {
 };
 
 
-const x = tokenize("1 1.5 (foo bar qux) u@q\nqux\n(nou)\n~\n~foo\n~@foo", "NUL");
+const x = tokenize("1 1.5 1,5 (foo bar qux) u@q\nqux\n(nou)\n~\n~foo\n~@foo", "NUL");
+
+console.log(x);
 
 
 /*console.log(format_error(tokenize("\n  a\n\n", "maybe.nul")[0], "undefined variable foo"));
