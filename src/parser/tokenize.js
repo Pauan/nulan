@@ -1,4 +1,14 @@
 import { symbol, integer, number } from "./types";
+import { format_error, crash } from "./error";
+
+
+const peek = (a, i) => {
+  if (i < a["length"]) {
+    return a[i];
+  } else {
+    return null;
+  }
+};
 
 
 const tokenize_syntax = (output, file, lines, line, column) => {
@@ -10,7 +20,7 @@ const tokenize_syntax = (output, file, lines, line, column) => {
 
   const end = { line, column };
 
-  output.push(symbol(char, file, lines, start, end));
+  output["push"](symbol(char, file, lines, start, end));
 
   return tokenize1(output, file, lines, line, column);
 };
@@ -40,61 +50,119 @@ const tokenize_symbol = (output, file, lines, line, column) => {
   column += 1;
 
   for (;;) {
-    if (column < chars["length"]) {
-      const char = chars[column];
+    const char = peek(chars, column);
 
-      if (specials[char] != null) {
+    if (char === null || specials[char] != null) {
+      const end = { line, column };
+      output["push"](tokenize_symbol1(value, file, lines, start, end));
+      return tokenize1(output, file, lines, line, column);
+
+    } else {
+      value += char;
+      column += 1;
+    }
+  }
+};
+
+
+const tokenize_block_comment = (output, file, lines, line, column) => {
+  const pending = [];
+
+  const start = { line, column };
+
+  column += 2;
+
+  const end = { line, column };
+
+  pending["push"](symbol("#/", file, lines, start, end));
+
+  for (;;) {
+    const chars = peek(lines, line);
+
+    if (chars !== null) {
+      const next1 = peek(chars, column);
+      const next2 = peek(chars, column + 1);
+
+      // The comment block has ended
+      if (next1 === "/" && next2 === "#") {
+        column += 2;
+        pending["pop"]();
+
+        if (pending["length"] === 0) {
+          return tokenize1(output, file, lines, line, column);
+        }
+
+      // Allow for nested comment blocks
+      } else if (next1 === "#" && next2 === "/") {
+        const start = { line, column };
+
+        column += 2;
+
         const end = { line, column };
-        output.push(tokenize_symbol1(value, file, lines, start, end));
-        return specials[char](output, file, lines, line, column);
+
+        pending["push"](symbol("#/", file, lines, start, end));
+
+      } else if (next1 !== null) {
+        column += 1;
 
       } else {
-        value += char;
-        column += 1;
+        line += 1;
+        column = 0;
       }
 
     } else {
-      const end = { line, column };
-      output.push(tokenize_symbol1(value, file, lines, start, end));
-      return tokenize1(output, file, lines, line, column);
+      crash(format_error(pending[pending["length"] - 1], "missing ending /#"));
     }
   }
 };
 
 
 const specials = {
-  // TODO error for \t ?
+  "\t": (output, file, lines, line, column) => {
+    const start = { line, column };
+
+    column += 1;
+
+    const end = { line, column };
+
+    crash(format_error(symbol("\t", file, lines, start, end), "tabs (U+0009) are not allowed"));
+  },
+
   " ": (output, file, lines, line, column) =>
     tokenize1(output, file, lines, line, column + 1),
 
-  /*"#": (car, cdr, file, loc) => {
+  "#": (output, file, lines, line, column) => {
+    const chars = lines[line];
 
+    const next = peek(chars, column + 1);
+
+    if (next === "/") {
+      return tokenize_block_comment(output, file, lines, line, column);
+
+    } else {
+      // Ignore the rest of the current line
+      return tokenize1(output, file, lines, line + 1, 0);
+    }
   },
 
-  "\"": (car, cdr, file, loc) => {
-  },*/
+  "\"": (output, file, lines, line, column) => {
+  },
 
   "~": (output, file, lines, line, column) => {
     const chars = lines[line];
-    const next  = column + 1;
 
-    if (next < chars["length"]) {
-      const char = chars[next];
+    const next = peek(chars, column + 1);
 
-      if (char === "@") {
-        const start = { line, column };
+    if (next === "@") {
+      const start = { line, column };
 
-        column = next + 1;
+      column += 2;
 
-        const end = { line, column };
+      const end = { line, column };
 
-        output.push(symbol("~@", file, lines, start, end));
+      output["push"](symbol("~@", file, lines, start, end));
 
-        return tokenize1(output, file, lines, line, column);
-
-      } else {
-        return tokenize_syntax(output, file, lines, line, column);
-      }
+      return tokenize1(output, file, lines, line, column);
 
     } else {
       return tokenize_syntax(output, file, lines, line, column);
@@ -112,12 +180,12 @@ const specials = {
 
 const tokenize1 = (output, file, lines, line, column) => {
   for (;;) {
-    if (line < lines["length"]) {
-      const chars = lines[line];
+    const chars = peek(lines, line);
 
-      if (column < chars["length"]) {
-        const char = chars[column];
+    if (chars !== null) {
+      const char = peek(chars, column);
 
+      if (char !== null) {
         if (specials[char] != null) {
           return specials[char](output, file, lines, line, column);
 
@@ -147,43 +215,11 @@ export const tokenize = (string, file) => {
 const x = tokenize("1 1.5 (foo bar qux) u@q\nqux\n(nou)\n~\n~foo\n~@foo", "NUL");
 
 
-const repeat = (s, i) =>
-  new Array(i + 1)["join"](s);
-
-const format_line = (x) => {
-  if (x.start.column === x.end.column) {
-    return "";
-
-  } else if (x.start.column < x.end.column) {
-    return repeat(" ", x.start.column) + "^" +
-           repeat("-", x.end.column - x.start.column - 1);
-
-  } else {
-    return repeat(" ", x.end.column) +
-           repeat("-", x.start.column - x.end.column - 1) + "^";
-  }
-};
-
-const format_message = (header, x, message) => {
-  const lines = x.lines["slice"](x.start.line, x.end.line + 1);
-
-  lines.push(format_line(x));
-
-  return header + ": " + message +
-         "  (" + x.filename +
-         " " + (x.start.line + 1) +
-         ":" + (x.start.column + 1) +
-         ")\n  " + lines["join"]("\n  ");
-};
-
-const format_error = (x, message) =>
-  format_message("Error", x, message);
-
-const format_warning = (x, message) =>
-  format_message("Warning", x, message);
-
-
-console.log(format_error(tokenize("\n  a\n\n", "maybe.nul")[0], "undefined variable foo"));
+/*console.log(format_error(tokenize("\n  a\n\n", "maybe.nul")[0], "undefined variable foo"));
 console.log(format_error(tokenize("\n  ab\n\n", "maybe.nul")[0], "undefined variable foo"));
 console.log(format_error(tokenize("\n  abc\n\n", "maybe.nul")[0], "undefined variable foo"));
 console.log(format_error(tokenize("\n    abcd\n\n", "maybe.nul")[0], "undefined variable foo"));
+*/
+
+console.log(tokenize("\n\n    \t  \n", "foo.nul"));
+console.log(tokenize("#/hiya#/#/#/#/1", "foo.nul"));
