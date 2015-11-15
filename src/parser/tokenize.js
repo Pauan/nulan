@@ -126,68 +126,73 @@ const tokenize_block_comment = (output, file, lines, line, column) => {
   }
 };
 
+const tokenize_comment = (output, file, lines, line, column) => {
+  const chars = lines[line];
 
-const specials = {
-  "\t": (output, file, lines, line, column) => {
-    const start = { line, column };
+  const next = peek(chars, column + 1);
 
-    column += 1;
+  if (next === "/") {
+    return tokenize_block_comment(output, file, lines, line, column);
 
-    const end = { line, column };
+  } else {
+    // Ignore the rest of the current line
+    return tokenize1(output, file, lines, line + 1, 0);
+  }
+};
 
-    crash(format_error(symbol("\t", file, lines, start, end), "tabs (U+0009) are not allowed"));
-  },
 
-  " ": (output, file, lines, line, column) => {
-    const start = { line, column };
+const tokenize_tab = (output, file, lines, line, column) => {
+  const start = { line, column };
 
-    const chars = lines[line];
+  column += 1;
 
-    column += 1;
+  const end = { line, column };
 
-    for (;;) {
-      const char = peek(chars, column);
+  crash(format_error(symbol("\t", file, lines, start, end), "tabs (U+0009) are not allowed"));
+};
 
-      if (char === " ") {
-        column += 1;
 
-      } else if (char === null) {
-        const end = { line, column };
+const tokenize_space = (output, file, lines, line, column) => {
+  const start = { line, column };
 
-        crash(format_error(symbol(" ", file, lines, start, end), "spaces (U+0020) are not allowed at the end of the line"));
+  const chars = lines[line];
 
-      } else {
-        return tokenize1(output, file, lines, line, column);
-      }
-    }
-  },
+  column += 1;
 
-  "#": (output, file, lines, line, column) => {
-    const chars = lines[line];
+  for (;;) {
+    const char = peek(chars, column);
 
-    const next = peek(chars, column + 1);
+    if (char === " ") {
+      column += 1;
 
-    if (next === "/") {
-      return tokenize_block_comment(output, file, lines, line, column);
+    } else if (char === null) {
+      const end = { line, column };
+
+      crash(format_error(symbol(" ", file, lines, start, end), "spaces (U+0020) are not allowed at the end of the line"));
 
     } else {
-      // Ignore the rest of the current line
-      return tokenize1(output, file, lines, line + 1, 0);
+      return tokenize1(output, file, lines, line, column);
     }
-  },
+  }
+};
 
+
+const specials = {
+  "\t": tokenize_tab,
+  " ":  tokenize_space,
+  "#":  tokenize_comment,
   "\"": tokenize_string,
 
-  "(": tokenize_syntax,
-  ")": tokenize_syntax,
-  "[": tokenize_syntax,
-  "]": tokenize_syntax,
-  "{": tokenize_syntax,
-  "}": tokenize_syntax,
-  "&": tokenize_syntax,
-  "~": tokenize_syntax,
-  "@": tokenize_syntax,
-  ".": tokenize_syntax
+  "(":  tokenize_syntax,
+  ")":  tokenize_syntax,
+  "[":  tokenize_syntax,
+  "]":  tokenize_syntax,
+  "{":  tokenize_syntax,
+  "}":  tokenize_syntax,
+  "&":  tokenize_syntax,
+  "~":  tokenize_syntax,
+  "@":  tokenize_syntax,
+  ".":  tokenize_syntax
 };
 
 
@@ -236,7 +241,8 @@ console.log(format_error(tokenize("\n  abc\n\n", "maybe.nul")[0], "undefined var
 console.log(format_error(tokenize("\n    abcd\n\n", "maybe.nul")[0], "undefined variable foo"));
 */
 
+//console.log(tokenize("a\rb\nc\r\nd", "foo.nul"));
 //console.log(tokenize("   a\n \n", "foo.nul"));
 //console.log(tokenize("   a     ", "foo.nul"));
 //console.log(tokenize("\n\n    a\ta  \n", "foo.nul"));
-console.log(tokenize("  #/hiya\n\n\n\n  1", "foo.nul"));
+//console.log(tokenize("  #/hiya\n\n\n\n  1", "foo.nul"));
