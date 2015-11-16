@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "name": "nulan",
+  "version": "0.1.0",
+  "repository": "https://github.com/Pauan/nulan.git",
+  "main": "build/nulan.js",
+  "dependencies": {
+    "Immutable": "git://github.com/Pauan/Immutable.git#v6.5.0"
+  },
+  "devDependencies": {
+    "esperanto": "^0.6.4"
+  },
+  "scripts": {
+    "prepublish": "node ./build.js"
+  }
+}
