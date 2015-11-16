@@ -276,33 +276,39 @@ const tokenize_block_comment = (output, file, lines, line, column) => {
 
     if (chars !== null) {
       const next1 = peek(chars, column);
-      const next2 = peek(chars, column + 1);
 
-      // The comment block has ended
-      if (next1 === "/" && next2 === "#") {
-        column += 2;
-        pending["pop"]();
+      if (next1 === " ") {
+        column = consume_spaces(file, lines, line, column);
 
-        if (pending["length"] === 0) {
-          return tokenize1(output, file, lines, line, column);
-        }
-
-      // Allow for nested comment blocks
-      } else if (next1 === "#" && next2 === "/") {
-        const start = { line, column };
-
-        column += 2;
-
-        const end = { line, column };
-
-        pending["push"](symbol("#/", file, lines, start, end));
-
-      } else if (next1 !== null) {
-        column += 1;
-
-      } else {
+      } else if (next1 === null) {
         line += 1;
         column = 0;
+
+      } else {
+        const next2 = peek(chars, column + 1);
+
+        // The comment block has ended
+        if (next1 === "/" && next2 === "#") {
+          column += 2;
+          pending["pop"]();
+
+          if (pending["length"] === 0) {
+            return tokenize1(output, file, lines, line, column);
+          }
+
+        // Allow for nested comment blocks
+        } else if (next1 === "#" && next2 === "/") {
+          const start = { line, column };
+
+          column += 2;
+
+          const end = { line, column };
+
+          pending["push"](symbol("#/", file, lines, start, end));
+
+        } else {
+          column += 1;
+        }
       }
 
     } else {
@@ -312,7 +318,26 @@ const tokenize_block_comment = (output, file, lines, line, column) => {
   }
 };
 
-// TODO handle spaces at the end of the line
+const tokenize_line_comment = (output, file, lines, line, column) => {
+  const chars = lines[line];
+
+  column += 1;
+
+  for (;;) {
+    const char = peek(chars, column);
+
+    if (char === " ") {
+      column = consume_spaces(file, lines, line, column);
+
+    } else if (char === null) {
+      return tokenize1(output, file, lines, line, column);
+
+    } else {
+      column += 1;
+    }
+  }
+};
+
 const tokenize_comment = (output, file, lines, line, column) => {
   const chars = lines[line];
 
@@ -322,8 +347,7 @@ const tokenize_comment = (output, file, lines, line, column) => {
     return tokenize_block_comment(output, file, lines, line, column);
 
   } else {
-    // Ignore the rest of the current line
-    return tokenize1(output, file, lines, line + 1, 0);
+    return tokenize_line_comment(output, file, lines, line, column);
   }
 };
 

@@ -451,13 +451,13 @@ test_crash("\"\n\n\n  ",
 
 test_crash("#  ",
   "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:2)\n" +
-  "    \n" +
-  "  ^-");
+  "  #  \n" +
+  "   ^-");
 
 test_crash("#/  ",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:2)\n" +
-  "    \n" +
-  "  ^-");
+  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:3)\n" +
+  "  #/  \n" +
+  "    ^-");
 
 
 test("\"\\u{21}\\u{1D306}\"", (file, lines) =>
