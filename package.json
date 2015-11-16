@@ -11,6 +11,7 @@
     "esperanto": "^0.6.4"
   },
   "scripts": {
-    "prepublish": "node ./build.js"
+    "prepublish": "node ./build.js",
+    "test": "babel-node --presets es2015 test/test.js"
   }
 }

@@ -64,3 +64,28 @@ export const assert_equal = (value, expected, message) => {
           indent(pretty(value), "    "));
   }
 };
+
+export const assert_crash = (f, expected, message) => {
+  try {
+    f();
+
+  } catch (e) {
+    const value = e["message"];
+
+    if (value === expected) {
+      return;
+
+    } else {
+      crash("Error: " + message + eol +
+            "  Expected:" + eol +
+            indent(expected, "    ") + eol +
+            "  Got:" + eol +
+            indent(value, "    "));
+    }
+  }
+
+  crash("Error: " + message + eol +
+        "  Expected:" + eol +
+        indent(expected, "    ") + eol +
+        "  Got:" + eol);
+};
