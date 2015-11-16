@@ -1,9 +1,0 @@
-[submodule "lib/nuit"]
-	path = lib/nuit
-	url = https://github.com/Pauan/nuit.git
-[submodule "lib/util"]
-	path = lib/util
-	url = https://github.com/Pauan/util.git
-[submodule "lib/escodegen"]
-	path = lib/escodegen
-	url = https://github.com/Constellation/escodegen.git
