@@ -1,8 +1,6 @@
-import { eol } from "../node";
+import { crash as _crash, eol } from "../node";
+import { repeat } from "./string";
 
-
-const repeat = (s, i) =>
-  new Array(i + 1)["join"](s);
 
 const format_line = (x) => {
   if (x.start.column === x.end.column) {
@@ -36,3 +34,6 @@ export const format_error = (x, message) =>
 
 export const format_warning = (x, message) =>
   format_message("Warning", x, message);
+
+export const crash = (x, message) =>
+  _crash(format_error(x, message));
