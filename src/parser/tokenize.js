@@ -88,6 +88,42 @@ const consume_spaces = (file, lines, line, column) => {
 };
 
 
+const consume_hex = (output, file, lines, line, column) => {
+  const chars = lines[line];
+
+  let hex = "";
+
+  for (;;) {
+    const char = peek(chars, column);
+
+    if (/^[0-9A-F]$/["test"](char)) {
+      column += 1;
+      hex += char;
+
+    } else if (hex === "") {
+      const start = { line, column };
+
+      if (char !== null) {
+        column += 1;
+      }
+
+      const end = { line, column };
+
+      const char2 = (char === null
+                      ? "#<EOL>"
+                      : char);
+
+      crash(symbol(char2, file, lines, start, end),
+            "expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got " + char2);
+
+    } else {
+      output["push"](hex);
+      return column;
+    }
+  }
+};
+
+
 const tokenize_escape = (value, file, lines, line, column) => {
   const chars = lines[line];
 
@@ -114,76 +150,69 @@ const tokenize_escape = (value, file, lines, line, column) => {
 
     const char = peek(chars, column);
 
-    if (char === "{") {
+    if (char === "[") {
       column += 1;
 
-      let hex = "";
+      const hexes = [];
 
       for (;;) {
-        const start = { line, column };
+        column = consume_hex(hexes, file, lines, line, column);
 
         const char = peek(chars, column);
 
-        if (char === "}") {
+        if (char === "]") {
           column += 1;
 
-          if (hex === "") {
-            const end = { line, column };
-
-            crash(symbol("}", file, lines, start, end),
-                  "expected [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got }");
-
-          } else {
-            value["push"](String["fromCodePoint"](parseInt(hex, 16)));
-            break;
+          for (let i = 0; i < hexes["length"]; ++i) {
+            value["push"](String["fromCodePoint"](parseInt(hexes[i], 16)));
           }
 
-        // TODO a tiny bit hacky
-        } else if (/^[0-9A-F]$/["test"](char)) {
+          break;
+
+        } else if (char === " ") {
           column += 1;
-          hex += char;
-
-        } else {
-          column += 1;
-
-          const end = { line, column };
-
-          const char2 = (char === null
-                          ? ""
-                          : char);
-
-          crash(symbol(char2, file, lines, start, end),
-                "expected [0 1 2 3 4 5 6 7 8 9 A B C D E F }] but got " + char2);
         }
       }
+
+    } else if (char === null) {
+      const end = { line, column };
+
+      crash(symbol("\\u", file, lines, start, end),
+            "expected \\u[ but got \\u");
 
     } else {
       column += 1;
 
       const end = { line, column };
 
-      const char2 = (char === null
-                      ? ""
-                      : char);
-
-      crash(symbol("\\u" + char2, file, lines, start, end),
-            "expected \\u{ but got \\u" + char2);
+      crash(symbol("\\u" + char, file, lines, start, end),
+            "expected \\u[ but got \\u" + char);
     }
+
+  } else if (char === null) {
+    const end = { line, column };
+
+    crash(symbol("\\", file, lines, start, end),
+          "expected one of [\\\\ \\\" \\s \\n \\u] but got \\");
 
   } else {
     column += 1;
 
     const end = { line, column };
 
-    const char2 = (char === null
-                    ? ""
-                    : char);
-
-    crash(symbol("\\" + char2, file, lines, start, end),
-          "expected [\\\\ \\\" \\s \\n \\u] but got \\" + char2);
+    crash(symbol("\\" + char, file, lines, start, end),
+          "expected one of [\\\\ \\\" \\s \\n \\u] but got \\" + char);
   }
 
   return column;
+};
+
+const indent_error = (indent, file, lines, line, column1, column2) => {
+  const start = { line, column: column1 };
+  const end   = { line, column: column2 };
+
+  crash(symbol(" ", file, lines, start, end),
+        "there must be " + indent + " or more spaces (U+0020)");
 };
 
 const tokenize_string = (output, file, lines, line, column) => {
@@ -230,19 +259,21 @@ const tokenize_string = (output, file, lines, line, column) => {
 
         const chars = peek(lines, line);
 
-        // TODO is this correct ?
-        if (chars !== null && peek(chars, column) !== null) {
-          column = consume_spaces(file, lines, line, column);
+        if (chars !== null) {
+          const char = peek(chars, column);
 
-          if (column < indent) {
-            const start = { line, column: 0 };
-            const end   = { line, column };
+          if (char === " ") {
+            column = consume_spaces(file, lines, line, column);
 
-            crash(symbol(" ", file, lines, start, end),
-                  "there must be " + indent + " or more spaces (U+0020)");
+            if (column < indent) {
+              indent_error(indent, file, lines, line, 0, column);
 
-          } else {
-            value["push"](repeat(" ", column - indent));
+            } else {
+              value["push"](repeat(" ", column - indent));
+            }
+
+          } else if (char !== null) {
+            indent_error(indent, file, lines, line, 0, 1);
           }
         }
 
@@ -428,31 +459,3 @@ const tokenize1 = (output, file, lines, line, column) => {
 
 export const tokenize = (lines, file) =>
   tokenize1([], file, lines, 0, 0);
-
-
-//const x = tokenize("1 1.5 1,5 (foo bar qux) u@q\nqux\n(nou)\n~\n~foo\n~@foo", "NUL");
-
-//console.log(x);
-
-
-/*console.log(format_error(tokenize("\n  a\n\n", "maybe.nul")[0], "undefined variable foo"));
-console.log(format_error(tokenize("\n  ab\n\n", "maybe.nul")[0], "undefined variable foo"));
-console.log(format_error(tokenize("\n  abc\n\n", "maybe.nul")[0], "undefined variable foo"));
-console.log(format_error(tokenize("\n    abcd\n\n", "maybe.nul")[0], "undefined variable foo"));
-crash(tokenize("\uD834\uDF06", "foo.nul")[0], "Hi");
-*/
-
-//console.log(tokenize("\"\\u{}\"", "foo.nul"));
-//console.log(tokenize("\"\\u{a\"", "foo.nul"));
-//console.log(tokenize("\"\\u{a}\"", "foo.nul"));
-//console.log(tokenize("\"\\u{21}\\u{1D306}\"", "foo.nul"));
-//console.log(tokenize("  \"foobar     \"", "foo.nul"));
-//console.log(tokenize("  \"foobar\n\n     \"", "foo.nul"));
-//console.log(tokenize("  \"foobar\n    \n\"", "foo.nul"));
-//console.log(tokenize("   \"foobar\n    \n\"", "foo.nul"));
-//console.log(tokenize("   \"foobar\n    qux\"a", "foo.nul"));
-//console.log(tokenize("a\rb\nc\r\nd", "foo.nul"));
-//console.log(tokenize("   a\n \n", "foo.nul"));
-//console.log(tokenize("   a     ", "foo.nul"));
-//console.log(tokenize("\n\n    a\ta  \n", "foo.nul"));
-//console.log(tokenize("  #/hiya\n\n\n\n  1", "foo.nul"));
