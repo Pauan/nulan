@@ -73,6 +73,17 @@ test("a0", (file, lines) =>
           { line: 0, column: 0 },
           { line: 0, column: 2 })]);
 
+test("0.0", (file, lines) =>
+  [integer(0, file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: 1 }),
+   symbol(".", file, lines,
+          { line: 0, column: 1 },
+          { line: 0, column: 2 }),
+   integer(0, file, lines,
+           { line: 0, column: 2 },
+           { line: 0, column: 3 })]);
+
 
 test(" foo bar", (file, lines) =>
   [symbol("foo", file, lines,
@@ -439,6 +450,11 @@ test_crash("\n    \n",
   "      \n" +
   "  ^---");
 
+test_crash("  foo   ",
+  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:6)\n" +
+  "    foo   \n" +
+  "       ^--");
+
 test_crash("\"  ",
   "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:2)\n" +
   "  \"  \n" +
@@ -458,6 +474,67 @@ test_crash("#/  ",
   "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:3)\n" +
   "  #/  \n" +
   "    ^-");
+
+test_crash("#/\n\n\n  ",
+  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 4:1)\n" +
+  "    \n" +
+  "  ^-");
+
+
+test_crash("\n   \t   \n",
+  "Error: tabs (U+0009) are not allowed  (tokenize.test 2:4)\n" +
+  "     \t   \n" +
+  "     ^");
+
+test_crash("\n   \t\t\t\t\t   \n",
+  "Error: tabs (U+0009) are not allowed  (tokenize.test 2:4)\n" +
+  "     \t\t\t\t\t   \n" +
+  "     ^----");
+
+
+test("a#a a a a a a\na", (file, lines) =>
+  [symbol("a", file, lines,
+          { line: 0, column: 0 },
+          { line: 0, column: 1 }),
+   symbol("a", file, lines,
+          { line: 1, column: 0 },
+          { line: 1, column: 1 })]);
+
+test("a#/a a a a a a/#a", (file, lines) =>
+  [symbol("a", file, lines,
+          { line: 0, column: 0 },
+          { line: 0, column: 1 }),
+   symbol("a", file, lines,
+          { line: 0, column: 16 },
+          { line: 0, column: 17 })]);
+
+test("a#/a\na a\na a\na/#a", (file, lines) =>
+  [symbol("a", file, lines,
+          { line: 0, column: 0 },
+          { line: 0, column: 1 }),
+   symbol("a", file, lines,
+          { line: 3, column: 3 },
+          { line: 3, column: 4 })]);
+
+test_crash("a# \na",
+  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:3)\n" +
+  "  a# \n" +
+  "    ^");
+
+test_crash("a#/a\n",
+  "Error: missing ending /#  (tokenize.test 1:2)\n" +
+  "  a#/a\n" +
+  "   ^-");
+
+test_crash("a#/a#/a\n",
+  "Error: missing ending /#  (tokenize.test 1:5)\n" +
+  "  a#/a#/a\n" +
+  "      ^-");
+
+test_crash("a#/a#/a/#\n",
+  "Error: missing ending /#  (tokenize.test 1:2)\n" +
+  "  a#/a#/a/#\n" +
+  "   ^-");
 
 
 test("\"\\u{21}\\u{1D306}\"", (file, lines) =>
