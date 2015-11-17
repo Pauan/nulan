@@ -12,7 +12,7 @@ const peek = (a, i) => {
 };
 
 
-const tokenize_syntax = (output, file, lines, line, column) => {
+const tokenize_delimiter = (output, file, lines, line, column) => {
   const char = lines[line][column];
 
   const start = { line, column };
@@ -353,14 +353,25 @@ const tokenize_comment = (output, file, lines, line, column) => {
 
 
 const tokenize_tab = (output, file, lines, line, column) => {
+  const chars = lines[line];
+
   const start = { line, column };
 
   column += 1;
 
-  const end = { line, column };
+  for (;;) {
+    const char = peek(chars, column);
 
-  crash(symbol("\t", file, lines, start, end),
-        "tabs (U+0009) are not allowed");
+    if (char === "\t") {
+      column += 1;
+
+    } else {
+      const end = { line, column };
+
+      crash(symbol("\t", file, lines, start, end),
+            "tabs (U+0009) are not allowed");
+    }
+  }
 };
 
 
@@ -376,16 +387,16 @@ const specials = {
   "#":  tokenize_comment,
   "\"": tokenize_string,
 
-  "(":  tokenize_syntax,
-  ")":  tokenize_syntax,
-  "[":  tokenize_syntax,
-  "]":  tokenize_syntax,
-  "{":  tokenize_syntax,
-  "}":  tokenize_syntax,
-  "&":  tokenize_syntax,
-  "~":  tokenize_syntax,
-  "@":  tokenize_syntax,
-  ".":  tokenize_syntax
+  "(":  tokenize_delimiter,
+  ")":  tokenize_delimiter,
+  "[":  tokenize_delimiter,
+  "]":  tokenize_delimiter,
+  "{":  tokenize_delimiter,
+  "}":  tokenize_delimiter,
+  "&":  tokenize_delimiter,
+  "~":  tokenize_delimiter,
+  "@":  tokenize_delimiter,
+  ".":  tokenize_delimiter
 };
 
 
@@ -405,7 +416,7 @@ const tokenize1 = (output, file, lines, line, column) => {
         }
 
       } else {
-        line = line + 1;
+        line += 1;
         column = 0;
       }
 
