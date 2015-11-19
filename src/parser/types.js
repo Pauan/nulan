@@ -1,6 +1,15 @@
+export const SYMBOL  = 0;
+export const INTEGER = 1;
+export const NUMBER  = 2;
+export const STRING  = 3;
+export const CALL    = 4;
+export const LIST    = 5;
+export const RECORD  = 6;
+export const ASSIGN  = 7;
+
 export const symbol = (value, filename, lines, start, end) => {
   return {
-    type: 0,
+    type: SYMBOL,
     value: value,
     filename: filename,
     lines: lines,
@@ -11,7 +20,7 @@ export const symbol = (value, filename, lines, start, end) => {
 
 export const integer = (value, filename, lines, start, end) => {
   return {
-    type: 1,
+    type: INTEGER,
     value: value,
     filename: filename,
     lines: lines,
@@ -22,7 +31,7 @@ export const integer = (value, filename, lines, start, end) => {
 
 export const number = (value, filename, lines, start, end) => {
   return {
-    type: 2,
+    type: NUMBER,
     value: value,
     filename: filename,
     lines: lines,
@@ -33,7 +42,18 @@ export const number = (value, filename, lines, start, end) => {
 
 export const string = (value, filename, lines, start, end) => {
   return {
-    type: 3,
+    type: STRING,
+    value: value,
+    filename: filename,
+    lines: lines,
+    start: start,
+    end: end
+  };
+};
+
+export const call = (value, filename, lines, start, end) => {
+  return {
+    type: CALL,
     value: value,
     filename: filename,
     lines: lines,
@@ -44,8 +64,31 @@ export const string = (value, filename, lines, start, end) => {
 
 export const list = (value, filename, lines, start, end) => {
   return {
-    type: 4,
+    type: LIST,
     value: value,
+    filename: filename,
+    lines: lines,
+    start: start,
+    end: end
+  };
+};
+
+export const record = (value, filename, lines, start, end) => {
+  return {
+    type: RECORD,
+    value: value,
+    filename: filename,
+    lines: lines,
+    start: start,
+    end: end
+  };
+};
+
+export const assign = (left, right, filename, lines, start, end) => {
+  return {
+    type: ASSIGN,
+    left: left,
+    right: right,
     filename: filename,
     lines: lines,
     start: start,

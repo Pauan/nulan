@@ -1,4 +1,4 @@
-import { eol } from "../node";
+import { eol } from "./node";
 
 
 // TODO is it necessary to handle \r or \r\n ?
@@ -11,4 +11,4 @@ export const repeat = (s, i) =>
   new Array(i + 1)["join"](s);
 
 export const indent = (s, spaces) =>
-  spaces + s["replace"](eols, eol + spaces);
+  s["replace"](eols, eol + spaces);

@@ -1,7 +1,7 @@
 import { assert_equal, assert_crash } from "../assert";
 import { string, symbol, integer } from "../../src/parser/types.js";
 import { tokenize } from "../../src/parser/tokenize.js";
-import { lines } from "../../src/parser/string.js";
+import { lines } from "../../src/util/string.js";
 
 
 const file = "tokenize.test";

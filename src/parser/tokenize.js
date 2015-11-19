@@ -1,15 +1,7 @@
 import { symbol, integer, string } from "./types";
 import { crash } from "./error";
-import { repeat } from "./string";
-
-
-const peek = (a, i) => {
-  if (i < a["length"]) {
-    return a[i];
-  } else {
-    return null;
-  }
-};
+import { repeat } from "../util/string";
+import { peek } from "../util/array";
 
 
 const tokenize_delimiter = (output, file, lines, line, column) => {

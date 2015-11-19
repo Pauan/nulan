@@ -1,5 +1,5 @@
-import { crash, pretty, eol } from "../src/node";
-import { indent } from "../src/parser/string";
+import { crash, pretty, eol } from "../src/util/node";
+import { indent } from "../src/util/string";
 
 
 const isObject = (x) =>
@@ -59,9 +59,9 @@ export const assert_equal = (value, expected, message) => {
   if (!equal(value, expected)) {
     crash("Error: " + message + eol +
           "  Expected:" + eol +
-          indent(pretty(expected), "    ") + eol +
+          "    " + indent(pretty(expected), "    ") + eol +
           "  Got:" + eol +
-          indent(pretty(value), "    "));
+          "    " + indent(pretty(value), "    "));
   }
 };
 
@@ -78,14 +78,14 @@ export const assert_crash = (f, expected, message) => {
     } else {
       crash("Error: " + message + eol +
             "  Expected:" + eol +
-            indent(expected, "    ") + eol +
+            "    " + indent(expected, "    ") + eol +
             "  Got:" + eol +
-            indent(value, "    "));
+            "    " + indent(value, "    "));
     }
   }
 
   crash("Error: " + message + eol +
         "  Expected:" + eol +
-        indent(expected, "    ") + eol +
+        "    " + indent(expected, "    ") + eol +
         "  Got:" + eol);
 };
