@@ -1,5 +1,5 @@
-import { crash as _crash, eol } from "../util/node";
-import { repeat } from "../util/string";
+import { crash as _crash, eol } from "./node";
+import { repeat } from "./string";
 
 
 const format_line = (x) => {

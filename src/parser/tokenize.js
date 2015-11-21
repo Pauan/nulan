@@ -1,7 +1,7 @@
-import { symbol, integer, string } from "./types";
-import { crash } from "./error";
+import { crash } from "../util/error";
 import { repeat } from "../util/string";
 import { peek } from "../util/array";
+import { symbol, integer, string } from "./ast";
 
 
 const tokenize_delimiter = (output, file, lines, line, column) => {
