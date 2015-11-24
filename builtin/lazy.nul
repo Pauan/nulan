@@ -1,0 +1,14 @@
+(DEFINE-GROUP (Lazy a))
+
+(UNSAFE-FFI-IMPORT (file "ffi/lazy.js")
+  lazy  :: (-> (-> Null a) (Lazy a))
+  force :: (-> (Lazy a) a))
+
+(DEFINE-ALIAS
+  (LAZY a)
+    &(lazy -> _ ~a))
+
+(EXPORT
+  | Lazy
+  | LAZY
+  | force)
