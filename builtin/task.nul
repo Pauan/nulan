@@ -1,0 +1,81 @@
+(DEFINE-GROUP (Task a))
+
+(UNSAFE-FFI-IMPORT (file "ffi/task.js")
+  transform     :: (-> (Task a) (-> a b) (Task b))
+  flatten       :: (-> (Task (Task a)) (Task a))
+  wrap          :: (-> a (Task a))
+  sequential    :: (-> (List (Task a)) (Task (List a)))
+  concurrent    :: (-> (List (Task a)) (Task (List a)))
+  # TODO use fastest2 instead ?
+  fastest       :: (-> (List (Task a)) (Task a))
+  perform       :: (-> (Task Null) Null)
+  delay         :: (-> Integer (Task Null))
+  with_resource :: (-> (Task a)
+                       (-> a (Task b))
+                       (-> a (Task Null))
+                       (Task b)))
+
+(DEFINE-ALIAS
+  (WITH-RESOURCE &(~n = ~v) use close)
+    &(with_resource ~v
+       (-> ~n ~use)
+       (-> ~n ~close)))
+
+(DEFINE after :: (-> (Task a) (-> a (Task b)) (Task b))
+  (after task fn)
+    (flatten (transform task fn)))
+
+(DEFINE timeout :: (-> (Task a) Integer (Task (Maybe a)))
+  (timeout task ms)
+    (fastest
+      [(transform task *some)
+       (transform (delay ms) -> _ *none)]))
+
+(DEFINE-ALIAS
+  (DO a)
+    a
+  (DO &(~pattern = ~value) @a)
+    &(after ~value -> ~pattern
+       (DO ~@a))
+  (DO value @a)
+    &(after ~value -> *null
+       (DO ~@a)))
+
+(EXPORT
+  | ($transform Task)
+  | ($flatten Task)
+  | ($wrap Task)
+  | sequential
+  | concurrent
+  | fastest
+  | timeout
+  | after
+  | DO
+  | WITH-RESOURCE)
+
+
+
+(WITH-RESOURCE fd = (open-file "foo")
+  (print (read fd))
+  (close-file fd))
+
+(DO fd = (open-file "foo")
+    (finally
+      (read fd)
+      (close-file fd)))
+
+a = (Task a)
+b = (Task b)
+c = (Task Null)
+
+Cancel a -> Run c
+Error a -> Error a
+Success a -> Run b
+
+Cancel b -> Run c
+Error b -> Run c -> Error b
+Success b -> Run c -> Success b
+
+Cancel c ->
+Error c -> Error c
+Success c -> Success b
