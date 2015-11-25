@@ -1,3 +1,6 @@
+//Error["prepareStackTrace"] = (e, x) => x;
+
+
 // TODO move to another module
 const crash = (e) => {
   throw e;
@@ -9,12 +12,48 @@ const _null = 0;
 const noop = () => {};
 
 
-export const sync = (f) =>
-  (thread, success, error) => {
+const CAPTURE_STACK = (typeof Error["captureStackTrace"] !== "undefined");
+
+const capture_stack_trace = (caller) => {
+  if (CAPTURE_STACK) {
+    const o = {};
+    Error["captureStackTrace"](o, caller);
+    return o["stack"]; // o["stack"]["split"](/\n/)[1]
+  } else {
+    return null;
+  }
+};
+
+const capture_stack = (thread, name) => {
+  if (CAPTURE_STACK) {
+    const o = {};
+    Error["captureStackTrace"](o, capture_stack);
+    thread.b["push"](o["stack"]
+    /*{
+      a: name,
+      b: o["stack"]["split"](/\n/)[1]
+    }*/);
+  }
+};
+
+const format_error = (e, x) => {
+  //["map"]((x) => "    " + x.a + x.b)
+  e["stack"] = e["stack"] + "\nTask stack:\n" + x.b["join"]("\n\n");
+  return e;
+};
+
+
+export const sync = (f) => {
+  const trace = capture_stack_trace(sync);
+
+  return (thread, success, error) => {
+    thread.b["push"](trace);
+
     // TODO does this need to set cancel to noop ?
     // TODO maybe use try/catch ?
     success(f());
   };
+};
 
 // Guarantees:
 // * success cannot be called after success or error
@@ -22,29 +61,35 @@ export const sync = (f) =>
 // * cleanup will not be run after success or error
 // * cleanup will not be run twice
 // * success or error is ignored after cleanup
-export const async = (f) =>
-  (thread, success, error) => {
+export const async = (f) => {
+  const trace = capture_stack_trace(async);
+
+  return (thread, success, error) => {
+    thread.b["push"](trace);
+
     let done = false;
 
-    console.log(new Error().stack);
-
-    on_kill(thread, f((value) => {
+    const on_success = (value) => {
       if (done) {
         crash(new Error("Invalid success"));
       } else {
         done = true;
         success(value);
       }
+    };
 
-    }, (value) => {
+    const on_error = (value) => {
       if (done) {
         crash(new Error("Invalid error"));
       } else {
         done = true;
         error(value);
       }
-    }));
+    };
+
+    on_kill(thread, f(on_success, on_error));
   };
+};
 
 
 const make_thread = () => {
@@ -310,7 +355,7 @@ export const delay = (ms) =>
   });
 
 export const log = (s) =>
-  sync(() => {
+  sync((thread) => {
     console["log"](s);
     return _null;
   });
@@ -390,7 +435,38 @@ const with_file = (path, flags, mode, f) =>
 
 
 
-const x = fastest([
+const foo = async((success, error) => {
+  //stack(thread, "foo", "task.js", 392, 12);
+  success(_null);
+  return noop;
+});
+
+const error = (e) =>
+  async((success, error) => {
+    error(e);
+  });
+
+perform(after(_yield, (_) =>
+        after(_yield, (_) =>
+        after(_yield, (_) =>
+              error(new Error("yield"))))));
+
+/*perform(after(log("1"), (_) =>
+        after(log("2"), (_) =>
+        after(log("3"), (_) =>
+              error(new Error("Hi1"))))));
+
+perform(after(delay(0), (_) =>
+        after(delay(0), (_) =>
+        after(delay(0), (_) =>
+              error(new Error("Hi2"))))));*/
+
+/*perform(after(foo, (_) =>
+        after(log("Hi"), (_) =>
+        after(delay(1000), (_) =>
+              wrap(5)))));*/
+
+/*const x = fastest([
             forever(_yield),
             delay(10000)
           ]);
@@ -406,3 +482,4 @@ x(make_thread(), (value) => {
 
 
 flatten(transform(read_file("foo"), (x) => write_file("bar", x)));
+*/

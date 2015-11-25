@@ -3,9 +3,11 @@
 (UNSAFE-FFI-IMPORT (file "ffi/task.js")
   transform     :: (-> (Task a) (-> a b) (Task b))
   flatten       :: (-> (Task (Task a)) (Task a))
+  after         :: (-> (Task a) (-> a (Task b)) (Task b))
   wrap          :: (-> a (Task a))
   sequential    :: (-> (List (Task a)) (Task (List a)))
   concurrent    :: (-> (List (Task a)) (Task (List a)))
+  fastest2      :: (-> (Task a) (Task a) (Task a))
   # TODO use fastest2 instead ?
   fastest       :: (-> (List (Task a)) (Task a))
   perform       :: (-> (Task Null) Null)
@@ -21,16 +23,18 @@
        (-> ~n ~use)
        (-> ~n ~close)))
 
-(DEFINE after :: (-> (Task a) (-> a (Task b)) (Task b))
+# TODO this should work for all monads
+#/(DEFINE after :: (-> (Task a) (-> a (Task b)) (Task b))
   (after task fn)
-    (flatten (transform task fn)))
+    (flatten (transform task fn)))/#
 
 (DEFINE timeout :: (-> (Task a) Integer (Task (Maybe a)))
   (timeout task ms)
-    (fastest
-      [(transform task *some)
-       (transform (delay ms) -> _ *none)]))
+    (fastest2
+      (transform task *some)
+      (transform (delay ms) -> _ *none)))
 
+# TODO this should work for all monads
 (DEFINE-ALIAS
   (DO a)
     a
@@ -47,11 +51,11 @@
   | ($wrap Task)
   | sequential
   | concurrent
+  | fastest2
   | fastest
   | timeout
   | after
-  | DO
-  | WITH-RESOURCE)
+  | DO)
 
 
 
