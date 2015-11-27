@@ -1,6 +1,6 @@
 import { assert_crash, format_error, format_pretty, equal } from "../assert";
 import { map } from "../../util/array";
-import { crash } from "../../util/node";
+import { crash, get_message } from "../../util/node";
 import { sync, transform, flatten, perform, wrap, sequential,
          concurrent, delay, fastest, _yield, throw_error,
          ignore_kill, on_error, async_killable,
@@ -64,9 +64,9 @@ const test_crash = (expected, task) =>
     after(on_error(task, (_) => null, (e) => e), (e) =>
       (e === null
         ? throw_error(new Error(format_error(name, null, expected)))
-        : (e["message"] === expected
+        : (get_message(e) === expected
             ? wrap(null)
-            : throw_error(new Error(format_error(name, e["message"], expected))))));
+            : throw_error(new Error(format_error(name, get_message(e), expected))))));
 
 
 
@@ -89,7 +89,7 @@ assert_crash(() => {
     success("1");
     error(new Error("2"));
   }));
-}, "Invalid error:\nError: 2");
+}, "Invalid error: 2");
 
 /*assert_crash(() => {
   perform(async_killable((success, error) => {
@@ -112,7 +112,7 @@ assert_crash(() => {
       error(new Error("1"));
     };
   }), "2"));
-}, "Invalid error:\nError: 1");
+}, "Invalid error: 1");
 
 
 /*console.log("START");
@@ -147,7 +147,7 @@ assert_crash(() => {
     success("1");
     error(new Error("2"));
   }));
-}, "Invalid error:\nError: 2");
+}, "Invalid error: 2");
 
 /*assert_crash(() => {
   perform(async_unkillable((success, error) => {
@@ -180,8 +180,7 @@ console.log("END");*/
 
 
 /*perform(fastest([
-  forever(_yield),
-  //forever(then(_yield, log("Hi"))),
+  ignore_kill(forever(then(_yield, log("Hi")))),
   delay(1000)
 ]));*/
 
@@ -208,6 +207,12 @@ assert_crash(() => {
 
 
 perform(tests([
+  test("1",
+    fastest([
+      forever(ignore_kill(then(ignore_kill(_yield), ignore_kill(wrap("2"))))),
+      then(delay(100), wrap("1"))
+    ])),
+
   test("1",
     fastest([
       then(then(_yield, _yield), wrap("1")),
@@ -250,12 +255,6 @@ perform(tests([
   test("1",
     fastest([
       forever(ignore_yield),
-      then(delay(100), wrap("1"))
-    ])),
-
-  test("1",
-    fastest([
-      ignore_kill(forever(_yield)),
       then(delay(100), wrap("1"))
     ])),
 

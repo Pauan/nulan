@@ -34,8 +34,10 @@ export const async_killable = (f) =>
 
     const on_error = (value) => {
       if (done) {
-        // TODO error stack
-        crash(new Error("Invalid error:\n" + value));
+        // TODO this is hacky
+        // TODO is the stack trace correct ?
+        value["message"] = "Invalid error: " + value["message"];
+        crash(value);
 
       } else {
         done = true;
@@ -91,8 +93,10 @@ export const async_unkillable = (f) =>
     const on_error = (value) => {
       if (done || killed) {
         done = true;
-        // TODO error stack
-        crash(new Error("Invalid error:\n" + value));
+        // TODO this is hacky
+        // TODO is the stack trace correct ?
+        value["message"] = "Invalid error: " + value["message"];
+        crash(value);
 
       } else {
         done = true;

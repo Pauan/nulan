@@ -10,10 +10,13 @@ export const eol = os["EOL"];
 export const pretty = (x) =>
   util["inspect"](x, { "colors": true, "depth": 5 });
 
+export const get_stack = (err) =>
+  err["stack"] || get_message(err);
+
 export const get_message = (err) =>
-  err["stack"] || err["message"] || "INVALID ERROR: " + err;
+  err["message"] || "INVALID ERROR: " + err;
 
 process["on"]("uncaughtException", (err) => {
-  console["error"](get_message(err));
+  console["error"]("Error: " + get_stack(err));
   process["exit"](1);
 });

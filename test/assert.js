@@ -1,4 +1,4 @@
-import { crash, pretty, eol } from "../util/node";
+import { crash, pretty, eol, get_message } from "../util/node";
 import { indent } from "../util/string";
 
 
@@ -56,7 +56,7 @@ export const equal = (x, y) => {
 };
 
 export const format_error = (message, value, expected) =>
-  "Error: " + message + eol +
+  message + eol +
   "  Expected:" + eol +
   "    " + indent(expected, "    ") + eol +
   "  Got:" + eol +
@@ -78,7 +78,7 @@ export const assert_crash = (f, expected, message) => {
     f();
 
   } catch (e) {
-    const value = e["message"];
+    const value = get_message(e);
 
     if (value === expected) {
       return;
