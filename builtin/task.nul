@@ -6,7 +6,7 @@
 
 (DEFINE-GROUP (Task a))
 
-(UNSAFE-FFI-IMPORT (file "ffi/task.js")
+(UNSAFE-FFI-IMPORT (file "../ffi/task.js")
   transform     :: (-> (Task a) (-> a b) (Task b))
   flatten       :: (-> (Task (Task a)) (Task a))
   after         :: (-> (Task a) (-> a (Task b)) (Task b))

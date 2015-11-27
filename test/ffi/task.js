@@ -4,7 +4,7 @@ import { crash, get_message } from "../../util/node";
 import { sync, transform, flatten, perform, wrap, sequential,
          concurrent, delay, fastest, _yield, throw_error,
          ignore_kill, on_error, async_killable,
-         async_unkillable, log, killed, never } from "../../builtin/ffi/task";
+         async_unkillable, log, killed, never } from "../../ffi/task";
 
 
 const after = (a, f) =>

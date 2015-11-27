@@ -1,4 +1,4 @@
-import { crash } from "../../util/node";
+import { crash } from "../util/node";
 
 
 // TODO move to another module
