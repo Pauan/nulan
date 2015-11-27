@@ -180,21 +180,40 @@ console.log("END");*/
 
 
 /*perform(fastest([
-  forever(then(_yield, log("Hi"))),
+  forever(_yield),
+  //forever(then(_yield, log("Hi"))),
   delay(1000)
-]));
+]));*/
 
+
+assert_crash(() => {
+  delay(-5);
+}, "Expected positive number but got -5");
+
+assert_crash(() => {
+  delay(0);
+}, "Cannot delay for 0 milliseconds (maybe use yield instead?)");
+
+assert_crash(() => {
+  sequential([]);
+}, "Cannot use sequential on an empty list");
 
 assert_crash(() => {
   concurrent([]);
-}, "u");
+}, "Cannot use concurrent on an empty list");
 
 assert_crash(() => {
   fastest([]);
-}, "u");*/
+}, "Cannot use fastest on an empty list");
 
 
-/*perform(tests([
+perform(tests([
+  test("1",
+    fastest([
+      then(then(_yield, _yield), wrap("1")),
+      then(delay(100), wrap("2"))
+    ])),
+
   test("1",
     fastest([
       then(async_unkillable((success, error) => {
@@ -212,26 +231,32 @@ assert_crash(() => {
 
   test("1",
     fastest([
-      forever(delay(0)),
-      then(delay(1000), wrap("1"))
+      forever(delay(10)),
+      then(delay(100), wrap("1"))
     ])),
 
   test("1",
     fastest([
-      forever(ignore_kill(delay(0))),
-      then(delay(1000), wrap("1"))
+      forever(ignore_kill(delay(10))),
+      then(delay(100), wrap("1"))
     ])),
 
   test("1",
     fastest([
       forever(_yield),
-      then(delay(1000), wrap("1"))
+      then(delay(100), wrap("1"))
     ])),
 
   test("1",
     fastest([
       forever(ignore_yield),
-      then(delay(1000), wrap("1"))
+      then(delay(100), wrap("1"))
+    ])),
+
+  test("1",
+    fastest([
+      ignore_kill(forever(_yield)),
+      then(delay(100), wrap("1"))
     ])),
 
   test("1",
@@ -246,19 +271,19 @@ assert_crash(() => {
   test("1",
     fastest([
       fastest([
-        then(delay(0), wrap("1")),
-        then(delay(0), wrap("2"))
+        then(delay(10), wrap("1")),
+        then(delay(10), wrap("2"))
       ]),
-      then(delay(1000), wrap("3"))
+      then(delay(100), wrap("3"))
     ])),
 
   test("3",
     fastest([
       fastest([
-        then(delay(1000), wrap("1")),
-        then(delay(1000), wrap("2"))
+        then(delay(100), wrap("1")),
+        then(delay(100), wrap("2"))
       ]),
-      then(delay(0), wrap("3"))
+      then(delay(10), wrap("3"))
     ])),
 
   test("2",
@@ -387,4 +412,3 @@ assert_crash(() => {
         _yield
       ]), _yield)))
 ]));
-*/

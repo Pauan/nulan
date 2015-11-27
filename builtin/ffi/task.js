@@ -238,8 +238,12 @@ export const flatten = (task) =>
     }, error);
   };
 
-export const sequential = (a) =>
-  (thread, success, error) => {
+export const sequential = (a) => {
+  if (a["length"] === 0) {
+    crash(new Error("Cannot use sequential on an empty list"));
+  }
+
+  return (thread, success, error) => {
     const length = a["length"];
     const values = new Array(length);
 
@@ -257,9 +261,14 @@ export const sequential = (a) =>
 
     loop(0);
   };
+};
 
-export const concurrent = (a) =>
-  (thread, success, error) => {
+export const concurrent = (a) => {
+  if (a["length"] === 0) {
+    crash(new Error("Cannot use concurrent on an empty list"));
+  }
+
+  return (thread, success, error) => {
     let running = true;
 
     let pending = a["length"];
@@ -305,47 +314,14 @@ export const concurrent = (a) =>
       }
     }
   };
+};
 
-export const fastest2 = (task1, task2) =>
-  (thread, success, error) => {
-    const thread1 = _make_thread();
-    const thread2 = _make_thread();
+export const fastest = (a) => {
+  if (a["length"] === 0) {
+    crash(new Error("Cannot use fastest on an empty list"));
+  }
 
-    let done = false;
-
-    task1(thread1, (value) => {
-      done = true;
-      _kill(thread2);
-      success(value);
-    }, (value) => {
-      done = true;
-      _kill(thread2);
-      error(value);
-    });
-
-    if (!done) {
-      task2(thread2, (value) => {
-        done = true;
-        _kill(thread1);
-        success(value);
-      }, (value) => {
-        done = true;
-        _kill(thread1);
-        error(value);
-      });
-
-      // TODO is this correct ?
-      if (!done) {
-        _set_kill(thread, () => {
-          _kill(thread1);
-          _kill(thread2);
-        });
-      }
-    }
-  };
-
-export const fastest = (a) =>
-  (thread, success, error) => {
+  return (thread, success, error) => {
     let running = true;
 
     const threads = [];
@@ -381,6 +357,7 @@ export const fastest = (a) =>
       }
     }
   };
+};
 
 
 // TODO is this correct ?
@@ -489,13 +466,17 @@ export const with_resource = (create, use, destroy) =>
 
 const _yield_queue = [];
 
-// TODO maybe this should have macrotask semantics rather than microtask ?
 const _yield_queue_run = () => {
-  for (let i = 0; i < _yield_queue["length"]; ++i) {
-    _yield_queue[i](_null);
+  const pending = _yield_queue["length"];
+
+  for (let i = 0; i < pending; ++i) {
+    // TODO faster implementation for this ?
+    _yield_queue["shift"]()(_null);
   }
 
-  _yield_queue["length"] = 0;
+  if (_yield_queue["length"] !== 0) {
+    setTimeout(_yield_queue_run, 0);
+  }
 };
 
 const _yield_queue_add = (x) => {
@@ -506,6 +487,7 @@ const _yield_queue_add = (x) => {
   }
 };
 
+// TODO guarantee that this cannot happen while calling _yield_queue_run ?
 const _yield_queue_remove = (x) => {
   const index = _yield_queue["indexOf"](x);
 
@@ -527,8 +509,16 @@ export const _yield =
   });
 
 
-export const delay = (ms) =>
-  async_killable((success, error) => {
+export const delay = (ms) => {
+  if (ms === 0) {
+    crash(new Error("Cannot delay for 0 milliseconds (maybe use yield instead?)"));
+  }
+
+  if (ms < 0) {
+    crash(new Error("Expected positive number but got " + ms));
+  }
+
+  return async_killable((success, error) => {
     const x = setTimeout(() => {
       success(_null);
     }, ms);
@@ -537,6 +527,7 @@ export const delay = (ms) =>
       clearTimeout(x);
     };
   });
+};
 
 export const log = (s) =>
   sync(() => {
