@@ -1,3 +1,9 @@
+(IMPORT (file "protocol.nul")
+  | $transform
+  | $flatten
+  | _transform = transform
+  | _flatten = flatten)
+
 (DEFINE-GROUP (Task a))
 
 (UNSAFE-FFI-IMPORT (file "ffi/task.js")
@@ -7,15 +13,25 @@
   wrap          :: (-> a (Task a))
   sequential    :: (-> (List (Task a)) (Task (List a)))
   concurrent    :: (-> (List (Task a)) (Task (List a)))
-  fastest2      :: (-> (Task a) (Task a) (Task a))
-  # TODO use fastest2 instead ?
   fastest       :: (-> (List (Task a)) (Task a))
   perform       :: (-> (Task Null) Null)
   delay         :: (-> Integer (Task Null))
+  throw_error   :: (-> Error (Task a))
+  on_error      :: (-> (Task a) (-> Error (Task a)) (Task a))
+  ignore_kill   :: (-> (Task a) (Task a))
+  unkillable    :: (-> (Task a) (Task a))
   with_resource :: (-> (Task a)
                        (-> a (Task b))
                        (-> a (Task Null))
                        (Task b)))
+
+(IMPLEMENT ($transform Task)
+  (_transform a fn)
+    (transform a fn))
+
+(IMPLEMENT ($flatten Task)
+  (_flatten a)
+    (flatten a))
 
 (DEFINE-ALIAS
   (WITH-RESOURCE &(~n = ~v) use close)
@@ -23,16 +39,18 @@
        (-> ~n ~use)
        (-> ~n ~close)))
 
-# TODO this should work for all monads
-#/(DEFINE after :: (-> (Task a) (-> a (Task b)) (Task b))
-  (after task fn)
-    (flatten (transform task fn)))/#
-
 (DEFINE timeout :: (-> (Task a) Integer (Task (Maybe a)))
   (timeout task ms)
-    (fastest2
-      (transform task *some)
-      (transform (delay ms) -> _ *none)))
+    (fastest
+      [(transform task *some)
+       (transform (delay ms) -> _ *none)]))
+
+
+# TODO put into other module
+(DEFINE after :: (REQUIRE ($transform a) ($flatten a)
+                   (-> (a b) (-> b (a c)) (a c)))
+  (after a fn)
+    (flatten (transform a fn)))
 
 # TODO this should work for all monads
 (DEFINE-ALIAS
@@ -45,22 +63,38 @@
     &(after ~value -> *null
        (DO ~@a)))
 
+(DEFINE-GROUP (Result a)
+  (*value a)
+  (*error Error))
+
+(DEFINE result :: (-> (Task a) (Task (Result a)))
+  (result a)
+    (on_error a *value *error))
+
+
 (EXPORT
+  | Task
+  | Result
+  | *value
+  | *error
   | ($transform Task)
   | ($flatten Task)
   | ($wrap Task)
   | sequential
   | concurrent
-  | fastest2
   | fastest
   | timeout
   | after
-  | DO)
+  | DO
+  | throw-error = throw_error
+  | result
+  | ignore-kill = ignore_kill
+  | unkillable)
 
 
 
 (WITH-RESOURCE fd = (open-file "foo")
-  (print (read fd))
+  (read fd)
   (close-file fd))
 
 (DO fd = (open-file "foo")

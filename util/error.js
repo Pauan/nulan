@@ -36,4 +36,4 @@ export const format_warning = (x, message) =>
   format_message("Warning", x, message);
 
 export const crash = (x, message) =>
-  _crash(format_error(x, message));
+  _crash(new Error(format_error(x, message)));

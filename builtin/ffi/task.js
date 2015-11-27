@@ -1,10 +1,5 @@
-//Error["prepareStackTrace"] = (e, x) => x;
+import { crash } from "../../util/node";
 
-
-// TODO move to another module
-const crash = (e) => {
-  throw e;
-};
 
 // TODO move to another module
 const _null = 0;
@@ -12,117 +7,220 @@ const _null = 0;
 const noop = () => {};
 
 
-const CAPTURE_STACK = (typeof Error["captureStackTrace"] !== "undefined");
-
-const capture_stack_trace = (caller) => {
-  if (CAPTURE_STACK) {
-    const o = {};
-    Error["captureStackTrace"](o, caller);
-    return o["stack"]; // o["stack"]["split"](/\n/)[1]
-  } else {
-    return null;
-  }
-};
-
-const capture_stack = (thread, name) => {
-  if (CAPTURE_STACK) {
-    const o = {};
-    Error["captureStackTrace"](o, capture_stack);
-    thread.b["push"](o["stack"]
-    /*{
-      a: name,
-      b: o["stack"]["split"](/\n/)[1]
-    }*/);
-  }
-};
-
-const format_error = (e, x) => {
-  //["map"]((x) => "    " + x.a + x.b)
-  e["stack"] = e["stack"] + "\nTask stack:\n" + x.b["join"]("\n\n");
-  return e;
-};
-
-
-export const sync = (f) => {
-  const trace = capture_stack_trace(sync);
-
-  return (thread, success, error) => {
-    thread.b["push"](trace);
-
-    // TODO does this need to set cancel to noop ?
+export const sync = (f) =>
+  (thread, success, error) => {
     // TODO maybe use try/catch ?
     success(f());
   };
-};
 
 // Guarantees:
-// * success cannot be called after success or error
-// * error cannot be called after success or error
-// * cleanup will not be run after success or error
-// * cleanup will not be run twice
-// * success or error is ignored after cleanup
-export const async = (f) => {
-  const trace = capture_stack_trace(async);
-
-  return (thread, success, error) => {
-    thread.b["push"](trace);
-
+// * success cannot be called after success, error, or kill
+// * error cannot be called after success, error, or kill
+// * will not be killed after success, error, or kill
+export const async_killable = (f) =>
+  (thread, success, error) => {
     let done = false;
 
     const on_success = (value) => {
       if (done) {
         crash(new Error("Invalid success"));
+
       } else {
         done = true;
+        _reset_kill(thread);
         success(value);
       }
     };
 
     const on_error = (value) => {
       if (done) {
-        crash(new Error("Invalid error"));
+        // TODO error stack
+        crash(new Error("Invalid error:\n" + value));
+
       } else {
         done = true;
+        _reset_kill(thread);
         error(value);
       }
     };
 
-    on_kill(thread, f(on_success, on_error));
+    const kill = f(on_success, on_error);
+
+    // TODO is this check needed ?
+    const on_kill = () => {
+      if (done) {
+        crash(new Error("Invalid kill"));
+
+      } else {
+        // TODO does this need to use _reset_kill ?
+        done = true;
+        kill();
+      }
+    };
+
+    if (!done) {
+      _set_kill(thread, on_kill);
+    }
   };
-};
+
+// Guarantees:
+// * success cannot be called after success or error
+// * error cannot be called after success, error, or kill
+// * success is ignored after being killed
+// * does nothing when killed
+// TODO implement this with async_killable + ignore_kill ?
+export const async_unkillable = (f) =>
+  (thread, success, error) => {
+    let done = false;
+    let killed = false;
+
+    const on_success = (value) => {
+      if (done) {
+        crash(new Error("Invalid success"));
+
+      } else {
+        done = true;
+        _reset_kill(thread);
+
+        if (!killed) {
+          success(value);
+        }
+      }
+    };
+
+    const on_error = (value) => {
+      if (done || killed) {
+        done = true;
+        // TODO error stack
+        crash(new Error("Invalid error:\n" + value));
+
+      } else {
+        done = true;
+        _reset_kill(thread);
+        error(value);
+      }
+    };
+
+    const on_kill = () => {
+      // TODO is this check needed ?
+      if (done || killed) {
+        killed = true;
+        crash(new Error("Invalid kill"));
+
+      } else {
+        killed = true;
+      }
+    };
+
+    _set_kill(thread, on_kill);
+
+    f(on_success, on_error);
+  };
+
+// TODO is this correct ?
+// TODO can this be made more efficient ?
+export const ignore_kill = (task) =>
+  (thread, success, error) => {
+    let killed = false;
+
+    _set_kill(thread, () => {
+      killed = true;
+    });
+
+    const x = _make_thread();
+
+    const on_success = (value) => {
+      if (!killed) {
+        _reset_kill(thread);
+        success(value);
+      }
+    };
+
+    // TODO handle error after kill ?
+    const on_error = (value) => {
+      if (!killed) {
+        _reset_kill(thread);
+        error(value);
+      }
+    };
+
+    task(x, on_success, on_error);
+  };
+
+// This is mostly useful for unit tests
+// TODO is this correct ?
+export const killed = (task, value) =>
+  (thread, success, error) => {
+    const x = _make_thread();
+
+    task(x, noop, error);
+
+    _kill(x);
+
+    // TODO what if the task errors ?
+    success(value);
+  };
 
 
-const make_thread = () => {
+// TODO handle cancellation later ?
+export const to_Promise = (task) =>
+  new Promise((resolve, reject) => {
+    const x = _make_thread();
+    task(x, resolve, reject);
+  });
+
+// TODO handle cancellation later ?
+export const from_Promise = (f) =>
+  // TODO should this use a raw Task or async_unkillable ?
+  async_unkillable((success, error) => {
+    f()["then"](success, error);
+  });
+
+
+const _make_thread = () => {
   return {
-    a: noop,
-    b: []
+    a: false, // is_killed
+    b: noop   // kill
   };
 };
 
-const on_kill = (thread, f) => {
-  thread.a = f;
+const _set_kill = (thread, f) => {
+  thread.b = f;
 };
 
-const off_kill = (thread) => {
-  thread.a = noop;
+const _reset_kill = (thread) => {
+  thread.b = noop;
 };
 
-// TODO guarantee that it can't be killed twice ?
-const kill = (thread) => {
-  thread.a();
+const _kill = (thread) => {
+  if (thread.a) {
+    crash(new Error("Cannot kill the same thread twice"));
+
+  } else {
+    const kill = thread.b;
+    thread.a = true;
+    thread.b = noop;
+    kill();
+  }
 };
 
-const kill_all = (a) => {
+const _kill_all = (a) => {
   for (let i = 0; i < a["length"]; ++i) {
-    kill(a[i]);
+    _kill(a[i]);
   }
 };
 
 
+export const never = (thread, success, error) => {};
+
 export const wrap = (value) =>
   (thread, success, error) => {
-    // TODO does this need to set cancel to noop ?
     success(value);
+  };
+
+export const throw_error = (value) =>
+  (thread, success, error) => {
+    error(value);
   };
 
 export const transform = (task, f) =>
@@ -140,7 +238,6 @@ export const flatten = (task) =>
     }, error);
   };
 
-// TODO test this
 export const sequential = (a) =>
   (thread, success, error) => {
     const length = a["length"];
@@ -161,94 +258,128 @@ export const sequential = (a) =>
     loop(0);
   };
 
-// TODO test this
 export const concurrent = (a) =>
   (thread, success, error) => {
+    let running = true;
+
     let pending = a["length"];
 
-    const running = new Array(pending);
-    const values  = new Array(pending);
+    const values = new Array(pending);
 
-    let done = false;
+    const threads = [];
 
-    const kill = () => {
-      if (done) {
-        // TODO better error message ?
-        crash(new Error("Invalid"));
-
-      } else {
-        done = true;
-        kill_all(running);
-      }
-    };
+    // TODO is this the correct place for this ?
+    _set_kill(thread, () => {
+      _kill_all(threads);
+    });
 
     const on_success = () => {
       --pending;
 
+      // TODO what about setting `running` ?
       if (pending === 0) {
-        done = true;
+        _reset_kill(thread);
         success(values);
       }
     };
 
-    // TODO what if a task is succeeded/errored immediately ?
+    const on_error = (value) => {
+      running = false;
+      _reset_kill(thread);
+      _kill_all(threads);
+      error(value);
+    };
+
     for (let i = 0; i < a["length"]; ++i) {
-      running[i] = make_thread();
+      if (running) {
+        threads["push"](_make_thread());
 
-      a[i](running[i], (value) => {
-        // TODO is this correct ?
-        off_kill(running[i]);
-        values[i] = value;
-        on_success();
+        a[i](threads[i], (value) => {
+          values[i] = value;
+          on_success();
+        }, on_error);
 
-      }, (value) => {
+      } else {
         // TODO is this correct ?
-        off_kill(running[i]);
-        kill();
-        error(value);
-      });
+        return;
+      }
     }
-
-    on_kill(thread, kill);
   };
 
-// TODO test this
-export const fastest = (a) =>
+export const fastest2 = (task1, task2) =>
   (thread, success, error) => {
-    const running = new Array(a["length"]);
+    const thread1 = _make_thread();
+    const thread2 = _make_thread();
 
     let done = false;
 
-    const kill = () => {
-      if (done) {
-        // TODO better error message ?
-        crash(new Error("Invalid"));
+    task1(thread1, (value) => {
+      done = true;
+      _kill(thread2);
+      success(value);
+    }, (value) => {
+      done = true;
+      _kill(thread2);
+      error(value);
+    });
 
-      } else {
+    if (!done) {
+      task2(thread2, (value) => {
         done = true;
-        kill_all(running);
-      }
-    };
-
-    // TODO what if a task is succeeded/errored immediately ?
-    for (let i = 0; i < a["length"]; ++i) {
-      running[i] = make_thread();
-
-      a[i](running[i], (value) => {
-        // TODO is this correct ?
-        off_kill(running[i]);
-        kill();
+        _kill(thread1);
         success(value);
-
       }, (value) => {
-        // TODO is this correct ?
-        off_kill(running[i]);
-        kill();
+        done = true;
+        _kill(thread1);
         error(value);
       });
-    }
 
-    on_kill(thread, kill);
+      // TODO is this correct ?
+      if (!done) {
+        _set_kill(thread, () => {
+          _kill(thread1);
+          _kill(thread2);
+        });
+      }
+    }
+  };
+
+export const fastest = (a) =>
+  (thread, success, error) => {
+    let running = true;
+
+    const threads = [];
+
+    // TODO is this the correct place for this ?
+    _set_kill(thread, () => {
+      _kill_all(threads);
+    });
+
+    const on_success = (value) => {
+      running = false;
+      _reset_kill(thread);
+      _kill_all(threads);
+      success(value);
+    };
+
+    const on_error = (value) => {
+      running = false;
+      _reset_kill(thread);
+      _kill_all(threads);
+      error(value);
+    };
+
+    for (let i = 0; i < a["length"]; ++i) {
+      if (running) {
+        threads["push"](_make_thread());
+
+        a[i](threads[i], on_success, on_error);
+
+      } else {
+        // TODO is this correct ?
+        return;
+      }
+    }
   };
 
 
@@ -258,7 +389,7 @@ export const fastest = (a) =>
   (thread, success, error) => {
     let succeeded = false;
 
-    const x = make_thread();
+    const x = _make_thread();
 
     use(x, (value) => {
       succeeded = true;
@@ -275,76 +406,129 @@ export const fastest = (a) =>
       }, error);
     });
 
-    on_kill(thread, () => {
+    _set_kill(thread, () => {
       if (!succeeded) {
         succeeded = true;
 
-        kill(x);
+        _kill(x);
         destroy(x, noop, error);
       }
     });
   };*/
 
+// TODO maybe handle kill ?
+export const on_error = (task, on_success, on_error) =>
+  (thread, success, error) => {
+    task(thread, (value) => {
+      success(on_success(value));
+    }, (value) => {
+      success(on_error(value));
+    });
+  };
+
 // TODO is this correct ?
 // TODO test this
 export const with_resource = (create, use, destroy) =>
   (thread, success, error) => {
-    let killed    = false;
-    let created   = false;
-    let succeeded = false;
+    let killed = false;
 
-    const x = make_thread();
+    const on_kill = () => {
+      killed = true;
+    };
+
+    // TODO what if it was killed ?
+    const on_error = (value) => {
+      _reset_kill(thread);
+      error(value);
+    };
+
+    // TODO is this the right place for this ?
+    _set_kill(thread, on_kill);
+
+    const x = _make_thread();
 
     create(x, (resource) => {
-      created = true;
-
       if (killed) {
+        // TODO is this correct ?
         destroy(resource)(x, noop, error);
 
       } else {
+        // TODO is this correct ?
+        _set_kill(thread, () => {
+          _kill(x);
+          // TODO is this correct ?
+          destroy(resource)(x, noop, error);
+        });
+
         use(resource)(x, (value) => {
-          succeeded = true;
+          _set_kill(thread, on_kill);
 
           destroy(resource)(x, (_) => {
-            success(value);
-          }, error);
+            // TODO is this correct ?
+            if (!killed) {
+              _reset_kill(thread);
+              success(value);
+            }
+          }, on_error);
 
         }, (value) => {
-          succeeded = true;
+          _set_kill(thread, on_kill);
 
           destroy(resource)(x, (_) => {
-            error(value);
-          }, error);
+            // TODO is this correct ?
+            if (!killed) {
+              _reset_kill(thread);
+              error(value);
+            }
+          }, on_error);
         });
       }
-    }, error);
-
-    on_kill(thread, () => {
-      killed = true;
-
-      if (created && !succeeded) {
-        succeeded = true;
-
-        kill(x);
-        destroy(value)(x, noop, error);
-      }
-    });
+    }, on_error);
   };
 
 
-const _yield =
-  async((success, error) => {
-    const x = setImmediate(() => {
-      success(_null);
-    });
+const _yield_queue = [];
+
+// TODO maybe this should have macrotask semantics rather than microtask ?
+const _yield_queue_run = () => {
+  for (let i = 0; i < _yield_queue["length"]; ++i) {
+    _yield_queue[i](_null);
+  }
+
+  _yield_queue["length"] = 0;
+};
+
+const _yield_queue_add = (x) => {
+  _yield_queue["push"](x);
+
+  if (_yield_queue["length"] === 1) {
+    setTimeout(_yield_queue_run, 0);
+  }
+};
+
+const _yield_queue_remove = (x) => {
+  const index = _yield_queue["indexOf"](x);
+
+  if (index === -1) {
+    crash(new Error("Invalid: could not kill yield (this should never happen)"));
+  } else {
+    _yield_queue["splice"](index, 1);
+  }
+};
+
+// TODO is this correct ?
+export const _yield =
+  async_killable((success, error) => {
+    _yield_queue_add(success);
 
     return () => {
-      clearImmediate(x);
+      _yield_queue_remove(success);
     };
   });
 
+
 export const delay = (ms) =>
-  async((success, error) => {
+  async_killable((success, error) => {
     const x = setTimeout(() => {
       success(_null);
     }, ms);
@@ -355,7 +539,7 @@ export const delay = (ms) =>
   });
 
 export const log = (s) =>
-  sync((thread) => {
+  sync(() => {
     console["log"](s);
     return _null;
   });
@@ -368,20 +552,9 @@ export const log = (s) =>
 //    }, error);
 //  };
 
-const after = (a, f) =>
-  flatten(transform(a, f));
-
-const then = (a, b) =>
-  after(a, (_) => b);
-
-const forever = (a) =>
-  after(a, (_) =>
-    forever(a));
-
 
 export const perform = (task) => {
-  const x = make_thread();
-
+  const x = _make_thread();
   task(x, noop, crash);
 };
 
@@ -407,64 +580,29 @@ const callback_null = (success, error) =>
   };
 
 const read_file = (path) =>
-  async((success, error) => {
+  async_unkillable((success, error) => {
     fs["readFile"](path, { "encoding": "utf8" }, callback(success, error));
-    return noop;
   });
 
 const write_file = (path, x) =>
-  async((success, error) => {
+  async_unkillable((success, error) => {
     fs["writeFile"](path, x, { "encoding": "utf8" }, callback_null(success, error));
-    return noop;
   });
 
 const open_file = (path, flags, mode) =>
-  async((success, error) => {
+  async_unkillable((success, error) => {
     fs["open"](path, flags, mode, callback(success, error));
-    return noop;
   });
 
 const close_fd = (fd) =>
-  async((success, error) => {
+  async_unkillable((success, error) => {
     fs["close"](fd, callback_null(success, error));
-    return noop;
   });
 
 const with_file = (path, flags, mode, f) =>
   with_resource(open_file(path, flags, mode), f, close_fd);
 
 
-
-const foo = async((success, error) => {
-  //stack(thread, "foo", "task.js", 392, 12);
-  success(_null);
-  return noop;
-});
-
-const error = (e) =>
-  async((success, error) => {
-    error(e);
-  });
-
-perform(after(_yield, (_) =>
-        after(_yield, (_) =>
-        after(_yield, (_) =>
-              error(new Error("yield"))))));
-
-/*perform(after(log("1"), (_) =>
-        after(log("2"), (_) =>
-        after(log("3"), (_) =>
-              error(new Error("Hi1"))))));
-
-perform(after(delay(0), (_) =>
-        after(delay(0), (_) =>
-        after(delay(0), (_) =>
-              error(new Error("Hi2"))))));*/
-
-/*perform(after(foo, (_) =>
-        after(log("Hi"), (_) =>
-        after(delay(1000), (_) =>
-              wrap(5)))));*/
 
 /*const x = fastest([
             forever(_yield),
@@ -474,7 +612,7 @@ perform(after(delay(0), (_) =>
 var start = Date.now();
 console.log("STARTING");
 
-x(make_thread(), (value) => {
+x(_make_thread(), (value) => {
   console.log("VALUE", Date.now() - start, value);
 }, (error) => {
   console.log("ERROR", Date.now() - start, error);

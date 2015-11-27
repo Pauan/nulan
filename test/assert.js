@@ -1,5 +1,5 @@
-import { crash, pretty, eol } from "../src/util/node";
-import { indent } from "../src/util/string";
+import { crash, pretty, eol } from "../util/node";
+import { indent } from "../util/string";
 
 
 const isObject = (x) =>
@@ -55,13 +55,21 @@ export const equal = (x, y) => {
   }
 };
 
+export const format_error = (message, value, expected) =>
+  "Error: " + message + eol +
+  "  Expected:" + eol +
+  "    " + indent(expected, "    ") + eol +
+  "  Got:" + eol +
+  (value === null
+    ? ""
+    : "    " + indent(value, "    "));
+
+export const format_pretty = (message, value, expected) =>
+  format_error(message, pretty(value), pretty(expected));
+
 export const assert_equal = (value, expected, message) => {
   if (!equal(value, expected)) {
-    crash("Error: " + message + eol +
-          "  Expected:" + eol +
-          "    " + indent(pretty(expected), "    ") + eol +
-          "  Got:" + eol +
-          "    " + indent(pretty(value), "    "));
+    crash(new Error(format_pretty(message, value, expected)));
   }
 };
 
@@ -76,16 +84,9 @@ export const assert_crash = (f, expected, message) => {
       return;
 
     } else {
-      crash("Error: " + message + eol +
-            "  Expected:" + eol +
-            "    " + indent(expected, "    ") + eol +
-            "  Got:" + eol +
-            "    " + indent(value, "    "));
+      crash(new Error(format_error(message, value, expected)));
     }
   }
 
-  crash("Error: " + message + eol +
-        "  Expected:" + eol +
-        "    " + indent(expected, "    ") + eol +
-        "  Got:" + eol);
+  crash(new Error(format_error(message, null, expected)));
 };

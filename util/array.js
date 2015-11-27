@@ -13,3 +13,13 @@ export const foldl = (init, x, f) => {
 
   return init;
 };
+
+export const map = (a, f) => {
+  const out = new Array(a["length"]);
+
+  for (let i = 0; i < a["length"]; ++i) {
+    out[i] = f(a[i], i);
+  }
+
+  return out;
+};
