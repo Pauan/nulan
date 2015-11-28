@@ -46,142 +46,32 @@ const counter = (f) => {
 };
 
 
-const tests = (a) =>
+const test_group = (group_name, a) =>
   then(concurrent(map(a, (f, index) => {
-                    const name = "test " + (index + 1);
+                    const name = group_name + " (test " + (index + 1) + ")";
                     return fastest([
                       f(name),
                       then(delay(10000),
                            throw_error(new Error(name + " took too long")))
                     ]);
                   })),
-       log("All tests succeeded"));
+       log(group_name + ": all tests succeeded"));
 
-const test = (expected, task) =>
+const expect = (expected, task) =>
   (name) =>
     after(task, (value) =>
       (equal(value, expected)
         ? wrap(null)
         : throw_error(new Error(format_pretty(name, value, expected)))));
 
-const test_crash = (expected, task) =>
+const expect_crash = (expected, fn) =>
   (name) =>
-    after(on_error(task, (_) => null, (e) => e), (e) =>
+    after(on_error(fn(), (_) => null, (e) => e), (e) =>
       (e === null
         ? throw_error(new Error(format_error(name, null, expected)))
         : (get_message(e) === expected
             ? wrap(null)
             : throw_error(new Error(format_error(name, get_message(e), expected))))));
-
-
-
-assert_crash(() => {
-  perform(async_killable((success, error) => {
-    success("1");
-    success("2");
-  }));
-}, "Invalid success");
-
-/*assert_crash(() => {
-  perform(async_killable((success, error) => {
-    error(new Error("1"));
-    error(new Error("2"));
-  }));
-}, "Invalid error");*/
-
-assert_crash(() => {
-  perform(async_killable((success, error) => {
-    success("1");
-    error(new Error("2"));
-  }));
-}, "Invalid error: 2");
-
-/*assert_crash(() => {
-  perform(async_killable((success, error) => {
-    error(new Error("1"));
-    success("2");
-  }));
-}, "Invalid success");*/
-
-assert_crash(() => {
-  perform(killed(async_killable((success, error) => {
-    return () => {
-      success("1");
-    };
-  }), "2"));
-}, "Invalid success");
-
-assert_crash(() => {
-  perform(killed(async_killable((success, error) => {
-    return () => {
-      error(new Error("1"));
-    };
-  }), "2"));
-}, "Invalid error: 1");
-
-
-/*console.log("START");
-perform(killed(async_killable((success, error) => {
-  setTimeout(() => {
-    console.log("Success");
-    success("1");
-  }, 0);
-  return () => {
-    console.log("Killed");
-  };
-}), "2"));
-console.log("END");*/
-
-
-assert_crash(() => {
-  perform(async_unkillable((success, error) => {
-    success("1");
-    success("2");
-  }));
-}, "Invalid success");
-
-/*assert_crash(() => {
-  perform(async_unkillable((success, error) => {
-    error(new Error("1"));
-    error(new Error("2"));
-  }));
-}, "Invalid error");*/
-
-assert_crash(() => {
-  perform(async_unkillable((success, error) => {
-    success("1");
-    error(new Error("2"));
-  }));
-}, "Invalid error: 2");
-
-/*assert_crash(() => {
-  perform(async_unkillable((success, error) => {
-    error(new Error("1"));
-    success("2");
-  }));
-}, "Invalid success");*/
-
-assert_crash(() => {
-  perform(killed(async_unkillable((success, error) => {
-    success("1");
-    success("2");
-  }), "3"));
-}, "Invalid success");
-
-assert_crash(() => {
-  perform(killed(async_unkillable((success, error) => {
-    error(new Error("1"));
-  }), "2"));
-}, "1");
-
-
-/*console.log("START");
-perform(killed(async_unkillable((success, error) => {
-  setTimeout(() => {
-    error(new Error("1"));
-  }, 0);
-}), "2"));
-console.log("END");*/
 
 
 /*perform(fastest([
@@ -211,23 +101,163 @@ assert_crash(() => {
 }, "Cannot use fastest on an empty list");
 
 
-perform(tests([
-  test("2",
+export const tests = test_group("task.js", [
+  expect("1",
+    async_killable((success, error) => {
+      success("1");
+
+      assert_crash(() => {
+        success("2");
+      }, "Invalid success");
+    })),
+
+  expect("1",
+    async_killable((success, error) => {
+      success("1");
+
+      assert_crash(() => {
+        error(new Error("2"));
+      }, "Invalid error");
+    })),
+
+  expect_crash("1", () =>
+    async_killable((success, error) => {
+      error(new Error("1"));
+
+      assert_crash(() => {
+        error(new Error("2"));
+      }, "Invalid error");
+    })),
+
+  expect_crash("1", () =>
+    async_killable((success, error) => {
+      error(new Error("1"));
+
+      assert_crash(() => {
+        success("2");
+      }, "Invalid success");
+    })),
+
+  expect("2",
+    killed(async_killable((success, error) => {
+      return () => {
+        assert_crash(() => {
+          success("1");
+        }, "Invalid success");
+      };
+    }), "2")),
+
+  expect("2",
+    killed(async_killable((success, error) => {
+      return () => {
+        assert_crash(() => {
+          error(new Error("1"));
+        }, "Invalid error");
+      };
+    }), "2")),
+
+  expect("2",
+    killed(async_killable((success, error) => {
+      setTimeout(() => {
+        assert_crash(() => {
+          success("1");
+        }, "Invalid success");
+      }, 0);
+      return () => {};
+    }), "2")),
+
+  expect("2",
+    killed(async_killable((success, error) => {
+      setTimeout(() => {
+        assert_crash(() => {
+          error(new Error("1"));
+        }, "Invalid error");
+      }, 0);
+      return () => {};
+    }), "2")),
+
+
+  expect("1",
+    async_unkillable((success, error) => {
+      success("1");
+
+      assert_crash(() => {
+        success("2");
+      }, "Invalid success");
+    })),
+
+  expect("1",
+    async_unkillable((success, error) => {
+      success("1");
+
+      assert_crash(() => {
+        error(new Error("2"));
+      }, "Invalid error");
+    })),
+
+  expect_crash("1", () =>
+    async_unkillable((success, error) => {
+      error(new Error("1"));
+
+      assert_crash(() => {
+        error(new Error("2"));
+      }, "Invalid error");
+    })),
+
+  expect_crash("1", () =>
+    async_unkillable((success, error) => {
+      error(new Error("1"));
+
+      assert_crash(() => {
+        success("2");
+      }, "Invalid success");
+    })),
+
+  expect("2",
+    killed(async_unkillable((success, error) => {
+      success("1");
+    }), "2")),
+
+  expect("2",
+    killed(async_unkillable((success, error) => {
+      assert_crash(() => {
+        error(new Error("1"));
+      }, "1");
+    }), "2")),
+
+  expect("2",
+    killed(async_unkillable((success, error) => {
+      setTimeout(() => {
+        success("1");
+      }, 0);
+    }), "2")),
+
+  expect("2",
+    killed(async_unkillable((success, error) => {
+      setTimeout(() => {
+        assert_crash(() => {
+          error(new Error("1"));
+        }, "1");
+      }, 0);
+    }), "2")),
+
+
+  expect("2",
     killed(ignore_kill(wrap("1")), "2")),
 
-  test("1",
+  expect("1",
     fastest([
       forever(ignore_kill(then(ignore_kill(_yield), ignore_kill(wrap("2"))))),
       then(delay(100), wrap("1"))
     ])),
 
-  test("1",
+  expect("1",
     fastest([
       then(then(_yield, _yield), wrap("1")),
       then(delay(100), wrap("2"))
     ])),
 
-  test("1",
+  expect("1",
     fastest([
       then(async_unkillable((success, error) => {
         success("2");
@@ -235,38 +265,31 @@ perform(tests([
       wrap("1")
     ])),
 
-  test("1",
-    killed(async_unkillable((success, error) => {
-      setTimeout(() => {
-        success("2");
-      }, 0);
-    }), "1")),
-
-  test("1",
+  expect("1",
     fastest([
       forever(delay(10)),
       then(delay(100), wrap("1"))
     ])),
 
-  test("1",
+  expect("1",
     fastest([
       forever(ignore_kill(delay(10))),
       then(delay(100), wrap("1"))
     ])),
 
-  test("1",
+  expect("1",
     fastest([
       forever(_yield),
       then(delay(100), wrap("1"))
     ])),
 
-  test("1",
+  expect("1",
     fastest([
       forever(ignore_yield),
       then(delay(100), wrap("1"))
     ])),
 
-  test("1",
+  expect("1",
     fastest([
       fastest([
         then(ignore_yield, wrap("1")),
@@ -275,7 +298,7 @@ perform(tests([
       then(ignore_yield, wrap("3"))
     ])),
 
-  test("1",
+  expect("1",
     fastest([
       fastest([
         then(delay(10), wrap("1")),
@@ -284,7 +307,7 @@ perform(tests([
       then(delay(100), wrap("3"))
     ])),
 
-  test("3",
+  expect("3",
     fastest([
       fastest([
         then(delay(100), wrap("1")),
@@ -293,12 +316,7 @@ perform(tests([
       then(delay(10), wrap("3"))
     ])),
 
-  test("2",
-    killed(async_unkillable((success, error) => {
-      success("1");
-    }), "2")),
-
-  test("1",
+  expect("1",
     fastest([
       async_unkillable((success, error) => {
         success("1");
@@ -306,7 +324,7 @@ perform(tests([
       wrap("3")
     ])),
 
-  test("3",
+  expect("3",
     fastest([
       wrap("3"),
       async_unkillable((success, error) => {
@@ -314,7 +332,7 @@ perform(tests([
       })
     ])),
 
-  test("3",
+  expect("3",
     fastest([
       wrap("3"),
       async_unkillable((success, error) => {
@@ -324,7 +342,7 @@ perform(tests([
       })
     ])),
 
-  test("3",
+  expect("3",
     fastest([
       async_unkillable((success, error) => {
         setTimeout(() => {
@@ -334,7 +352,7 @@ perform(tests([
       wrap("3")
     ])),
 
-  test_crash("Hi1",
+  expect_crash("Hi1", () =>
     concurrent([
       wrap("3"),
       throw_error(new Error("Hi1")),
@@ -342,13 +360,13 @@ perform(tests([
       wrap("4")
     ])),
 
-  test("3",
+  expect("3",
     fastest([
       wrap("3"),
       throw_error(new Error("Hi"))
     ])),
 
-  test("3",
+  expect("3",
     fastest([
       wrap("3"),
       async_killable((success, error) => {
@@ -357,7 +375,7 @@ perform(tests([
       })
     ])),
 
-  test("3",
+  expect("3",
     fastest([
       fastest([
         wrap("3"),
@@ -369,7 +387,7 @@ perform(tests([
       wrap("4")
     ])),
 
-  test("1",
+  expect("1",
     fastest([
       async_killable((success, error) => {
         success("1");
@@ -380,24 +398,24 @@ perform(tests([
       wrap("3")
     ])),
 
-  test(5,
+  expect(5,
     fastest([_yield, wrap(5)])),
 
-  test(5,
+  expect(5,
     fastest([wrap(5), _yield])),
 
-  test(1,
+  expect(1,
     counter((increment) =>
       fastest([increment, increment]))),
 
-  test(2,
+  expect(2,
     counter((increment) =>
       concurrent([
         increment,
         increment
       ]))),
 
-  test_crash("Hi",
+  expect_crash("Hi", () =>
     counter((increment) =>
       concurrent([
         throw_error(new Error("Hi")),
@@ -405,17 +423,19 @@ perform(tests([
         increment
       ]))),
 
-  test(1,
+  expect(1,
     counter((increment) =>
       fastest([
         increment,
         increment
       ]))),
 
-  test(1,
+  expect(1,
     counter((increment) =>
       then(fastest([
         repeat(after(ignore_yield, (_) => increment), 2),
         _yield
       ]), _yield)))
-]));
+]);
+
+perform(tests);

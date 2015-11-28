@@ -85,7 +85,7 @@ export const async_killable = (f) =>
 
     const on_error = (value) => {
       if (done) {
-        crash(invalid_error(value));
+        crash(new Error("Invalid error"));
 
       } else {
         done = true;
@@ -138,14 +138,19 @@ export const async_unkillable = (f) =>
     };
 
     const on_error = (value) => {
-      if (done || killed) {
-        done = true;
-        crash(invalid_error(value));
+      if (done) {
+        crash(new Error("Invalid error"));
 
       } else {
         done = true;
-        _reset_kill(thread);
-        error(value);
+
+        if (killed) {
+          crash(value);
+
+        } else {
+          _reset_kill(thread);
+          error(value);
+        }
       }
     };
 
