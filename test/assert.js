@@ -1,5 +1,8 @@
 import { crash, pretty, eol, get_message } from "../util/node";
 import { indent } from "../util/string";
+import { map } from "../util/array";
+import { fastest, flatten, transform, wrap, throw_error,
+         delay, concurrent, log, on_error, perform } from "../ffi/task";
 
 
 const isObject = (x) =>
@@ -55,6 +58,7 @@ export const equal = (x, y) => {
   }
 };
 
+
 export const format_error = (message, value, expected) =>
   message + eol +
   "  Expected:" + eol +
@@ -66,6 +70,54 @@ export const format_error = (message, value, expected) =>
 
 export const format_pretty = (message, value, expected) =>
   format_error(message, pretty(value), pretty(expected));
+
+
+const token = {};
+
+export const test_group = (group_name, a) => {
+  const tasks = map(a, (f, index) => {
+    const name = group_name + " (test " + (index + 1) + ")";
+
+    return fastest([
+      flatten(transform(f(name), (x) => {
+        if (x === token) {
+          return wrap(x);
+        } else {
+          return throw_error(new Error(name + " invalid unit test"));
+        }
+      })),
+
+      flatten(transform(delay(10000), (_) =>
+        throw_error(new Error(name + " took too long"))))
+    ]);
+  });
+
+  return flatten(transform(concurrent(tasks), (_) =>
+           log(group_name + ": all tests succeeded\n")));
+};
+
+export const expect = (expected, task) =>
+  (name) =>
+    flatten(transform(task, (value) =>
+      (equal(value, expected)
+        ? wrap(token)
+        : throw_error(new Error(format_pretty(name, value, expected))))));
+
+export const expect_crash = (expected, task) =>
+  (name) =>
+    flatten(transform(on_error(task, (_) => token, (e) => e), (e) =>
+      (e === token
+        ? throw_error(new Error(format_error(name, null, expected)))
+        : (get_message(e) === expected
+            ? wrap(token)
+            : throw_error(new Error(format_error(name, get_message(e), expected)))))));
+
+export const perform_tests = (a) => {
+  perform(flatten(transform(log("---- Starting unit tests\n"), (_) =>
+          flatten(transform(concurrent(a), (_) =>
+                  log("---- All unit tests succeeded"))))));
+};
+
 
 export const assert_equal = (value, expected, message) => {
   if (!equal(value, expected)) {

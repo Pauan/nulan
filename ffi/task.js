@@ -191,7 +191,7 @@ export const ignore_kill = (task) =>
 
     const on_error = (value) => {
       if (killed) {
-        crash(invalid_error(value));
+        crash(value);
 
       } else {
         _reset_kill(thread);

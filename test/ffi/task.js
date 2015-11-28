@@ -1,11 +1,8 @@
-import { assert_crash, format_error, format_pretty, equal } from "../assert";
-import { map } from "../../util/array";
-import { crash, get_message } from "../../util/node";
-import { sync, transform, flatten, perform, wrap, sequential,
-         concurrent, delay, fastest, _yield, throw_error,
-         ignore_kill, on_error, async_killable,
-         async_unkillable, log, never,
-         make_thread, kill_thread } from "../../ffi/task";
+import { expect, expect_crash, assert_crash } from "../assert";
+import { crash } from "../../util/node";
+import { sync, transform, flatten, wrap, sequential, concurrent, delay,
+         fastest, _yield, throw_error, ignore_kill, async_killable,
+         async_unkillable, never, make_thread, kill_thread } from "../../ffi/task";
 
 
 const after = (a, f) =>
@@ -33,7 +30,6 @@ const repeat = (x, i) => {
   }
 };
 
-
 const counter = (f) => {
   let _counter = 0;
 
@@ -44,34 +40,6 @@ const counter = (f) => {
 
   return transform(f(increment), (_) => _counter);
 };
-
-
-const test_group = (group_name, a) =>
-  then(concurrent(map(a, (f, index) => {
-                    const name = group_name + " (test " + (index + 1) + ")";
-                    return fastest([
-                      f(name),
-                      then(delay(10000),
-                           throw_error(new Error(name + " took too long")))
-                    ]);
-                  })),
-       log(group_name + ": all tests succeeded"));
-
-const expect = (expected, task) =>
-  (name) =>
-    after(task, (value) =>
-      (equal(value, expected)
-        ? wrap(null)
-        : throw_error(new Error(format_pretty(name, value, expected)))));
-
-const expect_crash = (expected, fn) =>
-  (name) =>
-    after(on_error(fn(), (_) => null, (e) => e), (e) =>
-      (e === null
-        ? throw_error(new Error(format_error(name, null, expected)))
-        : (get_message(e) === expected
-            ? wrap(null)
-            : throw_error(new Error(format_error(name, get_message(e), expected))))));
 
 
 /*perform(fastest([
@@ -101,7 +69,7 @@ assert_crash(() => {
 }, "Cannot use fastest on an empty list");
 
 
-export const tests = test_group("task.js", [
+export default [
   expect("1",
     async_killable((success, error) => {
       success("1");
@@ -120,7 +88,7 @@ export const tests = test_group("task.js", [
       }, "Invalid error");
     })),
 
-  expect_crash("1", () =>
+  expect_crash("1",
     async_killable((success, error) => {
       error(new Error("1"));
 
@@ -129,7 +97,7 @@ export const tests = test_group("task.js", [
       }, "Invalid error");
     })),
 
-  expect_crash("1", () =>
+  expect_crash("1",
     async_killable((success, error) => {
       error(new Error("1"));
 
@@ -195,7 +163,7 @@ export const tests = test_group("task.js", [
       }, "Invalid error");
     })),
 
-  expect_crash("1", () =>
+  expect_crash("1",
     async_unkillable((success, error) => {
       error(new Error("1"));
 
@@ -204,7 +172,7 @@ export const tests = test_group("task.js", [
       }, "Invalid error");
     })),
 
-  expect_crash("1", () =>
+  expect_crash("1",
     async_unkillable((success, error) => {
       error(new Error("1"));
 
@@ -352,7 +320,7 @@ export const tests = test_group("task.js", [
       wrap("3")
     ])),
 
-  expect_crash("Hi1", () =>
+  expect_crash("Hi1",
     concurrent([
       wrap("3"),
       throw_error(new Error("Hi1")),
@@ -415,7 +383,7 @@ export const tests = test_group("task.js", [
         increment
       ]))),
 
-  expect_crash("Hi", () =>
+  expect_crash("Hi",
     counter((increment) =>
       concurrent([
         throw_error(new Error("Hi")),
@@ -436,6 +404,4 @@ export const tests = test_group("task.js", [
         repeat(after(ignore_yield, (_) => increment), 2),
         _yield
       ]), _yield)))
-]);
-
-perform(tests);
+];
