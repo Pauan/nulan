@@ -14,6 +14,50 @@ const invalid_error = (value) => {
 };
 
 
+const _make_thread = () => {
+  return {
+    a: false, // is_killed
+    b: noop   // kill
+  };
+};
+
+const _set_kill = (thread, f) => {
+  if (thread.a) {
+    crash(new Error("Invalid set_kill: thread is already killed"));
+
+  } else {
+    thread.b = f;
+  }
+};
+
+const _reset_kill = (thread) => {
+  if (thread.a) {
+    crash(new Error("Invalid reset_kill: thread is already killed"));
+
+  } else {
+    thread.b = noop;
+  }
+};
+
+const _kill = (thread) => {
+  if (thread.a) {
+    crash(new Error("Invalid kill: thread is already killed"));
+
+  } else {
+    const kill = thread.b;
+    thread.a = true;
+    thread.b = noop;
+    kill();
+  }
+};
+
+const _kill_all = (a) => {
+  for (let i = 0; i < a["length"]; ++i) {
+    _kill(a[i]);
+  }
+};
+
+
 export const sync = (f) =>
   (thread, success, error) => {
     // TODO maybe use try/catch ?
@@ -58,7 +102,6 @@ export const async_killable = (f) =>
         crash(new Error("Invalid kill"));
 
       } else {
-        // TODO does this need to use _reset_kill ?
         done = true;
         kill();
       }
@@ -185,50 +228,6 @@ export const from_Promise = (f) =>
   async_unkillable((success, error) => {
     f()["then"](success, error);
   });
-
-
-const _make_thread = () => {
-  return {
-    a: false, // is_killed
-    b: noop   // kill
-  };
-};
-
-const _set_kill = (thread, f) => {
-  if (thread.a) {
-    crash(new Error("Invalid set_kill: thread is already killed"));
-
-  } else {
-    thread.b = f;
-  }
-};
-
-const _reset_kill = (thread) => {
-  if (thread.a) {
-    crash(new Error("Invalid reset_kill: thread is already killed"));
-
-  } else {
-    thread.b = noop;
-  }
-};
-
-const _kill = (thread) => {
-  if (thread.a) {
-    crash(new Error("Invalid kill: thread is already killed"));
-
-  } else {
-    const kill = thread.b;
-    thread.a = true;
-    thread.b = noop;
-    kill();
-  }
-};
-
-const _kill_all = (a) => {
-  for (let i = 0; i < a["length"]; ++i) {
-    _kill(a[i]);
-  }
-};
 
 
 export const never = (thread, success, error) => {};
