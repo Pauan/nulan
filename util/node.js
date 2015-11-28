@@ -17,6 +17,6 @@ export const get_message = (err) =>
   err["message"] || "INVALID ERROR: " + err;
 
 process["on"]("uncaughtException", (err) => {
-  console["error"]("Error: " + get_stack(err));
+  console["error"](get_stack(err));
   process["exit"](1);
 });
