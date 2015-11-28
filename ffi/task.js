@@ -6,6 +6,13 @@ const _null = 0;
 
 const noop = () => {};
 
+const invalid_error = (value) => {
+  // TODO this is hacky
+  // TODO is the stack trace correct ?
+  value["message"] = "Invalid error: " + value["message"];
+  return value;
+};
+
 
 export const sync = (f) =>
   (thread, success, error) => {
@@ -34,10 +41,7 @@ export const async_killable = (f) =>
 
     const on_error = (value) => {
       if (done) {
-        // TODO this is hacky
-        // TODO is the stack trace correct ?
-        value["message"] = "Invalid error: " + value["message"];
-        crash(value);
+        crash(invalid_error(value));
 
       } else {
         done = true;
@@ -82,9 +86,9 @@ export const async_unkillable = (f) =>
 
       } else {
         done = true;
-        _reset_kill(thread);
 
         if (!killed) {
+          _reset_kill(thread);
           success(value);
         }
       }
@@ -93,10 +97,7 @@ export const async_unkillable = (f) =>
     const on_error = (value) => {
       if (done || killed) {
         done = true;
-        // TODO this is hacky
-        // TODO is the stack trace correct ?
-        value["message"] = "Invalid error: " + value["message"];
-        crash(value);
+        crash(invalid_error(value));
 
       } else {
         done = true;
@@ -140,9 +141,11 @@ export const ignore_kill = (task) =>
       }
     };
 
-    // TODO handle error after kill ?
     const on_error = (value) => {
-      if (!killed) {
+      if (killed) {
+        crash(invalid_error(value));
+
+      } else {
         _reset_kill(thread);
         error(value);
       }
@@ -151,19 +154,22 @@ export const ignore_kill = (task) =>
     task(x, on_success, on_error);
   };
 
-// This is mostly useful for unit tests
-// TODO is this correct ?
-export const killed = (task, value) =>
-  (thread, success, error) => {
-    const x = _make_thread();
+export const make_thread = (task) =>
+  sync(() => {
+    const thread = _make_thread();
 
-    task(x, noop, error);
+    // TODO use perform ?
+    // TODO use invalid_error ?
+    task(thread, noop, crash);
 
-    _kill(x);
+    return thread;
+  });
 
-    // TODO what if the task errors ?
-    success(value);
-  };
+export const kill_thread = (thread) =>
+  sync(() => {
+    _kill(thread);
+    return _null;
+  });
 
 
 // TODO handle cancellation later ?
@@ -189,16 +195,26 @@ const _make_thread = () => {
 };
 
 const _set_kill = (thread, f) => {
-  thread.b = f;
+  if (thread.a) {
+    crash(new Error("Invalid set_kill: thread is already killed"));
+
+  } else {
+    thread.b = f;
+  }
 };
 
 const _reset_kill = (thread) => {
-  thread.b = noop;
+  if (thread.a) {
+    crash(new Error("Invalid reset_kill: thread is already killed"));
+
+  } else {
+    thread.b = noop;
+  }
 };
 
 const _kill = (thread) => {
   if (thread.a) {
-    crash(new Error("Cannot kill the same thread twice"));
+    crash(new Error("Invalid kill: thread is already killed"));
 
   } else {
     const kill = thread.b;

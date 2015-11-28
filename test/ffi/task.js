@@ -4,7 +4,8 @@ import { crash, get_message } from "../../util/node";
 import { sync, transform, flatten, perform, wrap, sequential,
          concurrent, delay, fastest, _yield, throw_error,
          ignore_kill, on_error, async_killable,
-         async_unkillable, log, killed, never } from "../../ffi/task";
+         async_unkillable, log, never,
+         make_thread, kill_thread } from "../../ffi/task";
 
 
 const after = (a, f) =>
@@ -16,6 +17,10 @@ const then = (a, b) =>
 const forever = (a) =>
   after(a, (_) =>
     forever(a));
+
+const killed = (a, value) =>
+  after(make_thread(a), (thread) =>
+    transform(kill_thread(thread), (_) => value));
 
 const ignore_yield = ignore_kill(_yield);
 
@@ -207,6 +212,9 @@ assert_crash(() => {
 
 
 perform(tests([
+  test("2",
+    killed(ignore_kill(wrap("1")), "2")),
+
   test("1",
     fastest([
       forever(ignore_kill(then(ignore_kill(_yield), ignore_kill(wrap("2"))))),
