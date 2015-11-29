@@ -156,12 +156,15 @@ export const async_unkillable = (f) =>
 
     const on_kill = () => {
       // TODO is this check needed ?
-      if (done || killed) {
-        killed = true;
+      if (killed) {
         crash(new Error("Invalid kill"));
 
       } else {
         killed = true;
+
+        if (done) {
+          crash(new Error("Invalid kill"));
+        }
       }
     };
 
@@ -429,6 +432,19 @@ export const on_error = (task, on_success, on_error) =>
 
 // TODO is this correct ?
 // TODO test this
+/*
+Success create | Success use | Success destroy -> Success use
+Success create | Error use   | Success destroy -> Error use
+Success create | Kill use    | Success destroy -> Nothing
+Success create | Success use | Error destroy   -> Error destroy
+Success create | Error use   | Error destroy   -> Error destroy
+Success create | Kill use    | Error destroy   -> Crash destroy
+Success create | Success use | Kill destroy    -> Nothing
+Success create | Error use   | Kill destroy    -> Crash use
+Error create   |             |                 -> Error create
+Kill create    |             | Success destroy -> Nothing
+Kill create    |             | Error destroy   -> Crash destroy
+*/
 export const with_resource = (create, use, destroy) =>
   (thread, success, error) => {
     let killed = false;
@@ -437,28 +453,29 @@ export const with_resource = (create, use, destroy) =>
       killed = true;
     };
 
-    // TODO what if it was killed ?
-    const on_error = (value) => {
-      _reset_kill(thread);
-      error(value);
-    };
-
-    // TODO is this the right place for this ?
     _set_kill(thread, on_kill);
 
     const x = _make_thread();
 
+    const on_error = (value) => {
+      /*if (killed) {
+        crash(value);
+
+      } else {*/
+        _reset_kill(thread);
+        error(value);
+      //}
+    };
+
     create(x, (resource) => {
       if (killed) {
-        // TODO is this correct ?
-        destroy(resource)(x, noop, error);
+        destroy(resource)(x, noop, crash);
 
       } else {
         // TODO is this correct ?
         _set_kill(thread, () => {
           _kill(x);
-          // TODO is this correct ?
-          destroy(resource)(x, noop, error);
+          destroy(resource)(x, noop, crash);
         });
 
         use(resource)(x, (value) => {
@@ -476,11 +493,7 @@ export const with_resource = (create, use, destroy) =>
           _set_kill(thread, on_kill);
 
           destroy(resource)(x, (_) => {
-            // TODO is this correct ?
-            if (!killed) {
-              _reset_kill(thread);
-              error(value);
-            }
+            on_error(value);
           }, on_error);
         });
       }

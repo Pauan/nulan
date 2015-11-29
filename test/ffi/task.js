@@ -210,12 +210,33 @@ export default [
     }), "2")),
 
 
+  expect("3",
+    killed(ignore_kill(async_killable((success, error) => {
+      success("1");
+      return () => {
+        crash(new Error("2"));
+      };
+    })), "3")),
+
+  expect("2",
+    killed(ignore_kill(async_killable((success, error) => {
+      return () => {
+        crash(new Error("1"));
+      };
+    })), "2")),
+
   expect("2",
     killed(ignore_kill(wrap("1")), "2")),
 
   expect("1",
     fastest([
-      forever(ignore_kill(then(ignore_kill(_yield), ignore_kill(wrap("2"))))),
+      forever(ignore_kill(then(_yield, wrap("2")))),
+      then(delay(100), wrap("1"))
+    ])),
+
+  expect("1",
+    fastest([
+      forever(ignore_kill(then(ignore_kill(_yield), wrap("2")))),
       then(delay(100), wrap("1"))
     ])),
 
