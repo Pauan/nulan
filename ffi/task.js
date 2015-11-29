@@ -65,6 +65,39 @@ export const sync = (f) =>
   };
 
 // Guarantees:
+// * success is ignored after being killed
+// * does nothing when killed
+export const ignore_kill = (task) =>
+  (thread, success, error) => {
+    let killed = false;
+
+    _set_kill(thread, () => {
+      killed = true;
+    });
+
+    const x = _make_thread();
+
+    const on_success = (value) => {
+      if (!killed) {
+        _reset_kill(thread);
+        success(value);
+      }
+    };
+
+    const on_error = (value) => {
+      if (killed) {
+        crash(value);
+
+      } else {
+        _reset_kill(thread);
+        error(value);
+      }
+    };
+
+    task(x, on_success, on_error);
+  };
+
+// Guarantees:
 // * success cannot be called after success, error, or kill
 // * error cannot be called after success, error, or kill
 // * will not be killed after success, error, or kill
@@ -117,93 +150,11 @@ export const async_killable = (f) =>
 // * error cannot be called after success, error, or kill
 // * success is ignored after being killed
 // * does nothing when killed
-// TODO implement this with async_killable + ignore_kill ?
 export const async_unkillable = (f) =>
-  (thread, success, error) => {
-    let done = false;
-    let killed = false;
-
-    const on_success = (value) => {
-      if (done) {
-        crash(new Error("Invalid success"));
-
-      } else {
-        done = true;
-
-        if (!killed) {
-          _reset_kill(thread);
-          success(value);
-        }
-      }
-    };
-
-    const on_error = (value) => {
-      if (done) {
-        crash(new Error("Invalid error"));
-
-      } else {
-        done = true;
-
-        if (killed) {
-          crash(value);
-
-        } else {
-          _reset_kill(thread);
-          error(value);
-        }
-      }
-    };
-
-    const on_kill = () => {
-      // TODO is this check needed ?
-      if (killed) {
-        crash(new Error("Invalid kill"));
-
-      } else {
-        killed = true;
-
-        if (done) {
-          crash(new Error("Invalid kill"));
-        }
-      }
-    };
-
-    _set_kill(thread, on_kill);
-
-    f(on_success, on_error);
-  };
-
-// TODO is this correct ?
-// TODO can this be made more efficient ?
-export const ignore_kill = (task) =>
-  (thread, success, error) => {
-    let killed = false;
-
-    _set_kill(thread, () => {
-      killed = true;
-    });
-
-    const x = _make_thread();
-
-    const on_success = (value) => {
-      if (!killed) {
-        _reset_kill(thread);
-        success(value);
-      }
-    };
-
-    const on_error = (value) => {
-      if (killed) {
-        crash(value);
-
-      } else {
-        _reset_kill(thread);
-        error(value);
-      }
-    };
-
-    task(x, on_success, on_error);
-  };
+  ignore_kill(async_killable((success, error) => {
+    f(success, error);
+    return noop;
+  }));
 
 export const make_thread = (task) =>
   sync(() => {
