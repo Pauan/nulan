@@ -57,19 +57,17 @@ assert_crash(() => {
 }, "Cannot delay for 0 milliseconds (maybe use yield instead?)");
 
 assert_crash(() => {
-  sequential([]);
-}, "Cannot use sequential on an empty list");
-
-assert_crash(() => {
-  concurrent([]);
-}, "Cannot use concurrent on an empty list");
-
-assert_crash(() => {
   fastest([]);
 }, "Cannot use fastest on an empty list");
 
 
 export default [
+  expect([],
+    sequential([])),
+
+  expect([],
+    concurrent([])),
+
   expect("1",
     async_killable((success, error) => {
       success("1");

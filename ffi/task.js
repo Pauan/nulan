@@ -265,12 +265,8 @@ export const flatten = (task) =>
     }, error);
   };
 
-export const sequential = (a) => {
-  if (a["length"] === 0) {
-    crash(new Error("Cannot use sequential on an empty list"));
-  }
-
-  return (thread, success, error) => {
+export const sequential = (a) =>
+  (thread, success, error) => {
     const length = a["length"];
     const values = new Array(length);
 
@@ -288,60 +284,59 @@ export const sequential = (a) => {
 
     loop(0);
   };
-};
 
-export const concurrent = (a) => {
-  if (a["length"] === 0) {
-    crash(new Error("Cannot use concurrent on an empty list"));
-  }
-
-  return (thread, success, error) => {
-    let running = true;
-
+export const concurrent = (a) =>
+  (thread, success, error) => {
     let pending = a["length"];
 
     const values = new Array(pending);
 
-    const threads = [];
+    if (pending === 0) {
+      success(values);
 
-    // TODO is this the correct place for this ?
-    _set_kill(thread, () => {
-      _kill_all(threads);
-    });
+    } else {
+      let running = true;
 
-    const on_success = () => {
-      --pending;
+      const threads = [];
 
-      // TODO what about setting `running` ?
-      if (pending === 0) {
+      // TODO is this the correct place for this ?
+      _set_kill(thread, () => {
+        _kill_all(threads);
+      });
+
+      const on_success = () => {
+        --pending;
+
+        // TODO what about setting `running` ?
+        if (pending === 0) {
+          _reset_kill(thread);
+          success(values);
+        }
+      };
+
+      const on_error = (value) => {
+        running = false;
         _reset_kill(thread);
-        success(values);
-      }
-    };
+        _kill_all(threads);
+        error(value);
+      };
 
-    const on_error = (value) => {
-      running = false;
-      _reset_kill(thread);
-      _kill_all(threads);
-      error(value);
-    };
+      for (let i = 0; i < a["length"]; ++i) {
+        if (running) {
+          threads["push"](_make_thread());
 
-    for (let i = 0; i < a["length"]; ++i) {
-      if (running) {
-        threads["push"](_make_thread());
+          a[i](threads[i], (value) => {
+            values[i] = value;
+            on_success();
+          }, on_error);
 
-        a[i](threads[i], (value) => {
-          values[i] = value;
-          on_success();
-        }, on_error);
-
-      } else {
-        // TODO is this correct ?
-        return;
+        } else {
+          // TODO is this correct ?
+          return;
+        }
       }
     }
   };
-};
 
 export const fastest = (a) => {
   if (a["length"] === 0) {
