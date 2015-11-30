@@ -42,10 +42,10 @@ const counter = (f) => {
 };
 
 
-/*perform(fastest([
+/*perform(fastest(
   ignore_kill(forever(then(_yield, log("Hi")))),
   delay(1000)
-]));*/
+));*/
 
 
 assert_crash(() => {
@@ -55,10 +55,6 @@ assert_crash(() => {
 assert_crash(() => {
   delay(0);
 }, "Cannot delay for 0 milliseconds (maybe use yield instead?)");
-
-assert_crash(() => {
-  fastest([]);
-}, "Cannot use fastest on an empty list");
 
 
 export default [
@@ -224,117 +220,117 @@ export default [
     killed(ignore_kill(wrap("1")), "2")),
 
   expect("1",
-    fastest([
+    fastest(
       forever(ignore_kill(then(_yield, wrap("2")))),
       then(delay(100), wrap("1"))
-    ])),
+    )),
 
   expect("1",
-    fastest([
+    fastest(
       forever(ignore_kill(then(ignore_kill(_yield), wrap("2")))),
       then(delay(100), wrap("1"))
-    ])),
+    )),
 
   expect("1",
-    fastest([
+    fastest(
       then(then(_yield, _yield), wrap("1")),
       then(delay(100), wrap("2"))
-    ])),
+    )),
 
   expect("1",
-    fastest([
+    fastest(
       then(async_unkillable((success, error) => {
         success("2");
       }), never),
       wrap("1")
-    ])),
+    )),
 
   expect("1",
-    fastest([
+    fastest(
       forever(delay(10)),
       then(delay(100), wrap("1"))
-    ])),
+    )),
 
   expect("1",
-    fastest([
+    fastest(
       forever(ignore_kill(delay(10))),
       then(delay(100), wrap("1"))
-    ])),
+    )),
 
   expect("1",
-    fastest([
+    fastest(
       forever(_yield),
       then(delay(100), wrap("1"))
-    ])),
+    )),
 
   expect("1",
-    fastest([
+    fastest(
       forever(ignore_yield),
       then(delay(100), wrap("1"))
-    ])),
+    )),
 
   expect("1",
-    fastest([
-      fastest([
+    fastest(
+      fastest(
         then(ignore_yield, wrap("1")),
         then(ignore_yield, wrap("2"))
-      ]),
+      ),
       then(ignore_yield, wrap("3"))
-    ])),
+    )),
 
   expect("1",
-    fastest([
-      fastest([
+    fastest(
+      fastest(
         then(delay(10), wrap("1")),
         then(delay(10), wrap("2"))
-      ]),
+      ),
       then(delay(100), wrap("3"))
-    ])),
+    )),
 
   expect("3",
-    fastest([
-      fastest([
+    fastest(
+      fastest(
         then(delay(100), wrap("1")),
         then(delay(100), wrap("2"))
-      ]),
+      ),
       then(delay(10), wrap("3"))
-    ])),
+    )),
 
   expect("1",
-    fastest([
+    fastest(
       async_unkillable((success, error) => {
         success("1");
       }),
       wrap("3")
-    ])),
+    )),
 
   expect("3",
-    fastest([
+    fastest(
       wrap("3"),
       async_unkillable((success, error) => {
         success("1");
       })
-    ])),
+    )),
 
   expect("3",
-    fastest([
+    fastest(
       wrap("3"),
       async_unkillable((success, error) => {
         setTimeout(() => {
           success("1");
         }, 0);
       })
-    ])),
+    )),
 
   expect("3",
-    fastest([
+    fastest(
       async_unkillable((success, error) => {
         setTimeout(() => {
           success("1");
         }, 0);
       }),
       wrap("3")
-    ])),
+    )),
 
   expect_crash("Hi1",
     concurrent([
@@ -345,34 +341,34 @@ export default [
     ])),
 
   expect("3",
-    fastest([
+    fastest(
       wrap("3"),
       throw_error(new Error("Hi"))
-    ])),
+    )),
 
   expect("3",
-    fastest([
+    fastest(
       wrap("3"),
       async_killable((success, error) => {
         success("1");
         return () => {};
       })
-    ])),
+    )),
 
   expect("3",
-    fastest([
-      fastest([
+    fastest(
+      fastest(
         wrap("3"),
         async_killable((success, error) => {
           success("1");
           return () => {};
         })
-      ]),
+      ),
       wrap("4")
-    ])),
+    )),
 
   expect("1",
-    fastest([
+    fastest(
       async_killable((success, error) => {
         success("1");
         return () => {
@@ -380,17 +376,17 @@ export default [
         };
       }),
       wrap("3")
-    ])),
+    )),
 
   expect(5,
-    fastest([_yield, wrap(5)])),
+    fastest(_yield, wrap(5))),
 
   expect(5,
-    fastest([wrap(5), _yield])),
+    fastest(wrap(5), _yield)),
 
   expect(1,
     counter((increment) =>
-      fastest([increment, increment]))),
+      fastest(increment, increment))),
 
   expect(2,
     counter((increment) =>
@@ -409,15 +405,33 @@ export default [
 
   expect(1,
     counter((increment) =>
-      fastest([
+      fastest(
         increment,
         increment
-      ]))),
+      ))),
 
   expect(1,
     counter((increment) =>
-      then(fastest([
+      then(fastest(
         repeat(after(ignore_yield, (_) => increment), 2),
         _yield
-      ]), _yield)))
+      ), _yield))),
+
+  /*expect("5",
+    fastest(
+      then(async_killable((success, error) => {
+             setTimeout(() => {
+               success("1");
+             }, 0);
+             return () => {
+               crash(new Error("2"));
+             };
+           }),
+           async_killable((success, error) => {
+             return () => {
+               crash(new Error("3"));
+             };
+           })),
+      then(delay(100), wrap("4"))
+    ))*/
 ];

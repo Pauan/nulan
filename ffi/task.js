@@ -225,6 +225,7 @@ export const concurrent = (a) =>
       const threads = [];
 
       // TODO is this the correct place for this ?
+      // TODO what about running ?
       _set_kill(thread, () => {
         _kill_all(threads);
       });
@@ -263,48 +264,41 @@ export const concurrent = (a) =>
     }
   };
 
-export const fastest = (a) => {
-  if (a["length"] === 0) {
-    crash(new Error("Cannot use fastest on an empty list"));
-  }
-
-  return (thread, success, error) => {
+export const fastest = (task_a, task_b) =>
+  (thread, success, error) => {
     let running = true;
 
-    const threads = [];
+    const thread_a = _make_thread();
+    const thread_b = _make_thread();
 
-    // TODO is this the correct place for this ?
+    // TODO what about running ?
     _set_kill(thread, () => {
-      _kill_all(threads);
+      _kill(thread_a);
+      _kill(thread_b);
     });
 
     const on_success = (value) => {
       running = false;
       _reset_kill(thread);
-      _kill_all(threads);
+      _kill(thread_a);
+      _kill(thread_b);
       success(value);
     };
 
     const on_error = (value) => {
       running = false;
       _reset_kill(thread);
-      _kill_all(threads);
+      _kill(thread_a);
+      _kill(thread_b);
       error(value);
     };
 
-    for (let i = 0; i < a["length"]; ++i) {
-      if (running) {
-        threads["push"](_make_thread());
+    task_a(thread_a, on_success, on_error);
 
-        a[i](threads[i], on_success, on_error);
-
-      } else {
-        // TODO is this correct ?
-        return;
-      }
+    if (running) {
+      task_b(thread_b, on_success, on_error);
     }
   };
-};
 
 
 // TODO is this correct ?
@@ -552,10 +546,10 @@ const with_file = (path, flags, mode, f) =>
 
 
 
-/*const x = fastest([
+/*const x = fastest(
             forever(_yield),
             delay(10000)
-          ]);
+          );
 
 var start = Date.now();
 console.log("STARTING");
