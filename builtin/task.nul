@@ -1,29 +1,40 @@
 (IMPORT (file "protocol.nul")
   | $transform
   | $flatten
+  | $wrap
   | _transform = transform
-  | _flatten = flatten)
+  | _flatten = flatten
+  | _wrap = wrap)
 
-(DEFINE-GROUP (Task a))
+(DEFINE-TYPE (Task a))
 
 (UNSAFE-FFI-IMPORT (file "../ffi/task.js")
+  wrap          :: (-> a (Task a))
   transform     :: (-> (Task a) (-> a b) (Task b))
   flatten       :: (-> (Task (Task a)) (Task a))
-  after         :: (-> (Task a) (-> a (Task b)) (Task b))
-  wrap          :: (-> a (Task a))
-  sequential    :: (-> (List (Task a)) (Task (List a)))
   concurrent    :: (-> (List (Task a)) (Task (List a)))
-  fastest       :: (-> (List (Task a)) (Task a))
-  perform       :: (-> (Task Null) Null)
+  fastest       :: (-> (Task a) (Task a) (Task a))
   delay         :: (-> Integer (Task Null))
-  throw_error   :: (-> Error (Task a))
-  on_error      :: (-> (Task a) (-> Error (Task a)) (Task a))
-  ignore_kill   :: (-> (Task a) (Task a))
-  unkillable    :: (-> (Task a) (Task a))
+  log           :: (-> String (Task Null))
   with_resource :: (-> (Task a)
                        (-> a (Task b))
                        (-> a (Task Null))
                        (Task b)))
+
+(stream -> push!
+  (with-resource (open-file "foo" "r")
+    (-> fd
+      (DO-MATCH (read fd)
+        *none
+          (wrap *null)
+        (*some x)
+          (push! x)))
+    close-file))
+
+
+(IMPLEMENT ($wrap Task)
+  (_wrap a fn)
+    (wrap a fn))
 
 (IMPLEMENT ($transform Task)
   (_transform a fn)
@@ -42,26 +53,8 @@
 (DEFINE timeout :: (-> (Task a) Integer (Task (Maybe a)))
   (timeout task ms)
     (fastest
-      [(transform task *some)
-       (transform (delay ms) -> _ *none)]))
-
-
-# TODO put into other module
-(DEFINE after :: (REQUIRE ($transform a) ($flatten a)
-                   (-> (a b) (-> b (a c)) (a c)))
-  (after a fn)
-    (flatten (transform a fn)))
-
-# TODO this should work for all monads
-(DEFINE-ALIAS
-  (DO a)
-    a
-  (DO &(~pattern = ~value) @a)
-    &(after ~value -> ~pattern
-       (DO ~@a))
-  (DO value @a)
-    &(after ~value -> *null
-       (DO ~@a)))
+      (transform task *some)
+      (transform (delay ms) -> _ *none)))
 
 (DEFINE-GROUP (Result a)
   (*value a)
@@ -74,22 +67,14 @@
 
 (EXPORT
   | Task
-  | Result
-  | *value
-  | *error
   | ($transform Task)
   | ($flatten Task)
   | ($wrap Task)
-  | sequential
   | concurrent
   | fastest
-  | timeout
-  | after
-  | DO
-  | throw-error = throw_error
-  | result
-  | ignore-kill = ignore_kill
-  | unkillable)
+  | delay
+  | log
+  | timeout)
 
 
 

@@ -6,13 +6,6 @@ const _null = 0;
 
 const noop = () => {};
 
-const invalid_error = (value) => {
-  // TODO this is hacky
-  // TODO is the stack trace correct ?
-  value["message"] = "Invalid error: " + value["message"];
-  return value;
-};
-
 
 const _make_thread = () => {
   return {
@@ -151,17 +144,18 @@ export const async_killable = (f) =>
 // * success is ignored after being killed
 // * does nothing when killed
 export const async_unkillable = (f) =>
+  // TODO this can be implemented more efficiently
   ignore_kill(async_killable((success, error) => {
     f(success, error);
     return noop;
   }));
+
 
 export const make_thread = (task) =>
   sync(() => {
     const thread = _make_thread();
 
     // TODO use perform ?
-    // TODO use invalid_error ?
     task(thread, noop, crash);
 
     return thread;
@@ -174,14 +168,14 @@ export const kill_thread = (thread) =>
   });
 
 
-// TODO handle cancellation later ?
-export const to_Promise = (task) =>
+// TODO handle cancellation ?
+export const Promise_from = (task) =>
   new Promise((resolve, reject) => {
     const x = _make_thread();
     task(x, resolve, reject);
   });
 
-// TODO handle cancellation later ?
+// TODO handle cancellation ?
 export const from_Promise = (f) =>
   // TODO should this use a raw Task or async_unkillable ?
   async_unkillable((success, error) => {
