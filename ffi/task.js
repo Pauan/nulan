@@ -210,26 +210,6 @@ export const flatten = (task) =>
     }, error);
   };
 
-export const sequential = (a) =>
-  (thread, success, error) => {
-    const length = a["length"];
-    const values = new Array(length);
-
-    const loop = (i) => {
-      if (i < length) {
-        a[i](thread, (value) => {
-          values[i] = value;
-          loop(i + 1);
-        }, error);
-
-      } else {
-        success(values);
-      }
-    };
-
-    loop(0);
-  };
-
 export const concurrent = (a) =>
   (thread, success, error) => {
     let pending = a["length"];

@@ -1,6 +1,6 @@
 import { expect, expect_crash, assert_crash } from "../assert";
 import { crash } from "../../util/node";
-import { sync, transform, flatten, wrap, sequential, concurrent, delay,
+import { sync, transform, flatten, wrap, concurrent, delay,
          fastest, _yield, throw_error, ignore_kill, async_killable,
          async_unkillable, never, make_thread, kill_thread } from "../../ffi/task";
 
@@ -62,9 +62,6 @@ assert_crash(() => {
 
 
 export default [
-  expect([],
-    sequential([])),
-
   expect([],
     concurrent([])),
 
