@@ -78,7 +78,7 @@ export const test_group = (group_name, a) => {
   const tasks = map(a, (f, index) => {
     const name = group_name + " (test " + (index + 1) + ")";
 
-    return fastest([
+    return fastest(
       flatten(transform(f(name), (x) => {
         if (x === token) {
           return wrap(x);
@@ -89,7 +89,7 @@ export const test_group = (group_name, a) => {
 
       flatten(transform(delay(10000), (_) =>
         throw_error(new Error(name + " took too long"))))
-    ]);
+    );
   });
 
   return flatten(transform(concurrent(tasks), (_) =>

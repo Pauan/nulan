@@ -417,21 +417,16 @@ export default [
         _yield
       ), _yield))),
 
-  /*expect("5",
+  expect("4",
     fastest(
       then(async_killable((success, error) => {
-             setTimeout(() => {
-               success("1");
-             }, 0);
-             return () => {
-               crash(new Error("2"));
-             };
-           }),
-           async_killable((success, error) => {
-             return () => {
-               crash(new Error("3"));
-             };
-           })),
+        setTimeout(() => {
+          success("1");
+        }, 0);
+        return () => {
+          crash(new Error("2"));
+        };
+      }), never),
       then(delay(100), wrap("4"))
-    ))*/
+    ))
 ];
