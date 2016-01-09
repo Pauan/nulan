@@ -1,5 +1,5 @@
 import { expect, expect_crash, assert_crash } from "../assert";
-import { crash } from "../../util/node";
+import { crash } from "../../util/error";
 import { sync, transform, flatten, wrap, concurrent, delay,
          fastest, _yield, throw_error, ignore_kill, async_killable,
          async_unkillable, never, make_thread, kill_thread } from "../../ffi/task";

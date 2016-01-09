@@ -1,4 +1,5 @@
-import { crash, pretty, eol, get_message } from "../util/node";
+import { crash } from "../util/error";
+import { pretty, eol, get_message } from "../util/node";
 import { indent } from "../util/string";
 import { map } from "../util/array";
 import { fastest, flatten, transform, wrap, throw_error,

@@ -6,6 +6,7 @@ export const CALL    = 4;
 export const LIST    = 5;
 export const RECORD  = 6;
 export const ASSIGN  = 7;
+export const LAMBDA  = 8;
 
 export const symbol = (value, filename, lines, start, end) => {
   return {
@@ -89,6 +90,18 @@ export const assign = (left, right, filename, lines, start, end) => {
     type: ASSIGN,
     left: left,
     right: right,
+    filename: filename,
+    lines: lines,
+    start: start,
+    end: end
+  };
+};
+
+export const lambda = (parameters, body, filename, lines, start, end) => {
+  return {
+    type: LAMBDA,
+    parameters: parameters,
+    body: body,
     filename: filename,
     lines: lines,
     start: start,

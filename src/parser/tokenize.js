@@ -1,4 +1,4 @@
-import { crash } from "../util/error";
+import { error } from "../util/error";
 import { repeat } from "../util/string";
 import { peek } from "../util/array";
 import { symbol, integer, string } from "./ast";
@@ -70,7 +70,7 @@ const consume_spaces = (file, lines, line, column) => {
     } else if (char === null) {
       const end = { line, column };
 
-      crash(symbol(" ", file, lines, start, end),
+      error(symbol(" ", file, lines, start, end),
             "spaces (U+0020) are not allowed at the end of the line");
 
     } else {
@@ -105,7 +105,7 @@ const consume_hex = (output, file, lines, line, column) => {
                       ? "#<EOL>"
                       : char);
 
-      crash(symbol(char2, file, lines, start, end),
+      error(symbol(char2, file, lines, start, end),
             "expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got " + char2);
 
     } else {
@@ -169,7 +169,7 @@ const tokenize_escape = (value, file, lines, line, column) => {
     } else if (char === null) {
       const end = { line, column };
 
-      crash(symbol("\\u", file, lines, start, end),
+      error(symbol("\\u", file, lines, start, end),
             "expected \\u[ but got \\u");
 
     } else {
@@ -177,14 +177,14 @@ const tokenize_escape = (value, file, lines, line, column) => {
 
       const end = { line, column };
 
-      crash(symbol("\\u" + char, file, lines, start, end),
+      error(symbol("\\u" + char, file, lines, start, end),
             "expected \\u[ but got \\u" + char);
     }
 
   } else if (char === null) {
     const end = { line, column };
 
-    crash(symbol("\\", file, lines, start, end),
+    error(symbol("\\", file, lines, start, end),
           "expected one of [\\\\ \\\" \\s \\n \\u] but got \\");
 
   } else {
@@ -192,7 +192,7 @@ const tokenize_escape = (value, file, lines, line, column) => {
 
     const end = { line, column };
 
-    crash(symbol("\\" + char, file, lines, start, end),
+    error(symbol("\\" + char, file, lines, start, end),
           "expected one of [\\\\ \\\" \\s \\n \\u] but got \\" + char);
   }
 
@@ -203,7 +203,7 @@ const indent_error = (indent, file, lines, line, column1, column2) => {
   const start = { line, column: column1 };
   const end   = { line, column: column2 };
 
-  crash(symbol(" ", file, lines, start, end),
+  error(symbol(" ", file, lines, start, end),
         "there must be " + indent + " or more spaces (U+0020)");
 };
 
@@ -276,7 +276,7 @@ const tokenize_string = (output, file, lines, line, column) => {
       }
 
     } else {
-      crash(symbol("\"", file, lines, start, end),
+      error(symbol("\"", file, lines, start, end),
             "missing ending \"");
     }
   }
@@ -335,7 +335,7 @@ const tokenize_block_comment = (output, file, lines, line, column) => {
       }
 
     } else {
-      crash(pending[pending["length"] - 1],
+      error(pending[pending["length"] - 1],
             "missing ending /#");
     }
   }
@@ -391,7 +391,7 @@ const tokenize_tab = (output, file, lines, line, column) => {
     } else {
       const end = { line, column };
 
-      crash(symbol("\t", file, lines, start, end),
+      error(symbol("\t", file, lines, start, end),
             "tabs (U+0009) are not allowed");
     }
   }

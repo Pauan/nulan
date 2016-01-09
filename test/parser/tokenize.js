@@ -1,7 +1,7 @@
 import { assert_equal, assert_crash } from "../assert";
-import { string, symbol, integer } from "../../src/parser/ast.js";
-import { tokenize } from "../../src/parser/tokenize.js";
-import { lines } from "../../src/util/string.js";
+import { string, symbol, integer } from "../../src/parser/ast";
+import { tokenize } from "../../src/parser/tokenize";
+import { lines } from "../../src/util/string";
 
 
 const file = "tokenize.test";
@@ -436,58 +436,58 @@ test(".....", (file, lines) =>
 
 
 test_crash("    ",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:1)\n" +
+  "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:1)\n" +
   "      \n" +
   "  ^---");
 
 test_crash("\n    ",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 2:1)\n" +
+  "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 2:1)\n" +
   "      \n" +
   "  ^---");
 
 test_crash("\n    \n",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 2:1)\n" +
+  "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 2:1)\n" +
   "      \n" +
   "  ^---");
 
 test_crash("  foo   ",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:6)\n" +
+  "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:6)\n" +
   "    foo   \n" +
   "       ^--");
 
 test_crash("\"  ",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:2)\n" +
+  "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:2)\n" +
   "  \"  \n" +
   "   ^-");
 
 test_crash("\"\n\n\n  ",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 4:1)\n" +
+  "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 4:1)\n" +
   "    \n" +
   "  ^-");
 
 test_crash("#  ",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:2)\n" +
+  "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:2)\n" +
   "  #  \n" +
   "   ^-");
 
 test_crash("#/  ",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:3)\n" +
+  "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:3)\n" +
   "  #/  \n" +
   "    ^-");
 
 test_crash("#/\n\n\n  ",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 4:1)\n" +
+  "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 4:1)\n" +
   "    \n" +
   "  ^-");
 
 
 test_crash("\n   \t   \n",
-  "Error: tabs (U+0009) are not allowed  (tokenize.test 2:4)\n" +
+  "tabs (U+0009) are not allowed  (tokenize.test 2:4)\n" +
   "     \t   \n" +
   "     ^");
 
 test_crash("\n   \t\t\t\t\t   \n",
-  "Error: tabs (U+0009) are not allowed  (tokenize.test 2:4)\n" +
+  "tabs (U+0009) are not allowed  (tokenize.test 2:4)\n" +
   "     \t\t\t\t\t   \n" +
   "     ^----");
 
@@ -517,73 +517,73 @@ test("a#/a\na a\na a\na/#a", (file, lines) =>
           { line: 3, column: 4 })]);
 
 test_crash("a# \na",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:3)\n" +
+  "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:3)\n" +
   "  a# \n" +
   "    ^");
 
 test_crash("a#/a\n",
-  "Error: missing ending /#  (tokenize.test 1:2)\n" +
+  "missing ending /#  (tokenize.test 1:2)\n" +
   "  a#/a\n" +
   "   ^-");
 
 test_crash("a#/a#/a\n",
-  "Error: missing ending /#  (tokenize.test 1:5)\n" +
+  "missing ending /#  (tokenize.test 1:5)\n" +
   "  a#/a#/a\n" +
   "      ^-");
 
 test_crash("a#/a#/a/#\n",
-  "Error: missing ending /#  (tokenize.test 1:2)\n" +
+  "missing ending /#  (tokenize.test 1:2)\n" +
   "  a#/a#/a/#\n" +
   "   ^-");
 
 
 test_crash("\"",
-  "Error: missing ending \"  (tokenize.test 1:1)\n" +
+  "missing ending \"  (tokenize.test 1:1)\n" +
   "  \"\n" +
   "  ^");
 
 test_crash("\"  ",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:2)\n" +
+  "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 1:2)\n" +
   "  \"  \n" +
   "   ^-");
 
 test_crash("\"foo\nbar",
-  "Error: there must be 1 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
+  "there must be 1 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
   "  bar\n" +
   "  ^");
 
 test_crash("\"\n\"",
-  "Error: there must be 1 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
+  "there must be 1 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
   "  \"\n" +
   "  ^");
 
 test_crash("\"\nfoo\"",
-  "Error: there must be 1 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
+  "there must be 1 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
   "  foo\"\n" +
   "  ^");
 
 test_crash("    \"\nfoo\"",
-  "Error: there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
+  "there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
   "  foo\"\n" +
   "  ^");
 
 test_crash("    \"\n foo\"",
-  "Error: there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
+  "there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
   "   foo\"\n" +
   "  ^");
 
 test_crash("    \"\n  foo\"",
-  "Error: there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
+  "there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
   "    foo\"\n" +
   "  ^-");
 
 test_crash("    \"\n   foo\"",
-  "Error: there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
+  "there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
   "     foo\"\n" +
   "  ^--");
 
 test_crash("    \"\n    foo\"",
-  "Error: there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
+  "there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
   "      foo\"\n" +
   "  ^---");
 
@@ -593,7 +593,7 @@ test("    \"\n     foo\"", (file, lines) =>
           { line: 1, column: 9 })]);
 
 test_crash("    \"\n\n\n     foo\n    bar\"",
-  "Error: there must be 5 or more spaces (U+0020)  (tokenize.test 5:1)\n" +
+  "there must be 5 or more spaces (U+0020)  (tokenize.test 5:1)\n" +
   "      bar\"\n" +
   "  ^---");
 
@@ -603,7 +603,7 @@ test("    \"\n\n\n     foo\n     bar\"", (file, lines) =>
           { line: 4, column: 9 })]);
 
 test_crash("    \" foo\n       bar\n \n\n     qux\"",
-  "Error: spaces (U+0020) are not allowed at the end of the line  (tokenize.test 3:1)\n" +
+  "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 3:1)\n" +
   "   \n" +
   "  ^");
 
@@ -679,33 +679,33 @@ test("\"\\n\"", (file, lines) =>
           { line: 0, column: 4 })]);
 
 test_crash("\"\\a\"",
-  "Error: expected one of [\\\\ \\\" \\s \\n \\u] but got \\a  (tokenize.test 1:2)\n" +
+  "expected one of [\\\\ \\\" \\s \\n \\u] but got \\a  (tokenize.test 1:2)\n" +
   "  \"\\a\"\n" +
   "   ^-");
 
 test_crash("\"\\t\"",
-  "Error: expected one of [\\\\ \\\" \\s \\n \\u] but got \\t  (tokenize.test 1:2)\n" +
+  "expected one of [\\\\ \\\" \\s \\n \\u] but got \\t  (tokenize.test 1:2)\n" +
   "  \"\\t\"\n" +
   "   ^-");
 
 test_crash("\"\\\n",
-  "Error: expected one of [\\\\ \\\" \\s \\n \\u] but got \\  (tokenize.test 1:2)\n" +
+  "expected one of [\\\\ \\\" \\s \\n \\u] but got \\  (tokenize.test 1:2)\n" +
   "  \"\\\n" +
   "   ^");
 
 
 test_crash("\"\\u\"",
-  "Error: expected \\u[ but got \\u\"  (tokenize.test 1:2)\n" +
+  "expected \\u[ but got \\u\"  (tokenize.test 1:2)\n" +
   "  \"\\u\"\n" +
   "   ^--");
 
 test_crash("\"\\u\n\"",
-  "Error: expected \\u[ but got \\u  (tokenize.test 1:2)\n" +
+  "expected \\u[ but got \\u  (tokenize.test 1:2)\n" +
   "  \"\\u\n" +
   "   ^-");
 
 test_crash("\"\\ua\"",
-  "Error: expected \\u[ but got \\ua  (tokenize.test 1:2)\n" +
+  "expected \\u[ but got \\ua  (tokenize.test 1:2)\n" +
   "  \"\\ua\"\n" +
   "   ^--");
 
@@ -725,37 +725,37 @@ test("\"\\u[21]\\u[1D306]\"", (file, lines) =>
           { line: 0, column: 17 })]);
 
 test_crash("\"\\u[]",
-  "Error: expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got ]  (tokenize.test 1:5)\n" +
+  "expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got ]  (tokenize.test 1:5)\n" +
   "  \"\\u[]\n" +
   "      ^");
 
 test_crash("\"\\u[",
-  "Error: expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got #<EOL>  (tokenize.test 1:5)\n" +
+  "expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got #<EOL>  (tokenize.test 1:5)\n" +
   "  \"\\u[\n" +
   "      ^");
 
 test_crash("\"\\u[\n",
-  "Error: expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got #<EOL>  (tokenize.test 1:5)\n" +
+  "expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got #<EOL>  (tokenize.test 1:5)\n" +
   "  \"\\u[\n" +
   "      ^");
 
 test_crash("\"\\u[a",
-  "Error: expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got a  (tokenize.test 1:5)\n" +
+  "expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got a  (tokenize.test 1:5)\n" +
   "  \"\\u[a\n" +
   "      ^");
 
 test_crash("\"\\u[A",
-  "Error: expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got #<EOL>  (tokenize.test 1:6)\n" +
+  "expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got #<EOL>  (tokenize.test 1:6)\n" +
   "  \"\\u[A\n" +
   "       ^");
 
 test_crash("\"\\u[A\n",
-  "Error: expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got #<EOL>  (tokenize.test 1:6)\n" +
+  "expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got #<EOL>  (tokenize.test 1:6)\n" +
   "  \"\\u[A\n" +
   "       ^");
 
 test_crash("\"\\u[A  A",
-  "Error: expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got    (tokenize.test 1:7)\n" +
+  "expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got    (tokenize.test 1:7)\n" +
   "  \"\\u[A  A\n" +
   "        ^");
 
