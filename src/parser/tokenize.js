@@ -1,6 +1,6 @@
-import { error } from "../util/error";
-import { repeat } from "../util/string";
-import { peek } from "../util/array";
+import { error } from "../../util/error";
+import { repeat } from "../../util/string";
+import { peek } from "../../util/array";
 import { symbol, integer, string } from "./ast";
 
 

@@ -120,12 +120,6 @@ export const perform_tests = (a) => {
 };
 
 
-export const assert_equal = (value, expected, message) => {
-  if (!equal(value, expected)) {
-    crash(new Error(format_pretty(message, value, expected)));
-  }
-};
-
 export const assert_crash = (f, expected, message) => {
   try {
     f();

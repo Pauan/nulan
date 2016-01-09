@@ -1,12 +1,15 @@
 import { test_group, perform_tests } from "./assert";
 
-import test1 from "./ffi/task";
-//import test2 from "./ffi/node";
-//import test2 from "./parser/tokenize";
-//import test3 from "./parser/parse";
-//import test4 from "./parser/pretty";
+import $task from "./ffi/task";
+//import $node from "./ffi/node";
+import $tokenize from "./parser/tokenize";
+//import $parse from "./parser/parse";
+//import $pretty from "./parser/pretty";
 
 perform_tests([
-  test_group("task.js", test1),
-  //test_group("node.js", test2)
+  test_group("ffi/task.js", $task),
+  //test_group("ffi/node.js", test2),
+
+  test_group("src/tokenize.js", $tokenize),
+  //test_group("src/parse.js", $parse)
 ]);

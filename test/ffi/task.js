@@ -2,7 +2,8 @@ import { expect, expect_crash, assert_crash } from "../assert";
 import { crash } from "../../util/error";
 import { sync, transform, flatten, wrap, concurrent, delay,
          fastest, _yield, throw_error, ignore_kill, async_killable,
-         async_unkillable, never, make_thread, kill_thread } from "../../ffi/task";
+         async_unkillable, never, make_thread, kill_thread,
+         catch_error } from "../../ffi/task";
 
 
 const after = (a, f) =>
@@ -48,16 +49,14 @@ const counter = (f) => {
 ));*/
 
 
-assert_crash(() => {
-  delay(-5);
-}, "Expected positive number but got -5");
-
-assert_crash(() => {
-  delay(0);
-}, "Cannot delay for 0 milliseconds (maybe use yield instead?)");
-
-
 export default [
+  expect_crash("Expected positive number but got -5",
+    catch_error(() => delay(-5))),
+
+  expect_crash("Cannot delay for 0 milliseconds (maybe use yield instead?)",
+    catch_error(() => delay(0))),
+
+
   expect([],
     concurrent([])),
 
@@ -368,7 +367,7 @@ export default [
     )),
 
   expect("1",
-    fastest(
+    ignore_kill(fastest(
       async_killable((success, error) => {
         success("1");
         return () => {
@@ -376,7 +375,7 @@ export default [
         };
       }),
       wrap("3")
-    )),
+    ))),
 
   expect(5,
     fastest(_yield, wrap(5))),
@@ -418,7 +417,7 @@ export default [
       ), _yield))),
 
   expect("4",
-    fastest(
+    ignore_kill(fastest(
       then(async_killable((success, error) => {
         setTimeout(() => {
           success("1");
@@ -428,5 +427,5 @@ export default [
         };
       }), never),
       then(delay(100), wrap("4"))
-    ))
+    )))
 ];

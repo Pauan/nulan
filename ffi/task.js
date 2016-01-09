@@ -58,6 +58,16 @@ export const sync = (f) =>
     success(f());
   };
 
+// TODO merge this into sync ?
+export const catch_error = (f) =>
+  (thread, success, error) => {
+    try {
+      success(f());
+    } catch (e) {
+      error(e);
+    }
+  };
+
 // Guarantees:
 // * success is ignored after being killed
 // * does nothing when killed
