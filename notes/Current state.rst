@@ -1,23 +1,29 @@
 (TYPE (Foo a))
 
 (TYPE Color
-  *red
-  *orange
-  *yellow
-  *green
-  *blue
-  *indigo
-  *violet)
+  | *red
+  | *orange
+  | *yellow
+  | *green
+  | *blue
+  | *indigo
+  | *violet)
 
 (TYPE RGB
   (*rgba Integer Integer Integer))
 
 (TYPE (List a)
-  *empty
-  (*value a (List a)))
+  | *empty
+  | (*value a (List a)))
 
 (PROTOCOL ($transform a)
-  transform :: (-> (a b) (-> b c) (a c)))
+  | transform :: (-> (a b) (-> b c) (a c)))
+
+(CONSTANT
+  | after :: (REQUIRE ($transform a) ($flatten a)
+               (-> (a b) (-> b (a c)) (a c)))
+  | after <= (-> a fn
+               (flatten (transform a fn))))
 
 (FUNCTION after :: (REQUIRE ($transform a) ($flatten a)
                      (-> (a b) (-> b (a c)) (a c)))
@@ -37,9 +43,18 @@
   | Maybe
   | *some
   | *none
-  | (IMPLEMENT ($flatten Maybe) flatten)
-  | (IMPLEMENT ($transform Maybe) transform)
-  | (IMPLEMENT ($wrap Maybe) wrap))
+  (PROVIDE ($flatten Maybe)
+    | flatten)
+  (PROVIDE ($transform Maybe)
+    | transform <= map)
+  (PROVIDE ($wrap Maybe)
+    | wrap))
+
+(PROVIDE ($transform Maybe)
+  | transform <= map)
+
+(PROVIDE ($transform Maybe)
+  | transform <= (-> ...))
 
 (EXPORT
   | d <= a
@@ -47,37 +62,58 @@
   | c
   | Maybe
   | *some
-  | *none
-  | ($flatten Maybe)
-  | ($transform Maybe)
-  | ($wrap Maybe))
+  | *none)
 
-(IMPORT (nulan "ffi")
-  | UNSAFE-FFI-IMPORT
+(EXPORT-CONSTANT
+  | foo <= *foo)
+
+(IMPORT (nulan "unsafe/ffi")
+  | UNSAFE-FFI-LOAD
   | javascript)
 
-(WITH-TARGET javascript
-  (UNSAFE-FFI-LOAD "foo/bar"
-    a :: (-> Integer Integer Integer)
-    b :: Integer
-    c :: Integer
-    d :: (Foo Integer)))
+(UNSAFE-FFI-LOAD { target <= javascript
+                 | file <= "foo/bar" }
+  | a :: (-> Integer Integer Integer)
+  | b :: Integer
+  | c :: Integer
+  | d :: (Foo Integer))
 
-(DEFINE foo :: (-> (-> Integer Integer Integer) Integer)
+(CONSTANT
+  | foo :: (-> (-> Integer Integer Integer) Integer)
+  | foo <= (-> a (a 1 2)))
+
+(MUTUAL-RECURSION
+  (FUNCTION even? :: (-> Integer Boolean)
+    (even? 0)
+      *true
+    (even? a)
+      (odd? (- a 1)))
+
+  (FUNCTION odd :: (-> Integer Boolean)
+    (odd? 0)
+      *false
+    (odd? a)
+      (even? (- a 1))))
+
+(LET a <= 1
+     b <= 2
+  (+ a b))
+
+(FUNCTION foo :: (-> (-> Integer Integer Integer) Integer)
   (foo a)
     (a 1 2))
 
-(DEFINE bar :: (-> Integer Integer)
+(FUNCTION bar :: (-> Integer Integer)
   (bar 1)
     2
   (bar a)
     (+ (bar 1) a))
 
-(DEFINE-ALIAS
+(REWRITE-RULE
   (QUX @a)
     &(+ ~@a))
 
-(DEFINE-ALIAS
+(REWRITE-RULE
   FOO
     &(BAR 1 2 3 4 5)
 
@@ -90,11 +126,22 @@
 
 (foo -> a b (+ a b))
 (foo (-> a b (+ a b)))
-FOO
 
-(UNSAFE-DEFINE-RULE add :: (-> Integer Integer Integer)
-  (add a b)
-    (ADD a b))
+FOO
+(FOO)
+((FOO))
+(((FOO)))
+
+(REWRITE-RULE
+  (UNSTREAM &(STREAM ~a))
+    a
+  (UNSTREAM a)
+    &(unstream ~a)
+
+  (STREAM &(UNSTREAM ~a))
+    a
+  (STREAM a)
+    &(stream ~a))
 
 (DO a <= a
     b <= b
@@ -102,25 +149,36 @@ FOO
 
 (DO x <= (read-file "foo")
     (log x)
-    (write-file "bar" x))
+    (write-file "bar" x)
+    (wrap *null))
 
-(DEFINE
-  a = 1
-  b = 2)
+(TRANSFORM a <= 1
+           b <= 2
+           c <= 3
+  (+ a b c))
 
-(LET a = 1
-     b = 2
-  c)
-
-(MATCHES [a b c]
-  [1 2 3]
+(MATCHES [ a b c ]
+  [ 1 2 3 ]
     1
-  [1 2 a]
+  [ 1 2 a ]
     2
-  [1 a b]
+  [ 1 a b ]
     3
-  [a b c]
+  [ a b c ]
     4)
+
+[ 1 2 3 ]
+
+[ 1
+| 2
+| 3 ]
+
+{ a b }
+
+{ a <= 1 | b <= 2 }
+
+{ a <= 1
+| b <= 2 }
 
 (MATCH a
   _
@@ -131,17 +189,48 @@ FOO
     3
   "foo"
     4
-  [a b c]
-    5
   { a b c }
-    6
+    5
   { a <= b | c <= d }
     { b <= a | d <= c }
   (*foo 1)
-    8
+    6)
+
+
+# Unsure
+(PRAGMA { phase <= run-time
+        | target <= javascript }
+  ...)
+
+(METADATA impure inline-function synchronous
+  ...)
+
+(INLINE
+  (-> ...))
+
+(MATCH a
   (-> view a)
     9)
 
-# Unsure
-(METADATA impure run-time-only compile-time-only inline-function synchronous
-  ...)
+(IMPORT (nulan "unsafe")
+  | UNSAFE-OPTIMIZATION-RULE)
+
+(UNSAFE-OPTIMIZATION-RULE
+  (after a b)
+  (flatten (transform a b)))
+
+(UNSAFE-OPTIMIZATION-RULE
+  (reduce-left [] a -> b c (push b d))
+  (reduce-left [] a -> b c (unsafe-push! b d)))
+
+(UNSAFE-OPTIMIZATION-RULE
+  (unstream (stream a))
+  a)
+
+(UNSAFE-OPTIMIZATION-RULE
+  (stream (unstream a))
+  a)
+
+(UNSAFE-OPTIMIZATION-RULE
+  (add a b)
+  (ADD a b))
