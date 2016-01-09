@@ -1,0 +1,14 @@
+(TYPE (Result a b)
+  (*success a)
+  (*failure b))
+
+(TYPE Failure
+  *does-not-exist)
+
+(UNSAFE-FFI-LOAD { target <= javascript-node
+                 | file <= "../ffi/node.js" }
+  )
+
+(UNSAFE-FFI-LOAD { target <= javascript-node
+                 | file <= "../ffi/node/random.js" }
+  | random-string :: (-> Integer (Task String)))

@@ -1,0 +1,22 @@
+(TYPE (Pair a b)
+  | (*pair a b))
+
+(DEFINE-ALIAS
+  (TRANSFORM &(~name <= ~value) body)
+    ~(transform ~value -> ~name ~body)
+
+  (TRANSFORM &(~name1 <= ~value1) &(~name2 <= ~value2) body)
+    ~(transform2 ~value1 ~value2 -> ~name1 ~name2 ~body)
+
+  (TRANSFORM &(~name1 <= ~value1) @args &(~name2 <= ~value2) body)
+    (LET value3 = (reduce-left value1 args -> value1 &(~_ <= ~value2)
+                    &(transform2 ~value1 ~value2 *pair))
+
+         name3  = (reduce-left name1 args -> name1 &(~name2 <= ~_)
+                    &(*pair ~name1 ~name2))
+
+      &(transform2 ~value3 ~value2 -> ~name3 ~name2 ~body)))
+
+(EXPORT
+  | Pair
+  | TRANSFORM)

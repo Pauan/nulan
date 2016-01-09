@@ -1,0 +1,256 @@
+(IMPORT (file "maybe")
+  | Maybe
+  | *some
+  | *none)
+
+(IMPORT (file "null")
+  | Null
+  | *null)
+
+(IMPORT (file "task")
+  | Task)
+
+(IMPORT (file "monad")
+  | DO)
+
+
+(TYPE (Step value state)
+  | *done
+  | (*skip state)
+  | (*value value state))
+
+(TYPE (Stream a)
+  (*stream b (-> b (Task (Step a b)))))
+
+(TYPE (Stream a)
+  (*stream (-> b (-> b a (Task b)) (Task b))))
+
+(TYPE (Stream a)
+  (*stream (-> (Output a) (Task Null))))
+
+
+(FUNCTION make-stream :: (-> (-> (Output a) (Task Null)) (Stream a)))
+
+(FUNCTION with-stream :: (-> (Stream a) (-> (Input a) (Task Null)) (Task Null)))
+
+(FUNCTION pull :: (-> (Input a) (Task a)))
+
+(FUNCTION push :: (-> (Output a) a (Task Null)))
+
+
+(FUNCTION make-stream :: (-> (-> (-> a (Task Null)) (Task Null)) (Stream a)))
+
+(FUNCTION with-stream :: (-> (Stream a) (-> (Task a) (Task Null)) (Task Null)))
+
+(FUNCTION with-stream :: (-> (Stream a) (Task (Task a))))
+
+
+(TYPE (Stream a)
+  (*stream (Task (Task a))))
+
+(FUNCTION make-stream :: (-> (Task (Task a)) (Stream a))
+  (make-stream a)
+    (*stream a))
+
+(FUNCTION with-stream :: (-> (Stream a) (Task (Task a)))
+  (with-stream (*stream a))
+    a)
+
+
+(make-stream
+  (DO pull <= (with-stream a)
+      (wrap (transform pull -> value
+              (MATCH value
+                *done
+                  *done
+
+                *skip
+                  *skip
+
+                (*value value)
+                  (*value (f value)))))))
+
+
+(TYPE (Stream a)
+  (*stream (-> (-> a (Task Null)) (Task Null))))
+
+(FUNCTION with-stream :: (-> (Stream a) (-> (Task a) (Task Null)) (Task Null))
+  (with-stream (*stream each) f)
+    (each -> value
+      (f (wrap value))))
+
+
+# TODO test this
+# TODO can this be implemented more efficiently ?
+(FUNCTION queue :: (-> Integer (Stream a) (Stream a))
+  (queue max stream)
+    (make-stream -> push
+      (DO pull <= (with-stream stream)
+          (LOOP queue <= empty :: (Queue a)
+            (LET l <= (length queue)
+              (IF (equal? l 0)
+                (DO value <= pull
+                    (loop (push queue value)))
+
+                (IF (equal? l max)
+                  (DO (push (peek queue))
+                      (loop (pop queue)))
+
+                  (flatten
+                    (fastest
+                      (transform pull -> value
+                        (loop (push queue value)))
+                      (transform (push (peek queue)) -> _
+                        (loop (pop queue))))))))))))
+
+
+(make-stream -> push
+  (with-stream a -> pull
+    (forever
+      (DO value <= pull
+          (push (f value))))))
+
+(make-stream -> push
+  (DO pull <= (with-stream a)
+      (forever
+        (DO value <= pull
+            (push (f value))))))
+
+(REWRITE-RULE
+  (TRANSFORM-STREAM a @body)
+    (WITH-UNIQUE initial next state step
+      &(MATCH (STREAM-FROM ~a)
+         (*stream ~initial ~next)
+           (FROM-STREAM
+             (*stream ~initial -> ~state
+               (transform (~next ~state) -> ~step
+                 (MATCH ~step
+                   ~@body)))))))
+
+(FUNCTION reduce-left :: (INLINE
+                           (REQUIRE ($stream-from a)
+                             (-> b (a c) (-> b c (Task b)) (Task b))))
+  (reduce-left initial a f)
+    (MATCH (STREAM-FROM a)
+      (*stream state next)
+        (LOOP initial <= initial
+              state <= state
+          (DO step <= (next state)
+              (MATCH step
+                *done
+                  (wrap initial)
+
+                (*skip state)
+                  (loop initial state)
+
+                (*value value state)
+                  (DO initial <= (f initial value)
+                      (loop initial state)))))))
+
+(FUNCTION each :: (INLINE
+                    (REQUIRE ($stream-from a)
+                      (-> (a b) (-> b (Task Null)) (Task Null))))
+  (each a f)
+    (reduce-left *null a -> _ value
+      (f value))
+
+    (MATCH (STREAM-FROM a)
+      (*stream state next)
+        (LOOP state <= state
+          (DO step <= (next state)
+              (MATCH step
+                *done
+                  (wrap *null)
+
+                (*skip state)
+                  (loop state)
+
+                (*value value state)
+                  (DO (f value)
+                      (loop state)))))))
+
+(FUNCTION transform-maybe :: (INLINE
+                               (REQUIRE ($stream-from a) ($from-stream a)
+                                 (-> (a b) (-> b (Maybe c)) (a c))))
+  (transform-maybe a f)
+    (TRANSFORM-STREAM a
+      *done
+        *done
+
+      (*skip state)
+        (*skip state)
+
+      (*value value state)
+        (MATCH (f value)
+          *none
+            (*skip state)
+
+          (*some value)
+            (*value value state))))
+
+(FUNCTION reduce-left :: (-> a (Stream b) (-> a b (Task a)) (Task a))
+  (reduce-left a s f)
+    (with-stream s -> pull
+      (LOOP init <= a
+        (DO value <= pull
+            init <= (f init value)
+            (next init)))))
+
+(FUNCTION reduce-left :: (-> a (Stream b) (-> a b (Task a)) (Task a))
+  (reduce-left a (*stream fold) f)
+    (fold a f))
+
+(FUNCTION each :: (-> (Stream a) (-> a (Task Null)) (Task Null))
+  (each stream f)
+    (reduce-left *null stream -> _ new
+      (f new)))
+
+(FUNCTION transform-maybe :: (-> (Stream a) (-> a (Maybe b)) (Stream b))
+  (transform-maybe (*stream fold) f)
+    (*stream -> initial step
+      (fold initial -> old new
+        (MATCH (f new)
+          (*some a)
+            (step old a)
+          *none
+            (wrap old)))))
+
+(FUNCTION transform :: (-> (Stream a) (-> a b) (Stream b))
+  (transform a b)
+    (transform-maybe a -> c
+      (*some (b c))))
+
+(FUNCTION concat :: (-> (Stream a) (Stream a) (Stream a))
+  (concat (*stream fold1) (*stream fold2))
+    (*stream -> initial step
+      (DO a <= (fold1 initial step)
+          b <= (fold2 a step)
+          b)))
+
+(FUNCTION wrap :: (-> a (Stream a))
+  (wrap a)
+    (*stream -> initial step
+      (step initial a)))
+
+(FUNCTION flatten :: (-> (Stream (Stream a)) (Stream a))
+  (flatten (*stream fold))
+    (*stream -> initial step
+      (fold initial -> old (*stream fold)
+        (fold old step))))
+
+# TODO maybe use a protocol for this ?
+(FUNCTION from-list :: (-> (List a) (Stream a))
+  (from-list a)
+    (*stream -> initial step
+      (reduce-left initial a step)))
+
+
+(EXPORT
+  | Stream
+  | reduce-left
+  | each
+  | transform-maybe
+  | transform
+  | concat
+  | wrap
+  | flatten)

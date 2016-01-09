@@ -1,25 +1,25 @@
-(IMPORT (file "protocol.nul")
-  | $transform
-  | $flatten
-  | $wrap
-  | _transform = transform
-  | _flatten = flatten
-  | _wrap = wrap)
+(IMPORT (nulan "unsafe")
+  | UNSAFE-FFI-LOAD)
+
+(IMPORT (nulan "target")
+  | WITH-TARGET
+  | javascript)
 
 (DEFINE-TYPE (Task a))
 
-(UNSAFE-FFI-IMPORT (file "../ffi/task.js")
-  wrap          :: (-> a (Task a))
-  transform     :: (-> (Task a) (-> a b) (Task b))
-  flatten       :: (-> (Task (Task a)) (Task a))
-  concurrent    :: (-> (List (Task a)) (Task (List a)))
-  fastest       :: (-> (Task a) (Task a) (Task a))
-  delay         :: (-> Integer (Task Null))
-  log           :: (-> String (Task Null))
-  with_resource :: (-> (Task a)
-                       (-> a (Task b))
-                       (-> a (Task Null))
-                       (Task b)))
+(WITH-TARGET javascript
+  (UNSAFE-FFI-LOAD "../ffi/task.js"
+    | wrap          :: (-> a (Task a))
+    | transform     :: (-> (Task a) (-> a b) (Task b))
+    | flatten       :: (-> (Task (Task a)) (Task a))
+    | concurrent    :: (-> (List (Task a)) (Task (List a)))
+    | fastest       :: (-> (Task a) (Task a) (Task a))
+    | delay         :: (-> Integer (Task Null))
+    | log           :: (-> String (Task Null))
+    | with_resource :: (-> (Task a)
+                           (-> a (Task b))
+                           (-> a (Task Null))
+                           (Task b))))
 
 (stream -> push!
   (with-resource (open-file "foo" "r")
@@ -31,26 +31,13 @@
           (push! x)))
     close-file))
 
-
-(IMPLEMENT ($wrap Task)
-  (_wrap a fn)
-    (wrap a fn))
-
-(IMPLEMENT ($transform Task)
-  (_transform a fn)
-    (transform a fn))
-
-(IMPLEMENT ($flatten Task)
-  (_flatten a)
-    (flatten a))
-
 (DEFINE-ALIAS
   (WITH-RESOURCE &(~n = ~v) use close)
     &(with_resource ~v
        (-> ~n ~use)
        (-> ~n ~close)))
 
-(DEFINE timeout :: (-> (Task a) Integer (Task (Maybe a)))
+(FUNCTION timeout :: (-> (Task a) Integer (Task (Maybe a)))
   (timeout task ms)
     (fastest
       (transform task *some)
@@ -67,9 +54,9 @@
 
 (EXPORT
   | Task
-  | ($transform Task)
-  | ($flatten Task)
-  | ($wrap Task)
+  | transform
+  | flatten
+  | wrap
   | concurrent
   | fastest
   | delay

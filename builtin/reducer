@@ -1,0 +1,111 @@
+(TYPE (Step value state)
+  | *done
+  | (*skip state)
+  | (*value value state))
+
+(TYPE (Reducer a)
+  (*reducer (-> b (-> b (Task (Step a b))) (Task b))))
+
+(PROTOCOL ($reducer-from a)
+  | reducer-from :: (INLINE (-> (a b) (Reducer m b))))
+
+(PROTOCOL ($from-reducer a)
+  | from-reducer :: (INLINE (-> (Reducer m b) (a b))))
+
+(REWRITE-RULE
+  (REDUCER-FROM &(FROM-REDUCER ~a))
+    a
+  (REDUCER-FROM a)
+    &(reducer-from ~a)
+
+  (FROM-REDUCER &(REDUCER-FROM ~a))
+    a
+  (FROM-REDUCER a)
+    &(from-reducer ~a))
+
+(REWRITE-RULE
+  (TRANSFORM-REDUCER a @body)
+    (WITH-UNIQUE initial next state
+      &(MATCH (reducer-from ~a)
+         (*reducer ~initial ~next)
+           (FROM-REDUCER
+             (*reducer ~initial -> ~state
+               (MATCH (~next ~state)
+                 ~@body))))))
+
+(FUNCTION transform-maybe :: (INLINE
+                               (REQUIRE ($reducer-from a) ($from-reducer a)
+                                 (-> (a b) (-> b (Maybe c)) (a c))))
+  (transform-maybe a f)
+    (TRANSFORM-REDUCER a
+      *done
+        *done
+
+      (*skip state)
+        (*skip state)
+
+      (*value value state)
+        (MATCH (f value)
+          *none
+            (*skip state)
+
+          (*some value)
+            (*value value state))))
+
+(FUNCTION transform :: (INLINE
+                         (REQUIRE ($reducer-from a) ($from-reducer a)
+                           (-> (a b) (-> b c) (a c))))
+  (transform a b)
+    (transform-maybe a -> c
+      (*some (b c))))
+
+(FUNCTION reduce-left :: (INLINE
+                           (REQUIRE ($reducer-from a)
+                             (-> b (a c) (-> b c b) b)))
+  (reduce-left initial a f)
+    (MATCH (REDUCER-FROM a)
+      (*reducer state next)
+        (LOOP initial <= initial
+              state <= state
+          (MATCH (next state)
+            *done
+              initial
+
+            (*skip state)
+              (loop initial state)
+
+            (*value value state)
+              (loop (f initial value) state)))))
+
+(FUNCTION concat :: (INLINE
+                      (REQUIRE ($reducer-from a) ($from-reducer a)
+                        (-> (a b) (a b) (a b))))
+  (concat a b)
+    (MATCH (REDUCER-FROM a)
+      (*reducer state1 next1)
+        (MATCH (REDUCER-FROM b)
+          (*reducer state2 next2)
+            (FROM-REDUCER
+              (*reducer (*left state1) -> state
+                (MATCH state
+                  (*left state)
+                    (MATCH (next1 state)
+                      *done
+                        (*skip (*right state2))
+
+                      (*skip state)
+                        (*skip (*left state))
+
+                      (*value value state)
+                        (*value value (*left state)))
+
+                  (*right state)
+                    (MATCH (next2 state)
+                      *done
+                        *done
+
+                      (*skip state)
+                        (*skip (*right state))
+
+                      (*value value state)
+                        (*value value (*right state)))))))))

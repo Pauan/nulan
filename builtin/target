@@ -1,0 +1,78 @@
+(IMPORT (file "boolean")
+  | Boolean
+  | *true
+  | *false
+  | AND
+  | OR)
+
+
+(TYPE Target
+  | *javascript-browser
+  | *javascript-node
+
+  | *javascript-extension-chrome-client
+  | *javascript-extension-chrome-server
+
+  | (*union Target Target))
+
+(FUNCTION target-subset? :: (-> Target Target Boolean)
+  (target-subset? (*union a b) c)
+    (AND (target-subset? a c)
+         (target-subset? b c))
+
+  (target-subset? a (*union b c))
+    (OR (target-subset? a b)
+        (target-subset? a c))
+
+  (target-subset? *javascript-browser
+                  *javascript-browser)
+    *true
+
+  (target-subset? *javascript-node
+                  *javascript-node)
+    *true
+
+  (target-subset? *javascript-extension-client-chrome
+                  *javascript-extension-client-chrome)
+    *true
+
+  (target-subset? *javascript-extension-server-chrome
+                  *javascript-extension-server-chrome)
+    *true
+
+  (target-subset? _ _)
+    *false)
+
+(FUNCTION concat :: (-> Target Target Target)
+  (concat a b)
+    (*union a b))
+
+# TODO better way of dealing with this
+(DEFINE
+  | javascript-node = *javascript-node
+  | javascript-extension-chrome-client = *javascript-extension-chrome-client
+  | javascript-extension-chrome-server = *javascript-extension-chrome-server)
+
+(DEFINE
+  | javascript-extension-client :: Target
+  | javascript-extension-client = javascript-extension-chrome-client)
+
+(DEFINE
+  | javascript-extension-server :: Target
+  | javascript-extension-server = javascript-extension-chrome-server)
+
+(DEFINE
+  | javascript-extension :: Target
+  | javascript-extension = (++ javascript-extension-client
+                               javascript-extension-server))
+
+(DEFINE
+  | javascript-browser :: Target
+  | javascript-browser = (++ *javascript-browser
+                             javascript-extension-client))
+
+(DEFINE
+  | javascript :: Target
+  | javascript = (++ javascript-browser
+                     javascript-node
+                     javascript-extension))

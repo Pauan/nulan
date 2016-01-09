@@ -1,0 +1,59 @@
+(IMPORT (nulan "unsafe/ffi")
+  | UNSAFE-FFI-LOAD
+  | javascript)
+
+(IMPORT (file "null")
+  | *null)
+
+(IMPORT (file "protocol")
+  | $transform
+  | transform
+
+  | $flatten
+  | flatten
+
+  | $wrap
+  | wrap
+
+  | $reduce-left
+  | reduce-left)
+
+(IMPORT (file "list")
+  | List)
+
+
+(REWRITE-RULE
+  (DO a)
+    &(wrap ~a)
+
+  (DO a b)
+    (MATCH a
+      &(~pattern <= ~value)
+        &(transform ~value -> ~pattern ~b)
+      value
+        &(transform ~value -> *null ~b))
+
+  (DO a @b)
+    (MATCH a
+      &(~pattern <= ~value)
+        &(flatten (transform ~value -> ~pattern (DO ~@b)))
+      value
+        &(flatten (transform ~value -> *null (DO ~@b)))))
+
+(REWRITE-RULE
+  (MATCH-DO a @b)
+    (WITH-UNIQUE c
+      &(flatten
+         (transform ~a -> ~c
+           (MATCH ~c ~@b)))))
+
+(UNSAFE-FFI-LOAD { target <= javascript
+                 | file <= "../ffi/monad.js" }
+  | sequential :: (REQUIRE ($transform a) ($flatten a) ($wrap a)
+                    (-> (List (a b)) (a (List b)))))
+
+
+(EXPORT
+  | sequential
+  | DO
+  | MATCH-DO)

@@ -1,0 +1,27 @@
+(IMPORT (nulan "unsafe/ffi")
+  | UNSAFE-FFI-LOAD
+  | javascript)
+
+(IMPORT (file "task")
+  | Task)
+
+(IMPORT (file "null")
+  | Null)
+
+
+(TYPE (Mutable a))
+
+(UNSAFE-FFI-LOAD { target <= javascript
+                 | file <= "../ffi/mutable.js" }
+  | mutable :: (-> a (Task (Mutable a)))
+  | get :: (-> (Mutable a) (Task a))
+  | set :: (-> (Mutable a) a (Task Null))
+  | modify :: (-> (Mutable a) (-> a a) (Task Null)))
+
+
+(EXPORT
+  | Mutable
+  | mutable
+  | get
+  | set! <= set
+  | modify! <= modify)

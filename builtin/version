@@ -1,0 +1,20 @@
+(DEFINE-TYPE Version
+  (*exactly Integer Integer Integer)
+  (*major Integer))
+
+(DEFINE
+  major :: (-> Integer Version)
+  major = *major)
+
+(DEFINE
+  exactly :: (-> Integer Integer Integer Version)
+  exactly = *exactly)
+
+(EXPORT
+  | Version
+  | major
+  | exactly)
+
+(github { path <= "foo/bar"
+        | file <= "qux/corge"
+        | version <= (major 1) })

@@ -1,0 +1,43 @@
+(PROTOCOL ($wrap a)
+  | wrap :: (-> b (a b)))
+
+(PROTOCOL ($transform a)
+  | transform :: (-> (a b) (-> b c) (a c)))
+
+(PROTOCOL ($transform2 a)
+  | transform2 :: (-> (a b) (a c) (-> b c d) (a d)))
+
+(PROTOCOL ($flatten a)
+  | flatten :: (-> (a (a b)) (a b)))
+
+(PROTOCOL ($empty a)
+  | empty :: a)
+
+(PROTOCOL ($concat a)
+  | concat :: (-> a a a))
+
+(PROTOCOL ($reduce-left a)
+  | reduce-left :: (-> b (a c) (-> b c b) b))
+
+
+(EXPORT
+  | $wrap
+  | wrap
+
+  | $transform
+  | transform
+
+  | $transform2
+  | transform2
+
+  | $flatten
+  | flatten
+
+  | $empty
+  | empty
+
+  | $concat
+  | concat
+
+  | $reduce-left
+  | reduce-left)

@@ -1,0 +1,24 @@
+(IMPORT (file "null")
+  | Null)
+
+(IMPORT (nulan "unsafe/ffi")
+  | UNSAFE-FFI-LOAD
+  | javascript)
+
+
+(TYPE (Lazy a))
+
+(UNSAFE-FFI-LOAD { target <= javascript
+                 | file <= "../ffi/lazy.js" }
+  | lazy  :: (-> (-> Null a) (Lazy a))
+  | force :: (-> (Lazy a) a))
+
+(REWRITE-RULE
+  (LAZY a)
+    &(lazy -> _ ~a))
+
+
+(EXPORT
+  | Lazy
+  | LAZY
+  | force)
