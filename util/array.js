@@ -23,3 +23,6 @@ export const map = (a, f) => {
 
   return out;
 };
+
+export const length = (a) =>
+  a["length"];

@@ -1,7 +1,6 @@
 import { async_unkillable, transform } from "../task";
 import { callback } from "./util";
-
-const $crypto = require("crypto");
+import { randomBytes } from "crypto";
 
 
 export const NUMERIC      = "0123456789";
@@ -24,7 +23,7 @@ export const chars_from_bytes = (chars, bytes) => {
 
 export const random_bytes = (limit) =>
   async_unkillable((success, error) => {
-    $crypto["randomBytes"](limit, callback(success, error));
+    randomBytes(limit, callback(success, error));
   });
 
 export const random_characters = (limit, chars) =>

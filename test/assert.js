@@ -1,7 +1,7 @@
 import { crash } from "../util/error";
 import { pretty, eol, get_message } from "../util/node";
 import { indent } from "../util/string";
-import { map } from "../util/array";
+import { map, length } from "../util/array";
 import { fastest, flatten, transform, wrap, throw_error,
          delay, concurrent, log, on_error, perform } from "../ffi/task";
 
@@ -94,7 +94,7 @@ export const test_group = (group_name, a) => {
   });
 
   return flatten(transform(concurrent(tasks), (_) =>
-           log(group_name + ": all tests succeeded\n")));
+           log(group_name + ": " + length(tasks) + " tests succeeded\n")));
 };
 
 export const expect = (expected, task) =>

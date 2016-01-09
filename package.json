@@ -4,14 +4,13 @@
   "version": "0.1.0",
   "repository": "https://github.com/Pauan/nulan.git",
   "main": "build/nulan.js",
-  "dependencies": {
-    "Immutable": "git://github.com/Pauan/Immutable.git#v6.5.0"
-  },
   "devDependencies": {
-    "esperanto": "^0.6.4"
+    "rollup": "^0.24.0",
+    "rollup-plugin-babel": "^2.3.8",
+    "babel-preset-es2015-rollup": "^1.0.0"
   },
   "scripts": {
-    "prepublish": "node ./build.js",
-    "test": "babel-node --presets es2015 test/test.js"
+    "prepublish": "rollup --config build.test.js",
+    "test": "node ./build/test.js"
   }
 }

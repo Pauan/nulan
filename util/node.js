@@ -1,10 +1,9 @@
-const os = require("os");
-const util = require("util");
+import { inspect } from "util";
+export { EOL as eol } from "os";
 
-export const eol = os["EOL"];
 
 export const pretty = (x) =>
-  util["inspect"](x, { "colors": true, "depth": 5 });
+  inspect(x, { "colors": true, "depth": 5 });
 
 export const get_stack = (err) =>
   err["stack"] || get_message(err);
