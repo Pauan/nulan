@@ -1,10 +1,6 @@
 const os = require("os");
 const util = require("util");
 
-export const crash = (x) => {
-  throw x;
-};
-
 export const eol = os["EOL"];
 
 export const pretty = (x) =>
