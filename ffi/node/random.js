@@ -1,3 +1,6 @@
+import { async_unkillable, transform } from "../task";
+import { callback } from "./util";
+
 const $crypto = require("crypto");
 
 
@@ -19,17 +22,11 @@ export const chars_from_bytes = (chars, bytes) => {
   return a["join"]("");
 };
 
-export const random_bytes = (limit, f) => {
-  $crypto["randomBytes"](limit, f);
-};
-
-export const random_characters = (limit, chars, f) => {
-  random_bytes(limit, (err, bytes) => {
-    if (err) {
-      f(err, bytes);
-
-    } else {
-      f(err, chars_from_bytes(chars, bytes));
-    }
+export const random_bytes = (limit) =>
+  async_unkillable((success, error) => {
+    $crypto["randomBytes"](limit, callback(success, error));
   });
-};
+
+export const random_characters = (limit, chars) =>
+  transform(random_bytes(limit), (bytes) =>
+    chars_from_bytes(chars, bytes));

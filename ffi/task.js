@@ -1,9 +1,10 @@
-import { crash } from "../util/node";
+import { crash } from "../util/error";
 
 
 // TODO move to another module
 const _null = 0;
 
+// TODO move to another module
 const noop = () => {};
 
 
@@ -78,6 +79,7 @@ export const ignore_kill = (task) =>
     };
 
     const on_error = (value) => {
+      // Never silently ignore errors
       if (killed) {
         crash(value);
 
@@ -122,19 +124,17 @@ export const async_killable = (f) =>
 
     const kill = f(on_success, on_error);
 
-    // TODO is this check needed ?
-    const on_kill = () => {
-      if (done) {
-        crash(new Error("Invalid kill"));
-
-      } else {
-        done = true;
-        kill();
-      }
-    };
-
     if (!done) {
-      _set_kill(thread, on_kill);
+      // TODO is this check needed ?
+      _set_kill(thread, () => {
+        if (done) {
+          crash(new Error("Invalid kill"));
+
+        } else {
+          done = true;
+          kill();
+        }
+      });
     }
   };
 
@@ -208,6 +208,56 @@ export const flatten = (task) =>
       // Tail call, to allow for infinite recursion
       task(thread, success, error);
     }, error);
+  };
+
+// TODO code duplication with concurrent
+export const concurrent_null = (a) =>
+  (thread, success, error) => {
+    let pending = a["length"];
+
+    if (pending === 0) {
+      success(_null);
+
+    } else {
+      let running = true;
+
+      const threads = [];
+
+      // TODO is this the correct place for this ?
+      // TODO what about running ?
+      _set_kill(thread, () => {
+        _kill_all(threads);
+      });
+
+      const on_success = (_) => {
+        --pending;
+
+        // TODO what about setting `running` ?
+        if (pending === 0) {
+          _reset_kill(thread);
+          success(_null);
+        }
+      };
+
+      const on_error = (value) => {
+        running = false;
+        _reset_kill(thread);
+        _kill_all(threads);
+        error(value);
+      };
+
+      for (let i = 0; i < a["length"]; ++i) {
+        if (running) {
+          threads["push"](_make_thread());
+
+          a[i](threads[i], on_success, on_error);
+
+        } else {
+          // TODO is this correct ?
+          return;
+        }
+      }
+    }
   };
 
 export const concurrent = (a) =>
@@ -300,39 +350,6 @@ export const fastest = (task_a, task_b) =>
     }
   };
 
-
-// TODO is this correct ?
-// TODO test this
-/*export const _finally = (use, destroy) =>
-  (thread, success, error) => {
-    let succeeded = false;
-
-    const x = _make_thread();
-
-    use(x, (value) => {
-      succeeded = true;
-
-      destroy(x, (_) => {
-        success(value);
-      }, error);
-
-    }, (value) => {
-      succeeded = true;
-
-      destroy(x, (_) => {
-        error(value);
-      }, error);
-    });
-
-    _set_kill(thread, () => {
-      if (!succeeded) {
-        succeeded = true;
-
-        _kill(x);
-        destroy(x, noop, error);
-      }
-    });
-  };*/
 
 // TODO maybe handle kill ?
 export const on_error = (task, on_success, on_error) =>
@@ -486,63 +503,11 @@ export const log = (s) =>
     return _null;
   });
 
-//const after = (task, f) =>
-//  (thread, success, error) => {
-//    task(thread, (value) => {
-//      // Tail call, to allow for infinite recursion
-//      f(value)(thread, success, error);
-//    }, error);
-//  };
-
 
 export const perform = (task) => {
   const x = _make_thread();
   task(x, noop, crash);
 };
-
-
-const fs = require("fs");
-
-const callback = (success, error) =>
-  (err, value) => {
-    if (err) {
-      error(err);
-    } else {
-      success(value);
-    }
-  };
-
-const callback_null = (success, error) =>
-  (err) => {
-    if (err) {
-      error(err);
-    } else {
-      success(_null);
-    }
-  };
-
-const read_file = (path) =>
-  async_unkillable((success, error) => {
-    fs["readFile"](path, { "encoding": "utf8" }, callback(success, error));
-  });
-
-const write_file = (path, x) =>
-  async_unkillable((success, error) => {
-    fs["writeFile"](path, x, { "encoding": "utf8" }, callback_null(success, error));
-  });
-
-const open_file = (path, flags, mode) =>
-  async_unkillable((success, error) => {
-    fs["open"](path, flags, mode, callback(success, error));
-  });
-
-const close_fd = (fd) =>
-  async_unkillable((success, error) => {
-    fs["close"](fd, callback_null(success, error));
-  });
-
-const with_file = (path, flags, mode, f) =>
-  with_resource(open_file(path, flags, mode), f, close_fd);
 
 
 
