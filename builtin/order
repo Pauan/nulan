@@ -1,0 +1,68 @@
+(TYPE Order
+  | *less
+  | *equal
+  | *more)
+
+(PROTOCOL ($order a b)
+  | order :: (-> a b Order))
+
+(FUNCTION less? :: (REQUIRE ($order a b)
+                     (-> a b Boolean))
+  (less? a b)
+    (MATCH (order a b)
+      *less
+        *true
+      _
+        *false))
+
+(FUNCTION equal? :: (REQUIRE ($order a b)
+                      (-> a b Boolean))
+  (equal? a b)
+    (MATCH (order a b)
+      *equal
+        *true
+      _
+        *false))
+
+(FUNCTION more? :: (REQUIRE ($order a b)
+                     (-> a b Boolean))
+  (more? a b)
+    (MATCH (order a b)
+      *more
+        *true
+      _
+        *false))
+
+(FUNCTION less-or-more? :: (REQUIRE ($order a b)
+                             (-> a b Boolean))
+  (less-or-more? a b)
+    (MATCH (order a b)
+      *equal
+        *false
+      _
+        *true))
+
+(FUNCTION less-or-equal? :: (REQUIRE ($order a b)
+                              (-> a b Boolean))
+  (less-or-equal? a b)
+    (MATCH (order a b)
+      *more
+        *false
+      _
+        *true))
+
+(FUNCTION more-or-equal? :: (REQUIRE ($order a b)
+                              (-> a b Boolean))
+  (more-or-equal? a b)
+    (MATCH (order a b)
+      *less
+        *false
+      _
+        *true))
+
+
+(EXPORT
+  | Order
+  | *less
+  | *equal
+  | *more)
