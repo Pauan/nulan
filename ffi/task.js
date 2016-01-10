@@ -6,7 +6,7 @@ import { noop } from "./util";
 const _make_thread = () => {
   return {
     a: false, // is_killed
-    b: noop   // kill
+    b: null   // kill
   };
 };
 
@@ -14,8 +14,14 @@ const _set_kill = (thread, f) => {
   if (thread.a) {
     crash(new Error("Invalid set_kill: thread is already killed"));
 
-  } else {
+  } else if (f === null) {
+    crash(new Error("Invalid set_kill: use reset_kill instead"));
+
+  } else if (thread.b === null) {
     thread.b = f;
+
+  } else {
+    crash(new Error("Invalid set_kill: thread is already set"));
   }
 };
 
@@ -23,8 +29,11 @@ const _reset_kill = (thread) => {
   if (thread.a) {
     crash(new Error("Invalid reset_kill: thread is already killed"));
 
+  } else if (thread.b === null) {
+    crash(new Error("Invalid reset_kill: thread is already reset"));
+
   } else {
-    thread.b = noop;
+    thread.b = null;
   }
 };
 
@@ -34,9 +43,13 @@ const _kill = (thread) => {
 
   } else {
     const kill = thread.b;
+
     thread.a = true;
-    thread.b = noop;
-    kill();
+    thread.b = null;
+
+    if (kill !== null) {
+      kill();
+    }
   }
 };
 
@@ -127,20 +140,18 @@ export const async_killable = (f) =>
       }
     };
 
+    // TODO is this check needed ?
+    _set_kill(thread, () => {
+      if (done) {
+        crash(new Error("Invalid kill"));
+
+      } else {
+        done = true;
+        kill();
+      }
+    });
+
     const kill = f(on_success, on_error);
-
-    if (!done) {
-      // TODO is this check needed ?
-      _set_kill(thread, () => {
-        if (done) {
-          crash(new Error("Invalid kill"));
-
-        } else {
-          done = true;
-          kill();
-        }
-      });
-    }
   };
 
 // Guarantees:

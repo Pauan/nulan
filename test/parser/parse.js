@@ -8,7 +8,7 @@ import { string, symbol, integer,
          dot } from "../../src/parser/ast";
 
 
-const file = "tokenize.test";
+const file = "parse.test";
 
 const test = (input, f) => {
   const x = lines(input);
@@ -27,22 +27,22 @@ const test_crash = (input, expected) =>
 const test_brackets = (start, end, make) =>
   [
     test_crash("foo" + end,
-      "missing starting " + start + "  (tokenize.test 1:4)\n" +
+      "missing starting " + start + "  (parse.test 1:4)\n" +
       "  foo" + end + "\n" +
       "     ^"),
 
     test_crash(start + "foo",
-      "missing ending " + end + "  (tokenize.test 1:1)\n" +
+      "missing ending " + end + "  (parse.test 1:1)\n" +
       "  " + start + "foo\n" +
       "  ^"),
 
     test_crash("foo" + end + "bar" + end,
-      "missing starting " + start + "  (tokenize.test 1:4)\n" +
+      "missing starting " + start + "  (parse.test 1:4)\n" +
       "  foo" + end + "bar" + end + "\n" +
       "     ^"),
 
     test_crash(start + "foo " + start + "bar",
-      "missing ending " + end + "  (tokenize.test 1:6)\n" +
+      "missing ending " + end + "  (parse.test 1:6)\n" +
       "  " + start + "foo " + start + "bar\n" +
       "       ^"),
 
@@ -118,7 +118,7 @@ export default [
            { line: 0, column: 12 })
   ]),
 
-  test("(-> 1 2 3 4 5)", (file, lines) => [
+  /*test("(-> 1 2 3 4 5)", (file, lines) => [
     lambda([integer(1, file, lines,
                     { line: 0, column: 4 },
                     { line: 0, column: 5 }),
@@ -136,7 +136,12 @@ export default [
                    { line: 0, column: 13 }), file, lines,
            { line: 0, column: 1 },
            { line: 0, column: 13 })
-  ]),
+  ]),*/
+
+  test_crash("(-> 1)",
+    "functions must have at least one argument  (parse.test 1:1)\n" +
+    "  (-> 1)\n" +
+    "  ^-----"),
 
 
   /*test("a.b", (file, lines) => [

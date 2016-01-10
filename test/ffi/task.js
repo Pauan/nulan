@@ -3,7 +3,7 @@ import { crash } from "../../util/error";
 import { sync, transform, flatten, wrap, concurrent, concurrent_null,
          delay, fastest, _yield, throw_error, ignore_kill, async_killable,
          async_unkillable, never, make_thread, kill_thread,
-         catch_error } from "../../ffi/task";
+         catch_error, on_error } from "../../ffi/task";
 import { _null } from "../../ffi/types";
 
 
@@ -89,6 +89,19 @@ export default [
         increment,
         increment
       ]))),
+
+
+  expect(2,
+    on_error(throw_error(new Error("Hi")), (_) => 1, (_) => 2)),
+
+  expect(2,
+    on_error(fastest(throw_error(new Error("Hi")), wrap(3)), (_) => 1, (_) => 2)),
+
+  expect(2,
+    fastest(
+      on_error(throw_error(new Error("Hi")), (_) => 1, (_) => 2),
+      wrap(3)
+    )),
 
 
   expect([],
