@@ -1,9 +1,6 @@
 import { crash } from "../util/error";
 import { _null } from "./types";
-
-
-// TODO move to another module
-const noop = () => {};
+import { noop } from "./util";
 
 
 const _make_thread = () => {
