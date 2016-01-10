@@ -1,6 +1,6 @@
 import { crash } from "../util/error";
 import { _null } from "./types";
-import { noop } from "./util";
+import { noop, try_catch } from "./util";
 
 
 const _make_thread = () => {
@@ -69,10 +69,13 @@ export const sync = (f) =>
 // TODO merge this into sync ?
 export const catch_error = (f) =>
   (thread, success, error) => {
-    try {
-      success(f());
-    } catch (e) {
-      error(e);
+    const x = try_catch(f);
+
+    if (x.$ === 0) {
+      success(x.a);
+
+    } else {
+      error(x.a);
     }
   };
 

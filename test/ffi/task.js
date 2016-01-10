@@ -3,7 +3,7 @@ import { crash } from "../../util/error";
 import { sync, transform, flatten, wrap, concurrent, concurrent_null,
          delay, fastest, _yield, throw_error, ignore_kill, async_killable,
          async_unkillable, never, make_thread, kill_thread,
-         catch_error, on_error } from "../../ffi/task";
+         catch_error, on_error, perform } from "../../ffi/task";
 import { _null } from "../../ffi/types";
 
 
@@ -42,6 +42,17 @@ const counter = (f) => {
 
   return transform(f(increment), (_) => _counter);
 };
+
+const test_crash = (task, value) =>
+  sync(() => {
+    assert_crash(() => {
+      perform(after(fastest(task, never), (_) => {
+        crash(new Error("CRASHING!"));
+      }));
+    }, "CRASHING!");
+
+    return value;
+  });
 
 
 /*perform(fastest(
@@ -102,6 +113,27 @@ export default [
       on_error(throw_error(new Error("Hi")), (_) => 1, (_) => 2),
       wrap(3)
     )),
+
+  expect(3,
+    fastest(
+      on_error(delay(100), (_) => 1, (_) => 2),
+      wrap(3)
+    )),
+
+
+  expect(2,
+    test_crash(catch_error(() => 1), 2)),
+
+  expect_crash("3",
+    then(catch_error(() => 1),
+         throw_error(new Error("3")))),
+
+  expect_crash("3",
+    then(on_error(then(catch_error(() => 1),
+                       throw_error(new Error("2"))),
+                  (x) => x,
+                  (_) => null),
+         throw_error(new Error("3")))),
 
 
   expect([],
