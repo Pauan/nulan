@@ -1,9 +1,10 @@
 import { expect, expect_crash, assert_crash } from "../assert";
 import { crash } from "../../util/error";
-import { sync, transform, flatten, wrap, concurrent, delay,
-         fastest, _yield, throw_error, ignore_kill, async_killable,
+import { sync, transform, flatten, wrap, concurrent, concurrent_null,
+         delay, fastest, _yield, throw_error, ignore_kill, async_killable,
          async_unkillable, never, make_thread, kill_thread,
          catch_error } from "../../ffi/task";
+import { _null } from "../../ffi/types";
 
 
 const after = (a, f) =>
@@ -55,6 +56,39 @@ export default [
 
   expect_crash("Cannot delay for 0 milliseconds (maybe use yield instead?)",
     catch_error(() => delay(0))),
+
+
+  expect(_null,
+    concurrent_null([])),
+
+  expect(_null,
+    concurrent_null([
+      wrap("3"),
+      wrap("4")
+    ])),
+
+  expect_crash("Hi1",
+    concurrent_null([
+      wrap("3"),
+      throw_error(new Error("Hi1")),
+      throw_error(new Error("Hi2")),
+      wrap("4")
+    ])),
+
+  expect(2,
+    counter((increment) =>
+      concurrent_null([
+        increment,
+        increment
+      ]))),
+
+  expect_crash("Hi",
+    counter((increment) =>
+      concurrent_null([
+        throw_error(new Error("Hi")),
+        increment,
+        increment
+      ]))),
 
 
   expect([],

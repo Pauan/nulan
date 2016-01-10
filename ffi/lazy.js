@@ -1,5 +1,4 @@
-// TODO move to another module
-const _null = 0;
+import { _null } from "./types";
 
 
 export const lazy = (f) => {

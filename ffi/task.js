@@ -1,8 +1,6 @@
 import { crash } from "../util/error";
+import { _null } from "./types";
 
-
-// TODO move to another module
-const _null = 0;
 
 // TODO move to another module
 const noop = () => {};

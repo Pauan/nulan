@@ -3,7 +3,7 @@ import { pretty, eol, get_message } from "../util/node";
 import { indent } from "../util/string";
 import { map, length } from "../util/array";
 import { fastest, flatten, transform, wrap, throw_error,
-         delay, concurrent, log, on_error, perform } from "../ffi/task";
+         delay, concurrent_null, log, on_error, perform } from "../ffi/task";
 
 
 const isObject = (x) =>
@@ -93,7 +93,7 @@ export const test_group = (group_name, a) => {
     );
   });
 
-  return flatten(transform(concurrent(tasks), (_) =>
+  return flatten(transform(concurrent_null(tasks), (_) =>
            log(group_name + ": " + length(tasks) + " tests succeeded\n")));
 };
 
@@ -115,7 +115,7 @@ export const expect_crash = (expected, task) =>
 
 export const perform_tests = (a) => {
   perform(flatten(transform(log("---- Starting unit tests\n"), (_) =>
-          flatten(transform(concurrent(a), (_) =>
+          flatten(transform(concurrent_null(a), (_) =>
                   log("---- All unit tests succeeded"))))));
 };
 
