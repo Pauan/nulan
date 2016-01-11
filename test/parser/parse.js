@@ -5,7 +5,7 @@ import { parse } from "../../src/parser/parse";
 import { lines, repeat } from "../../util/string";
 import { string, symbol, integer,
          call, list, record, lambda,
-         dot, bar, assign } from "../../src/parser/ast";
+         dot, bar, assign, type } from "../../src/parser/ast";
 
 
 const file = "parse.test";
@@ -190,6 +190,7 @@ export default [
 
   ...test_infix("<=", assign),
   ...test_infix(".", dot),
+  ...test_infix("::", type),
 
 
   test("{ hi }", (file, lines) => [
