@@ -368,6 +368,28 @@ export default [
            { line: 0, column: 21 })
   ]),
 
+  test("-> 1 &-> 2 ~@3", (file, lines) => [
+    lambda([integer(1, file, lines,
+                    { line: 0, column: 3 },
+                    { line: 0, column: 4 })],
+           quote(lambda([integer(2, file, lines,
+                                 { line: 0, column: 9 },
+                                 { line: 0, column: 10 })],
+                        unquote(splice(integer(3, file, lines,
+                                               { line: 0, column: 13 },
+                                               { line: 0, column: 14 }), file, lines,
+                                       { line: 0, column: 12 },
+                                       { line: 0, column: 14 }), file, lines,
+                                { line: 0, column: 11 },
+                                { line: 0, column: 14 }), file, lines,
+                        { line: 0, column: 6 },
+                        { line: 0, column: 14 }), file, lines,
+                 { line: 0, column: 5 },
+                 { line: 0, column: 14 }), file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: 14 })
+  ]),
+
   test_crash("(->)",
     "functions must have at least 1 parameter  (parse.test 1:2)\n" +
     "  (->)\n" +
@@ -389,5 +411,42 @@ export default [
         file, lines,
         { line: 0, column: 0 },
         { line: 0, column: 3 })
+  ]),
+
+  test("a.b <= c.d", (file, lines) => [
+    assign(dot(symbol("a", file, lines,
+                      { line: 0, column: 0 },
+                      { line: 0, column: 1 }),
+               symbol("b", file, lines,
+                      { line: 0, column: 2 },
+                      { line: 0, column: 3 }), file, lines,
+               { line: 0, column: 0 },
+               { line: 0, column: 3 }),
+           dot(symbol("c", file, lines,
+                      { line: 0, column: 7 },
+                      { line: 0, column: 8 }),
+               symbol("d", file, lines,
+                      { line: 0, column: 9 },
+                      { line: 0, column: 10 }), file, lines,
+               { line: 0, column: 7 },
+               { line: 0, column: 10 }), file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: 10 })
+  ]),
+
+
+  test("&a.~b", (file, lines) => [
+    quote(dot(symbol("a", file, lines,
+                     { line: 0, column: 1 },
+                     { line: 0, column: 2 }),
+              unquote(symbol("b", file, lines,
+                             { line: 0, column: 4 },
+                             { line: 0, column: 5 }), file, lines,
+                      { line: 0, column: 3 },
+                      { line: 0, column: 5 }), file, lines,
+              { line: 0, column: 1 },
+              { line: 0, column: 5 }), file, lines,
+          { line: 0, column: 0 },
+          { line: 0, column: 5 })
   ]),
 ];

@@ -202,8 +202,8 @@ const specials = {
 
   "|": parse_prefix(10, bar),
   "&": parse_prefix(10, quote),
-  "~": parse_prefix(10, unquote),
-  "@": parse_prefix(10, splice),
+  "~": parse_prefix(20, unquote),
+  "@": parse_prefix(20, splice),
 
   ".":  parse_infix(10, dot, false),
   "<=": parse_infix(10, assign, true),
