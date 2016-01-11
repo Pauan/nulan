@@ -2,10 +2,10 @@ import { expect, expect_crash } from "../assert";
 import { wrap, catch_error } from "../../ffi/task";
 import { tokenize } from "../../src/parser/tokenize";
 import { parse } from "../../src/parser/parse";
-import { lines } from "../../util/string";
+import { lines, repeat } from "../../util/string";
 import { string, symbol, integer,
          call, list, record, lambda,
-         dot } from "../../src/parser/ast";
+         dot, bar, assign } from "../../src/parser/ast";
 
 
 const file = "parse.test";
@@ -23,8 +23,82 @@ const test_crash = (input, expected) =>
       return parse(tokenize(x, file));
     }));
 
+const marker = (name) =>
+  "^" + repeat("-", name["length"] - 1);
 
-const test_brackets = (start, end, make) =>
+
+const test_prefix = (name, make) =>
+  [
+    test_crash(name,
+      "missing expression on the right side  (parse.test 1:1)\n" +
+      "  " + name + "\n" +
+      "  ^"),
+
+    test(name + " 1", (file, lines) => [
+      make(integer(1, file, lines,
+                   { line: 0, column: name["length"] + 1 },
+                   { line: 0, column: name["length"] + 2 }), file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: name["length"] + 2 })
+    ]),
+
+    test(name + " " + name + " 1", (file, lines) => [
+      make(make(integer(1, file, lines,
+                        { line: 0, column: name["length"] + name["length"] + 2 },
+                        { line: 0, column: name["length"] + name["length"] + 3 }), file, lines,
+                { line: 0, column: name["length"] + 1 },
+                { line: 0, column: name["length"] + name["length"] + 3 }), file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: name["length"] + name["length"] + 3 })
+    ]),
+  ];
+
+const test_infix = (name, make) =>
+  [
+    test_crash(name,
+      "missing expression on the left side  (parse.test 1:1)\n" +
+      "  " + name + "\n" +
+      "  " + marker(name)),
+
+    test_crash(name + " 2",
+      "missing expression on the left side  (parse.test 1:1)\n" +
+      "  " + name + " 2\n" +
+      "  " + marker(name)),
+
+    test_crash("1 " + name,
+      "missing expression on the right side  (parse.test 1:3)\n" +
+      "  1 " + name + "\n" +
+      "    " + marker(name)),
+
+    test("1 " + name + " 2", (file, lines) => [
+      make(integer(1, file, lines,
+                   { line: 0, column: 0 },
+                   { line: 0, column: 1 }),
+           integer(2, file, lines,
+                   { line: 0, column: name["length"] + 3 },
+                   { line: 0, column: name["length"] + 4 }), file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: name["length"] + 4 })
+    ]),
+
+    test("1 " + name + " 2 " + name + " 3", (file, lines) => [
+      make(make(integer(1, file, lines,
+                        { line: 0, column: 0 },
+                        { line: 0, column: 1 }),
+                integer(2, file, lines,
+                        { line: 0, column: name["length"] + 3 },
+                        { line: 0, column: name["length"] + 4 }), file, lines,
+                { line: 0, column: 0 },
+                { line: 0, column: name["length"] + 4 }),
+           integer(3, file, lines,
+                   { line: 0, column: name["length"] + name["length"] + 6 },
+                   { line: 0, column: name["length"] + name["length"] + 7 }), file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: name["length"] + name["length"] + 7 })
+    ]),
+  ];
+
+const test_brackets = (start, end, make, unwrap) =>
   [
     test_crash("foo" + end,
       "missing starting " + start + "  (parse.test 1:4)\n" +
@@ -46,6 +120,12 @@ const test_brackets = (start, end, make) =>
       "  " + start + "foo " + start + "bar\n" +
       "       ^"),
 
+    test(start + end, (file, lines) => [
+      make([], file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: 2 })
+    ]),
+
     test(start + "foo bar qux" + end, (file, lines) => [
       make([symbol("foo", file, lines,
                    { line: 0, column: 1 },
@@ -60,34 +140,55 @@ const test_brackets = (start, end, make) =>
            { line: 0, column: 13 })
     ]),
 
-    test(start + start + "foo" + end + " " +
-                 start + "bar" + end + " " +
-                 start + "qux" + end + end, (file, lines) => [
-      make([make([symbol("foo", file, lines,
-                         { line: 0, column: 2 },
-                         { line: 0, column: 5 })], file, lines,
-                 { line: 0, column: 1 },
-                 { line: 0, column: 6 }),
-            make([symbol("bar", file, lines,
-                         { line: 0, column: 8 },
-                         { line: 0, column: 11 })], file, lines,
-                 { line: 0, column: 7 },
-                 { line: 0, column: 12 }),
-            make([symbol("qux", file, lines,
-                         { line: 0, column: 14 },
-                         { line: 0, column: 17 })], file, lines,
-                 { line: 0, column: 13 },
-                 { line: 0, column: 18 })], file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 19 })
-    ])
+    (unwrap
+      ? test(start + start + "foo" + end + " " +
+                     start + "bar" + end + " " +
+                     start + "qux" + end + end, (file, lines) => [
+          make([symbol("foo", file, lines,
+                       { line: 0, column: 2 },
+                       { line: 0, column: 5 }),
+                symbol("bar", file, lines,
+                       { line: 0, column: 8 },
+                       { line: 0, column: 11 }),
+                symbol("qux", file, lines,
+                       { line: 0, column: 14 },
+                       { line: 0, column: 17 })], file, lines,
+               { line: 0, column: 0 },
+               { line: 0, column: 19 })
+        ])
+      : test(start + start + "foo" + end + " " +
+                     start + "bar" + end + " " +
+                     start + "qux" + end + end, (file, lines) => [
+          make([make([symbol("foo", file, lines,
+                             { line: 0, column: 2 },
+                             { line: 0, column: 5 })], file, lines,
+                     { line: 0, column: 1 },
+                     { line: 0, column: 6 }),
+                make([symbol("bar", file, lines,
+                             { line: 0, column: 8 },
+                             { line: 0, column: 11 })], file, lines,
+                     { line: 0, column: 7 },
+                     { line: 0, column: 12 }),
+                make([symbol("qux", file, lines,
+                             { line: 0, column: 14 },
+                             { line: 0, column: 17 })], file, lines,
+                     { line: 0, column: 13 },
+                     { line: 0, column: 18 })], file, lines,
+               { line: 0, column: 0 },
+               { line: 0, column: 19 })
+        ]))
   ];
 
 
 export default [
-  ...test_brackets("(", ")", call),
-  ...test_brackets("[", "]", list),
-  ...test_brackets("{", "}", record),
+  ...test_brackets("(", ")", call, true),
+  ...test_brackets("[", "]", list, false),
+  ...test_brackets("{", "}", record, false),
+
+
+  ...test_prefix("|", bar),
+
+  ...test_infix("<=", assign),
 
 
   test("{ hi }", (file, lines) => [
@@ -97,6 +198,30 @@ export default [
             { line: 0, column: 0 },
             { line: 0, column: 6 })
   ]),
+
+  test("{ foo <= 1 | bar <= 2 }", (file, lines) => [
+    record([assign(symbol("foo", file, lines,
+                          { line: 0, column: 2 },
+                          { line: 0, column: 5 }),
+                   integer(1, file, lines,
+                           { line: 0, column: 9 },
+                           { line: 0, column: 10 }), file, lines,
+                   { line: 0, column: 2 },
+                   { line: 0, column: 10 }),
+            bar(assign(symbol("bar", file, lines,
+                              { line: 0, column: 13 },
+                              { line: 0, column: 16 }),
+                       integer(2, file, lines,
+                               { line: 0, column: 20 },
+                               { line: 0, column: 21 }), file, lines,
+                       { line: 0, column: 13 },
+                       { line: 0, column: 21 }), file, lines,
+                { line: 0, column: 11 },
+                { line: 0, column: 21 })], file, lines,
+            { line: 0, column: 0 },
+            { line: 0, column: 23 })
+  ]),
+
 
   test("-> 1 2 3 4 5", (file, lines) => [
     lambda([integer(1, file, lines,
@@ -118,7 +243,7 @@ export default [
            { line: 0, column: 12 })
   ]),
 
-  /*test("(-> 1 2 3 4 5)", (file, lines) => [
+  test("(-> 1 2 3 4 5)", (file, lines) => [
     lambda([integer(1, file, lines,
                     { line: 0, column: 4 },
                     { line: 0, column: 5 }),
@@ -136,12 +261,38 @@ export default [
                    { line: 0, column: 13 }), file, lines,
            { line: 0, column: 1 },
            { line: 0, column: 13 })
-  ]),*/
+  ]),
+
+  test_crash("->",
+    "functions must have at least 1 parameter  (parse.test 1:1)\n" +
+    "  ->\n" +
+    "  ^-"),
+
+  test_crash("-> 1",
+    "functions must have at least 1 parameter  (parse.test 1:1)\n" +
+    "  -> 1\n" +
+    "  ^-"),
+
+  test("-> 1 2", (file, lines) => [
+    lambda([integer(1, file, lines,
+                    { line: 0, column: 3 },
+                    { line: 0, column: 4 })],
+           integer(2, file, lines,
+                   { line: 0, column: 5 },
+                   { line: 0, column: 6 }), file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: 6 })
+  ]),
+
+  test_crash("(->)",
+    "functions must have at least 1 parameter  (parse.test 1:2)\n" +
+    "  (->)\n" +
+    "   ^-"),
 
   test_crash("(-> 1)",
-    "functions must have at least one argument  (parse.test 1:1)\n" +
+    "functions must have at least 1 parameter  (parse.test 1:2)\n" +
     "  (-> 1)\n" +
-    "  ^-----"),
+    "   ^-"),
 
 
   /*test("a.b", (file, lines) => [

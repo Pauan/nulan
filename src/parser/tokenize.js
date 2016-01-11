@@ -412,10 +412,13 @@ const specials = {
 
   "(":  tokenize_delimiter,
   ")":  tokenize_delimiter,
+
   "[":  tokenize_delimiter,
   "]":  tokenize_delimiter,
+
   "{":  tokenize_delimiter,
   "}":  tokenize_delimiter,
+
   "&":  tokenize_delimiter,
   "~":  tokenize_delimiter,
   "@":  tokenize_delimiter,

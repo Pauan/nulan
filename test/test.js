@@ -11,5 +11,5 @@ perform_tests([
   //test_group("ffi/node.js", test2),
 
   test_group("src/tokenize.js", $tokenize),
-  //test_group("src/parse.js", $parse)
+  test_group("src/parse.js", $parse)
 ]);

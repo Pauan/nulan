@@ -34,6 +34,12 @@ export const crash = (x) => {
   throw x;
 };
 
+export const assert = (x) => {
+  if (!x) {
+    crash(new Error("Assertion failed"));
+  }
+};
+
 export const error = (x, message) => {
   crash(new Error(format_message("Error", x, message)));
 };

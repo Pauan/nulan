@@ -7,6 +7,7 @@ export const LIST    = 5;
 export const RECORD  = 6;
 export const ASSIGN  = 7;
 export const LAMBDA  = 8;
+export const BAR     = 9;
 
 export const symbol = (value, filename, lines, start, end) => {
   return {
@@ -107,4 +108,8 @@ export const lambda = (parameters, body, filename, lines, start, end) => {
     start: start,
     end: end
   };
+};
+
+export const bar = (value, filename, lines, start, end) => {
+  return { type: BAR, value, filename, lines, start, end };
 };
