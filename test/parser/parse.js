@@ -186,7 +186,6 @@ export default [
   ...test_brackets("[", "]", list, false),
   ...test_brackets("{", "}", record, false),
 
-
   ...test_prefix("|", bar),
   ...test_prefix("&", quote),
   ...test_prefix("~", unquote),

@@ -164,26 +164,27 @@ const parse_infix = (priority, make) =>
     }
   });
 
-const parse_lambda = parsed({
-  priority: 20,
-  right_associative: true,
-  parse: (left, middle, right) => {
-    if (right["length"] < 2) {
-      error(middle, "functions must have at least 1 parameter");
+const parse_lambda = (priority, make) =>
+  parsed({
+    priority: priority,
+    right_associative: true,
+    parse: (left, middle, right) => {
+      if (right["length"] < 2) {
+        error(middle, "functions must have at least 1 parameter");
 
-    } else {
-      const parameters = right["slice"](0, -1);
-      const body = right[right["length"] - 1];
+      } else {
+        const parameters = right["slice"](0, -1);
+        const body = right[right["length"] - 1];
 
-      const x = lambda(parameters, body,
+        const x = make(parameters, body,
                        middle.filename, middle.lines,
                        middle.start, body.end);
 
-      left["push"](x);
-      return left;
+        left["push"](x);
+        return left;
+      }
     }
-  }
-});
+  });
 
 
 const specials = {
@@ -196,7 +197,7 @@ const specials = {
   "{": end_at("}", record, false),
   "}": start_at("{"),
 
-  "->": parse_lambda,
+  "->": parse_lambda(10, lambda),
 
   "|": parse_prefix(10, bar),
   "&": parse_prefix(10, quote),
