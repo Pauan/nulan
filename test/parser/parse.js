@@ -54,7 +54,7 @@ const test_prefix = (name, make) =>
     ]),
   ];
 
-const test_infix = (name, make) =>
+const test_infix = (name, make, right_associative) =>
   [
     test_crash(name,
       "missing expression on the left side  (parse.test 1:1)\n" +
@@ -82,21 +82,37 @@ const test_infix = (name, make) =>
            { line: 0, column: name["length"] + 4 })
     ]),
 
-    test("1 " + name + " 2 " + name + " 3", (file, lines) => [
-      make(make(integer(1, file, lines,
-                        { line: 0, column: 0 },
-                        { line: 0, column: 1 }),
-                integer(2, file, lines,
-                        { line: 0, column: name["length"] + 3 },
-                        { line: 0, column: name["length"] + 4 }), file, lines,
-                { line: 0, column: 0 },
-                { line: 0, column: name["length"] + 4 }),
-           integer(3, file, lines,
-                   { line: 0, column: name["length"] + name["length"] + 6 },
-                   { line: 0, column: name["length"] + name["length"] + 7 }), file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: name["length"] + name["length"] + 7 })
-    ]),
+    (right_associative
+      ? test("1 " + name + " 2 " + name + " 3", (file, lines) => [
+          make(integer(1, file, lines,
+                       { line: 0, column: 0 },
+                       { line: 0, column: 1 }),
+               make(integer(2, file, lines,
+                            { line: 0, column: name["length"] + 3 },
+                            { line: 0, column: name["length"] + 4 }),
+                    integer(3, file, lines,
+                            { line: 0, column: name["length"] + name["length"] + 6 },
+                            { line: 0, column: name["length"] + name["length"] + 7 }), file, lines,
+                    { line: 0, column: name["length"] + 3 },
+                    { line: 0, column: name["length"] + name["length"] + 7 }), file, lines,
+               { line: 0, column: 0 },
+               { line: 0, column: name["length"] + name["length"] + 7 })
+        ])
+      : test("1 " + name + " 2 " + name + " 3", (file, lines) => [
+          make(make(integer(1, file, lines,
+                            { line: 0, column: 0 },
+                            { line: 0, column: 1 }),
+                    integer(2, file, lines,
+                            { line: 0, column: name["length"] + 3 },
+                            { line: 0, column: name["length"] + 4 }), file, lines,
+                    { line: 0, column: 0 },
+                    { line: 0, column: name["length"] + 4 }),
+               integer(3, file, lines,
+                       { line: 0, column: name["length"] + name["length"] + 6 },
+                       { line: 0, column: name["length"] + name["length"] + 7 }), file, lines,
+               { line: 0, column: 0 },
+               { line: 0, column: name["length"] + name["length"] + 7 })
+        ])),
   ];
 
 const test_brackets = (start, end, make, unwrap) =>
@@ -191,9 +207,9 @@ export default [
   ...test_prefix("~", unquote),
   ...test_prefix("@", splice),
 
-  ...test_infix("<=", assign),
-  ...test_infix(".", dot),
-  ...test_infix("::", type),
+  ...test_infix("<=", assign, true),
+  ...test_infix(".", dot, false),
+  ...test_infix("::", type, false),
 
 
   test("{ hi }", (file, lines) => [
@@ -287,6 +303,69 @@ export default [
                    { line: 0, column: 6 }), file, lines,
            { line: 0, column: 0 },
            { line: 0, column: 6 })
+  ]),
+
+  test("-> 1 -> 2 3", (file, lines) => [
+    lambda([integer(1, file, lines,
+                    { line: 0, column: 3 },
+                    { line: 0, column: 4 })],
+           lambda([integer(2, file, lines,
+                           { line: 0, column: 8 },
+                           { line: 0, column: 9 })],
+                  integer(3, file, lines,
+                          { line: 0, column: 10 },
+                          { line: 0, column: 11 }), file, lines,
+                  { line: 0, column: 5 },
+                  { line: 0, column: 11 }), file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: 11 })
+  ]),
+
+  test("-> 1 -> 2 3 <= 4", (file, lines) => [
+    lambda([integer(1, file, lines,
+                    { line: 0, column: 3 },
+                    { line: 0, column: 4 })],
+           lambda([integer(2, file, lines,
+                           { line: 0, column: 8 },
+                           { line: 0, column: 9 })],
+                  assign(integer(3, file, lines,
+                                 { line: 0, column: 10 },
+                                 { line: 0, column: 11 }),
+                         integer(4, file, lines,
+                                 { line: 0, column: 15 },
+                                 { line: 0, column: 16 }), file, lines,
+                         { line: 0, column: 10 },
+                         { line: 0, column: 16 }), file, lines,
+                  { line: 0, column: 5 },
+                  { line: 0, column: 16 }), file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: 16 })
+  ]),
+
+  test("-> 1 2 <= -> 3 4 <= 5", (file, lines) => [
+    lambda([integer(1, file, lines,
+                    { line: 0, column: 3 },
+                    { line: 0, column: 4 })],
+           assign(integer(2, file, lines,
+                          { line: 0, column: 5 },
+                          { line: 0, column: 6 }),
+                  lambda([integer(3, file, lines,
+                                  { line: 0, column: 13 },
+                                  { line: 0, column: 14 })],
+                         assign(integer(4, file, lines,
+                                        { line: 0, column: 15 },
+                                        { line: 0, column: 16 }),
+                                integer(5, file, lines,
+                                        { line: 0, column: 20 },
+                                        { line: 0, column: 21 }), file, lines,
+                                { line: 0, column: 15 },
+                                { line: 0, column: 21 }), file, lines,
+                         { line: 0, column: 10 },
+                         { line: 0, column: 21 }), file, lines,
+                   { line: 0, column: 5 },
+                   { line: 0, column: 21 }), file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: 21 })
   ]),
 
   test_crash("(->)",

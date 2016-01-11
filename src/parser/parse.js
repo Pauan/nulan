@@ -145,9 +145,10 @@ const parse_prefix = (priority, make) =>
     }
   });
 
-const parse_infix = (priority, make) =>
+const parse_infix = (priority, make, right_associative) =>
   parsed({
     priority: priority,
+    right_associative: right_associative,
     parse: (left, middle, right) => {
       if (left["length"] === 0) {
         error(middle, "missing expression on the left side");
@@ -204,7 +205,7 @@ const specials = {
   "~": parse_prefix(10, unquote),
   "@": parse_prefix(10, splice),
 
-  ".":  parse_infix(10, dot),
-  "<=": parse_infix(10, assign),
-  "::": parse_infix(10, type),
+  ".":  parse_infix(10, dot, false),
+  "<=": parse_infix(10, assign, true),
+  "::": parse_infix(10, type, false),
 };
