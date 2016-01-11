@@ -189,6 +189,7 @@ export default [
   ...test_prefix("|", bar),
 
   ...test_infix("<=", assign),
+  ...test_infix(".", dot),
 
 
   test("{ hi }", (file, lines) => [
@@ -295,7 +296,7 @@ export default [
     "   ^-"),
 
 
-  /*test("a.b", (file, lines) => [
+  test("a.b", (file, lines) => [
     dot(symbol("a", file, lines,
                { line: 0, column: 0 },
                { line: 0, column: 1 }),
@@ -305,5 +306,5 @@ export default [
         file, lines,
         { line: 0, column: 0 },
         { line: 0, column: 3 })
-  ]),*/
+  ]),
 ];
