@@ -78,7 +78,7 @@ const parsed = (info) => {
   return info;
 };
 
-const end_at = (end, make, unwrap) => {
+const end_at = (end, make) => {
   return {
     // TODO is this the correct priority ?
     priority: Infinity,
@@ -99,12 +99,7 @@ const end_at = (end, make, unwrap) => {
 
           state.index = right.index + 1;
 
-          if (unwrap && values["length"] === 1) {
-            state.output["push"](values[0]);
-
-          } else {
-            state.output["push"](make(values, first.filename, first.lines, first.start, token.end));
-          }
+          state.output["push"](make(values, first.filename, first.lines, first.start, token.end));
 
           return state;
 
@@ -188,13 +183,13 @@ const parse_lambda = (priority, make) =>
 
 
 const specials = {
-  "(": end_at(")", call, true),
+  "(": end_at(")", call),
   ")": start_at("("),
 
-  "[": end_at("]", list, false),
+  "[": end_at("]", list),
   "]": start_at("["),
 
-  "{": end_at("}", record, false),
+  "{": end_at("}", record),
   "}": start_at("{"),
 
   "->": parse_lambda(10, lambda),

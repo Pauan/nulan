@@ -140,7 +140,7 @@ const test_infix = (name, make, right_associative) =>
         ])),
   ];
 
-const test_brackets = (start, end, make, unwrap) =>
+const test_brackets = (start, end, make) =>
   [
     test_crash("foo" + end,
       "missing starting " + start + "  (parse.test 1:4)\n" +
@@ -182,50 +182,34 @@ const test_brackets = (start, end, make, unwrap) =>
            { line: 0, column: 13 })
     ]),
 
-    (unwrap
-      ? test(start + start + "foo" + end + " " +
-                     start + "bar" + end + " " +
-                     start + "qux" + end + end, (file, lines) => [
-          make([symbol("foo", file, lines,
-                       { line: 0, column: 2 },
-                       { line: 0, column: 5 }),
-                symbol("bar", file, lines,
-                       { line: 0, column: 8 },
-                       { line: 0, column: 11 }),
-                symbol("qux", file, lines,
-                       { line: 0, column: 14 },
-                       { line: 0, column: 17 })], file, lines,
-               { line: 0, column: 0 },
-               { line: 0, column: 19 })
-        ])
-      : test(start + start + "foo" + end + " " +
-                     start + "bar" + end + " " +
-                     start + "qux" + end + end, (file, lines) => [
-          make([make([symbol("foo", file, lines,
-                             { line: 0, column: 2 },
-                             { line: 0, column: 5 })], file, lines,
-                     { line: 0, column: 1 },
-                     { line: 0, column: 6 }),
-                make([symbol("bar", file, lines,
-                             { line: 0, column: 8 },
-                             { line: 0, column: 11 })], file, lines,
-                     { line: 0, column: 7 },
-                     { line: 0, column: 12 }),
-                make([symbol("qux", file, lines,
-                             { line: 0, column: 14 },
-                             { line: 0, column: 17 })], file, lines,
-                     { line: 0, column: 13 },
-                     { line: 0, column: 18 })], file, lines,
-               { line: 0, column: 0 },
-               { line: 0, column: 19 })
-        ]))
+    test(start + start + "foo" + end + " " +
+                 start + "bar" + end + " " +
+                 start + "qux" + end + end, (file, lines) => [
+      make([make([symbol("foo", file, lines,
+                         { line: 0, column: 2 },
+                         { line: 0, column: 5 })], file, lines,
+                 { line: 0, column: 1 },
+                 { line: 0, column: 6 }),
+            make([symbol("bar", file, lines,
+                         { line: 0, column: 8 },
+                         { line: 0, column: 11 })], file, lines,
+                 { line: 0, column: 7 },
+                 { line: 0, column: 12 }),
+            make([symbol("qux", file, lines,
+                         { line: 0, column: 14 },
+                         { line: 0, column: 17 })], file, lines,
+                 { line: 0, column: 13 },
+                 { line: 0, column: 18 })], file, lines,
+           { line: 0, column: 0 },
+           { line: 0, column: 19 })
+    ])
   ];
 
 
 export default [
-  ...test_brackets("(", ")", call, true),
-  ...test_brackets("[", "]", list, false),
-  ...test_brackets("{", "}", record, false),
+  ...test_brackets("(", ")", call),
+  ...test_brackets("[", "]", list),
+  ...test_brackets("{", "}", record),
 
   ...test_prefix("|", bar),
   ...test_prefix("&", quote),
@@ -290,23 +274,25 @@ export default [
   ]),
 
   test("(-> 1 2 3 4 5)", (file, lines) => [
-    lambda([integer(1, file, lines,
-                    { line: 0, column: 4 },
-                    { line: 0, column: 5 }),
-            integer(2, file, lines,
-                    { line: 0, column: 6 },
-                    { line: 0, column: 7 }),
-            integer(3, file, lines,
-                    { line: 0, column: 8 },
-                    { line: 0, column: 9 }),
-            integer(4, file, lines,
-                    { line: 0, column: 10 },
-                    { line: 0, column: 11 })],
-           integer(5, file, lines,
-                   { line: 0, column: 12 },
-                   { line: 0, column: 13 }), file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 13 })
+    call([lambda([integer(1, file, lines,
+                          { line: 0, column: 4 },
+                          { line: 0, column: 5 }),
+                  integer(2, file, lines,
+                          { line: 0, column: 6 },
+                          { line: 0, column: 7 }),
+                  integer(3, file, lines,
+                          { line: 0, column: 8 },
+                          { line: 0, column: 9 }),
+                  integer(4, file, lines,
+                          { line: 0, column: 10 },
+                          { line: 0, column: 11 })],
+                 integer(5, file, lines,
+                         { line: 0, column: 12 },
+                         { line: 0, column: 13 }), file, lines,
+                 { line: 0, column: 1 },
+                 { line: 0, column: 13 })], file, lines,
+         { line: 0, column: 0 },
+         { line: 0, column: 14 })
   ]),
 
   test_crash("->",
