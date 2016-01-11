@@ -24,5 +24,8 @@ export const map = (a, f) => {
   return out;
 };
 
+export const join = (a, s) =>
+  a["join"](s);
+
 export const length = (a) =>
   a["length"];
