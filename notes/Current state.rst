@@ -54,7 +54,7 @@
   | transform <= map)
 
 (PROVIDE ($transform Maybe)
-  | transform <= (-> ...))
+  | transform <= (-> a a))
 
 (EXPORT
   | d <= a

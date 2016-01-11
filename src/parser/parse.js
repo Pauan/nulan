@@ -3,7 +3,8 @@ import { peek } from "../../util/array";
 //import { pretty } from "./pretty";
 import { SYMBOL, symbol, integer, string,
          call, list, record, lambda, bar,
-         assign, dot, type } from "./ast";
+         assign, dot, type, quote, unquote,
+         splice } from "./ast";
 
 
 const is_symbol = (x, s) =>
@@ -198,10 +199,11 @@ const specials = {
   "->": parse_lambda,
 
   "|": parse_prefix(10, bar),
+  "&": parse_prefix(10, quote),
+  "~": parse_prefix(10, unquote),
+  "@": parse_prefix(10, splice),
 
+  ".":  parse_infix(10, dot),
   "<=": parse_infix(10, assign),
-  ".": parse_infix(10, dot),
   "::": parse_infix(10, type),
-
-  //"&": parse_prefix
 };

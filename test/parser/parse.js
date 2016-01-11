@@ -5,7 +5,8 @@ import { parse } from "../../src/parser/parse";
 import { lines, repeat } from "../../util/string";
 import { string, symbol, integer,
          call, list, record, lambda,
-         dot, bar, assign, type } from "../../src/parser/ast";
+         dot, bar, assign, type,
+         quote, unquote, splice } from "../../src/parser/ast";
 
 
 const file = "parse.test";
@@ -187,6 +188,9 @@ export default [
 
 
   ...test_prefix("|", bar),
+  ...test_prefix("&", quote),
+  ...test_prefix("~", unquote),
+  ...test_prefix("@", splice),
 
   ...test_infix("<=", assign),
   ...test_infix(".", dot),

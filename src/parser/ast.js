@@ -10,6 +10,9 @@ export const LAMBDA  = 8;
 export const BAR     = 9;
 export const DOT     = 10;
 export const TYPE    = 11;
+export const QUOTE   = 12;
+export const UNQUOTE = 13;
+export const SPLICE  = 14;
 
 export const symbol = (value, filename, lines, start, end) => {
   return {
@@ -122,4 +125,16 @@ export const lambda = (parameters, body, filename, lines, start, end) => {
 
 export const bar = (value, filename, lines, start, end) => {
   return { type: BAR, value, filename, lines, start, end };
+};
+
+export const quote = (value, filename, lines, start, end) => {
+  return { type: QUOTE, value, filename, lines, start, end };
+};
+
+export const unquote = (value, filename, lines, start, end) => {
+  return { type: UNQUOTE, value, filename, lines, start, end };
+};
+
+export const splice = (value, filename, lines, start, end) => {
+  return { type: SPLICE, value, filename, lines, start, end };
 };
