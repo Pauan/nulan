@@ -1,21 +1,31 @@
-export const SYMBOL  = 0;
-export const INTEGER = 1;
-export const NUMBER  = 2;
-export const STRING  = 3;
-export const CALL    = 4;
-export const LIST    = 5;
-export const RECORD  = 6;
-export const ASSIGN  = 7;
-export const LAMBDA  = 8;
-export const BAR     = 9;
-export const DOT     = 10;
-export const TYPE    = 11;
-export const QUOTE   = 12;
-export const UNQUOTE = 13;
-export const SPLICE  = 14;
+export const SYMBOL      = 0;
+export const CONSTRUCTOR = 1;
+export const PROTOCOL    = 2;
+export const INTEGER     = 3;
+export const NUMBER      = 4;
+export const STRING      = 5;
+export const CALL        = 6;
+export const LIST        = 7;
+export const RECORD      = 8;
+export const ASSIGN      = 9;
+export const LAMBDA      = 10;
+export const BAR         = 11;
+export const DOT         = 12;
+export const TYPE        = 13;
+export const QUOTE       = 14;
+export const UNQUOTE     = 15;
+export const SPLICE      = 16;
 
 export const symbol = (value, filename, lines, start, end) => {
   return { type: SYMBOL, value, filename, lines, start, end };
+};
+
+export const constructor = (value, filename, lines, start, end) => {
+  return { type: CONSTRUCTOR, value, filename, lines, start, end };
+};
+
+export const protocol = (value, filename, lines, start, end) => {
+  return { type: PROTOCOL, value, filename, lines, start, end };
 };
 
 export const integer = (value, filename, lines, start, end) => {

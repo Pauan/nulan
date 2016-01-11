@@ -5,6 +5,8 @@ import { map, length, all } from "../../util/array";
 
 const is_simple_parameter = (x) =>
   x.type === $ast.SYMBOL ||
+  x.type === $ast.CONSTRUCTOR ||
+  x.type === $ast.PROTOCOL ||
   x.type === $ast.INTEGER ||
   x.type === $ast.NUMBER ||
   x.type === $ast.STRING ||
@@ -94,7 +96,9 @@ const pretty_infix = (left, name, right) => {
 
 
 export const pretty = (x) => {
-  if (x.type === $ast.SYMBOL) {
+  if (x.type === $ast.SYMBOL ||
+      x.type === $ast.CONSTRUCTOR ||
+      x.type === $ast.PROTOCOL) {
     return x.value;
 
   } else if (x.type === $ast.INTEGER || x.type === $ast.NUMBER) {

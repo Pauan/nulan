@@ -1,7 +1,7 @@
 import { error } from "../../util/error";
 import { repeat } from "../../util/string";
 import { peek } from "../../util/array";
-import { symbol, integer, string } from "./ast";
+import { symbol, constructor, protocol, integer, string } from "./ast";
 
 
 const tokenize_delimiter = (output, file, lines, line, column) => {
@@ -29,7 +29,7 @@ const tokenize_symbol1 = (value, file, lines, start, end) => {
   }
 };
 
-const tokenize_symbol = (output, file, lines, line, column) => {
+const consume_symbol = (output, file, lines, line, column, f) => {
   const start = { line, column };
 
   const chars = lines[line];
@@ -43,7 +43,7 @@ const tokenize_symbol = (output, file, lines, line, column) => {
 
     if (char === null || specials[char] != null) {
       const end = { line, column };
-      output["push"](tokenize_symbol1(value, file, lines, start, end));
+      output["push"](f(value, file, lines, start, end));
       return tokenize1(output, file, lines, line, column);
 
     } else {
@@ -52,6 +52,15 @@ const tokenize_symbol = (output, file, lines, line, column) => {
     }
   }
 };
+
+const tokenize_symbol = (output, file, lines, line, column) =>
+  consume_symbol(output, file, lines, line, column, tokenize_symbol1);
+
+const tokenize_constructor = (output, file, lines, line, column) =>
+  consume_symbol(output, file, lines, line, column, constructor);
+
+const tokenize_protocol = (output, file, lines, line, column) =>
+  consume_symbol(output, file, lines, line, column, protocol);
 
 
 const consume_spaces = (file, lines, line, column) => {
@@ -409,6 +418,9 @@ const specials = {
   " ":  tokenize_space,
   "#":  tokenize_comment,
   "\"": tokenize_string,
+
+  "*": tokenize_constructor,
+  "$": tokenize_protocol,
 
   "(":  tokenize_delimiter,
   ")":  tokenize_delimiter,

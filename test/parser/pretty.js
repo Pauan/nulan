@@ -5,7 +5,8 @@ import { lines } from "../../util/string";
 import { string, symbol, integer,
          call, list, record, lambda,
          dot, bar, assign, type,
-         quote, unquote, splice } from "../../src/parser/ast";
+         quote, unquote, splice,
+         constructor, protocol } from "../../src/parser/ast";
 
 
 const test = (input, expected) =>
@@ -19,6 +20,13 @@ const test_lambda = lambda([symbol("a"), symbol("b")],
                       call([symbol("c"), symbol("d")]));
 
 export default [
+  test(constructor("*foo"),
+    "*foo"),
+
+  test(protocol("$foo"),
+    "$foo"),
+
+
   test(call([integer(1), integer(2), integer(3)]),
     "(1 2 3)"),
 
@@ -47,9 +55,9 @@ export default [
     "        qux\" \"corge\n" +
     "              yes\")"),
 
-  /*test(call([string("foo\n\n")]),
+  test(call([string("foo\n\n")]),
     "(\"foo\n\n" +
-    "  \")"),*/
+    "  \")"),
 
 
   test(call([string("foo\nbar"), quote(string("qux\ncorge"))]),

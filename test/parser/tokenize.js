@@ -1,6 +1,6 @@
 import { expect, expect_crash } from "../assert";
 import { wrap, catch_error } from "../../ffi/task";
-import { string, symbol, integer } from "../../src/parser/ast";
+import { string, symbol, integer, constructor, protocol } from "../../src/parser/ast";
 import { tokenize } from "../../src/parser/tokenize";
 import { lines } from "../../util/string";
 
@@ -94,6 +94,19 @@ export default [
     integer(0, file, lines,
             { line: 0, column: 2 },
             { line: 0, column: 3 })
+  ]),
+
+
+  test("*foo", (file, lines) => [
+    constructor("*foo", file, lines,
+                { line: 0, column: 0 },
+                { line: 0, column: 4 })
+  ]),
+
+  test("$foo", (file, lines) => [
+    protocol("$foo", file, lines,
+             { line: 0, column: 0 },
+             { line: 0, column: 4 })
   ]),
 
 

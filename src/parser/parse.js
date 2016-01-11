@@ -1,6 +1,5 @@
 import { error } from "../../util/error";
 import { peek } from "../../util/array";
-//import { pretty } from "./pretty";
 import { SYMBOL, symbol, integer, string,
          call, list, record, lambda, bar,
          assign, dot, type, quote, unquote,
