@@ -52,6 +52,31 @@ const test_prefix = (name, make) =>
            { line: 0, column: 0 },
            { line: 0, column: name["length"] + name["length"] + 3 })
     ]),
+
+    test("(a\n" +
+         "  " + name + " b\n" +
+         "  " + name + " (c d))", (file, lines) => [
+      call([symbol("a", file, lines,
+                   { line: 0, column: 1 },
+                   { line: 0, column: 2 }),
+            make(symbol("b", file, lines,
+                        { line: 1, column: name["length"] + 3 },
+                        { line: 1, column: name["length"] + 4 }), file, lines,
+                 { line: 1, column: 2 },
+                 { line: 1, column: name["length"] + 4 }),
+            make(call([symbol("c", file, lines,
+                              { line: 2, column: name["length"] + 4 },
+                              { line: 2, column: name["length"] + 5 }),
+                       symbol("d", file, lines,
+                              { line: 2, column: name["length"] + 6 },
+                              { line: 2, column: name["length"] + 7 })], file, lines,
+                      { line: 2, column: name["length"] + 3 },
+                      { line: 2, column: name["length"] + 8 }), file, lines,
+                 { line: 2, column: 2 },
+                 { line: 2, column: name["length"] + 8 })], file, lines,
+           { line: 0, column: 0 },
+           { line: 2, column: name["length"] + 9 })
+    ])
   ];
 
 const test_infix = (name, make, right_associative) =>

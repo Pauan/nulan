@@ -200,13 +200,13 @@ FOO
 # Unsure
 (PRAGMA { phase <= run-time
         | target <= javascript }
-  ...)
+  foo)
 
 (METADATA impure inline-function synchronous
-  ...)
+  foo)
 
 (INLINE
-  (-> ...))
+  (-> foo bar))
 
 (MATCH a
   (-> view a)

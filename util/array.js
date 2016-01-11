@@ -14,6 +14,16 @@ export const foldl = (init, x, f) => {
   return init;
 };
 
+export const all = (a, f) => {
+  for (let i = 0; i < a["length"]; ++i) {
+    if (!f(a[i])) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 export const map = (a, f) => {
   const out = new Array(a["length"]);
 

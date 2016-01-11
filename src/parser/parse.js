@@ -82,7 +82,7 @@ const parsed = (info) => {
 const end_at = (end, make, unwrap) => {
   return {
     // TODO is this the correct priority ?
-    priority: 0,
+    priority: Infinity,
     parse: (state, tokens, first) => {
       let right = {
         index: state.index,

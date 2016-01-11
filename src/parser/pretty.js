@@ -1,9 +1,9 @@
 import * as $ast from "./ast";
 import { repeat, indent, lines } from "../../util/string";
-import { map, join, length } from "../../util/array";
+import { map, length, all } from "../../util/array";
 
 
-const is_simple = (x) =>
+const is_simple_parameter = (x) =>
   x.type === $ast.SYMBOL ||
   x.type === $ast.INTEGER ||
   x.type === $ast.NUMBER ||
@@ -18,6 +18,9 @@ const is_simple = (x) =>
   (x.type === $ast.SPLICE &&
     is_simple(x.value));
 
+const is_simple = (x) =>
+  is_simple_parameter(x);
+
 
 const last = (s) => {
   const x = lines(s);
@@ -27,12 +30,25 @@ const last = (s) => {
 const pretty_lambda = (left, parameters, body, right) => {
   let output = left;
 
+  let simple = true;
+
   for (let i = 0; i < parameters["length"]; ++i) {
+    const x = parameters[i];
+
     output += " ";
-    output += indent(pretty(parameters[i]), repeat(" ", last(output)));
+    output += indent(pretty(x), repeat(" ", last(output)));
+
+    if (!is_simple_parameter(x)) {
+      simple = false;
+    }
   }
 
-  return output + "\n  " + indent(pretty(body), "  ") + right;
+  if (simple) {
+    return output + " " + indent(pretty(body), repeat(" ", last(output) + 1)) + right;
+
+  } else {
+    return output + "\n  " + indent(pretty(body), "  ") + right;
+  }
 };
 
 const pretty_brackets = (left, value, right, space, indented) => {

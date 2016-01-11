@@ -158,35 +158,28 @@ export default [
 
 
   test(call([lambda([symbol("a"), symbol("b")], symbol("c")), symbol("d")]),
-    "((-> a b\n" +
-    "   c)\n" +
+    "((-> a b c)\n" +
     "  d)"),
 
   test(call([lambda([], string("foo\nbar"))]),
-    "((->\n" +
-    "   \"foo\n" +
-    "    bar\"))"),
+    "((-> \"foo\n" +
+    "      bar\"))"),
 
   test(call([lambda([string("foo\nbar"), string("qux\ncorge")], symbol("c")), symbol("d")]),
     "((-> \"foo\n" +
     "      bar\" \"qux\n" +
-    "            corge\"\n" +
-    "   c)\n" +
+    "            corge\" c)\n" +
     "  d)"),
 
   test(call([test_lambda, symbol("e")]),
-    "((-> a b\n" +
-    "   (c d))\n" +
+    "((-> a b (c d))\n" +
     "  e)"),
 
 
   test(record([assign(symbol("foo"), test_lambda),
                bar(assign(symbol("bar"), test_lambda)),
                bar(assign(symbol("corge"), test_lambda))]),
-    "{ foo <= (-> a b\n" +
-    "           (c d))\n" +
-    "| bar <= (-> a b\n" +
-    "           (c d))\n" +
-    "| corge <= (-> a b\n" +
-    "             (c d)) }"),
+    "{ foo <= (-> a b (c d))\n" +
+    "| bar <= (-> a b (c d))\n" +
+    "| corge <= (-> a b (c d)) }"),
 ];
