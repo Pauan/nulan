@@ -1,7 +1,7 @@
 import { error } from "../../util/error";
 import { repeat } from "../../util/string";
 import { peek } from "../../util/array";
-import { symbol, constructor, protocol, integer, string } from "./ast";
+import * as $ast from "./ast";
 
 
 const tokenize_delimiter = (output, file, lines, line, column) => {
@@ -13,19 +13,19 @@ const tokenize_delimiter = (output, file, lines, line, column) => {
 
   const end = { line, column };
 
-  output["push"](symbol(char, file, lines, start, end));
+  output["push"]($ast.symbol(char, $ast.loc(file, lines, start, end)));
 
   return tokenize1(output, file, lines, line, column);
 };
 
 
-const tokenize_symbol1 = (value, file, lines, start, end) => {
+const tokenize_symbol1 = (value, loc) => {
   // TODO a tiny bit hacky
   if (/^[0-9]+$/["test"](value)) {
-    return integer(+value, file, lines, start, end);
+    return $ast.integer(+value, loc);
 
   } else {
-    return symbol(value, file, lines, start, end);
+    return $ast.symbol(value, loc);
   }
 };
 
@@ -43,7 +43,7 @@ const consume_symbol = (output, file, lines, line, column, f) => {
 
     if (char === null || specials[char] != null) {
       const end = { line, column };
-      output["push"](f(value, file, lines, start, end));
+      output["push"](f(value, $ast.loc(file, lines, start, end)));
       return tokenize1(output, file, lines, line, column);
 
     } else {
@@ -57,10 +57,10 @@ const tokenize_symbol = (output, file, lines, line, column) =>
   consume_symbol(output, file, lines, line, column, tokenize_symbol1);
 
 const tokenize_constructor = (output, file, lines, line, column) =>
-  consume_symbol(output, file, lines, line, column, constructor);
+  consume_symbol(output, file, lines, line, column, $ast.constructor);
 
 const tokenize_protocol = (output, file, lines, line, column) =>
-  consume_symbol(output, file, lines, line, column, protocol);
+  consume_symbol(output, file, lines, line, column, $ast.protocol);
 
 
 const consume_spaces = (file, lines, line, column) => {
@@ -79,7 +79,7 @@ const consume_spaces = (file, lines, line, column) => {
     } else if (char === null) {
       const end = { line, column };
 
-      error(symbol(" ", file, lines, start, end),
+      error($ast.symbol(" ", $ast.loc(file, lines, start, end)),
             "spaces (U+0020) are not allowed at the end of the line");
 
     } else {
@@ -114,7 +114,7 @@ const consume_hex = (output, file, lines, line, column) => {
                       ? "#<EOL>"
                       : char);
 
-      error(symbol(char2, file, lines, start, end),
+      error($ast.symbol(char2, $ast.loc(file, lines, start, end)),
             "expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got " + char2);
 
     } else {
@@ -178,7 +178,7 @@ const tokenize_escape = (value, file, lines, line, column) => {
     } else if (char === null) {
       const end = { line, column };
 
-      error(symbol("\\u", file, lines, start, end),
+      error($ast.symbol("\\u", $ast.loc(file, lines, start, end)),
             "expected \\u[ but got \\u");
 
     } else {
@@ -186,14 +186,14 @@ const tokenize_escape = (value, file, lines, line, column) => {
 
       const end = { line, column };
 
-      error(symbol("\\u" + char, file, lines, start, end),
+      error($ast.symbol("\\u" + char, $ast.loc(file, lines, start, end)),
             "expected \\u[ but got \\u" + char);
     }
 
   } else if (char === null) {
     const end = { line, column };
 
-    error(symbol("\\", file, lines, start, end),
+    error($ast.symbol("\\", $ast.loc(file, lines, start, end)),
           "expected one of [\\\\ \\\" \\s \\n \\u] but got \\");
 
   } else {
@@ -201,7 +201,7 @@ const tokenize_escape = (value, file, lines, line, column) => {
 
     const end = { line, column };
 
-    error(symbol("\\" + char, file, lines, start, end),
+    error($ast.symbol("\\" + char, $ast.loc(file, lines, start, end)),
           "expected one of [\\\\ \\\" \\s \\n \\u] but got \\" + char);
   }
 
@@ -212,7 +212,7 @@ const indent_error = (indent, file, lines, line, column1, column2) => {
   const start = { line, column: column1 };
   const end   = { line, column: column2 };
 
-  error(symbol(" ", file, lines, start, end),
+  error($ast.symbol(" ", $ast.loc(file, lines, start, end)),
         "there must be " + indent + " or more spaces (U+0020)");
 };
 
@@ -238,7 +238,7 @@ const tokenize_string = (output, file, lines, line, column) => {
 
         const end = { line, column };
 
-        output["push"](string(value["join"](""), file, lines, start, end));
+        output["push"]($ast.string(value["join"](""), $ast.loc(file, lines, start, end)));
 
         return tokenize1(output, file, lines, line, column);
 
@@ -285,7 +285,7 @@ const tokenize_string = (output, file, lines, line, column) => {
       }
 
     } else {
-      error(symbol("\"", file, lines, start, end),
+      error($ast.symbol("\"", $ast.loc(file, lines, start, end)),
             "missing ending \"");
     }
   }
@@ -301,7 +301,7 @@ const tokenize_block_comment = (output, file, lines, line, column) => {
 
   const end = { line, column };
 
-  pending["push"](symbol("#/", file, lines, start, end));
+  pending["push"]($ast.symbol("#/", $ast.loc(file, lines, start, end)));
 
   for (;;) {
     const chars = peek(lines, line);
@@ -336,7 +336,7 @@ const tokenize_block_comment = (output, file, lines, line, column) => {
 
           const end = { line, column };
 
-          pending["push"](symbol("#/", file, lines, start, end));
+          pending["push"]($ast.symbol("#/", $ast.loc(file, lines, start, end)));
 
         } else {
           column += 1;
@@ -400,7 +400,7 @@ const tokenize_tab = (output, file, lines, line, column) => {
     } else {
       const end = { line, column };
 
-      error(symbol("\t", file, lines, start, end),
+      error($ast.symbol("\t", $ast.loc(file, lines, start, end)),
             "tabs (U+0009) are not allowed");
     }
   }

@@ -17,14 +17,16 @@ const format_line = (x) => {
 };
 
 const format_message = (header, x, message) => {
-  const lines = x.lines["slice"](x.start.line, x.end.line + 1);
+  const loc = x.loc;
 
-  lines["push"](format_line(x));
+  const lines = loc.lines["slice"](loc.start.line, loc.end.line + 1);
+
+  lines["push"](format_line(loc));
 
   return header + ": " + message +
-         "  (" + x.filename +
-         " " + (x.start.line + 1) +
-         ":" + (x.start.column + 1) +
+         "  (" + loc.filename +
+         " " + (loc.start.line + 1) +
+         ":" + (loc.start.column + 1) +
          ")" + eol +
          "  " + lines["join"](eol + "  ");
 };

@@ -1,6 +1,6 @@
 import { expect, expect_crash } from "../assert";
 import { wrap, catch_error } from "../../ffi/task";
-import { string, symbol, integer, constructor, protocol } from "../../src/parser/ast";
+import { loc, string, symbol, integer, constructor, protocol } from "../../src/parser/ast";
 import { tokenize } from "../../src/parser/tokenize";
 import { lines } from "../../util/string";
 
@@ -9,7 +9,13 @@ const file = "tokenize.test";
 
 const test = (input, f) => {
   const x = lines(input);
-  return expect(f(file, x),
+
+  const _loc = (line1, column1, line2, column2) =>
+    loc(file, x,
+        { line: line1, column: column1 },
+        { line: line2, column: column2 });
+
+  return expect(f(_loc),
            wrap(tokenize(x, file)));
 };
 
@@ -22,462 +28,345 @@ const test_crash = (input, expected) =>
 
 
 export default [
-  test("", (file, lines) =>
+  test("", (loc) =>
     []),
 
-  test("\n\n\n\n\n", (file, lines) =>
+  test("\n\n\n\n\n", (loc) =>
     []),
 
 
-  test("foo", (file, lines) => [
-    symbol("foo", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 3 })
+  test("foo", (loc) => [
+    symbol("foo", loc(0, 0,
+                      0, 3))
   ]),
 
-  test("foo\n", (file, lines) => [
-    symbol("foo", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 3 })
+  test("foo\n", (loc) => [
+    symbol("foo", loc(0, 0,
+                      0, 3))
   ]),
 
-  test("\nfoo\n", (file, lines) => [
-    symbol("foo", file, lines,
-           { line: 1, column: 0 },
-           { line: 1, column: 3 })
+  test("\nfoo\n", (loc) => [
+    symbol("foo", loc(1, 0,
+                      1, 3))
   ]),
 
-  test("\nfoo\nbar\n", (file, lines) => [
-    symbol("foo", file, lines,
-           { line: 1, column: 0 },
-           { line: 1, column: 3 }),
-    symbol("bar", file, lines,
-           { line: 2, column: 0 },
-           { line: 2, column: 3 })
+  test("\nfoo\nbar\n", (loc) => [
+    symbol("foo", loc(1, 0,
+                      1, 3)),
+    symbol("bar", loc(2, 0,
+                      2, 3))
   ]),
 
-  test("\n foo\n   bar\n", (file, lines) => [
-    symbol("foo", file, lines,
-           { line: 1, column: 1 },
-           { line: 1, column: 4 }),
-    symbol("bar", file, lines,
-           { line: 2, column: 3 },
-           { line: 2, column: 6 })
+  test("\n foo\n   bar\n", (loc) => [
+    symbol("foo", loc(1, 1,
+                      1, 4)),
+    symbol("bar", loc(2, 3,
+                      2, 6))
   ]),
 
 
-  test("0", (file, lines) => [
-    integer(0, file, lines,
-            { line: 0, column: 0 },
-            { line: 0, column: 1 })
+  test("0", (loc) => [
+    integer(0, loc(0, 0,
+                   0, 1))
   ]),
 
-  test("0a", (file, lines) => [
-    symbol("0a", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 2 })
+  test("0a", (loc) => [
+    symbol("0a", loc(0, 0,
+                     0, 2))
   ]),
 
-  test("a0", (file, lines) => [
-    symbol("a0", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 2 })
+  test("a0", (loc) => [
+    symbol("a0", loc(0, 0,
+                     0, 2))
   ]),
 
-  test("0.0", (file, lines) => [
-    integer(0, file, lines,
-            { line: 0, column: 0 },
-            { line: 0, column: 1 }),
-    symbol(".", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 2 }),
-    integer(0, file, lines,
-            { line: 0, column: 2 },
-            { line: 0, column: 3 })
+  test("0.0", (loc) => [
+    integer(0, loc(0, 0,
+                   0, 1)),
+    symbol(".", loc(0, 1,
+                    0, 2)),
+    integer(0, loc(0, 2,
+                   0, 3))
   ]),
 
 
-  test("*foo", (file, lines) => [
-    constructor("*foo", file, lines,
-                { line: 0, column: 0 },
-                { line: 0, column: 4 })
+  test("*foo", (loc) => [
+    constructor("*foo", loc(0, 0,
+                            0, 4))
   ]),
 
-  test("$foo", (file, lines) => [
-    protocol("$foo", file, lines,
-             { line: 0, column: 0 },
-             { line: 0, column: 4 })
-  ]),
-
-
-  test(" foo bar", (file, lines) => [
-    symbol("foo", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 4 }),
-    symbol("bar", file, lines,
-           { line: 0, column: 5 },
-           { line: 0, column: 8 })
-  ]),
-
-  test("(foo(bar(", (file, lines) => [
-    symbol("(", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("foo", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 4 }),
-    symbol("(", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 }),
-    symbol("bar", file, lines,
-           { line: 0, column: 5 },
-           { line: 0, column: 8 }),
-    symbol("(", file, lines,
-           { line: 0, column: 8 },
-           { line: 0, column: 9 })
-  ]),
-
-  test(")foo)bar)", (file, lines) => [
-    symbol(")", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("foo", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 4 }),
-    symbol(")", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 }),
-    symbol("bar", file, lines,
-           { line: 0, column: 5 },
-           { line: 0, column: 8 }),
-    symbol(")", file, lines,
-           { line: 0, column: 8 },
-           { line: 0, column: 9 })
-  ]),
-
-  test("[foo[bar[", (file, lines) => [
-    symbol("[", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("foo", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 4 }),
-    symbol("[", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 }),
-    symbol("bar", file, lines,
-           { line: 0, column: 5 },
-           { line: 0, column: 8 }),
-    symbol("[", file, lines,
-           { line: 0, column: 8 },
-           { line: 0, column: 9 })
-  ]),
-
-  test("]foo]bar]", (file, lines) => [
-    symbol("]", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("foo", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 4 }),
-    symbol("]", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 }),
-    symbol("bar", file, lines,
-           { line: 0, column: 5 },
-           { line: 0, column: 8 }),
-    symbol("]", file, lines,
-           { line: 0, column: 8 },
-           { line: 0, column: 9 })
-  ]),
-
-  test("{foo{bar{", (file, lines) => [
-    symbol("{", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("foo", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 4 }),
-    symbol("{", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 }),
-    symbol("bar", file, lines,
-           { line: 0, column: 5 },
-           { line: 0, column: 8 }),
-    symbol("{", file, lines,
-           { line: 0, column: 8 },
-           { line: 0, column: 9 })
-  ]),
-
-  test("}foo}bar}", (file, lines) => [
-    symbol("}", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("foo", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 4 }),
-    symbol("}", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 }),
-    symbol("bar", file, lines,
-           { line: 0, column: 5 },
-           { line: 0, column: 8 }),
-    symbol("}", file, lines,
-           { line: 0, column: 8 },
-           { line: 0, column: 9 })
-  ]),
-
-  test("&foo&bar&", (file, lines) => [
-    symbol("&", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("foo", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 4 }),
-    symbol("&", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 }),
-    symbol("bar", file, lines,
-           { line: 0, column: 5 },
-           { line: 0, column: 8 }),
-    symbol("&", file, lines,
-           { line: 0, column: 8 },
-           { line: 0, column: 9 })
-  ]),
-
-  test("~foo~bar~", (file, lines) => [
-    symbol("~", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("foo", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 4 }),
-    symbol("~", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 }),
-    symbol("bar", file, lines,
-           { line: 0, column: 5 },
-           { line: 0, column: 8 }),
-    symbol("~", file, lines,
-           { line: 0, column: 8 },
-           { line: 0, column: 9 })
-  ]),
-
-  test("@foo@bar@", (file, lines) => [
-    symbol("@", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("foo", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 4 }),
-    symbol("@", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 }),
-    symbol("bar", file, lines,
-           { line: 0, column: 5 },
-           { line: 0, column: 8 }),
-    symbol("@", file, lines,
-           { line: 0, column: 8 },
-           { line: 0, column: 9 })
-  ]),
-
-  test(".foo.bar.", (file, lines) => [
-    symbol(".", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("foo", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 4 }),
-    symbol(".", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 }),
-    symbol("bar", file, lines,
-           { line: 0, column: 5 },
-           { line: 0, column: 8 }),
-    symbol(".", file, lines,
-           { line: 0, column: 8 },
-           { line: 0, column: 9 })
+  test("$foo", (loc) => [
+    protocol("$foo", loc(0, 0,
+                         0, 4))
   ]),
 
 
-  test(".(.(.", (file, lines) => [
-    symbol(".", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("(", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 2 }),
-    symbol(".", file, lines,
-           { line: 0, column: 2 },
-           { line: 0, column: 3 }),
-    symbol("(", file, lines,
-           { line: 0, column: 3 },
-           { line: 0, column: 4 }),
-    symbol(".", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 })
+  test(" foo bar", (loc) => [
+    symbol("foo", loc(0, 1,
+                      0, 4)),
+    symbol("bar", loc(0, 5,
+                      0, 8))
   ]),
 
-  test(".).).", (file, lines) => [
-    symbol(".", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol(")", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 2 }),
-    symbol(".", file, lines,
-           { line: 0, column: 2 },
-           { line: 0, column: 3 }),
-    symbol(")", file, lines,
-           { line: 0, column: 3 },
-           { line: 0, column: 4 }),
-    symbol(".", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 })
+  test("(foo(bar(", (loc) => [
+    symbol("(", loc(0, 0,
+                    0, 1)),
+    symbol("foo", loc(0, 1,
+                      0, 4)),
+    symbol("(", loc(0, 4,
+                    0, 5)),
+    symbol("bar", loc(0, 5,
+                      0, 8)),
+    symbol("(", loc(0, 8,
+                    0, 9))
   ]),
 
-  test(".[.[.", (file, lines) => [
-    symbol(".", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("[", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 2 }),
-    symbol(".", file, lines,
-           { line: 0, column: 2 },
-           { line: 0, column: 3 }),
-    symbol("[", file, lines,
-           { line: 0, column: 3 },
-           { line: 0, column: 4 }),
-    symbol(".", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 })
+  test(")foo)bar)", (loc) => [
+    symbol(")", loc(0, 0,
+                    0, 1)),
+    symbol("foo", loc(0, 1,
+                      0, 4)),
+    symbol(")", loc(0, 4,
+                    0, 5)),
+    symbol("bar", loc(0, 5,
+                      0, 8)),
+    symbol(")", loc(0, 8,
+                    0, 9))
   ]),
 
-  test(".].].", (file, lines) => [
-    symbol(".", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("]", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 2 }),
-    symbol(".", file, lines,
-           { line: 0, column: 2 },
-           { line: 0, column: 3 }),
-    symbol("]", file, lines,
-           { line: 0, column: 3 },
-           { line: 0, column: 4 }),
-    symbol(".", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 })
+  test("[foo[bar[", (loc) => [
+    symbol("[", loc(0, 0,
+                    0, 1)),
+    symbol("foo", loc(0, 1,
+                      0, 4)),
+    symbol("[", loc(0, 4,
+                    0, 5)),
+    symbol("bar", loc(0, 5,
+                      0, 8)),
+    symbol("[", loc(0, 8,
+                    0, 9))
   ]),
 
-  test(".{.{.", (file, lines) => [
-    symbol(".", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("{", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 2 }),
-    symbol(".", file, lines,
-           { line: 0, column: 2 },
-           { line: 0, column: 3 }),
-    symbol("{", file, lines,
-           { line: 0, column: 3 },
-             { line: 0, column: 4 }),
-    symbol(".", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 })
+  test("]foo]bar]", (loc) => [
+    symbol("]", loc(0, 0,
+                    0, 1)),
+    symbol("foo", loc(0, 1,
+                      0, 4)),
+    symbol("]", loc(0, 4,
+                    0, 5)),
+    symbol("bar", loc(0, 5,
+                      0, 8)),
+    symbol("]", loc(0, 8,
+                    0, 9))
   ]),
 
-  test(".}.}.", (file, lines) => [
-    symbol(".", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("}", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 2 }),
-    symbol(".", file, lines,
-           { line: 0, column: 2 },
-           { line: 0, column: 3 }),
-    symbol("}", file, lines,
-           { line: 0, column: 3 },
-           { line: 0, column: 4 }),
-    symbol(".", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 })
+  test("{foo{bar{", (loc) => [
+    symbol("{", loc(0, 0,
+                    0, 1)),
+    symbol("foo", loc(0, 1,
+                      0, 4)),
+    symbol("{", loc(0, 4,
+                    0, 5)),
+    symbol("bar", loc(0, 5,
+                      0, 8)),
+    symbol("{", loc(0, 8,
+                    0, 9))
   ]),
 
-  test(".&.&.", (file, lines) => [
-    symbol(".", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("&", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 2 }),
-    symbol(".", file, lines,
-           { line: 0, column: 2 },
-           { line: 0, column: 3 }),
-    symbol("&", file, lines,
-           { line: 0, column: 3 },
-           { line: 0, column: 4 }),
-    symbol(".", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 })
+  test("}foo}bar}", (loc) => [
+    symbol("}", loc(0, 0,
+                    0, 1)),
+    symbol("foo", loc(0, 1,
+                      0, 4)),
+    symbol("}", loc(0, 4,
+                    0, 5)),
+    symbol("bar", loc(0, 5,
+                      0, 8)),
+    symbol("}", loc(0, 8,
+                    0, 9))
   ]),
 
-  test(".~.~.", (file, lines) => [
-    symbol(".", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("~", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 2 }),
-    symbol(".", file, lines,
-           { line: 0, column: 2 },
-           { line: 0, column: 3 }),
-    symbol("~", file, lines,
-           { line: 0, column: 3 },
-           { line: 0, column: 4 }),
-    symbol(".", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 })
+  test("&foo&bar&", (loc) => [
+    symbol("&", loc(0, 0,
+                    0, 1)),
+    symbol("foo", loc(0, 1,
+                      0, 4)),
+    symbol("&", loc(0, 4,
+                    0, 5)),
+    symbol("bar", loc(0, 5,
+                      0, 8)),
+    symbol("&", loc(0, 8,
+                    0, 9))
   ]),
 
-  test(".@.@.", (file, lines) => [
-    symbol(".", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("@", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 2 }),
-    symbol(".", file, lines,
-           { line: 0, column: 2 },
-           { line: 0, column: 3 }),
-    symbol("@", file, lines,
-           { line: 0, column: 3 },
-           { line: 0, column: 4 }),
-    symbol(".", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 })
+  test("~foo~bar~", (loc) => [
+    symbol("~", loc(0, 0,
+                    0, 1)),
+    symbol("foo", loc(0, 1,
+                      0, 4)),
+    symbol("~", loc(0, 4,
+                    0, 5)),
+    symbol("bar", loc(0, 5,
+                      0, 8)),
+    symbol("~", loc(0, 8,
+                    0, 9))
   ]),
 
-  test(".....", (file, lines) => [
-    symbol(".", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol(".", file, lines,
-           { line: 0, column: 1 },
-           { line: 0, column: 2 }),
-    symbol(".", file, lines,
-           { line: 0, column: 2 },
-           { line: 0, column: 3 }),
-    symbol(".", file, lines,
-           { line: 0, column: 3 },
-           { line: 0, column: 4 }),
-    symbol(".", file, lines,
-           { line: 0, column: 4 },
-           { line: 0, column: 5 })
+  test("@foo@bar@", (loc) => [
+    symbol("@", loc(0, 0,
+                    0, 1)),
+    symbol("foo", loc(0, 1,
+                      0, 4)),
+    symbol("@", loc(0, 4,
+                    0, 5)),
+    symbol("bar", loc(0, 5,
+                      0, 8)),
+    symbol("@", loc(0, 8,
+                    0, 9))
+  ]),
+
+  test(".foo.bar.", (loc) => [
+    symbol(".", loc(0, 0,
+                    0, 1)),
+    symbol("foo", loc(0, 1,
+                      0, 4)),
+    symbol(".", loc(0, 4,
+                    0, 5)),
+    symbol("bar", loc(0, 5,
+                      0, 8)),
+    symbol(".", loc(0, 8,
+                    0, 9))
+  ]),
+
+
+  test(".(.(.", (loc) => [
+    symbol(".", loc(0, 0,
+                    0, 1)),
+    symbol("(", loc(0, 1,
+                    0, 2)),
+    symbol(".", loc(0, 2,
+                    0, 3)),
+    symbol("(", loc(0, 3,
+                    0, 4)),
+    symbol(".", loc(0, 4,
+                    0, 5))
+  ]),
+
+  test(".).).", (loc) => [
+    symbol(".", loc(0, 0,
+                    0, 1)),
+    symbol(")", loc(0, 1,
+                    0, 2)),
+    symbol(".", loc(0, 2,
+                    0, 3)),
+    symbol(")", loc(0, 3,
+                    0, 4)),
+    symbol(".", loc(0, 4,
+                    0, 5))
+  ]),
+
+  test(".[.[.", (loc) => [
+    symbol(".", loc(0, 0,
+                    0, 1)),
+    symbol("[", loc(0, 1,
+                    0, 2)),
+    symbol(".", loc(0, 2,
+                    0, 3)),
+    symbol("[", loc(0, 3,
+                    0, 4)),
+    symbol(".", loc(0, 4,
+                    0, 5))
+  ]),
+
+  test(".].].", (loc) => [
+    symbol(".", loc(0, 0,
+                    0, 1)),
+    symbol("]", loc(0, 1,
+                    0, 2)),
+    symbol(".", loc(0, 2,
+                    0, 3)),
+    symbol("]", loc(0, 3,
+                    0, 4)),
+    symbol(".", loc(0, 4,
+                    0, 5))
+  ]),
+
+  test(".{.{.", (loc) => [
+    symbol(".", loc(0, 0,
+                    0, 1)),
+    symbol("{", loc(0, 1,
+                    0, 2)),
+    symbol(".", loc(0, 2,
+                    0, 3)),
+    symbol("{", loc(0, 3,
+                    0, 4)),
+    symbol(".", loc(0, 4,
+                    0, 5))
+  ]),
+
+  test(".}.}.", (loc) => [
+    symbol(".", loc(0, 0,
+                    0, 1)),
+    symbol("}", loc(0, 1,
+                    0, 2)),
+    symbol(".", loc(0, 2,
+                    0, 3)),
+    symbol("}", loc(0, 3,
+                    0, 4)),
+    symbol(".", loc(0, 4,
+                    0, 5))
+  ]),
+
+  test(".&.&.", (loc) => [
+    symbol(".", loc(0, 0,
+                    0, 1)),
+    symbol("&", loc(0, 1,
+                    0, 2)),
+    symbol(".", loc(0, 2,
+                    0, 3)),
+    symbol("&", loc(0, 3,
+                    0, 4)),
+    symbol(".", loc(0, 4,
+                    0, 5))
+  ]),
+
+  test(".~.~.", (loc) => [
+    symbol(".", loc(0, 0,
+                    0, 1)),
+    symbol("~", loc(0, 1,
+                    0, 2)),
+    symbol(".", loc(0, 2,
+                    0, 3)),
+    symbol("~", loc(0, 3,
+                    0, 4)),
+    symbol(".", loc(0, 4,
+                    0, 5))
+  ]),
+
+  test(".@.@.", (loc) => [
+    symbol(".", loc(0, 0,
+                    0, 1)),
+    symbol("@", loc(0, 1,
+                    0, 2)),
+    symbol(".", loc(0, 2,
+                    0, 3)),
+    symbol("@", loc(0, 3,
+                    0, 4)),
+    symbol(".", loc(0, 4,
+                    0, 5))
+  ]),
+
+  test(".....", (loc) => [
+    symbol(".", loc(0, 0,
+                    0, 1)),
+    symbol(".", loc(0, 1,
+                    0, 2)),
+    symbol(".", loc(0, 2,
+                    0, 3)),
+    symbol(".", loc(0, 3,
+                    0, 4)),
+    symbol(".", loc(0, 4,
+                    0, 5))
   ]),
 
 
@@ -538,31 +427,32 @@ export default [
     "     ^----"),
 
 
-  test("a#a a a a a a\na", (file, lines) => [
-    symbol("a", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("a", file, lines,
-           { line: 1, column: 0 },
-           { line: 1, column: 1 })
+  test("a#a a a a a a\na", (loc) => [
+    symbol("a", loc(0, 0,
+                    0, 1)),
+    symbol("a", loc(1, 0,
+                    1, 1))
   ]),
 
-  test("a#/a a a a a a/#a", (file, lines) => [
-    symbol("a", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("a", file, lines,
-           { line: 0, column: 16 },
-           { line: 0, column: 17 })
+  test("a#/a a a a a a/#a", (loc) => [
+    symbol("a", loc(0, 0,
+                    0, 1)),
+    symbol("a", loc(0, 16,
+                    0, 17))
   ]),
 
-  test("a#/a\na a\na a\na/#a", (file, lines) => [
-    symbol("a", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 1 }),
-    symbol("a", file, lines,
-           { line: 3, column: 3 },
-           { line: 3, column: 4 })
+  test("a#/a a #/a a/# a a/#a", (loc) => [
+    symbol("a", loc(0, 0,
+                    0, 1)),
+    symbol("a", loc(0, 20,
+                    0, 21))
+  ]),
+
+  test("a#/a\na a\na a\na/#a", (loc) => [
+    symbol("a", loc(0, 0,
+                    0, 1)),
+    symbol("a", loc(3, 3,
+                    3, 4))
   ]),
 
   test_crash("a# \na",
@@ -636,10 +526,9 @@ export default [
     "      foo\"\n" +
     "  ^---"),
 
-  test("    \"\n     foo\"", (file, lines) => [
-    string("\nfoo", file, lines,
-           { line: 0, column: 4 },
-           { line: 1, column: 9 })
+  test("    \"\n     foo\"", (loc) => [
+    string("\nfoo", loc(0, 4,
+                        1, 9))
   ]),
 
   test_crash("    \"\n\n\n     foo\n    bar\"",
@@ -647,10 +536,9 @@ export default [
     "      bar\"\n" +
     "  ^---"),
 
-  test("    \"\n\n\n     foo\n     bar\"", (file, lines) => [
-    string("\n\n\nfoo\nbar", file, lines,
-           { line: 0, column: 4 },
-           { line: 4, column: 9 })
+  test("    \"\n\n\n     foo\n     bar\"", (loc) => [
+    string("\n\n\nfoo\nbar", loc(0, 4,
+                                 4, 9))
   ]),
 
   test_crash("    \" foo\n       bar\n \n\n     qux\"",
@@ -658,88 +546,74 @@ export default [
     "   \n" +
     "  ^"),
 
-  test("\"\n \"", (file, lines) => [
-    string("\n", file, lines,
-           { line: 0, column: 0 },
-           { line: 1, column: 2 })
+  test("\"\n \"", (loc) => [
+    string("\n", loc(0, 0,
+                     1, 2))
   ]),
 
-  test("\"foo\n bar\"", (file, lines) => [
-    string("foo\nbar", file, lines,
-           { line: 0, column: 0 },
-           { line: 1, column: 5 })
+  test("\"foo\n bar\"", (loc) => [
+    string("foo\nbar", loc(0, 0,
+                           1, 5))
   ]),
 
-  test("    \"foo\n     bar\"", (file, lines) => [
-    string("foo\nbar", file, lines,
-           { line: 0, column: 4 },
-           { line: 1, column: 9 })
+  test("    \"foo\n     bar\"", (loc) => [
+    string("foo\nbar", loc(0, 4,
+                           1, 9))
   ]),
 
-  test("    \" foo\n       bar\"", (file, lines) => [
-    string(" foo\n  bar", file, lines,
-           { line: 0, column: 4 },
-           { line: 1, column: 11 })
+  test("    \" foo\n       bar\"", (loc) => [
+    string(" foo\n  bar", loc(0, 4,
+                              1, 11))
   ]),
 
-  test("    \" foo\n       bar\n\n\n     qux\"", (file, lines) => [
-    string(" foo\n  bar\n\n\nqux", file, lines,
-           { line: 0, column: 4 },
-           { line: 4, column: 9 })
+  test("    \" foo\n       bar\n\n\n     qux\"", (loc) => [
+    string(" foo\n  bar\n\n\nqux", loc(0, 4,
+                                       4, 9))
   ]),
 
 
-  test("\"foobar\"", (file, lines) => [
-    string("foobar", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 8 })
+  test("\"foobar\"", (loc) => [
+    string("foobar", loc(0, 0,
+                         0, 8))
   ]),
 
-  test("\"foobar\"a", (file, lines) => [
-    string("foobar", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 8 }),
-    symbol("a", file, lines,
-           { line: 0, column: 8 },
-           { line: 0, column: 9 })
+  test("\"foobar\"a", (loc) => [
+    string("foobar", loc(0, 0,
+                         0, 8)),
+    symbol("a", loc(0, 8,
+                    0, 9))
   ]),
 
-  test("\"foo   bar  \"", (file, lines) => [
-    string("foo   bar  ", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 13 })
+  test("\"foo   bar  \"", (loc) => [
+    string("foo   bar  ", loc(0, 0,
+                              0, 13))
   ]),
 
   // TODO should treat all Unicode characters as a single width
-  test("\"!\uD834\uDF06\"", (file, lines) => [
-    string("!\uD834\uDF06", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 5 })
+  test("\"!\uD834\uDF06\"", (loc) => [
+    string("!\uD834\uDF06", loc(0, 0,
+                                0, 5))
   ]),
 
 
-  test("\"\\\\\"", (file, lines) => [
-    string("\\", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 4 })
+  test("\"\\\\\"", (loc) => [
+    string("\\", loc(0, 0,
+                     0, 4))
   ]),
 
-  test("\"\\\"\"", (file, lines) => [
-    string("\"", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 4 })
+  test("\"\\\"\"", (loc) => [
+    string("\"", loc(0, 0,
+                     0, 4))
   ]),
 
-  test("\"\\s\"", (file, lines) => [
-    string(" ", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 4 })
+  test("\"\\s\"", (loc) => [
+    string(" ", loc(0, 0,
+                    0, 4))
   ]),
 
-  test("\"\\n\"", (file, lines) => [
-    string("\n", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 4 })
+  test("\"\\n\"", (loc) => [
+    string("\n", loc(0, 0,
+                     0, 4))
   ]),
 
   test_crash("\"\\a\"",
@@ -773,22 +647,19 @@ export default [
     "  \"\\ua\"\n" +
     "   ^--"),
 
-  test("\"\\u[21 1D306]\"", (file, lines) => [
-    string("!\uD834\uDF06", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 14 })
+  test("\"\\u[21 1D306]\"", (loc) => [
+    string("!\uD834\uDF06", loc(0, 0,
+                                0, 14))
   ]),
 
-  test("\"\\u[21 1D306]a\"", (file, lines) => [
-    string("!\uD834\uDF06a", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 15 })
+  test("\"\\u[21 1D306]a\"", (loc) => [
+    string("!\uD834\uDF06a", loc(0, 0,
+                                 0, 15))
   ]),
 
-  test("\"\\u[21]\\u[1D306]\"", (file, lines) => [
-    string("!\uD834\uDF06", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 17 })
+  test("\"\\u[21]\\u[1D306]\"", (loc) => [
+    string("!\uD834\uDF06", loc(0, 0,
+                                0, 17))
   ]),
 
   test_crash("\"\\u[]",
@@ -828,82 +699,58 @@ export default [
 
 
   // TODO should treat all Unicode characters as a single width
-  test("\uD834\uDF06", (file, lines) => [
-    symbol("\uD834\uDF06", file, lines,
-           { line: 0, column: 0 },
-           { line: 0, column: 2 })
+  test("\uD834\uDF06", (loc) => [
+    symbol("\uD834\uDF06", loc(0, 0,
+                               0, 2))
   ]),
 
 
-  test("1 1.5 1,5 (foo bar qux) u@q\nqux\n(nou)\n~\n~foo\n~@foo", (file, lines) => [
-    integer(1, file, lines,
-            { line: 0, column: 0 },
-            { line: 0, column: 1 }),
-    integer(1, file, lines,
-            { line: 0, column: 2 },
-            { line: 0, column: 3 }),
-    symbol(".", file, lines,
-           { line: 0, column: 3 },
-           { line: 0, column: 4 }),
-    integer(5, file, lines,
-            { line: 0, column: 4 },
-            { line: 0, column: 5 }),
-    symbol("1,5", file, lines,
-           { line: 0, column: 6 },
-           { line: 0, column: 9 }),
-    symbol("(", file, lines,
-           { line: 0, column: 10 },
-           { line: 0, column: 11 }),
-    symbol("foo", file, lines,
-           { line: 0, column: 11 },
-           { line: 0, column: 14 }),
-    symbol("bar", file, lines,
-           { line: 0, column: 15 },
-           { line: 0, column: 18 }),
-    symbol("qux", file, lines,
-           { line: 0, column: 19 },
-           { line: 0, column: 22 }),
-    symbol(")", file, lines,
-           { line: 0, column: 22 },
-           { line: 0, column: 23 }),
-    symbol("u", file, lines,
-           { line: 0, column: 24 },
-           { line: 0, column: 25 }),
-    symbol("@", file, lines,
-           { line: 0, column: 25 },
-           { line: 0, column: 26 }),
-    symbol("q", file, lines,
-           { line: 0, column: 26 },
-           { line: 0, column: 27 }),
-    symbol("qux", file, lines,
-           { line: 1, column: 0 },
-           { line: 1, column: 3 }),
-    symbol("(", file, lines,
-           { line: 2, column: 0 },
-           { line: 2, column: 1 }),
-    symbol("nou", file, lines,
-           { line: 2, column: 1 },
-           { line: 2, column: 4 }),
-    symbol(")", file, lines,
-           { line: 2, column: 4 },
-           { line: 2, column: 5 }),
-    symbol("~", file, lines,
-           { line: 3, column: 0 },
-           { line: 3, column: 1 }),
-    symbol("~", file, lines,
-           { line: 4, column: 0 },
-           { line: 4, column: 1 }),
-    symbol("foo", file, lines,
-           { line: 4, column: 1 },
-           { line: 4, column: 4 }),
-    symbol("~", file, lines,
-           { line: 5, column: 0 },
-           { line: 5, column: 1 }),
-    symbol("@", file, lines,
-           { line: 5, column: 1 },
-           { line: 5, column: 2 }),
-    symbol("foo", file, lines,
-           { line: 5, column: 2 },
-           { line: 5, column: 5 })
+  test("1 1.5 1,5 (foo bar qux) u@q\nqux\n(nou)\n~\n~foo\n~@foo", (loc) => [
+    integer(1, loc(0, 0,
+                   0, 1)),
+    integer(1, loc(0, 2,
+                   0, 3)),
+    symbol(".", loc(0, 3,
+                    0, 4)),
+    integer(5, loc(0, 4,
+                   0, 5)),
+    symbol("1,5", loc(0, 6,
+                      0, 9)),
+    symbol("(", loc(0, 10,
+                    0, 11)),
+    symbol("foo", loc(0, 11,
+                      0, 14)),
+    symbol("bar", loc(0, 15,
+                      0, 18)),
+    symbol("qux", loc(0, 19,
+                      0, 22)),
+    symbol(")", loc(0, 22,
+                    0, 23)),
+    symbol("u", loc(0, 24,
+                    0, 25)),
+    symbol("@", loc(0, 25,
+                    0, 26)),
+    symbol("q", loc(0, 26,
+                    0, 27)),
+    symbol("qux", loc(1, 0,
+                      1, 3)),
+    symbol("(", loc(2, 0,
+                    2, 1)),
+    symbol("nou", loc(2, 1,
+                      2, 4)),
+    symbol(")", loc(2, 4,
+                    2, 5)),
+    symbol("~", loc(3, 0,
+                    3, 1)),
+    symbol("~", loc(4, 0,
+                    4, 1)),
+    symbol("foo", loc(4, 1,
+                      4, 4)),
+    symbol("~", loc(5, 0,
+                    5, 1)),
+    symbol("@", loc(5, 1,
+                    5, 2)),
+    symbol("foo", loc(5, 2,
+                      5, 5))
   ]),
 ];

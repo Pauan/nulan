@@ -1,3 +1,6 @@
+import * as $array from "../../util/array";
+
+
 export const SYMBOL      = 0;
 export const CONSTRUCTOR = 1;
 export const PROTOCOL    = 2;
@@ -21,74 +24,129 @@ export const QUOTE       = 15;
 export const UNQUOTE     = 16;
 export const SPLICE      = 17;
 
-export const box = (module, id, name, filename, lines, start, end) => {
-  return { type: BOX, module, id, name, filename, lines, start, end };
+
+export const box = (module, id, name, loc) => {
+  return { type: BOX, module, id, name, loc };
 };
 
-export const symbol = (value, filename, lines, start, end) => {
-  return { type: SYMBOL, value, filename, lines, start, end };
+export const symbol = (value, loc) => {
+  return { type: SYMBOL, value, loc };
 };
 
-export const constructor = (value, filename, lines, start, end) => {
-  return { type: CONSTRUCTOR, value, filename, lines, start, end };
+export const constructor = (value, loc) => {
+  return { type: CONSTRUCTOR, value, loc };
 };
 
-export const protocol = (value, filename, lines, start, end) => {
-  return { type: PROTOCOL, value, filename, lines, start, end };
+export const protocol = (value, loc) => {
+  return { type: PROTOCOL, value, loc };
 };
 
-export const integer = (value, filename, lines, start, end) => {
-  return { type: INTEGER, value, filename, lines, start, end };
+export const integer = (value, loc) => {
+  return { type: INTEGER, value, loc };
 };
 
-export const number = (value, filename, lines, start, end) => {
-  return { type: NUMBER, value, filename, lines, start, end };
+export const number = (value, loc) => {
+  return { type: NUMBER, value, loc };
 };
 
-export const string = (value, filename, lines, start, end) => {
-  return { type: STRING, value, filename, lines, start, end };
+export const string = (value, loc) => {
+  return { type: STRING, value, loc };
 };
 
-export const call = (value, filename, lines, start, end) => {
-  return { type: CALL, value, filename, lines, start, end };
+export const call = (value, loc) => {
+  return { type: CALL, value, loc };
 };
 
-export const list = (value, filename, lines, start, end) => {
-  return { type: LIST, value, filename, lines, start, end };
+export const list = (value, loc) => {
+  return { type: LIST, value, loc };
 };
 
-export const record = (value, filename, lines, start, end) => {
-  return { type: RECORD, value, filename, lines, start, end };
+export const record = (value, loc) => {
+  return { type: RECORD, value, loc };
 };
 
-export const assign = (left, right, filename, lines, start, end) => {
-  return { type: ASSIGN, left, right, filename, lines, start, end };
+export const assign = (left, right, loc) => {
+  return { type: ASSIGN, left, right, loc };
 };
 
-export const dot = (left, right, filename, lines, start, end) => {
-  return { type: DOT, left, right, filename, lines, start, end };
+export const dot = (left, right, loc) => {
+  return { type: DOT, left, right, loc };
 };
 
-export const type = (left, right, filename, lines, start, end) => {
-  return { type: TYPE, left, right, filename, lines, start, end };
+export const type = (left, right, loc) => {
+  return { type: TYPE, left, right, loc };
 };
 
-export const lambda = (parameters, body, filename, lines, start, end) => {
-  return { type: LAMBDA, parameters, body, filename, lines, start, end };
+export const lambda = (parameters, body, loc) => {
+  return { type: LAMBDA, parameters, body, loc };
 };
 
-export const bar = (value, filename, lines, start, end) => {
-  return { type: BAR, value, filename, lines, start, end };
+export const bar = (value, loc) => {
+  return { type: BAR, value, loc };
 };
 
-export const quote = (value, filename, lines, start, end) => {
-  return { type: QUOTE, value, filename, lines, start, end };
+export const quote = (value, loc) => {
+  return { type: QUOTE, value, loc };
 };
 
-export const unquote = (value, filename, lines, start, end) => {
-  return { type: UNQUOTE, value, filename, lines, start, end };
+export const unquote = (value, loc) => {
+  return { type: UNQUOTE, value, loc };
 };
 
-export const splice = (value, filename, lines, start, end) => {
-  return { type: SPLICE, value, filename, lines, start, end };
+export const splice = (value, loc) => {
+  return { type: SPLICE, value, loc };
+};
+
+
+export const loc = (filename, lines, start, end) => {
+  return { filename, lines, start, end };
+};
+
+export const concat_loc = (left, right) =>
+  loc(left.filename, left.lines, left.start, right.end);
+
+
+export const map = (x, f) => {
+  switch (x.type) {
+  case CALL:
+  case LIST:
+  case RECORD:
+    return {
+      type: x.type,
+      value: $array.map(x.value, f),
+      loc: x.loc
+    };
+
+  case LAMBDA:
+    return {
+      type: x.type,
+      parameters: $array.map(x.parameters, f),
+      body: f(x.body),
+      loc: x.loc
+    };
+
+  case ASSIGN:
+  case DOT:
+  case TYPE:
+    return {
+      type: x.type,
+      left: f(x.left),
+      right: f(x.right),
+      loc: x.loc
+    };
+
+  case BAR:
+  case QUOTE:
+  case UNQUOTE:
+  case SPLICE:
+    return {
+      type: x.type,
+      value: f(x.value),
+      loc: x.loc
+    };
+
+  // TODO is this correct ?
+  default:
+    return x;
+  }
 };

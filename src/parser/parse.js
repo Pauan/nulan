@@ -1,16 +1,13 @@
 import { error } from "../../util/error";
 import { peek } from "../../util/array";
-import { SYMBOL, symbol, integer, string,
-         call, list, record, lambda, bar,
-         assign, dot, type, quote, unquote,
-         splice } from "./ast";
+import * as $ast from "./ast";
 
 
 const is_symbol = (x, s) =>
-  x.type === SYMBOL && x.value === s;
+  x.type === $ast.SYMBOL && x.value === s;
 
 const lookup = (token) => {
-  if (token.type === SYMBOL && specials[token.value] != null) {
+  if (token.type === $ast.SYMBOL && specials[token.value] != null) {
     return specials[token.value];
 
   } else {
@@ -19,7 +16,7 @@ const lookup = (token) => {
 };
 
 
-// Heavily modified Pratt parser
+// Modified Pratt parser
 const parse1 = (state, tokens, priority) => {
   for (;;) {
     const token = peek(tokens, state.index);
@@ -99,7 +96,7 @@ const end_at = (end, make) => {
 
           state.index = right.index + 1;
 
-          state.output["push"](make(values, first.filename, first.lines, first.start, token.end));
+          state.output["push"](make(values, $ast.concat_loc(first.loc, token.loc)));
 
           return state;
 
@@ -133,7 +130,7 @@ const parse_prefix = (priority, make) =>
 
       } else {
         const r = right["shift"]();
-        const x = make(r, middle.filename, middle.lines, middle.start, r.end);
+        const x = make(r, $ast.concat_loc(middle.loc, r.loc));
         return left["concat"]([x], right);
       }
     }
@@ -153,7 +150,7 @@ const parse_infix = (priority, make, right_associative) =>
       } else {
         const l = left["pop"]();
         const r = right["shift"]();
-        const x = make(l, r, middle.filename, middle.lines, l.start, r.end);
+        const x = make(l, r, $ast.concat_loc(l.loc, r.loc));
         return left["concat"]([x], right);
       }
     }
@@ -171,9 +168,7 @@ const parse_lambda = (priority, make) =>
         const parameters = right["slice"](0, -1);
         const body = right[right["length"] - 1];
 
-        const x = make(parameters, body,
-                       middle.filename, middle.lines,
-                       middle.start, body.end);
+        const x = make(parameters, body, $ast.concat_loc(middle.loc, body.loc));
 
         left["push"](x);
         return left;
@@ -183,23 +178,23 @@ const parse_lambda = (priority, make) =>
 
 
 const specials = {
-  "(": end_at(")", call),
+  "(": end_at(")", $ast.call),
   ")": start_at("("),
 
-  "[": end_at("]", list),
+  "[": end_at("]", $ast.list),
   "]": start_at("["),
 
-  "{": end_at("}", record),
+  "{": end_at("}", $ast.record),
   "}": start_at("{"),
 
-  "->": parse_lambda(10, lambda),
+  "->": parse_lambda(10, $ast.lambda),
 
-  "|": parse_prefix(10, bar),
-  "&": parse_prefix(10, quote),
-  "~": parse_prefix(20, unquote),
-  "@": parse_prefix(20, splice),
+  "|": parse_prefix(10, $ast.bar),
+  "&": parse_prefix(10, $ast.quote),
+  "~": parse_prefix(20, $ast.unquote),
+  "@": parse_prefix(20, $ast.splice),
 
-  ".":  parse_infix(10, dot, false),
-  "<=": parse_infix(10, assign, true),
-  "::": parse_infix(10, type, false),
+  ".":  parse_infix(10, $ast.dot, false),
+  "<=": parse_infix(10, $ast.assign, true),
+  "::": parse_infix(10, $ast.type, false),
 };
