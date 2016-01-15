@@ -4,17 +4,26 @@ export const PROTOCOL    = 2;
 export const INTEGER     = 3;
 export const NUMBER      = 4;
 export const STRING      = 5;
-export const CALL        = 6;
-export const LIST        = 7;
-export const RECORD      = 8;
-export const ASSIGN      = 9;
+export const BOX         = 6;
+
+export const CALL        = 7;
+export const LIST        = 8;
+export const RECORD      = 9;
+
 export const LAMBDA      = 10;
-export const BAR         = 11;
+
+export const ASSIGN      = 11;
 export const DOT         = 12;
 export const TYPE        = 13;
-export const QUOTE       = 14;
-export const UNQUOTE     = 15;
-export const SPLICE      = 16;
+
+export const BAR         = 14;
+export const QUOTE       = 15;
+export const UNQUOTE     = 16;
+export const SPLICE      = 17;
+
+export const box = (module, id, name, filename, lines, start, end) => {
+  return { type: BOX, module, id, name, filename, lines, start, end };
+};
 
 export const symbol = (value, filename, lines, start, end) => {
   return { type: SYMBOL, value, filename, lines, start, end };

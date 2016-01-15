@@ -24,6 +24,12 @@ export const all = (a, f) => {
   return true;
 };
 
+export const each = (a, f) => {
+  for (let i = 0; i < a["length"]; ++i) {
+    f(a[i], i);
+  }
+};
+
 export const map = (a, f) => {
   const out = new Array(a["length"]);
 
