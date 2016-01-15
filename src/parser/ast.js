@@ -1,28 +1,26 @@
 import * as $array from "../../util/array";
 
 
-export const SYMBOL      = 0;
-export const CONSTRUCTOR = 1;
-export const PROTOCOL    = 2;
-export const INTEGER     = 3;
-export const NUMBER      = 4;
-export const STRING      = 5;
-export const BOX         = 6;
+export const SYMBOL  = 0;
+export const INTEGER = 1;
+export const NUMBER  = 2;
+export const STRING  = 3;
+export const BOX     = 4;
 
-export const CALL        = 7;
-export const LIST        = 8;
-export const RECORD      = 9;
+export const CALL    = 5;
+export const LIST    = 6;
+export const RECORD  = 7;
 
-export const LAMBDA      = 10;
+export const LAMBDA  = 8;
 
-export const ASSIGN      = 11;
-export const DOT         = 12;
-export const TYPE        = 13;
+export const ASSIGN  = 9;
+export const DOT     = 10;
+export const TYPE    = 11;
 
-export const BAR         = 14;
-export const QUOTE       = 15;
-export const UNQUOTE     = 16;
-export const SPLICE      = 17;
+export const BAR     = 12;
+export const QUOTE   = 13;
+export const UNQUOTE = 14;
+export const SPLICE  = 15;
 
 
 export const box = (module, id, name, loc) => {
@@ -31,14 +29,6 @@ export const box = (module, id, name, loc) => {
 
 export const symbol = (value, loc) => {
   return { type: SYMBOL, value, loc };
-};
-
-export const constructor = (value, loc) => {
-  return { type: CONSTRUCTOR, value, loc };
-};
-
-export const protocol = (value, loc) => {
-  return { type: PROTOCOL, value, loc };
 };
 
 export const integer = (value, loc) => {

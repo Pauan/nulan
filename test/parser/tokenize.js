@@ -1,6 +1,6 @@
 import { expect, expect_crash } from "../assert";
 import { wrap, catch_error } from "../../ffi/task";
-import { loc, string, symbol, integer, constructor, protocol } from "../../src/parser/ast";
+import { loc, string, symbol, integer } from "../../src/parser/ast";
 import { tokenize } from "../../src/parser/tokenize";
 import { lines } from "../../util/string";
 
@@ -91,13 +91,13 @@ export default [
 
 
   test("*foo", (loc) => [
-    constructor("*foo", loc(0, 0,
-                            0, 4))
+    symbol("*foo", loc(0, 0,
+                       0, 4))
   ]),
 
   test("$foo", (loc) => [
-    protocol("$foo", loc(0, 0,
-                         0, 4))
+    symbol("$foo", loc(0, 0,
+                       0, 4))
   ]),
 
 

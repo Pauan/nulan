@@ -56,12 +56,6 @@ const consume_symbol = (output, file, lines, line, column, f) => {
 const tokenize_symbol = (output, file, lines, line, column) =>
   consume_symbol(output, file, lines, line, column, tokenize_symbol1);
 
-const tokenize_constructor = (output, file, lines, line, column) =>
-  consume_symbol(output, file, lines, line, column, $ast.constructor);
-
-const tokenize_protocol = (output, file, lines, line, column) =>
-  consume_symbol(output, file, lines, line, column, $ast.protocol);
-
 
 const consume_spaces = (file, lines, line, column) => {
   const chars = lines[line];
@@ -418,9 +412,6 @@ const specials = {
   " ":  tokenize_space,
   "#":  tokenize_comment,
   "\"": tokenize_string,
-
-  "*": tokenize_constructor,
-  "$": tokenize_protocol,
 
   "(":  tokenize_delimiter,
   ")":  tokenize_delimiter,
