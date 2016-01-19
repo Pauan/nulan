@@ -1,98 +1,104 @@
 (TYPE (Foo a))
 
 (TYPE Color
-  | *red
-  | *orange
-  | *yellow
-  | *green
-  | *blue
-  | *indigo
-  | *violet)
+| *red
+| *orange
+| *yellow
+| *green
+| *blue
+| *indigo
+| *violet)
 
 (TYPE RGB
-  (*rgba Integer Integer Integer))
+| (*rgba Integer Integer Integer))
 
 (TYPE (List a)
-  | *empty
-  | (*value a (List a)))
+| *empty
+| (*value a (List a)))
 
 (PROTOCOL ($transform a)
-  | transform :: (-> (a b) (-> b c) (a c)))
+| transform :: (-> (a b) (-> b c) (a c)))
 
 (CONSTANT
-  | after :: (REQUIRE ($transform a) ($flatten a)
-               (-> (a b) (-> b (a c)) (a c)))
-  | after <= (-> a fn
-               (flatten (transform a fn))))
+| after :: (REQUIRE ($transform a) ($flatten a)
+             (-> (a b) (-> b (a c)) (a c)))
+| after <= (-> a fn
+             (flatten (transform a fn))))
 
 (FUNCTION after :: (REQUIRE ($transform a) ($flatten a)
                      (-> (a b) (-> b (a c)) (a c)))
-  (after a fn)
+| (after a fn)
     (flatten (transform a fn)))
 
 (IMPORT (github { name <= "nulan/flatten"
                 | file <= "src/flatten.nul"
                 | version <= (major 2) })
-  | $flatten
-  | flatten)
+| $flatten
+| flatten)
 
 (IMPORT (file "foo/bar")
-  | a <= d
-  | b
-  | c
-  | Maybe
-  | *some
-  | *none
-  (PROVIDE ($flatten Maybe)
-    | flatten)
-  (PROVIDE ($transform Maybe)
-    | transform <= map)
-  (PROVIDE ($wrap Maybe)
-    | wrap))
-
-(PROVIDE ($transform Maybe)
+| a <= d
+| b
+| c
+| Maybe
+| *some
+| *none
+| (PROVIDE ($flatten Maybe)
+  | flatten)
+| (PROVIDE ($transform Maybe)
   | transform <= map)
+| (PROVIDE ($wrap Maybe)
+  | wrap))
 
 (PROVIDE ($transform Maybe)
-  | transform <= (-> a a))
+| transform <= map)
+
+(PROVIDE ($transform Maybe)
+| transform <= (-> a a))
 
 (EXPORT
-  | d <= a
-  | b
-  | c
-  | Maybe
-  | *some
-  | *none)
+| d <= a
+| b
+| c
+| Maybe
+| *some
+| *none)
+
+(IF test
+| then
+| else)
 
 (EXPORT-CONSTANT
-  | foo <= *foo)
+| foo <= *foo)
+
+(IMPORT-BUILTINS)
 
 (IMPORT (nulan "unsafe/ffi")
-  | UNSAFE-FFI-LOAD
-  | javascript)
+| UNSAFE-FFI-LOAD
+| javascript)
 
 (UNSAFE-FFI-LOAD { target <= javascript
                  | file <= "foo/bar" }
-  | a :: (-> Integer Integer Integer)
-  | b :: Integer
-  | c :: Integer
-  | d :: (Foo Integer))
+| a :: (-> Integer Integer Integer)
+| b :: Integer
+| c :: Integer
+| d :: (Foo Integer))
 
 (CONSTANT
-  | foo :: (-> (-> Integer Integer Integer) Integer)
-  | foo <= (-> a (a 1 2)))
+| foo :: (-> (-> Integer Integer Integer) Integer)
+| foo <= (-> a (a 1 2)))
 
-(MUTUAL-RECURSION
+(MUTUALLY-RECURSIVE
   (FUNCTION even? :: (-> Integer Boolean)
-    (even? 0)
-      *true
-    (even? a)
+  | (even? 0)
+      true
+  | (even? a)
       (odd? (- a 1)))
 
   (FUNCTION odd :: (-> Integer Boolean)
-    (odd? 0)
-      *false
-    (odd? a)
+  | (odd? 0)
+      false
+  | (odd? a)
       (even? (- a 1))))
 
 (LET a <= 1
@@ -100,28 +106,28 @@
   (+ a b))
 
 (FUNCTION foo :: (-> (-> Integer Integer Integer) Integer)
-  (foo a)
+| (foo a)
     (a 1 2))
 
 (FUNCTION bar :: (-> Integer Integer)
-  (bar 1)
+| (bar 1)
     2
-  (bar a)
+| (bar a)
     (+ (bar 1) a))
 
 (REWRITE-RULE
-  (QUX @a)
+| (QUX @a)
     &(+ ~@a))
 
 (REWRITE-RULE
-  FOO
+| FOO
     &(BAR 1 2 3 4 5)
 
-  (BAR a @b)
+| (BAR a @b)
     (MATCH a
-      &~n <= ~v
+    | &~n <= ~v
         &(QUX ~n ~v ~@b)
-      v
+    | v
         &(QUX 1 ~v ~@b)))
 
 (foo -> a b (+ a b))
@@ -132,16 +138,18 @@ FOO
 ((FOO))
 (((FOO)))
 
-(REWRITE-RULE
-  (UNSTREAM &(STREAM ~a))
-    a
-  (UNSTREAM a)
-    &(unstream ~a)
+(MUTUALLY-RECURSIVE
+  (REWRITE-RULE
+  | (UNSTREAM &(STREAM ~a))
+      a
+  | (UNSTREAM a)
+      &(unstream ~a))
 
-  (STREAM &(UNSTREAM ~a))
-    a
-  (STREAM a)
-    &(stream ~a))
+  (REWRITE-RULE
+  | (STREAM &(UNSTREAM ~a))
+      a
+  | (STREAM a)
+      &(stream ~a)))
 
 (DO a <= a
     b <= b
@@ -150,7 +158,7 @@ FOO
 (DO x <= (read-file "foo")
     (log x)
     (write-file "bar" x)
-    (wrap *null))
+    (wrap null))
 
 (TRANSFORM a <= 1
            b <= 2
@@ -158,13 +166,13 @@ FOO
   (+ a b c))
 
 (MATCHES [ a b c ]
-  [ 1 2 3 ]
+| [ 1 2 3 ]
     1
-  [ 1 2 a ]
+| [ 1 2 a ]
     2
-  [ 1 a b ]
+| [ 1 a b ]
     3
-  [ a b c ]
+| [ a b c ]
     4)
 
 [ 1 2 3 ]
@@ -181,19 +189,19 @@ FOO
 | b <= 2 }
 
 (MATCH a
-  _
+| _
     1
-  a
+| a
     2
-  1
+| 1
     3
-  "foo"
+| "foo"
     4
-  { a b c }
+| { a b c }
     5
-  { a <= b | c <= d }
+| { a <= b | c <= d }
     { b <= a | d <= c }
-  (*foo 1)
+| (*foo 1)
     6)
 
 
@@ -209,28 +217,28 @@ FOO
   (-> foo bar))
 
 (MATCH a
-  (-> view a)
+| (-> view a)
     9)
 
 (IMPORT (nulan "unsafe")
-  | UNSAFE-OPTIMIZATION-RULE)
+| UNSAFE-OPTIMIZATION-RULE)
 
 (UNSAFE-OPTIMIZATION-RULE
-  (after a b)
-  (flatten (transform a b)))
+| (after a b)
+    (flatten (transform a b)))
 
 (UNSAFE-OPTIMIZATION-RULE
-  (reduce-left [] a -> b c (push b d))
-  (reduce-left [] a -> b c (unsafe-push! b d)))
+| (reduce-left [] a -> b c (push b d))
+    (reduce-left [] a -> b c (unsafe-push! b d)))
 
 (UNSAFE-OPTIMIZATION-RULE
-  (unstream (stream a))
-  a)
+| (unstream (stream a))
+    a)
 
 (UNSAFE-OPTIMIZATION-RULE
-  (stream (unstream a))
-  a)
+| (stream (unstream a))
+    a)
 
 (UNSAFE-OPTIMIZATION-RULE
-  (add a b)
-  (ADD a b))
+| (add a b)
+    (ADD a b))
