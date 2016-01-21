@@ -3,7 +3,7 @@ import { pretty, eol, get_message } from "../util/node";
 import { indent } from "../util/string";
 import { map, length } from "../util/array";
 import { fastest, flatten, transform, wrap, throw_error,
-         delay, concurrent_null, log, on_error, perform } from "../ffi/task";
+         delay, concurrent_null, log, on_error, make_thread_run } from "../ffi/task";
 
 
 const isObject = (x) =>
@@ -113,10 +113,10 @@ export const expect_crash = (expected, task) =>
             ? wrap(token)
             : throw_error(new Error(format_error(name, get_message(e), expected)))))));
 
-export const perform_tests = (a) => {
-  perform(flatten(transform(log("---- Starting unit tests\n"), (_) =>
-          flatten(transform(concurrent_null(a), (_) =>
-                  log("---- All unit tests succeeded"))))));
+export const run_tests = (a) => {
+  make_thread_run(flatten(transform(log("---- Starting unit tests\n"), (_) =>
+                  flatten(transform(concurrent_null(a), (_) =>
+                          log("---- All unit tests succeeded"))))));
 };
 
 

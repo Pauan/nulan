@@ -3,8 +3,8 @@ import { crash } from "../../util/error";
 import { get_message } from "../../util/node";
 import { sync, transform, flatten, wrap, concurrent, concurrent_null,
          delay, fastest, _yield, throw_error, ignore_kill, async_killable,
-         async_unkillable, never, make_thread, kill_thread,
-         catch_error, on_error, perform, with_resource } from "../../ffi/task";
+         async_unkillable, never, kill_thread,
+         catch_error, on_error, make_thread_run, with_resource } from "../../ffi/task";
 import { _null } from "../../ffi/types";
 
 
@@ -19,8 +19,10 @@ const forever = (a) =>
     forever(a));
 
 const killed = (a, value) =>
-  after(make_thread(a), (thread) =>
-    after(kill_thread(thread), (_) => value));
+  sync(() => {
+    kill_thread(make_thread_run(a));
+    return value;
+  });
 
 const ignore_yield = ignore_kill(_yield);
 
@@ -65,7 +67,7 @@ const queue = (f) =>
 const test_crash = (task, value) =>
   sync(() => {
     assert_crash(() => {
-      perform(after(fastest(task, never), (_) => {
+      make_thread_run(after(fastest(task, never), (_) => {
         crash(new Error("CRASHING!"));
       }));
     }, "CRASHING!");
@@ -74,7 +76,7 @@ const test_crash = (task, value) =>
   });
 
 
-/*perform(fastest(
+/*make_thread_run(fastest(
   ignore_kill(forever(then(_yield, log("Hi")))),
   delay(1000)
 ));*/

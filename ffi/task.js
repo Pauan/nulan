@@ -3,7 +3,7 @@ import { _null, none, some } from "./types";
 import { noop, try_catch } from "./util";
 
 
-const _make_thread = () => {
+export const make_thread = () => {
   return {
     a: false, // is_killed
     b: null   // kill
@@ -37,7 +37,7 @@ const _reset_kill = (thread) => {
   }
 };
 
-const _kill = (thread) => {
+export const kill_thread = (thread) => {
   if (thread.a) {
     crash(new Error("Invalid kill: thread is already killed"));
 
@@ -55,7 +55,16 @@ const _kill = (thread) => {
 
 const _kill_all = (a) => {
   for (let i = 0; i < a["length"]; ++i) {
-    _kill(a[i]);
+    kill_thread(a[i]);
+  }
+};
+
+export const run = (task, thread, on_success, on_error) => {
+  if (thread.a) {
+    crash(new Error("Cannot run: thread is killed"));
+
+  } else {
+    task(thread, on_success, on_error);
   }
 };
 
@@ -90,7 +99,7 @@ export const ignore_kill = (task) =>
       killed = true;
     });
 
-    const x = _make_thread();
+    const x = make_thread();
 
     const on_success = (value) => {
       if (!killed) {
@@ -170,27 +179,10 @@ export const async_unkillable = (f) =>
   }));
 
 
-export const make_thread = (task) =>
-  sync(() => {
-    const thread = _make_thread();
-
-    // TODO use perform ?
-    task(thread, noop, crash);
-
-    return thread;
-  });
-
-export const kill_thread = (thread) =>
-  sync(() => {
-    _kill(thread);
-    return _null;
-  });
-
-
 // TODO handle cancellation ?
 export const Promise_from = (task) =>
   new Promise((resolve, reject) => {
-    const x = _make_thread();
+    const x = make_thread();
     task(x, resolve, reject);
   });
 
@@ -267,7 +259,7 @@ export const concurrent_null = (a) =>
 
       for (let i = 0; i < a["length"]; ++i) {
         if (running) {
-          threads["push"](_make_thread());
+          threads["push"](make_thread());
 
           a[i](threads[i], on_success, on_error);
 
@@ -318,7 +310,7 @@ export const concurrent = (a) =>
 
       for (let i = 0; i < a["length"]; ++i) {
         if (running) {
-          threads["push"](_make_thread());
+          threads["push"](make_thread());
 
           a[i](threads[i], (value) => {
             values[i] = value;
@@ -337,28 +329,28 @@ export const fastest = (task_a, task_b) =>
   (thread, success, error) => {
     let running = true;
 
-    const thread_a = _make_thread();
-    const thread_b = _make_thread();
+    const thread_a = make_thread();
+    const thread_b = make_thread();
 
     // TODO what about running ?
     _set_kill(thread, () => {
-      _kill(thread_a);
-      _kill(thread_b);
+      kill_thread(thread_a);
+      kill_thread(thread_b);
     });
 
     const on_success = (value) => {
       running = false;
       _reset_kill(thread);
-      _kill(thread_a);
-      _kill(thread_b);
+      kill_thread(thread_a);
+      kill_thread(thread_b);
       success(value);
     };
 
     const on_error = (value) => {
       running = false;
       _reset_kill(thread);
-      _kill(thread_a);
-      _kill(thread_b);
+      kill_thread(thread_a);
+      kill_thread(thread_b);
       error(value);
     };
 
@@ -400,8 +392,8 @@ Kill create + Error create   |             |                                -> C
 */
 export const with_resource = (create, use, destroy) =>
   (thread, success, error) => {
-    const x = _make_thread();
-    const y = _make_thread();
+    const x = make_thread();
+    const y = make_thread();
 
     let killed = false;
     let resource = none;
@@ -410,7 +402,7 @@ export const with_resource = (create, use, destroy) =>
       killed = true;
 
       if (resource.$ === 1) {
-        _kill(y);
+        kill_thread(y);
         destroy(resource.a)(x, noop, crash);
       }
     });
@@ -532,9 +524,10 @@ export const log = (s) =>
   });
 
 
-export const perform = (task) => {
-  const x = _make_thread();
+export const make_thread_run = (task) => {
+  const x = make_thread();
   task(x, noop, crash);
+  return x;
 };
 
 
