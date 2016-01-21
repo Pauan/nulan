@@ -7,4 +7,4 @@ export const _true = 1;
 
 export const none = { $: 0 };
 
-export const some = (a) => { $: 1, a };
+export const some = (a) => ({ $: 1, a });

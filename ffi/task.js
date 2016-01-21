@@ -1,5 +1,5 @@
 import { crash } from "../util/error";
-import { _null } from "./types";
+import { _null, none, some } from "./types";
 import { noop, try_catch } from "./util";
 
 
@@ -383,71 +383,80 @@ export const on_error = (task, on_success, on_error) =>
 // TODO is this correct ?
 // TODO test this
 /*
-Success create | Success use | Success destroy -> Success use
-Success create | Error use   | Success destroy -> Error use
-Success create | Kill use    | Success destroy -> Nothing
-Success create | Success use | Error destroy   -> Error destroy
-Success create | Error use   | Error destroy   -> Error destroy
-Success create | Kill use    | Error destroy   -> Crash destroy
-Success create | Success use | Kill destroy    -> Nothing
-Success create | Error use   | Kill destroy    -> Crash use
-Error create   |             |                 -> Error create
-Kill create    |             | Success destroy -> Nothing
-Kill create    |             | Error destroy   -> Crash destroy
+Success create               | Success use | Success destroy                -> Success use
+Success create               | Success use | Error destroy                  -> Error destroy
+Success create               | Success use | Kill destroy + Success destroy -> Nothing
+Success create               | Success use | Kill destroy + Error destroy   -> Crash destroy
+Success create               | Error use   | Success destroy                -> Error use
+Success create               | Error use   | Error destroy                  -> Error destroy
+Success create               | Error use   | Kill destroy + Success destroy -> Crash use
+Success create               | Error use   | Kill destroy + Error destroy   -> Crash destroy
+Success create               | Kill use    | Success destroy                -> Nothing
+Success create               | Kill use    | Error destroy                  -> Crash destroy
+Error create                 |             |                                -> Error create
+Kill create + Success create |             | Success destroy                -> Nothing
+Kill create + Success create |             | Error destroy                  -> Crash destroy
+Kill create + Error create   |             |                                -> Crash create
 */
 export const with_resource = (create, use, destroy) =>
   (thread, success, error) => {
-    let killed = false;
-
-    const on_kill = () => {
-      killed = true;
-    };
-
-    _set_kill(thread, on_kill);
-
     const x = _make_thread();
+    const y = _make_thread();
 
-    const on_error = (value) => {
-      /*if (killed) {
-        crash(value);
+    let killed = false;
+    let resource = none;
 
-      } else {*/
-        _reset_kill(thread);
-        error(value);
-      //}
-    };
+    _set_kill(thread, () => {
+      killed = true;
 
-    create(x, (resource) => {
+      if (resource.$ === 1) {
+        _kill(y);
+        destroy(resource.a)(x, noop, crash);
+      }
+    });
+
+    const on_success = (o) => {
       if (killed) {
-        destroy(resource)(x, noop, crash);
+        destroy(o)(x, noop, crash);
 
       } else {
-        // TODO is this correct ?
-        _set_kill(thread, () => {
-          _kill(x);
-          destroy(resource)(x, noop, crash);
-        });
+        resource = some(o);
 
-        use(resource)(x, (value) => {
-          _set_kill(thread, on_kill);
+        const _success = (value) => {
+          resource = none;
 
-          destroy(resource)(x, (_) => {
-            // TODO is this correct ?
+          destroy(o)(x, (_) => {
             if (!killed) {
               _reset_kill(thread);
               success(value);
             }
           }, on_error);
+        };
 
-        }, (value) => {
-          _set_kill(thread, on_kill);
+        const _error = (value) => {
+          resource = none;
 
-          destroy(resource)(x, (_) => {
+          destroy(o)(x, (_) => {
             on_error(value);
           }, on_error);
-        });
+        };
+
+        use(o)(y, _success, _error);
       }
-    }, on_error);
+    };
+
+    // TODO code duplication with ignore_kill
+    const on_error = (value) => {
+      if (killed) {
+        crash(value);
+
+      } else {
+        _reset_kill(thread);
+        error(value);
+      }
+    };
+
+    create(x, on_success, on_error);
   };
 
 

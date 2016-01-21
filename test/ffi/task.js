@@ -1,9 +1,10 @@
 import { expect, expect_crash, assert_crash } from "../assert";
 import { crash } from "../../util/error";
+import { get_message } from "../../util/node";
 import { sync, transform, flatten, wrap, concurrent, concurrent_null,
          delay, fastest, _yield, throw_error, ignore_kill, async_killable,
          async_unkillable, never, make_thread, kill_thread,
-         catch_error, on_error, perform } from "../../ffi/task";
+         catch_error, on_error, perform, with_resource } from "../../ffi/task";
 import { _null } from "../../ffi/types";
 
 
@@ -19,7 +20,7 @@ const forever = (a) =>
 
 const killed = (a, value) =>
   after(make_thread(a), (thread) =>
-    transform(kill_thread(thread), (_) => value));
+    after(kill_thread(thread), (_) => value));
 
 const ignore_yield = ignore_kill(_yield);
 
@@ -42,6 +43,24 @@ const counter = (f) => {
 
   return transform(f(increment), (_) => _counter);
 };
+
+const queue = (f) =>
+  after(sync(() => []), (queue) =>
+    on_error(f((value) =>
+                 sync(() => {
+                   queue["push"](value);
+                   return _null;
+                 })),
+      (value) => ({
+        queue: queue,
+        value: value,
+        error: null
+      }),
+      (error) => ({
+        queue: queue,
+        value: null,
+        error: get_message(error)
+      })));
 
 const test_crash = (task, value) =>
   sync(() => {
@@ -182,7 +201,7 @@ export default [
           success("1");
         }, "Invalid success");
       };
-    }), "2")),
+    }), wrap("2"))),
 
   expect("2",
     killed(async_killable((success, error) => {
@@ -191,7 +210,7 @@ export default [
           error(new Error("1"));
         }, "Invalid error");
       };
-    }), "2")),
+    }), wrap("2"))),
 
   expect("2",
     killed(async_killable((success, error) => {
@@ -201,7 +220,7 @@ export default [
         }, "Invalid success");
       }, 0);
       return () => {};
-    }), "2")),
+    }), wrap("2"))),
 
   expect("2",
     killed(async_killable((success, error) => {
@@ -211,7 +230,7 @@ export default [
         }, "Invalid error");
       }, 0);
       return () => {};
-    }), "2")),
+    }), wrap("2"))),
 
 
   expect("1",
@@ -253,21 +272,21 @@ export default [
   expect("2",
     killed(async_unkillable((success, error) => {
       success("1");
-    }), "2")),
+    }), wrap("2"))),
 
   expect("2",
     killed(async_unkillable((success, error) => {
       assert_crash(() => {
         error(new Error("1"));
       }, "1");
-    }), "2")),
+    }), wrap("2"))),
 
   expect("2",
     killed(async_unkillable((success, error) => {
       setTimeout(() => {
         success("1");
       }, 0);
-    }), "2")),
+    }), wrap("2"))),
 
   expect("2",
     killed(async_unkillable((success, error) => {
@@ -276,7 +295,7 @@ export default [
           error(new Error("1"));
         }, "1");
       }, 0);
-    }), "2")),
+    }), wrap("2"))),
 
 
   expect("3",
@@ -285,17 +304,17 @@ export default [
       return () => {
         crash(new Error("2"));
       };
-    })), "3")),
+    })), wrap("3"))),
 
   expect("2",
     killed(ignore_kill(async_killable((success, error) => {
       return () => {
         crash(new Error("1"));
       };
-    })), "2")),
+    })), wrap("2"))),
 
   expect("2",
-    killed(ignore_kill(wrap("1")), "2")),
+    killed(ignore_kill(wrap("1")), wrap("2"))),
 
   expect("1",
     fastest(
@@ -506,5 +525,116 @@ export default [
         };
       }), never),
       then(delay(100), wrap("4"))
-    )))
+    ))),
+
+
+  // TODO Kill create | Error destroy -> Crash destroy
+  // TODO Success create | Kill use | Error destroy -> Crash destroy
+  // TODO Success create | Error use | Kill destroy -> Crash use
+
+  // Success create | Success use | Success destroy -> Success use
+  expect({
+    queue: ["create", ["use", 1], ["destroy", 1]],
+    value: 6,
+    error: null
+  }, queue((push) =>
+       with_resource(then(push("create"),
+                          wrap(1)),
+         (id) => then(push(["use", id]),
+                      wrap(id + 5)),
+         (id) => then(push(["destroy", id]),
+                      wrap(id + 6))))),
+
+  // Error create -> Error create
+  expect({
+    queue: ["create"],
+    value: null,
+    error: "Hi"
+  }, queue((push) =>
+       with_resource(then(push("create"),
+                          throw_error(new Error("Hi"))),
+         (id) => push(["use", id]),
+         (id) => push(["destroy", id])))),
+
+  // Kill create | Success destroy -> Nothing
+  expect({
+    queue: ["killed", "create", ["destroy", 1]],
+    value: 50,
+    error: null
+  }, queue((push) =>
+       killed(with_resource(then(then(delay(10), push("create")), wrap(1)),
+                (id) => push(["use", id]),
+                (id) => push(["destroy", id])),
+              then(push("killed"),
+                   then(delay(100), wrap(50)))))),
+
+  // Success create | Error use | Success destroy -> Error use
+  expect({
+    queue: ["create", ["use", 1], ["destroy", 1]],
+    value: null,
+    error: "Hi"
+  }, queue((push) =>
+       with_resource(then(push("create"),
+                          wrap(1)),
+         (id) => then(push(["use", id]),
+                      throw_error(new Error("Hi"))),
+         (id) => then(push(["destroy", id]),
+                      wrap(id + 6))))),
+
+  // Success create | Success use | Error destroy -> Error destroy
+  expect({
+    queue: ["create", ["use", 1], ["destroy", 1]],
+    value: null,
+    error: "Hi"
+  }, queue((push) =>
+       with_resource(then(push("create"),
+                          wrap(1)),
+         (id) => then(push(["use", id]),
+                      wrap(id + 5)),
+         (id) => then(push(["destroy", id]),
+                      throw_error(new Error("Hi")))))),
+
+  // Success create | Error use | Error destroy -> Error destroy
+  expect({
+    queue: ["create", ["use", 1], ["destroy", 1]],
+    value: null,
+    error: "Hi2"
+  }, queue((push) =>
+       with_resource(then(push("create"),
+                          wrap(1)),
+         (id) => then(push(["use", id]),
+                      throw_error(new Error("Hi1"))),
+         (id) => then(push(["destroy", id]),
+                      throw_error(new Error("Hi2")))))),
+
+  // Success create | Kill use | Success destroy -> Nothing
+  expect({
+    queue: ["create", ["use", 1], ["destroy", 1], "killed"],
+    value: 50,
+    error: null
+  }, queue((push) =>
+       killed(with_resource(then(push("create"),
+                                 wrap(1)),
+                (id) => then(push(["use", id]),
+                             then(delay(10),
+                                  throw_error(new Error("Fail")))),
+                (id) => then(push(["destroy", id]),
+                             wrap(id + 6))),
+              then(push("killed"),
+                   wrap(50))))),
+
+  // Success create | Success use | Kill destroy -> Nothing
+  expect({
+    queue: ["create", ["use", 1], ["destroy", 1], "killed"],
+    value: 50,
+    error: null
+  }, queue((push) =>
+       killed(with_resource(then(push("create"),
+                                 wrap(1)),
+                (id) => then(push(["use", id]),
+                             wrap(id + 5)),
+                (id) => then(push(["destroy", id]),
+                             never)),
+              then(push("killed"),
+                   wrap(50))))),
 ];
