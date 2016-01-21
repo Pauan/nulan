@@ -19,10 +19,9 @@ const forever = (a) =>
     forever(a));
 
 const killed = (a, value) =>
-  sync(() => {
-    kill_thread(make_thread_run(a));
-    return value;
-  });
+  after(sync(() => {
+          kill_thread(make_thread_run(a));
+        }), (_) => value);
 
 const ignore_yield = ignore_kill(_yield);
 
