@@ -10,7 +10,7 @@ When does the optimization apply?
      | a <= 1
        (loop a))
 
-2) Calls itself within the body of a `MATCHES`::
+2) Calls itself within the body of a ``MATCHES``::
 
      (WITH-LOOP loop
      | a <= 1
@@ -31,7 +31,7 @@ When does the optimization apply?
        | [a]
            (loop a)))
 
-3) Calls itself within the body of a nested `WITH-LOOP`::
+3) Calls itself within the body of a nested ``WITH-LOOP``::
 
     (WITH-LOOP loop
     | a <= 1
@@ -56,7 +56,8 @@ When does the optimization apply?
                (loop a)))))
 
 Note: because of lambda inlining, this optimization also applies when it
-calls itself within the body of a `->`, and the `->` is immediately called::
+calls itself within the body of a ``->``, and the ``->`` is immediately
+called::
 
    (WITH-LOOP loop
    | a <= 1
@@ -88,7 +89,7 @@ is normally implemented by reusing the existing stack frame, rather than
 creating a new stack frame.
 
 If the implementation is a compiler, this optimization is normally implemented
-by using gotos, or a `for` / `while` loop and labels.
+by using gotos, or a ``for`` / ``while`` loop and labels.
 
 Here is an example of the output of the Nulan -> JavaScript compiler:
 
@@ -142,5 +143,5 @@ Here is an example of the output of the Nulan -> JavaScript compiler:
 
     loop(0);
 
-Because it uses a `for` loop and labeled statements, it is evaluated with
+Because it uses a ``for`` loop and labeled statements, it is evaluated with
 constant memory usage.
