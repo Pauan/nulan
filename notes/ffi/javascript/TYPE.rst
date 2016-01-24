@@ -101,7 +101,7 @@ This is very convenient for creating Nulan wrappers for JavaScript types,
 while still using JavaScript types at run-time::
 
   (TYPE URL
-  | (*url String))
+  | (*url Text))
 
   (UNSAFE-FFI-LOAD { target <= javascript
                    | file <= "url.js" }
@@ -109,7 +109,7 @@ while still using JavaScript types at run-time::
 
 The ``concat`` function only works with the type ``URL``, and the static type
 system guarantees that it will be used correctly: it is not possible to call
-``concat`` with a ``String``
+``concat`` with a ``Text``
 
 But at run-time, it is actually using JavaScript strings, which gives good
 performance.
