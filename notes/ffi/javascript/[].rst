@@ -1,0 +1,40 @@
+The ``[]`` syntax creates new Nulan lists. They are represented as JavaScript
+arrays:
+
+* Nulan::
+
+    [ 1 2 3 ]
+
+* JavaScript::
+
+    [1, 2, 3]
+
+When pattern matching on a Nulan list, it uses a JavaScript switch to check
+the length of the array, and then uses JavaScript array index access:
+
+* Nulan::
+
+    (FUNCTION foo :: (-> (List a) (List a))
+    | (foo [ a ])
+        [ a ]
+    | (foo [ a b c ])
+        [ a b c ]
+    | (foo a)
+        a)
+
+* JavaScript::
+
+    const foo = (a) => {
+      switch (a.length) {
+      case 1:
+        const b = a[0];
+        return [b];
+      case 3:
+        const b = a[0];
+        const c = a[1];
+        const d = a[2];
+        return [b, c, d];
+      default:
+        return a;
+      }
+    };

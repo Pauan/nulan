@@ -1,0 +1,68 @@
+The ``{}`` syntax creates new Nulan records. They are represented as
+JavaScript objects, which contains alphabetical properties (starting with
+``a``, ``b``, ``c``, etc.) which corresponds to each property in the record,
+in order:
+
+* Nulan::
+
+    { foo <= 1
+    | bar <= 2
+    | qux <= 3 }
+
+* JavaScript::
+
+    {
+      a: 1,
+      b: 2,
+      c: 3
+    }
+
+When pattern matching on a record, it accesses the property using JavaScript's
+``.`` syntax:
+
+* Nulan::
+
+    (FUNCTION foo :: (-> { bar :: Integer
+                         | qux :: Integer }
+                         Integer)
+    | (foo { bar qux })
+        (+ bar qux))
+
+    (foo { bar <= 1
+         | qux <= 2 })
+
+* JavaScript::
+
+    const foo = (a) => {
+      const bar = a.a;
+      const qux = a.b;
+      return bar + qux;
+    };
+
+    foo({
+      a: 1,
+      b: 2
+    });
+
+Nulan's ``.`` syntax is represented as JavaScript's ``.`` syntax:
+
+* Nulan::
+
+    (CONSTANT
+    | foo :: { bar :: Integer
+             | qux :: Integer }
+    | foo <= { bar <= 1
+             | qux <= 2 })
+
+    foo.bar
+    foo.qux
+
+* JavaScript::
+
+    const foo = {
+      a: 1,
+      b: 2
+    };
+
+    foo.a;
+    foo.b;
