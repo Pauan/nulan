@@ -47,8 +47,8 @@
   | flatten)
 | (PROVIDE ($transform Maybe)
   | transform <= map)
-| (PROVIDE ($wrap Maybe)
-  | wrap))
+| (PROVIDE ($yield Maybe)
+  | yield))
 
 (PROVIDE ($transform Maybe)
 | transform <= map)
@@ -95,7 +95,7 @@
   | (even? a)
       (odd? (- a 1)))
 
-  (FUNCTION odd :: (-> Integer Boolean)
+  (FUNCTION odd? :: (-> Integer Boolean)
   | (odd? 0)
       false
   | (odd? a)
@@ -105,9 +105,18 @@
      b <= 2
   (+ a b))
 
+(WITH-LOOP loop
+| a <= 1
+| b <= 2
+  (loop a b))
+
 (FUNCTION foo :: (-> (-> Integer Integer Integer) Integer)
 | (foo a)
     (a 1 2))
+
+(FUNCTION foo :: (-> Text Text)
+| (foo a)
+    a)
 
 (FUNCTION bar :: (-> Integer Integer)
 | (bar 1)
@@ -116,19 +125,23 @@
     (+ (bar 1) a))
 
 (REWRITE-RULE
-| (QUX @a)
+| (QUX ~@a)
     &(+ ~@a))
 
-(REWRITE-RULE
-| FOO
-    &(BAR 1 2 3 4 5)
+(MUTUALLY-RECURSIVE
+  (REWRITE-RULE
+  | (FOO ~n <= ~v)
+      &(BAR ~n ~v)
+  | (FOO ~v)
+      &(BAR ~v))
 
-| (BAR a @b)
-    (MATCH a
-    | &~n <= ~v
-        &(QUX ~n ~v ~@b)
-    | v
-        &(QUX 1 ~v ~@b)))
+  (REWRITE-RULE
+  | (BAR ~a ~@b)
+      (MATCH a
+      | &~n <= ~v
+          &(QUX ~n ~v ~@b)
+      | v
+          &(QUX 1 ~v ~@b))))
 
 (foo -> a b (+ a b))
 (foo (-> a b (+ a b)))
@@ -140,15 +153,15 @@ FOO
 
 (MUTUALLY-RECURSIVE
   (REWRITE-RULE
-  | (UNSTREAM &(STREAM ~a))
+  | (UNSTREAM (STREAM ~a))
       a
-  | (UNSTREAM a)
+  | (UNSTREAM ~a)
       &(unstream ~a))
 
   (REWRITE-RULE
-  | (STREAM &(UNSTREAM ~a))
+  | (STREAM (UNSTREAM ~a))
       a
-  | (STREAM a)
+  | (STREAM ~a)
       &(stream ~a)))
 
 (DO a <= a
@@ -158,7 +171,7 @@ FOO
 (DO x <= (read-file "foo")
     (log x)
     (write-file "bar" x)
-    (wrap null))
+    (yield null))
 
 (TRANSFORM a <= 1
            b <= 2
@@ -218,6 +231,10 @@ FOO
 
 (MATCH a
 | (-> view a)
+    9)
+
+(MATCH a
+| (LET a <= a (equal? a 1))
     9)
 
 (IMPORT (nulan "unsafe")
