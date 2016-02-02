@@ -60,48 +60,79 @@ const set_attributes = (x, a) => {
   }
 };
 
+
+const set_children_list = (x, a) => {
+  for (let i = 0; i < a["length"]; ++i) {
+    x["appendChild"](html(a[i]));
+  }
+};
+
+const set_children_observe = (x, a) => {
+  // TODO error handling and cancellation
+  make_thread_run(a.a(a.b, (a) =>
+    sync(() => {
+      // TODO cleanup the running observers of the children
+      x["innerHTML"] = "";
+
+      for (let i = 0; i < a["length"]; ++i) {
+        x["appendChild"](html(a[i]));
+      }
+
+      return _null;
+    })));
+};
+
 const set_children = (x, a) => {
   switch (a.$) {
   // *children-list
   case 0:
-    // TODO
-    for (let i = 0; i < a.a["length"]; ++i) {
-      x["appendChild"](html(a.a[i]));
-    }
+    set_children_list(x, a.a);
     break;
 
   // *children-observe
   case 1:
-    // TODO error handling and cancellation
-    make_thread_run(a.a(a.b, (a) =>
-      sync(() => {
-        // TODO cleanup the running observers of the children
-        x["innerHTML"] = "";
-
-        for (let i = 0; i < a["length"]; ++i) {
-          x["appendChild"](html(a[i]));
-        }
-
-        return _null;
-      })));
+    set_children_observe(x, a);
     break;
   }
+};
+
+
+const html_parent = (a) => {
+  const x = document["createElement"](a.a);
+  set_attributes(x, a.b);
+  set_children(x, a.c);
+  return x;
+};
+
+const html_void = (a) => {
+  const x = document["createElement"](a.a);
+  set_attributes(x, a.b);
+  return x;
+};
+
+const html_observe = (a) => {
+  const x = document["createTextNode"]("");
+
+  // TODO error handling and cancellation
+  make_thread_run(a.a(a.b, (text) =>
+    sync(() => {
+      // TODO is this correct ?
+      x["textContent"] = text;
+      return _null;
+    })));
+
+  return x;
 };
 
 const html = (a) => {
   switch (a.$) {
   // *parent
   case 0:
-    const x1 = document["createElement"](a.a);
-    set_attributes(x1, a.b);
-    set_children(x1, a.c);
-    return x1;
+    return html_parent(a);
 
   // *void
   case 1:
-    const x2 = document["createElement"](a.a);
-    set_attributes(x2, a.b);
-    return x2;
+    return html_void(a);
 
   // *text
   case 2:
@@ -109,19 +140,10 @@ const html = (a) => {
 
   // *observe
   case 3:
-    const x3 = document["createTextNode"]("");
-
-    // TODO error handling and cancellation
-    make_thread_run(a.a(a.b, (text) =>
-      sync(() => {
-        // TODO is this correct ?
-        x3["textContent"] = text;
-        return _null;
-      })));
-
-    return x3;
+    return html_observe(a);
   }
 };
+
 
 const render = (parent, a) =>
   sync(() => {
