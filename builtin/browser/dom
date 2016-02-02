@@ -1,0 +1,137 @@
+(TYPE Class
+| (*class Text))
+
+
+(TYPE Attribute
+| (*attribute-text Text Text)
+| (*attribute-class (List Class))
+
+| (REQUIRE ($observe a)
+    (*attribute-observe Text (a (Maybe Text))))
+
+| (REQUIRE ($observe a)
+    (*attribute-class-observe (a (List Class)))))
+
+
+(TYPE Children
+| (*children-list (List HTML))
+| (REQUIRE ($observe a)
+    (*children-observe (a (List HTML)))))
+
+
+(TYPE HTML
+| (*parent Text (List Attribute) Children)
+| (*void Text (List Attribute))
+| (*text Text)
+| (REQUIRE ($observe a)
+    (*observe (a Text))))
+
+
+(POLYMORPHIC
+| (FUNCTION attribute :: (INLINE (-> Text Text Attribute))
+  | (attribute a b)
+      (*attribute-text a b))
+
+| (FUNCTION attribute :: (REQUIRE ($observe a)
+                           (INLINE (-> Text (a (Maybe Text)) Attribute)))
+  | (attribute a b)
+      (*attribute-observe a b)))
+
+
+(POLYMORPHIC
+| (FUNCTION attribute-class :: (INLINE (-> (List Class) Attribute))
+  | (attribute-class a)
+      (*attribute-class a))
+
+| (FUNCTION attribute-class :: (REQUIRE ($observe a)
+                                 (INLINE (-> (a (List Class)) Attribute)))
+  | (attribute-class a)
+      (*attribute-class-observe a)))
+
+
+(POLYMORPHIC
+| (FUNCTION children :: (INLINE (-> (List HTML) Children))
+  | (children a)
+      (*children-list a))
+
+| (FUNCTION children :: (REQUIRE ($observe a)
+                          (INLINE (-> (a (List HTML)) Children)))
+  | (children a)
+      (*children-observe a)))
+
+
+(POLYMORPHIC
+| (FUNCTION text :: (INLINE (-> Text HTML))
+  | (text a)
+      (*text a))
+
+| (FUNCTION text :: (REQUIRE ($observe a)
+                      (INLINE (-> (a Text) HTML)))
+  | (text a)
+      (*observe a)))
+
+
+(REWRITE-RULE
+| (ATTRIBUTES ~@a)
+    &[ ~@(transform a -> &~a <= ~b
+           (MATCH a
+           | &"class"
+               &(attribute-class ~b)
+           | _
+               &(attribute ~a ~b))) ])
+
+(REWRITE-RULE
+| (PARENT ~a ~@b ~c)
+    &(*parent ~a (ATTRIBUTES ~@b) (children ~c)))
+
+(REWRITE-RULE
+| (VOID ~a ~@b)
+    &(*void ~a (ATTRIBUTES ~@b)))
+
+(REWRITE-RULE
+| (DIV ~@a ~b)
+    &(PARENT "div" ~@a ~b))
+
+(REWRITE-RULE
+| (INPUT ~@a)
+    &(VOID "input" ~@a))
+
+
+#/
+(DIV "foo" <= "bar"
+     "src" <= (always (*some "nou"))
+     "class" <= [ bar qux corge ]
+  [ (text "Hi") ])
+
+(*parent "div"
+  [ (attribute "foo" "bar")
+  | (attribute "src" (always (*some "nou")))
+  | (attribute-class [ bar qux corge ]) ]
+  (children [ (text "Hi") ]))
+
+(*parent "div"
+  [ (*attribute-text "foo" "bar")
+  | (*attribute-observe "src" (always (*some "nou")))
+  | (*attribute-class [ bar qux corge ]) ]
+  (*children-list [ (*text "Hi") ]))
+
+{
+  $: 0,
+  a: [
+    { $: 0, a: "foo", b: "bar" },
+    { $: 2, a: observe, b: "src", c: always({ $: 1, a: "nou" }) },
+    { $: 1, a: [ bar, qux, corge ] }
+  ],
+  b: {
+    $: 0,
+    a: [
+      { $: 2, a: "Hi" }
+    ]
+  }
+}
+
+
+(div [ (attr "foo" "bar")
+     | (attr "src" (transform src -> src (*some src))) ]
+  (children [ (text "Hi") ]))
+/#

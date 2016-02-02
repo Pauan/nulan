@@ -1,111 +1,156 @@
+import { make_thread_run, sync } from "../task";
+import { _null } from "../types";
 
 
-(with-id tab.id
-  (with-cache tab html-tab))
+const set_attribute_observe = (x, attr) => {
+  // TODO error handling and cancellation
+  make_thread_run(attr.a(attr.c, (maybe) =>
+    sync(() => {
+      switch (maybe.$) {
+      // *none
+      case 0:
+        x["removeAttribute"](attr.b);
+        return _null;
+
+      // *some
+      case 1:
+        x["setAttribute"](attr.b, maybe.a);
+        return _null;
+      }
+    })));
+};
+
+const set_attribute_class_observe = (x, attr) => {
+  // TODO error handling and cancellation
+  make_thread_run(attr.a(attr.b, (a) =>
+    sync(() => {
+      x["setAttribute"]("class", a["join"](" "));
+      return _null;
+    })));
+};
+
+const set_attribute = (x, attr) => {
+  switch (attr.$) {
+  // *attribute-text
+  case 0:
+    x["setAttribute"](attr.a, attr.b);
+    break;
+
+  // *attribute-class
+  case 1:
+    x["setAttribute"]("class", attr.a["join"](" "));
+    break;
+
+  // *attribute-observe
+  case 2:
+    set_attribute_observe(x, attr);
+    break;
+
+  // *attribute-class-observe
+  case 3:
+    set_attribute_class_observe(x, attr);
+    break;
+  }
+};
+
+// TODO duplicate attribute checks ?
+const set_attributes = (x, a) => {
+  for (let i = 0; i < a["length"]; ++i) {
+    set_attribute(x, a[i]);
+  }
+};
+
+const set_children = (x, a) => {
+  switch (a.$) {
+  // *children-list
+  case 0:
+    // TODO
+    for (let i = 0; i < a.a["length"]; ++i) {
+      x["appendChild"](html(a.a[i]));
+    }
+    break;
+
+  // *children-observe
+  case 1:
+    // TODO error handling and cancellation
+    make_thread_run(a.a(a.b, (a) =>
+      sync(() => {
+        // TODO cleanup the running observers of the children
+        x["innerHTML"] = "";
+
+        for (let i = 0; i < a["length"]; ++i) {
+          x["appendChild"](html(a[i]));
+        }
+
+        return _null;
+      })));
+    break;
+  }
+};
+
+const html = (a) => {
+  switch (a.$) {
+  // *parent
+  case 0:
+    const x1 = document["createElement"](a.a);
+    set_attributes(x1, a.b);
+    set_children(x1, a.c);
+    return x1;
+
+  // *void
+  case 1:
+    const x2 = document["createElement"](a.a);
+    set_attributes(x2, a.b);
+    return x2;
+
+  // *text
+  case 2:
+    return document["createTextNode"](a.a);
+
+  // *observe
+  case 3:
+    const x3 = document["createTextNode"]("");
+
+    // TODO error handling and cancellation
+    make_thread_run(a.a(a.b, (text) =>
+      sync(() => {
+        // TODO is this correct ?
+        x3["textContent"] = text;
+        return _null;
+      })));
+
+    return x3;
+  }
+};
+
+const render = (parent, a) =>
+  sync(() => {
+    parent["appendChild"](html(a));
+    return _null;
+  });
 
 
-HTML
+const bar = "__style1__";
+const qux = "__style2__";
+const corge = "__style3__";
 
-HTML-ID
+const observe = (a, b) =>
+  b(a);
 
-(DEFINE-TYPE HTML-Unique
-  (*text Text)
-  (*html Text HTML))
+const always = (a) => a;
 
-(DEFINE-TYPE HTML-Attribute
-  (*))
-
-(DEFINE-TYPE HTML
-  (*element Text (List HTML-Attribute) (List HTML-Unique)))
-
-(PROTOCOL ($HTML a)
-  ()
-  )
-
-text :: (-> Text HTML-Unique)
-with-id :: (-> Text HTML HTML-Unique)
-with-cache :: (-> a (-> a HTML) HTML)
-element :: (-> Text (List Attribute) (List HTML-Unique) HTML)
-
-
-(DEFINE html-tab :: (-> (-> Tab-Action (Task Null)) Tab HTML)
-  (html-tab push tab)
-    (with-id tab.id
-      (with-cache tab -> tab
-        (div [ (on-hover -> hover?
-                 (push (*hover tab hover?)))
-             | (on-hold -> hold?
-                 (push (*hold tab hold?)))
-             | (class class-tab-hover tab.hover?)
-             | (class class-tab-hold tab.hold?) ]
-          [ (html-tab-favicon tab)
-          | (html-tab-text tab)
-          | (html-tab-close tab) ]))))
-
-(DEFINE html-group :: (-> (-> Group-Action (Task Null)) Group HTML)
-  (html-group push group)
-    (with-id group.id
-      (with-cache group -> group
-        (div [ (on-hover -> hover?
-                 (push (*hover group hover?)))
-             | (on-hold -> hold?
-                 (push (*hold group hold?))) ]
-          (LET push-tab = (-> value
-                            (push (*tab-action value)))
-            (map group.tabs -> tab
-              (html-tab push-tab tab)))))))
-
-
-(DEFINE-TYPE Tab
-  (*tab { id :: Text
-        | url :: (Mutable (Maybe Text))
-        | title :: (Mutable (Maybe Text))
-        | hovering? :: (Mutable Boolean)
-        | holding? :: (Mutable Boolean)
-        | hovering-close? :: (Mutable Boolean)
-        | holding-close? :: (Mutable Boolean) }))
-
-(DEFINE html-tab-favicon :: (-> Tab HTML)
-  (html-tab-favicon (*tab tab))
-  )
-
-(DEFINE html-tab :: (-> Tab HTML)
-  (html-tab (MATCH tab (*tab info)))
-    (div [ (on-hover -> hover?
-             (set! info.hovering? hover?))
-
-         | (on-hold -> hold?
-             (set! info.holding? hold?))
-
-         | (toggle-style style-tab-hover
-             info.hovering?)
-
-         | (toggle-style style-tab-hold
-             (and info.hovering?
-                  info.holding?)) ]
-      [ (html-tab-favicon tab)
-      | (html-tab-text tab)
-      | (html-tab-close tab) ]))
-
-(DEFINE-STYLE style-tab-hover
-  "background-color" = (always "red")
-  "color" = (always "black"))
-
-(DEFINE html-tab :: (-> Tab HTML)
-  (html-tab (MATCH tab (*tab info)))
-    (div { on-hover = (-> hover?
-                        (set! info.hovering? hover?))
-
-         | on-hold = (-> hold?
-                       (set! info.holding? hold?))
-
-         | styles = [ (toggle-style style-tab-hover
-                        info.hovering?)
-                    | (toggle-style style-tab-hold
-                        (and info.hovering?
-                             info.holding?))
-                    | (inline-style "background-color"
-                        (always "blue")) ] }
-      [ (html-tab-favicon tab)
-      | (html-tab-text tab)
-      | (html-tab-close tab) ]))
+make_thread_run(render(document.body, {
+  $: 0,
+  a: "div",
+  b: [
+    { $: 0, a: "foo", b: "bar" },
+    { $: 2, a: observe, b: "src", c: always({ $: 1, a: "nou" }) },
+    { $: 1, a: [ bar, qux, corge ] }
+  ],
+  c: {
+    $: 0,
+    a: [
+      { $: 2, a: "Hi" }
+    ]
+  }
+}));
