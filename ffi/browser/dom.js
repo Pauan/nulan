@@ -134,19 +134,44 @@ const set_children_observe = (pool, x, observe, a) => {
 };
 
 
+const push_children = (children, error, x, a) => {
+  for (let i = 0; i < a["length"]; ++i) {
+    // TODO kill all the thread pools when it errors ?
+    const _pool = make_thread_pool(error);
+
+    children["push"](_pool);
+
+    x["appendChild"](html(_pool, a[i]));
+  }
+};
+
 // TODO test this
 const insert_before = (children, error, x, index, a) => {
   // TODO kill all the thread pools when it errors ?
   const _pool = make_thread_pool(error);
 
-  children["splice"](index, 0, _pool);
-
   // TODO test this
-  if (index === x["childNodes"]["length"]) {
+  if (index === children["length"]) {
+    children["push"](_pool);
+
     x["appendChild"](html(_pool, a));
+
   } else {
+    children["splice"](index, 0, _pool);
+
     x["insertBefore"](html(_pool, a), x["childNodes"][index]);
   }
+};
+
+// TODO test this
+const replace_child = (children, error, x, index, a) => {
+  // TODO kill all the thread pools when it errors ?
+  const _pool = make_thread_pool(error);
+
+  kill_thread_pool(children[index]);
+  children[index] = _pool;
+
+  x["replaceChild"](html(_pool, a), x["childNodes"][index]);
 };
 
 // TODO test this
@@ -176,13 +201,7 @@ const set_children_observe_list = (pool, x, observe, a) => {
         switch (a.$) {
         // *initial
         case 0:
-          // TODO
-          for (let i = 0; i < a.a["length"]; ++i) {
-            // TODO kill all the thread pools when it errors ?
-            const _pool = make_thread_pool(error);
-            children["push"](_pool);
-            x["appendChild"](html(_pool, a.a[i]));
-          }
+          push_children(children, error, x, a.a);
           break;
 
         // *insert
@@ -192,8 +211,7 @@ const set_children_observe_list = (pool, x, observe, a) => {
 
         // *update
         case 2:
-          remove_child(children, x, a.a);
-          insert_before(children, error, x, a.a, a.b);
+          replace_child(children, error, x, a.a, a.b);
           break;
 
         // *remove
@@ -242,8 +260,8 @@ const html_observe = (pool, a) => {
 
   run_in_thread_pool(pool, a.a(a.b, (text) =>
     sync(() => {
-      // TODO is this correct ?
-      x["textContent"] = text;
+      // http://jsperf.com/textnode-performance
+      x["data"] = text;
       return _null;
     })));
 
