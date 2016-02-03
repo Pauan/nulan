@@ -134,6 +134,82 @@ const set_children_observe = (pool, x, observe, a) => {
 };
 
 
+// TODO test this
+const insert_before = (children, error, x, index, a) => {
+  // TODO kill all the thread pools when it errors ?
+  const _pool = make_thread_pool(error);
+
+  children["splice"](index, 0, _pool);
+
+  // TODO test this
+  if (index === x["childNodes"]["length"]) {
+    x["appendChild"](html(_pool, a));
+  } else {
+    x["insertBefore"](html(_pool, a), x["childNodes"][index]);
+  }
+};
+
+// TODO test this
+const remove_child = (children, x, index) => {
+  kill_thread_pool(children[index]);
+
+  children["splice"](index, 1);
+
+  x["removeChild"](x["childNodes"][index]);
+};
+
+// TODO test this
+const set_children_observe_list = (pool, x, observe, a) => {
+  // TODO hacky
+  run_in_thread_pool(pool, async_killable((success, error) => {
+    const children = [];
+
+    // TODO should this remove the children from the DOM ?
+    const kill = () => {
+      for (let i = 0; i < children["length"]; ++i) {
+        kill_thread_pool(children[i]);
+      }
+    };
+
+    run_in_thread_pool(pool, observe(a, (a) =>
+      sync(() => {
+        switch (a.$) {
+        // *initial
+        case 0:
+          // TODO
+          for (let i = 0; i < a.a["length"]; ++i) {
+            // TODO kill all the thread pools when it errors ?
+            const _pool = make_thread_pool(error);
+            children["push"](_pool);
+            x["appendChild"](html(_pool, a.a[i]));
+          }
+          break;
+
+        // *insert
+        case 1:
+          insert_before(children, error, x, a.a, a.b);
+          break;
+
+        // *update
+        case 2:
+          remove_child(children, x, a.a);
+          insert_before(children, error, x, a.a, a.b);
+          break;
+
+        // *remove
+        case 3:
+          remove_child(children, x, a.a);
+          break;
+        }
+
+        return _null;
+      })));
+
+    return kill;
+  }));
+};
+
+
 const html_parent_list = (pool, a) => {
   const x = document["createElement"](a.a);
   set_attributes(pool, x, a.b);
@@ -145,6 +221,13 @@ const html_parent_observe = (pool, a) => {
   const x = document["createElement"](a.b);
   set_attributes(pool, x, a.c);
   set_children_observe(pool, x, a.a, a.d);
+  return x;
+};
+
+const html_parent_observe_list = (pool, a) => {
+  const x = document["createElement"](a.b);
+  set_attributes(pool, x, a.c);
+  set_children_observe_list(pool, x, a.a, a.d);
   return x;
 };
 
@@ -177,16 +260,20 @@ const html = (pool, a) => {
   case 1:
     return html_parent_observe(pool, a);
 
-  // *void
+  // *parent-observe-list
   case 2:
+    return html_parent_observe_list(pool, a);
+
+  // *void
+  case 3:
     return html_void(pool, a);
 
   // *text
-  case 3:
+  case 4:
     return document["createTextNode"](a.a);
 
   // *observe
-  case 4:
+  case 5:
     return html_observe(pool, a);
   }
 };

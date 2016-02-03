@@ -1,6 +1,16 @@
 import { crash } from "./error";
 
 
+export const copy = (a) => {
+  const b = new Array(a["length"]);
+
+  for (let i = 0; i < a["length"]; ++i) {
+    b[i] = a[i];
+  }
+
+  return b;
+};
+
 export const remove = (a, x) => {
   const i = a["indexOf"](x);
 
