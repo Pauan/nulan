@@ -265,7 +265,7 @@ const html = (pool, a) => {
 };
 
 
-const _render = (parent, a) =>
+export const render = (parent, a) =>
   async_killable((success, error) => {
     // TODO remove from the DOM when an error happens ?
     const pool = make_thread_pool(error);
@@ -281,5 +281,4 @@ const _render = (parent, a) =>
     };
   });
 
-export const render = (a) =>
-  _render(document["body"], a);
+export const root = document["body"];
