@@ -1,4 +1,4 @@
-import { error } from "../../util/error";
+import { error } from "./error";
 import { peek } from "../../util/array";
 import * as $ast from "./ast";
 

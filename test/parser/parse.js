@@ -3,7 +3,7 @@ import { wrap, catch_error } from "../../ffi/task";
 import { tokenize } from "../../src/parser/tokenize";
 import { parse } from "../../src/parser/parse";
 import { lines, repeat } from "../../util/string";
-import { loc, string, symbol, integer,
+import { loc, text, symbol, integer,
          call, list, record, lambda,
          dot, bar, assign, type,
          quote, unquote, splice } from "../../src/parser/ast";

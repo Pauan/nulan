@@ -1,12 +1,13 @@
 import { crash } from "../util/error";
 import { _null, none, some } from "./types";
 import { noop, try_catch } from "./util";
+import * as $array from "../util/array";
 
 
 export const make_thread = () => {
   return {
     a: false, // is_killed
-    b: null   // kill
+    b: null   // on_kill
   };
 };
 
@@ -53,18 +54,67 @@ export const kill_thread = (thread) => {
   }
 };
 
-const _kill_all = (a) => {
+export const kill_threads = (a) => {
   for (let i = 0; i < a["length"]; ++i) {
     kill_thread(a[i]);
   }
 };
 
+// TODO rename to run_in_thread
 export const run = (task, thread, on_success, on_error) => {
   if (thread.a) {
     crash(new Error("Cannot run: thread is killed"));
 
   } else {
     task(thread, on_success, on_error);
+  }
+};
+
+export const make_thread_pool = (on_error) => {
+  const pool = {
+    // is_killed
+    a: false,
+
+    // threads
+    b: [],
+
+    // on_error
+    c: (e) => {
+      kill_thread_pool(pool);
+      on_error(e);
+    }
+  };
+
+  return pool;
+};
+
+export const kill_thread_pool = (pool) => {
+  if (pool.a) {
+    crash(new Error("Invalid kill: thread pool is already killed"));
+
+  } else {
+    const threads = pool.b;
+
+    pool.a = true;
+    pool.b = null;
+    pool.c = null;
+
+    kill_threads(threads);
+  }
+};
+
+export const run_in_thread_pool = (pool, task) => {
+  if (pool.a) {
+    crash(new Error("Cannot run: thread pool is killed"));
+
+  } else {
+    const thread = make_thread();
+
+    pool.b["push"](thread);
+
+    task(thread, () => {
+      $array.remove(pool.b, thread);
+    }, pool.c);
   }
 };
 
@@ -237,7 +287,7 @@ export const concurrent_null = (a) =>
       // TODO is this the correct place for this ?
       // TODO what about running ?
       _set_kill(thread, () => {
-        _kill_all(threads);
+        kill_threads(threads);
       });
 
       const on_success = (_) => {
@@ -253,7 +303,7 @@ export const concurrent_null = (a) =>
       const on_error = (value) => {
         running = false;
         _reset_kill(thread);
-        _kill_all(threads);
+        kill_threads(threads);
         error(value);
       };
 
@@ -288,7 +338,7 @@ export const concurrent = (a) =>
       // TODO is this the correct place for this ?
       // TODO what about running ?
       _set_kill(thread, () => {
-        _kill_all(threads);
+        kill_threads(threads);
       });
 
       const on_success = () => {
@@ -304,7 +354,7 @@ export const concurrent = (a) =>
       const on_error = (value) => {
         running = false;
         _reset_kill(thread);
-        _kill_all(threads);
+        kill_threads(threads);
         error(value);
       };
 
@@ -477,13 +527,7 @@ const _yield_queue_add = (x) => {
 
 // TODO guarantee that this cannot happen while calling _yield_queue_run ?
 const _yield_queue_remove = (x) => {
-  const index = _yield_queue["indexOf"](x);
-
-  if (index === -1) {
-    crash(new Error("Invalid: could not kill yield (this should never happen)"));
-  } else {
-    _yield_queue["splice"](index, 1);
-  }
+  $array.remove(_yield_queue, x);
 };
 
 // TODO is this correct ?

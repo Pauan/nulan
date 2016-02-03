@@ -1,3 +1,17 @@
+import { crash } from "./error";
+
+
+export const remove = (a, x) => {
+  const i = a["indexOf"](x);
+
+  if (i === -1) {
+    crash(new Error("Cannot remove: element not found"));
+
+  } else {
+    a["splice"](i, 1);
+  }
+};
+
 export const peek = (a, i) => {
   if (i < a["length"]) {
     return a[i];

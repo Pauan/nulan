@@ -4,7 +4,7 @@ import * as $array from "../../util/array";
 export const SYMBOL  = 0;
 export const INTEGER = 1;
 export const NUMBER  = 2;
-export const STRING  = 3;
+export const TEXT    = 3;
 export const BOX     = 4;
 
 export const CALL    = 5;
@@ -39,8 +39,8 @@ export const number = (value, loc) => {
   return { type: NUMBER, value, loc };
 };
 
-export const string = (value, loc) => {
-  return { type: STRING, value, loc };
+export const text = (value, loc) => {
+  return { type: TEXT, value, loc };
 };
 
 export const call = (value, loc) => {

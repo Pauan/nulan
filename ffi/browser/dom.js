@@ -1,10 +1,10 @@
-import { make_thread_run, sync } from "../task";
+import { make_thread_pool, kill_thread_pool, run_in_thread_pool, sync,
+         async_killable } from "../task";
 import { _null } from "../types";
 
 
-const set_attribute_observe = (x, attr) => {
-  // TODO error handling and cancellation
-  make_thread_run(attr.a(attr.c, (maybe) =>
+const set_attribute_observe = (pool, x, attr) => {
+  run_in_thread_pool(pool, attr.a(attr.c, (maybe) =>
     sync(() => {
       switch (maybe.$) {
       // *none
@@ -20,16 +20,15 @@ const set_attribute_observe = (x, attr) => {
     })));
 };
 
-const set_attribute_class_observe = (x, attr) => {
-  // TODO error handling and cancellation
-  make_thread_run(attr.a(attr.b, (a) =>
+const set_attribute_class_observe = (pool, x, attr) => {
+  run_in_thread_pool(pool, attr.a(attr.b, (a) =>
     sync(() => {
       x["setAttribute"]("class", a["join"](" "));
       return _null;
     })));
 };
 
-const set_attribute = (x, attr) => {
+const set_attribute = (pool, x, attr) => {
   switch (attr.$) {
   // *attribute-text
   case 0:
@@ -43,78 +42,92 @@ const set_attribute = (x, attr) => {
 
   // *attribute-observe
   case 2:
-    set_attribute_observe(x, attr);
+    set_attribute_observe(pool, x, attr);
     break;
 
   // *attribute-class-observe
   case 3:
-    set_attribute_class_observe(x, attr);
+    set_attribute_class_observe(pool, x, attr);
     break;
   }
 };
 
 // TODO duplicate attribute checks ?
-const set_attributes = (x, a) => {
+const set_attributes = (pool, x, a) => {
   for (let i = 0; i < a["length"]; ++i) {
-    set_attribute(x, a[i]);
+    set_attribute(pool, x, a[i]);
   }
 };
 
 
-const set_children_list = (x, a) => {
+const set_children_list = (pool, x, a) => {
   for (let i = 0; i < a["length"]; ++i) {
-    x["appendChild"](html(a[i]));
+    x["appendChild"](html(pool, a[i]));
   }
 };
 
-const set_children_observe = (x, a) => {
-  // TODO error handling and cancellation
-  make_thread_run(a.a(a.b, (a) =>
-    sync(() => {
-      // TODO cleanup the running observers of the children
-      x["innerHTML"] = "";
+// TODO test this
+const set_children_observe = (pool, x, a) => {
+  // TODO hacky
+  run_in_thread_pool(pool, async_killable((success, error) => {
+    let children = null;
 
-      for (let i = 0; i < a["length"]; ++i) {
-        x["appendChild"](html(a[i]));
+    const kill = () => {
+      if (children !== null) {
+        kill_thread_pool(children);
       }
+    };
 
-      return _null;
-    })));
+    run_in_thread_pool(pool, a.a(a.b, (a) =>
+      sync(() => {
+        kill();
+        children = make_thread_pool(error);
+
+        x["innerHTML"] = "";
+
+        for (let i = 0; i < a["length"]; ++i) {
+          x["appendChild"](html(children, a[i]));
+        }
+
+        return _null;
+      })));
+
+    return kill;
+  }));
 };
 
-const set_children = (x, a) => {
+const set_children = (pool, x, a) => {
   switch (a.$) {
   // *children-list
   case 0:
-    set_children_list(x, a.a);
+    set_children_list(pool, x, a.a);
     break;
 
   // *children-observe
   case 1:
-    set_children_observe(x, a);
+    set_children_observe(pool, x, a);
     break;
   }
 };
 
 
-const html_parent = (a) => {
+const html_parent = (pool, a) => {
   const x = document["createElement"](a.a);
-  set_attributes(x, a.b);
-  set_children(x, a.c);
+  set_attributes(pool, x, a.b);
+  set_children(pool, x, a.c);
   return x;
 };
 
-const html_void = (a) => {
+const html_void = (pool, a) => {
   const x = document["createElement"](a.a);
-  set_attributes(x, a.b);
+  set_attributes(pool, x, a.b);
   return x;
 };
 
-const html_observe = (a) => {
+const html_observe = (pool, a) => {
   const x = document["createTextNode"]("");
 
-  // TODO error handling and cancellation
-  make_thread_run(a.a(a.b, (text) =>
+  run_in_thread_pool(pool, a.a(a.b, (text) =>
     sync(() => {
       // TODO is this correct ?
       x["textContent"] = text;
@@ -124,15 +137,15 @@ const html_observe = (a) => {
   return x;
 };
 
-const html = (a) => {
+const html = (pool, a) => {
   switch (a.$) {
   // *parent
   case 0:
-    return html_parent(a);
+    return html_parent(pool, a);
 
   // *void
   case 1:
-    return html_void(a);
+    return html_void(pool, a);
 
   // *text
   case 2:
@@ -140,39 +153,66 @@ const html = (a) => {
 
   // *observe
   case 3:
-    return html_observe(a);
+    return html_observe(pool, a);
   }
 };
 
 
-const render = (parent, a) =>
-  sync(() => {
-    parent["appendChild"](html(a));
-    return _null;
+const _render = (parent, a) =>
+  async_killable((success, error) => {
+    const pool = make_thread_pool(error);
+
+    const x = html(pool, a);
+
+    parent["appendChild"](x);
+
+    return () => {
+      kill_thread_pool(pool);
+      // TODO test this
+      // TODO what about if an error happens ?
+      parent["removeChild"](x);
+    };
   });
 
+export const render = (a) =>
+  _render(document["body"], a);
+
+
+
+import { make_thread_run, concurrent_null, flatten, transform, delay } from "../task";
+import { mutable, modify, observe } from "../mutable";
 
 const bar = "__style1__";
 const qux = "__style2__";
 const corge = "__style3__";
 
-const observe = (a, b) =>
+/*const observe = (a, b) =>
   b(a);
 
-const always = (a) => a;
+const always = (a) => a;*/
 
-make_thread_run(render(document.body, {
-  $: 0,
-  a: "div",
-  b: [
-    { $: 0, a: "foo", b: "bar" },
-    { $: 2, a: observe, b: "src", c: always({ $: 1, a: "nou" }) },
-    { $: 1, a: [ bar, qux, corge ] }
-  ],
-  c: {
-    $: 0,
-    a: [
-      { $: 2, a: "Hi" }
-    ]
-  }
-}));
+const loop = (mut) =>
+  flatten(transform(delay(1000), (_) =>
+  flatten(transform(modify(mut, (x) => x + 1), (_) =>
+                    loop(mut)))));
+
+make_thread_run(flatten(transform(mutable(0), (mut) =>
+  concurrent_null([
+    loop(mut),
+    render({
+      $: 0,
+      a: "div",
+      b: [
+        { $: 0, a: "foo", b: "bar" },
+        { $: 2, a: observe, b: "src", c: { a: "nou", b: [] } },
+        { $: 1, a: [ bar, qux, corge ] }
+      ],
+      c: {
+        $: 0,
+        a: [
+          { $: 2, a: "Hi" },
+          { $: 3, a: observe, b: mut }
+        ]
+      }
+    })
+  ]))));

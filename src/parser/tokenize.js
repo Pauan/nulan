@@ -1,4 +1,4 @@
-import { error } from "../../util/error";
+import { error } from "./error";
 import { repeat } from "../../util/string";
 import { peek } from "../../util/array";
 import * as $ast from "./ast";
@@ -210,7 +210,7 @@ const indent_error = (indent, file, lines, line, column1, column2) => {
         "there must be " + indent + " or more spaces (U+0020)");
 };
 
-const tokenize_string = (output, file, lines, line, column) => {
+const tokenize_text = (output, file, lines, line, column) => {
   const start = { line, column };
 
   column += 1;
@@ -232,7 +232,7 @@ const tokenize_string = (output, file, lines, line, column) => {
 
         const end = { line, column };
 
-        output["push"]($ast.string(value["join"](""), $ast.loc(file, lines, start, end)));
+        output["push"]($ast.text(value["join"](""), $ast.loc(file, lines, start, end)));
 
         return tokenize1(output, file, lines, line, column);
 
@@ -411,7 +411,7 @@ const specials = {
   "\t": tokenize_tab,
   " ":  tokenize_space,
   "#":  tokenize_comment,
-  "\"": tokenize_string,
+  "\"": tokenize_text,
 
   "(":  tokenize_delimiter,
   ")":  tokenize_delimiter,

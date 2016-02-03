@@ -1,6 +1,6 @@
 import { expect, expect_crash } from "../assert";
 import { wrap, catch_error } from "../../ffi/task";
-import { loc, string, symbol, integer } from "../../src/parser/ast";
+import { loc, text, symbol, integer } from "../../src/parser/ast";
 import { tokenize } from "../../src/parser/tokenize";
 import { lines } from "../../util/string";
 
@@ -527,8 +527,8 @@ export default [
     "  ^---"),
 
   test("    \"\n     foo\"", (loc) => [
-    string("\nfoo", loc(0, 4,
-                        1, 9))
+    text("\nfoo", loc(0, 4,
+                      1, 9))
   ]),
 
   test_crash("    \"\n\n\n     foo\n    bar\"",
@@ -537,8 +537,8 @@ export default [
     "  ^---"),
 
   test("    \"\n\n\n     foo\n     bar\"", (loc) => [
-    string("\n\n\nfoo\nbar", loc(0, 4,
-                                 4, 9))
+    text("\n\n\nfoo\nbar", loc(0, 4,
+                               4, 9))
   ]),
 
   test_crash("    \" foo\n       bar\n \n\n     qux\"",
@@ -547,73 +547,73 @@ export default [
     "  ^"),
 
   test("\"\n \"", (loc) => [
-    string("\n", loc(0, 0,
-                     1, 2))
+    text("\n", loc(0, 0,
+                   1, 2))
   ]),
 
   test("\"foo\n bar\"", (loc) => [
-    string("foo\nbar", loc(0, 0,
-                           1, 5))
+    text("foo\nbar", loc(0, 0,
+                         1, 5))
   ]),
 
   test("    \"foo\n     bar\"", (loc) => [
-    string("foo\nbar", loc(0, 4,
-                           1, 9))
+    text("foo\nbar", loc(0, 4,
+                         1, 9))
   ]),
 
   test("    \" foo\n       bar\"", (loc) => [
-    string(" foo\n  bar", loc(0, 4,
-                              1, 11))
+    text(" foo\n  bar", loc(0, 4,
+                            1, 11))
   ]),
 
   test("    \" foo\n       bar\n\n\n     qux\"", (loc) => [
-    string(" foo\n  bar\n\n\nqux", loc(0, 4,
-                                       4, 9))
+    text(" foo\n  bar\n\n\nqux", loc(0, 4,
+                                     4, 9))
   ]),
 
 
   test("\"foobar\"", (loc) => [
-    string("foobar", loc(0, 0,
-                         0, 8))
+    text("foobar", loc(0, 0,
+                       0, 8))
   ]),
 
   test("\"foobar\"a", (loc) => [
-    string("foobar", loc(0, 0,
-                         0, 8)),
+    text("foobar", loc(0, 0,
+                       0, 8)),
     symbol("a", loc(0, 8,
                     0, 9))
   ]),
 
   test("\"foo   bar  \"", (loc) => [
-    string("foo   bar  ", loc(0, 0,
-                              0, 13))
+    text("foo   bar  ", loc(0, 0,
+                            0, 13))
   ]),
 
   // TODO should treat all Unicode characters as a single width
   test("\"!\uD834\uDF06\"", (loc) => [
-    string("!\uD834\uDF06", loc(0, 0,
-                                0, 5))
+    text("!\uD834\uDF06", loc(0, 0,
+                              0, 5))
   ]),
 
 
   test("\"\\\\\"", (loc) => [
-    string("\\", loc(0, 0,
-                     0, 4))
+    text("\\", loc(0, 0,
+                   0, 4))
   ]),
 
   test("\"\\\"\"", (loc) => [
-    string("\"", loc(0, 0,
-                     0, 4))
+    text("\"", loc(0, 0,
+                   0, 4))
   ]),
 
   test("\"\\s\"", (loc) => [
-    string(" ", loc(0, 0,
-                    0, 4))
+    text(" ", loc(0, 0,
+                  0, 4))
   ]),
 
   test("\"\\n\"", (loc) => [
-    string("\n", loc(0, 0,
-                     0, 4))
+    text("\n", loc(0, 0,
+                   0, 4))
   ]),
 
   test_crash("\"\\a\"",
@@ -648,18 +648,18 @@ export default [
     "   ^--"),
 
   test("\"\\u[21 1D306]\"", (loc) => [
-    string("!\uD834\uDF06", loc(0, 0,
-                                0, 14))
+    text("!\uD834\uDF06", loc(0, 0,
+                              0, 14))
   ]),
 
   test("\"\\u[21 1D306]a\"", (loc) => [
-    string("!\uD834\uDF06a", loc(0, 0,
-                                 0, 15))
+    text("!\uD834\uDF06a", loc(0, 0,
+                               0, 15))
   ]),
 
   test("\"\\u[21]\\u[1D306]\"", (loc) => [
-    string("!\uD834\uDF06", loc(0, 0,
-                                0, 17))
+    text("!\uD834\uDF06", loc(0, 0,
+                              0, 17))
   ]),
 
   test_crash("\"\\u[]",
