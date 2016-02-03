@@ -104,35 +104,6 @@ const set_children_list = (pool, x, a) => {
   }
 };
 
-// TODO test this
-const set_children_observe = (pool, x, observe, a) => {
-  // TODO hacky
-  run_in_thread_pool(pool, async_killable((success, error) => {
-    let children = null;
-
-    const kill = () => {
-      if (children !== null) {
-        kill_thread_pool(children);
-
-        // TODO should this be in here ?
-        x["innerHTML"] = "";
-      }
-    };
-
-    run_in_thread_pool(pool, observe(a, (a) =>
-      sync(() => {
-        kill();
-        children = make_thread_pool(error);
-
-        set_children_list(children, x, a);
-
-        return _null;
-      })));
-
-    return kill;
-  }));
-};
-
 
 const push_children = (children, error, x, a) => {
   for (let i = 0; i < a["length"]; ++i) {
@@ -190,6 +161,7 @@ const set_children_observe_list = (pool, x, observe, a) => {
     const children = [];
 
     // TODO should this remove the children from the DOM ?
+    // TODO prevent double kill
     const kill = () => {
       for (let i = 0; i < children["length"]; ++i) {
         kill_thread_pool(children[i]);
@@ -199,8 +171,15 @@ const set_children_observe_list = (pool, x, observe, a) => {
     run_in_thread_pool(pool, observe(a, (a) =>
       sync(() => {
         switch (a.$) {
-        // *initial
+        // *set
         case 0:
+          if (children["length"] !== 0) {
+            kill();
+            children["length"] = 0;
+            // TODO is there a faster way to clear the children ?
+            x["innerHTML"] = "";
+          }
+
           push_children(children, error, x, a.a);
           break;
 
@@ -232,13 +211,6 @@ const html_parent_list = (pool, a) => {
   const x = document["createElement"](a.a);
   set_attributes(pool, x, a.b);
   set_children_list(pool, x, a.c);
-  return x;
-};
-
-const html_parent_observe = (pool, a) => {
-  const x = document["createElement"](a.b);
-  set_attributes(pool, x, a.c);
-  set_children_observe(pool, x, a.a, a.d);
   return x;
 };
 
@@ -274,24 +246,20 @@ const html = (pool, a) => {
   case 0:
     return html_parent_list(pool, a);
 
-  // *parent-observe
-  case 1:
-    return html_parent_observe(pool, a);
-
-  // *parent-observe-list
-  case 2:
-    return html_parent_observe_list(pool, a);
-
   // *void
-  case 3:
+  case 1:
     return html_void(pool, a);
 
   // *text
-  case 4:
+  case 2:
     return document["createTextNode"](a.a);
 
+  // *parent-observe-list
+  case 3:
+    return html_parent_observe_list(pool, a);
+
   // *observe
-  case 5:
+  case 4:
     return html_observe(pool, a);
   }
 };
@@ -299,6 +267,7 @@ const html = (pool, a) => {
 
 const _render = (parent, a) =>
   async_killable((success, error) => {
+    // TODO remove from the DOM when an error happens ?
     const pool = make_thread_pool(error);
 
     const x = html(pool, a);
@@ -308,7 +277,6 @@ const _render = (parent, a) =>
     return () => {
       kill_thread_pool(pool);
       // TODO test this
-      // TODO what about if an error happens ?
       parent["removeChild"](x);
     };
   });

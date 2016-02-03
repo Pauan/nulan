@@ -28,9 +28,23 @@ export const mutable_list = (value) =>
 
 
 // TODO code duplication with mutable.js
-export const current = (mutable) =>
+export const get = (mutable) =>
   // TODO use immutable arrays instead ?
   sync(() => $array.copy(mutable.a));
+
+
+export const set = (mutable, a) =>
+  sync(() => {
+    // TODO use immutable arrays instead ?
+    mutable.a = $array.copy(a);
+
+    _trigger(mutable, {
+      $: 0,
+      a: a
+    });
+
+    return _null;
+  });
 
 
 export const push = (mutable, a) =>
