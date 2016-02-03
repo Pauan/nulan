@@ -3,6 +3,12 @@ import { make_thread_pool, kill_thread_pool, run_in_thread_pool, sync,
 import { _null } from "../types";
 
 
+const set_attribute_event = (pool, x, attr) => {
+  x["addEventListener"](attr.a, (e) => {
+    run_in_thread_pool(pool, attr.b(e));
+  }, true);
+};
+
 const set_attribute_observe = (pool, x, attr) => {
   run_in_thread_pool(pool, attr.a(attr.c, (maybe) =>
     sync(() => {
@@ -40,13 +46,18 @@ const set_attribute = (pool, x, attr) => {
     x["setAttribute"]("class", attr.a["join"](" "));
     break;
 
-  // *attribute-observe
+  // *attribute-event
   case 2:
+    set_attribute_event(pool, x, attr);
+    break;
+
+  // *attribute-observe
+  case 3:
     set_attribute_observe(pool, x, attr);
     break;
 
   // *attribute-class-observe
-  case 3:
+  case 4:
     set_attribute_class_observe(pool, x, attr);
     break;
   }
