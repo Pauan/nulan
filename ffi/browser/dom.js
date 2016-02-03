@@ -29,7 +29,7 @@ const set_attribute_observe = (pool, x, attr) => {
 const set_attribute_class_observe = (pool, x, attr) => {
   run_in_thread_pool(pool, attr.a(attr.b, (a) =>
     sync(() => {
-      x["setAttribute"]("class", a["join"](" "));
+      x["className"] = a["join"](" ");
       return _null;
     })));
 };
@@ -60,7 +60,7 @@ const set_attribute = (pool, x, attr) => {
 
   // *attribute-class
   case 1:
-    x["setAttribute"]("class", attr.a["join"](" "));
+    x["className"] = attr.a["join"](" ");
     break;
 
   // *attribute-style-text
