@@ -34,6 +34,23 @@ const set_attribute_class_observe = (pool, x, attr) => {
     })));
 };
 
+const set_attribute_style_observe = (pool, x, attr) => {
+  run_in_thread_pool(pool, attr.a(attr.c, (maybe) =>
+    sync(() => {
+      switch (maybe.$) {
+      // *none
+      case 0:
+        x["style"]["removeProperty"](attr.b);
+        return _null;
+
+      // *some
+      case 1:
+        x["style"]["setProperty"](attr.b, maybe.a, "");
+        return _null;
+      }
+    })));
+};
+
 const set_attribute = (pool, x, attr) => {
   switch (attr.$) {
   // *attribute-text
@@ -46,19 +63,29 @@ const set_attribute = (pool, x, attr) => {
     x["setAttribute"]("class", attr.a["join"](" "));
     break;
 
-  // *attribute-event
+  // *attribute-style-text
   case 2:
+    x["style"]["setProperty"](attr.a, attr.b, "");
+    break;
+
+  // *attribute-event
+  case 3:
     set_attribute_event(pool, x, attr);
     break;
 
   // *attribute-observe
-  case 3:
+  case 4:
     set_attribute_observe(pool, x, attr);
     break;
 
   // *attribute-class-observe
-  case 4:
+  case 5:
     set_attribute_class_observe(pool, x, attr);
+    break;
+
+  // *attribute-style-observe
+  case 6:
+    set_attribute_style_observe(pool, x, attr);
     break;
   }
 };
@@ -86,6 +113,9 @@ const set_children_observe = (pool, x, a) => {
     const kill = () => {
       if (children !== null) {
         kill_thread_pool(children);
+
+        // TODO should this be in here ?
+        x["innerHTML"] = "";
       }
     };
 
@@ -93,8 +123,6 @@ const set_children_observe = (pool, x, a) => {
       sync(() => {
         kill();
         children = make_thread_pool(error);
-
-        x["innerHTML"] = "";
 
         for (let i = 0; i < a["length"]; ++i) {
           x["appendChild"](html(children, a[i]));
