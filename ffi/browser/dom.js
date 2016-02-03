@@ -105,7 +105,7 @@ const set_children_list = (pool, x, a) => {
 };
 
 // TODO test this
-const set_children_observe = (pool, x, a) => {
+const set_children_observe = (pool, x, observe, a) => {
   // TODO hacky
   run_in_thread_pool(pool, async_killable((success, error) => {
     let children = null;
@@ -119,14 +119,12 @@ const set_children_observe = (pool, x, a) => {
       }
     };
 
-    run_in_thread_pool(pool, a.a(a.b, (a) =>
+    run_in_thread_pool(pool, observe(a, (a) =>
       sync(() => {
         kill();
         children = make_thread_pool(error);
 
-        for (let i = 0; i < a["length"]; ++i) {
-          x["appendChild"](html(children, a[i]));
-        }
+        set_children_list(children, x, a);
 
         return _null;
       })));
@@ -135,25 +133,18 @@ const set_children_observe = (pool, x, a) => {
   }));
 };
 
-const set_children = (pool, x, a) => {
-  switch (a.$) {
-  // *children-list
-  case 0:
-    set_children_list(pool, x, a.a);
-    break;
 
-  // *children-observe
-  case 1:
-    set_children_observe(pool, x, a);
-    break;
-  }
-};
-
-
-const html_parent = (pool, a) => {
+const html_parent_list = (pool, a) => {
   const x = document["createElement"](a.a);
   set_attributes(pool, x, a.b);
-  set_children(pool, x, a.c);
+  set_children_list(pool, x, a.c);
+  return x;
+};
+
+const html_parent_observe = (pool, a) => {
+  const x = document["createElement"](a.b);
+  set_attributes(pool, x, a.c);
+  set_children_observe(pool, x, a.a, a.d);
   return x;
 };
 
@@ -178,20 +169,24 @@ const html_observe = (pool, a) => {
 
 const html = (pool, a) => {
   switch (a.$) {
-  // *parent
+  // *parent-list
   case 0:
-    return html_parent(pool, a);
+    return html_parent_list(pool, a);
+
+  // *parent-observe
+  case 1:
+    return html_parent_observe(pool, a);
 
   // *void
-  case 1:
+  case 2:
     return html_void(pool, a);
 
   // *text
-  case 2:
+  case 3:
     return document["createTextNode"](a.a);
 
   // *observe
-  case 3:
+  case 4:
     return html_observe(pool, a);
   }
 };
