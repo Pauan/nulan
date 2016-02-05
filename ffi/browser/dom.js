@@ -3,6 +3,76 @@ import { make_thread_pool, kill_thread_pool, run_in_thread_pool, sync,
 import { _null } from "../types";
 
 
+const root_style = document["createElement"]("style");
+root_style["type"] = "text/css";
+document["head"]["appendChild"](root_style);
+
+// TODO test if this works in all browsers
+const root_sheet = root_style["sheet"];
+const css_rules = root_sheet["cssRules"];
+
+const insert_rule = (rule) => {
+  // TODO test if this works in all browsers
+  const index = root_sheet["insertRule"](rule + " {}", css_rules["length"]);
+
+  // TODO test if this works in all browsers
+  return css_rules[index];
+};
+
+
+// TODO remove the stylesheet when it is errored or killed ?
+export const stylesheet = (name, rules) =>
+  async_killable((success, error) => {
+    const pool = make_thread_pool(error);
+
+    const rule = insert_rule(name);
+
+    set_attribute_styles(pool, rule["style"], rules);
+
+    return () => {
+      kill_thread_pool(pool);
+    };
+  });
+
+
+/*let class_id = 0;
+
+export const make_class = (rules) => {
+  const class_name = "__" + (++class_id);
+
+  stylesheet("." + class_name, rules);
+
+  return class_name;
+};*/
+
+
+// TODO check that the property and value is valid
+// TODO vendor prefixes
+const set_style = (pool, style, a) => {
+  style[a.a] = a.b;
+};
+
+// TODO check that the property and value is valid
+// TODO vendor prefixes
+const set_style_observe = (pool, style, a) => {
+  run_in_thread_pool(pool, a.a(a.c, (maybe) =>
+    sync(() => {
+      switch (maybe.$) {
+      // *none
+      case 0:
+        // TODO set it to "" instead ?
+        style["removeProperty"](attr.b);
+        return _null;
+
+      // *some
+      case 1:
+        style[attr.b] = maybe.a;
+        return _null;
+      }
+    })));
+};
+
+
 const set_attribute_event = (pool, x, attr) => {
   x["addEventListener"](attr.a, (e) => {
     run_in_thread_pool(pool, attr.b(e));
@@ -26,7 +96,7 @@ const set_attribute_observe = (pool, x, attr) => {
     })));
 };
 
-const set_attribute_class_observe = (pool, x, attr) => {
+const set_attribute_classes_observe = (pool, x, attr) => {
   run_in_thread_pool(pool, attr.a(attr.b, (a) =>
     sync(() => {
       x["className"] = a["join"](" ");
@@ -34,21 +104,22 @@ const set_attribute_class_observe = (pool, x, attr) => {
     })));
 };
 
-const set_attribute_style_observe = (pool, x, attr) => {
-  run_in_thread_pool(pool, attr.a(attr.c, (maybe) =>
-    sync(() => {
-      switch (maybe.$) {
-      // *none
-      case 0:
-        x["style"]["removeProperty"](attr.b);
-        return _null;
+// TODO duplicate style checks ?
+const set_attribute_styles = (pool, style, styles) => {
+  for (let i = 0; i < styles["length"]; ++i) {
+    const a = styles[i];
 
-      // *some
-      case 1:
-        x["style"]["setProperty"](attr.b, maybe.a, "");
-        return _null;
-      }
-    })));
+    switch (a.$) {
+    // *style
+    case 0:
+      set_style(pool, style, a);
+      break;
+    // *style-observe
+    case 1:
+      set_style_observe(pool, style, a);
+      break;
+    }
+  }
 };
 
 const set_attribute = (pool, x, attr) => {
@@ -58,34 +129,29 @@ const set_attribute = (pool, x, attr) => {
     x["setAttribute"](attr.a, attr.b);
     break;
 
-  // *attribute-class
+  // *attribute-classes
   case 1:
     x["className"] = attr.a["join"](" ");
     break;
 
-  // *attribute-style-text
-  case 2:
-    x["style"]["setProperty"](attr.a, attr.b, "");
-    break;
-
   // *attribute-event
-  case 3:
+  case 2:
     set_attribute_event(pool, x, attr);
     break;
 
-  // *attribute-observe
+  // *attribute-styles
+  case 3:
+    set_attribute_styles(pool, x["style"], attr.a);
+    break;
+
+  // *attribute-text-observe
   case 4:
     set_attribute_observe(pool, x, attr);
     break;
 
-  // *attribute-class-observe
+  // *attribute-classes-observe
   case 5:
-    set_attribute_class_observe(pool, x, attr);
-    break;
-
-  // *attribute-style-observe
-  case 6:
-    set_attribute_style_observe(pool, x, attr);
+    set_attribute_classes_observe(pool, x, attr);
     break;
   }
 };
@@ -221,13 +287,13 @@ const html_parent_observe_list = (pool, a) => {
   return x;
 };
 
-const html_void = (pool, a) => {
+const html_child = (pool, a) => {
   const x = document["createElement"](a.a);
   set_attributes(pool, x, a.b);
   return x;
 };
 
-const html_observe = (pool, a) => {
+const html_text_observe = (pool, a) => {
   const x = document["createTextNode"]("");
 
   run_in_thread_pool(pool, a.a(a.b, (text) =>
@@ -246,9 +312,9 @@ const html = (pool, a) => {
   case 0:
     return html_parent_list(pool, a);
 
-  // *void
+  // *child
   case 1:
-    return html_void(pool, a);
+    return html_child(pool, a);
 
   // *text
   case 2:
@@ -258,9 +324,9 @@ const html = (pool, a) => {
   case 3:
     return html_parent_observe_list(pool, a);
 
-  // *observe
+  // *text-observe
   case 4:
-    return html_observe(pool, a);
+    return html_text_observe(pool, a);
   }
 };
 

@@ -1,137 +1,112 @@
-(TYPE Class
-| (*class Text))
+(IMPORT (file "../list")
+| transform
+| List)
+
+(IMPORT (file "../text")
+| Text)
+
+(IMPORT (file "../null")
+| Null)
+
+(IMPORT (file "../task")
+| Task)
+
+(IMPORT (file "../maybe")
+| Maybe)
+
+(IMPORT (file "../observe")
+| $observe
+| $observe-list)
+
+
+(TYPE Root)
+(TYPE Event)
+(TYPE Class)
+
+
+(TYPE Style
+| (*style Text Text)
+
+| (REQUIRE ($observe a)
+    (*style-observe Text (a (Maybe Text)))))
 
 
 (TYPE Attribute
 | (*attribute-text Text Text)
-| (*attribute-class (List Class))
+
+| (*attribute-classes (List Class))
+
+| (*attribute-event Text (-> Event (Task Null)))
+
+| (*attribute-styles (List Style))
 
 | (REQUIRE ($observe a)
-    (*attribute-observe Text (a (Maybe Text))))
+    (*attribute-text-observe Text (a (Maybe Text))))
 
 | (REQUIRE ($observe a)
-    (*attribute-class-observe (a (List Class)))))
-
-
-(TYPE Children
-| (*children-list (List HTML))
-| (REQUIRE ($observe a)
-    (*children-observe (a (List HTML)))))
+    (*attribute-classes-observe (a (List Class)))))
 
 
 (TYPE HTML
-| (*parent Text (List Attribute) Children)
-| (*void Text (List Attribute))
+| (*parent-list Text (List Attribute) (List HTML))
+
+| (*child Text (List Attribute))
+
 | (*text Text)
+
+| (REQUIRE ($observe-list a)
+    (*parent-observe-list Text (List Attribute) (a HTML)))
+
 | (REQUIRE ($observe a)
-    (*observe (a Text))))
+    (*text-observe (a Text))))
 
 
-(POLYMORPHIC
-| (FUNCTION attribute :: (INLINE (-> Text Text Attribute))
-  | (attribute a b)
-      (*attribute-text a b))
-
-| (FUNCTION attribute :: (REQUIRE ($observe a)
-                           (INLINE (-> Text (a (Maybe Text)) Attribute)))
-  | (attribute a b)
-      (*attribute-observe a b)))
-
-
-(POLYMORPHIC
-| (FUNCTION attribute-class :: (INLINE (-> (List Class) Attribute))
-  | (attribute-class a)
-      (*attribute-class a))
-
-| (FUNCTION attribute-class :: (REQUIRE ($observe a)
-                                 (INLINE (-> (a (List Class)) Attribute)))
-  | (attribute-class a)
-      (*attribute-class-observe a)))
-
-
-(POLYMORPHIC
-| (FUNCTION children :: (INLINE (-> (List HTML) Children))
-  | (children a)
-      (*children-list a))
-
-| (FUNCTION children :: (REQUIRE ($observe a)
-                          (INLINE (-> (a (List HTML)) Children)))
-  | (children a)
-      (*children-observe a)))
-
-
-(POLYMORPHIC
-| (FUNCTION text :: (INLINE (-> Text HTML))
-  | (text a)
-      (*text a))
-
-| (FUNCTION text :: (REQUIRE ($observe a)
-                      (INLINE (-> (a Text) HTML)))
-  | (text a)
-      (*observe a)))
+(UNSAFE-FFI-LOAD { target <= javascript-browser
+                 | file <= "../../ffi/browser/dom.js" }
+| make_class :: (-> (List Style) Class)
+# TODO make this into a Task ?
+| root :: Root
+| render :: (-> Root HTML (Task Null)))
 
 
 (REWRITE-RULE
-| (ATTRIBUTES ~@a)
-    &[ ~@(transform a -> &~a <= ~b
-           (MATCH a
-           | &"class"
-               &(attribute-class ~b)
-           | _
-               &(attribute ~a ~b))) ])
-
-(REWRITE-RULE
-| (PARENT ~a ~@b ~c)
-    &(*parent ~a (ATTRIBUTES ~@b) (children ~c)))
-
-(REWRITE-RULE
-| (VOID ~a ~@b)
-    &(*void ~a (ATTRIBUTES ~@b)))
-
-(REWRITE-RULE
-| (DIV ~@a ~b)
-    &(PARENT "div" ~@a ~b))
-
-(REWRITE-RULE
-| (INPUT ~@a)
-    &(VOID "input" ~@a))
+| (CLASS ~name ~@a)
+    &(CONSTANT
+     | ~name :: Class
+     | ~name <= (make_class [ ~@a ])))
 
 
-#/
-(DIV "foo" <= "bar"
-     "src" <= (always (*some "nou"))
-     "class" <= [ bar qux corge ]
-  [ (text "Hi") ])
+(EXPORT-CONSTANT
+| event <= *attribute-event
 
-(*parent "div"
-  [ (attribute "foo" "bar")
-  | (attribute "src" (always (*some "nou")))
-  | (attribute-class [ bar qux corge ]) ]
-  (children [ (text "Hi") ]))
+| attr <= *attribute-text
+| attr-observe <= *attribute-text-observe
 
-(*parent "div"
-  [ (*attribute-text "foo" "bar")
-  | (*attribute-observe "src" (always (*some "nou")))
-  | (*attribute-class [ bar qux corge ]) ]
-  (*children-list [ (*text "Hi") ]))
+| classes <= *attribute-classes
+| classes-observe <= *attribute-classes-observe
 
-{
-  $: 0,
-  a: [
-    { $: 0, a: "foo", b: "bar" },
-    { $: 2, a: observe, b: "src", c: always({ $: 1, a: "nou" }) },
-    { $: 1, a: [ bar, qux, corge ] }
-  ],
-  b: {
-    $: 0,
-    a: [
-      { $: 2, a: "Hi" }
-    ]
-  }
-}
+| styles <= *attribute-styles
 
+| style <= *style
+| style-observe <= *style-observe
 
-(div [ (attr "foo" "bar")
-     | (attr "src" (transform src -> src (*some src))) ]
-  (children [ (text "Hi") ]))
-/#
+| parent <= *parent-list
+| parent-observe <= *parent-observe-list
+
+| text <= *text
+| text-observe <= *text-observe
+
+| child <= *child)
+
+(EXPORT
+| Root
+| Class
+| Attribute
+| Style
+| HTML
+
+| class <= make_class
+| CLASS
+
+| root
+| render)
