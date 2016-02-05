@@ -1,5 +1,4 @@
 (IMPORT (file "../list")
-| transform
 | List)
 
 (IMPORT (file "../text")
@@ -21,7 +20,6 @@
 
 (TYPE Root)
 (TYPE Event)
-(TYPE Class)
 
 
 (TYPE Style
@@ -34,7 +32,7 @@
 (TYPE Attribute
 | (*attribute-text Text Text)
 
-| (*attribute-classes (List Class))
+| (*attribute-classes (List Text))
 
 | (*attribute-event Text (-> Event (Task Null)))
 
@@ -44,7 +42,7 @@
     (*attribute-text-observe Text (a (Maybe Text))))
 
 | (REQUIRE ($observe a)
-    (*attribute-classes-observe (a (List Class)))))
+    (*attribute-classes-observe (a (List Text)))))
 
 
 (TYPE HTML
@@ -63,17 +61,11 @@
 
 (UNSAFE-FFI-LOAD { target <= javascript-browser
                  | file <= "../../ffi/browser/dom.js" }
-| make_class :: (-> (List Style) Class)
+| stylesheet :: (-> Text (List Style) (Task Null))
+| stylesheet_class :: (-> Text (List Style) (Task Null))
 # TODO make this into a Task ?
 | root :: Root
 | render :: (-> Root HTML (Task Null)))
-
-
-(REWRITE-RULE
-| (CLASS ~name ~@a)
-    &(CONSTANT
-     | ~name :: Class
-     | ~name <= (make_class [ ~@a ])))
 
 
 (EXPORT-CONSTANT
@@ -100,13 +92,11 @@
 
 (EXPORT
 | Root
-| Class
 | Attribute
 | Style
 | HTML
 
-| class <= make_class
-| CLASS
-
 | root
-| render)
+| render
+| stylesheet
+| stylesheet-class <= stylesheet_class)

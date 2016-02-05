@@ -1,6 +1,7 @@
 import { make_thread_pool, kill_thread_pool, run_in_thread_pool, sync,
          async_killable } from "../task";
 import { _null } from "../types";
+import { crash } from "../../util/error";
 
 
 const root_style = document["createElement"]("style");
@@ -33,6 +34,96 @@ export const stylesheet = (name, rules) =>
       kill_thread_pool(pool);
     };
   });
+
+
+const escape_class = (s) => {
+  if (s["length"] === 0) {
+    crash(new Error("Class cannot be empty"));
+  }
+
+  const out = [];
+
+  // TODO test the performance of this
+  switch (s[0]) {
+  case "0":
+  case "1":
+  case "2":
+  case "3":
+  case "4":
+  case "5":
+  case "6":
+  case "7":
+  case "8":
+  case "9":
+    out["push"]("\\00003");
+    break;
+  }
+
+  const length = s["length"];
+
+  for (let i = 0; i < length; ++i) {
+    const c = s[i];
+
+    // TODO test the performance of this
+    switch (c) {
+    case "!":
+    case "\"":
+    case "#":
+    case "$":
+    case "%":
+    case "&":
+    case "'":
+    case "(":
+    case ")":
+    case "*":
+    case "+":
+    case ",":
+    case "-":
+    case ".":
+    case "/":
+    case ":":
+    case ";":
+    case "<":
+    case "=":
+    case ">":
+    case "?":
+    case "@":
+    case "[":
+    case "\\":
+    case "]":
+    case "^":
+    case "`":
+    case "{":
+    case "|":
+    case "}":
+    case "~":
+    case " ":
+    case "_":
+      out["push"]("\\");
+      out["push"](c);
+      break;
+
+    case "\t":
+    case "\n":
+    case "\v":
+    case "\f":
+    case "\r":
+      out["push"]("\\");
+      out["push"](c["charCodeAt"](0)["toString"](16));
+      out["push"](" ");
+      break;
+
+    default:
+      out["push"](c);
+      break;
+    }
+  }
+
+  return out["join"]("");
+};
+
+export const stylesheet_class = (name, rules) =>
+  stylesheet("." + escape_class(name), rules);
 
 
 /*let class_id = 0;
