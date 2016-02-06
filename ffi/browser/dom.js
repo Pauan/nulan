@@ -139,12 +139,10 @@ export const make_class = (rules) => {
 
 // TODO check that the property and value is valid
 // TODO vendor prefixes
-const set_style = (pool, style, a) => {
-  style[a.a] = a.b;
+const set_style = (style, name, value) => {
+  style[name] = value;
 };
 
-// TODO check that the property and value is valid
-// TODO vendor prefixes
 const set_style_observe = (pool, style, a) => {
   run_in_thread_pool(pool, a.a(a.c, (maybe) =>
     sync(() => {
@@ -157,7 +155,7 @@ const set_style_observe = (pool, style, a) => {
 
       // *some
       case 1:
-        style[attr.b] = maybe.a;
+        set_style(style, attr.b, maybe.a);
         return _null;
       }
     })));
@@ -192,17 +190,22 @@ const set_on_hover = (pool, x, f) => {
   }, true);
 };
 
+// TODO test this
 const set_on_hold = (pool, x, f) => {
-  x["addEventListener"]("mousedown", (e) => {
-    run_in_thread_pool(pool, f({
-      a: true
-    }));
-  }, true);
+  const mouseup = (e) => {
+    removeEventListener("mouseup", mouseup, true);
 
-  // TODO is this correct ?
-  x["addEventListener"]("mouseup", (e) => {
     run_in_thread_pool(pool, f({
       a: false
+    }));
+  };
+
+  x["addEventListener"]("mousedown", (e) => {
+    // TODO use the blur event as well ?
+    addEventListener("mouseup", mouseup, true);
+
+    run_in_thread_pool(pool, f({
+      a: true
     }));
   }, true);
 };
@@ -271,7 +274,7 @@ const set_attribute_styles = (pool, style, styles) => {
     switch (a.$) {
     // *style
     case 0:
-      set_style(pool, style, a);
+      set_style(style, a.a, a.b);
       break;
     // *style-observe
     case 1:
