@@ -29,12 +29,22 @@
     (*style-observe Text (a (Maybe Text)))))
 
 
+(TYPE Attribute-Event
+| (*attribute-event Text (-> Event (Task Null)))
+
+| (*on-click (-> {} (Task Null)))
+
+| (*on-hover (-> { hovering? :: Boolean } (Task Null)))
+
+| (*on-hold (-> { holding? :: Boolean } (Task Null))))
+
+
 (TYPE Attribute
 | (*attribute-text Text Text)
 
 | (*attribute-classes (List Text))
 
-| (*attribute-event Text (-> Event (Task Null)))
+| (*attribute-events (List Attribute-Event))
 
 | (*attribute-styles (List Style))
 
@@ -69,7 +79,11 @@
 
 
 (EXPORT-CONSTANT
+| events <= *attribute-events
 | event <= *attribute-event
+| on-click <= *on-click
+| on-hover <= *on-hover
+| on-hold <= *on-hold
 
 | attr <= *attribute-text
 | attr-observe <= *attribute-text-observe

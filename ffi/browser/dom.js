@@ -164,11 +164,79 @@ const set_style_observe = (pool, style, a) => {
 };
 
 
-const set_attribute_event = (pool, x, attr) => {
-  x["addEventListener"](attr.a, (e) => {
-    run_in_thread_pool(pool, attr.b(e));
+const set_attribute_event = (pool, x, name, f) => {
+  x["addEventListener"](name, (e) => {
+    run_in_thread_pool(pool, f(e));
   }, true);
 };
+
+const set_on_click = (pool, x, f) => {
+  x["addEventListener"]("click", (e) => {
+    run_in_thread_pool(pool, f({}));
+  }, true);
+};
+
+const set_on_hover = (pool, x, f) => {
+  // TODO check for descendents
+  x["addEventListener"]("mouseover", (e) => {
+    run_in_thread_pool(pool, f({
+      a: true
+    }));
+  }, true);
+
+  // TODO check for descendents
+  x["addEventListener"]("mouseout", (e) => {
+    run_in_thread_pool(pool, f({
+      a: false
+    }));
+  }, true);
+};
+
+const set_on_hold = (pool, x, f) => {
+  x["addEventListener"]("mousedown", (e) => {
+    run_in_thread_pool(pool, f({
+      a: true
+    }));
+  }, true);
+
+  // TODO is this correct ?
+  x["addEventListener"]("mouseup", (e) => {
+    run_in_thread_pool(pool, f({
+      a: false
+    }));
+  }, true);
+};
+
+const set_event = (pool, x, attr) => {
+  switch (attr.$) {
+  // *attribute-event
+  case 0:
+    set_attribute_event(pool, x, attr.a, attr.b);
+    break;
+
+  // *on-click
+  case 1:
+    set_on_click(pool, x, attr.a);
+    break;
+
+  // *on-hover
+  case 2:
+    set_on_hover(pool, x, attr.a);
+    break;
+
+  // *on-hold
+  case 3:
+    set_on_hold(pool, x, attr.a);
+    break;
+  }
+};
+
+const set_attribute_events = (pool, x, a) => {
+  for (let i = 0; i < a["length"]; ++i) {
+    set_event(pool, x, a[i]);
+  }
+};
+
 
 const set_attribute_observe = (pool, x, attr) => {
   run_in_thread_pool(pool, attr.a(attr.c, (maybe) =>
@@ -213,6 +281,7 @@ const set_attribute_styles = (pool, style, styles) => {
   }
 };
 
+
 const set_attribute = (pool, x, attr) => {
   switch (attr.$) {
   // *attribute-text
@@ -225,9 +294,9 @@ const set_attribute = (pool, x, attr) => {
     x["className"] = attr.a["join"](" ");
     break;
 
-  // *attribute-event
+  // *attribute-events
   case 2:
-    set_attribute_event(pool, x, attr);
+    set_attribute_events(pool, x, attr.a);
     break;
 
   // *attribute-styles
