@@ -62,11 +62,11 @@
 
 | (*text Text)
 
-| (REQUIRE ($observe-list a)
-    (*parent-observe-list Text (List Attribute) (a HTML)))
-
 | (REQUIRE ($observe a)
-    (*text-observe (a Text))))
+    (*text-observe (a Text)))
+
+| (REQUIRE ($observe-list a)
+    (*parent-observe-list Text (List Attribute) (a HTML))))
 
 
 (UNSAFE-FFI-LOAD { target <= javascript-browser

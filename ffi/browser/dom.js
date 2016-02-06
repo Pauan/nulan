@@ -483,13 +483,13 @@ const html = (pool, a) => {
   case 2:
     return document["createTextNode"](a.a);
 
-  // *parent-observe-list
-  case 3:
-    return html_parent_observe_list(pool, a);
-
   // *text-observe
-  case 4:
+  case 3:
     return html_text_observe(pool, a);
+
+  // *parent-observe-list
+  case 4:
+    return html_parent_observe_list(pool, a);
   }
 };
 
