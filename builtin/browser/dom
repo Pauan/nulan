@@ -1,5 +1,6 @@
 (IMPORT (file "../list")
-| List)
+| List
+| List-Delta)
 
 (IMPORT (file "../text")
 | Text)
@@ -13,9 +14,8 @@
 (IMPORT (file "../maybe")
 | Maybe)
 
-(IMPORT (file "../observe")
-| $observe
-| $observe-list)
+(IMPORT (file "../stream")
+| Stream)
 
 
 (TYPE Root)
@@ -25,8 +25,7 @@
 (TYPE Style
 | (*style Text Text)
 
-| (REQUIRE ($observe a)
-    (*style-observe Text (a (Maybe Text)))))
+| (*style-stream Text (Stream (Maybe Text))))
 
 
 (TYPE Attribute-Event
@@ -48,11 +47,9 @@
 
 | (*attribute-styles (List Style))
 
-| (REQUIRE ($observe a)
-    (*attribute-text-observe Text (a (Maybe Text))))
+| (*attribute-text-stream Text (Stream (Maybe Text)))
 
-| (REQUIRE ($observe a)
-    (*attribute-classes-observe (a (List Text)))))
+| (*attribute-classes-stream (Stream (List Text))))
 
 
 (TYPE HTML
@@ -62,11 +59,9 @@
 
 | (*text Text)
 
-| (REQUIRE ($observe a)
-    (*text-observe (a Text)))
+| (*text-stream (Stream Text))
 
-| (REQUIRE ($observe-list a)
-    (*parent-observe-list Text (List Attribute) (a HTML))))
+| (*parent-stream Text (List Attribute) (Stream (List-Delta HTML))))
 
 
 (UNSAFE-FFI-LOAD { target <= javascript-browser
@@ -86,21 +81,21 @@
 | on-hold <= *on-hold
 
 | attr <= *attribute-text
-| attr-observe <= *attribute-text-observe
+| attr-stream <= *attribute-text-stream
 
 | classes <= *attribute-classes
-| classes-observe <= *attribute-classes-observe
+| classes-stream <= *attribute-classes-stream
 
 | styles <= *attribute-styles
 
 | style <= *style
-| style-observe <= *style-observe
+| style-stream <= *style-stream
 
 | parent <= *parent-list
-| parent-observe <= *parent-observe-list
+| parent-stream <= *parent-stream
 
 | text <= *text
-| text-observe <= *text-observe
+| text-stream <= *text-stream
 
 | child <= *child)
 

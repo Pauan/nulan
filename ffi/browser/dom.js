@@ -137,28 +137,36 @@ export const make_class = (rules) => {
 };*/
 
 
+const each = (pool, stream, f) => {
+  run_in_thread_pool(pool, stream(_null, (a, b) =>
+    sync(() => {
+      f(b);
+      return a;
+    })));
+};
+
+
 // TODO check that the property and value is valid
 // TODO vendor prefixes
 const set_style = (style, name, value) => {
   style[name] = value;
 };
 
-const set_style_observe = (pool, style, a) => {
-  run_in_thread_pool(pool, a.a(a.c, (maybe) =>
-    sync(() => {
-      switch (maybe.$) {
-      // *none
-      case 0:
-        // TODO set it to "" instead ?
-        style["removeProperty"](attr.b);
-        return _null;
+const set_style_stream = (pool, style, attr) => {
+  each(pool, attr.b, (maybe) => {
+    switch (maybe.$) {
+    // *none
+    case 0:
+      // TODO set it to "" instead ?
+      style["removeProperty"](attr.a);
+      break;
 
-      // *some
-      case 1:
-        set_style(style, attr.b, maybe.a);
-        return _null;
-      }
-    })));
+    // *some
+    case 1:
+      set_style(style, attr.a, maybe.a);
+      break;
+    }
+  });
 };
 
 
@@ -241,29 +249,26 @@ const set_attribute_events = (pool, x, a) => {
 };
 
 
-const set_attribute_observe = (pool, x, attr) => {
-  run_in_thread_pool(pool, attr.a(attr.c, (maybe) =>
-    sync(() => {
-      switch (maybe.$) {
-      // *none
-      case 0:
-        x["removeAttribute"](attr.b);
-        return _null;
+const set_attribute_stream = (pool, x, attr) => {
+  each(pool, attr.b, (maybe) => {
+    switch (maybe.$) {
+    // *none
+    case 0:
+      x["removeAttribute"](attr.a);
+      break;
 
-      // *some
-      case 1:
-        x["setAttribute"](attr.b, maybe.a);
-        return _null;
-      }
-    })));
+    // *some
+    case 1:
+      x["setAttribute"](attr.a, maybe.a);
+      break;
+    }
+  });
 };
 
-const set_attribute_classes_observe = (pool, x, attr) => {
-  run_in_thread_pool(pool, attr.a(attr.b, (a) =>
-    sync(() => {
-      x["className"] = a["join"](" ");
-      return _null;
-    })));
+const set_attribute_classes_stream = (pool, x, attr) => {
+  each(pool, attr.a, (a) => {
+    x["className"] = a["join"](" ");
+  });
 };
 
 // TODO duplicate style checks ?
@@ -276,9 +281,9 @@ const set_attribute_styles = (pool, style, styles) => {
     case 0:
       set_style(style, a.a, a.b);
       break;
-    // *style-observe
+    // *style-stream
     case 1:
-      set_style_observe(pool, style, a);
+      set_style_stream(pool, style, a);
       break;
     }
   }
@@ -307,14 +312,14 @@ const set_attribute = (pool, x, attr) => {
     set_attribute_styles(pool, x["style"], attr.a);
     break;
 
-  // *attribute-text-observe
+  // *attribute-text-stream
   case 4:
-    set_attribute_observe(pool, x, attr);
+    set_attribute_stream(pool, x, attr);
     break;
 
-  // *attribute-classes-observe
+  // *attribute-classes-stream
   case 5:
-    set_attribute_classes_observe(pool, x, attr);
+    set_attribute_classes_stream(pool, x, attr);
     break;
   }
 };
@@ -384,7 +389,7 @@ const remove_child = (children, x, index) => {
 };
 
 // TODO test this
-const set_children_observe_list = (pool, x, observe, a) => {
+const set_children_stream = (pool, x, a) => {
   // TODO hacky
   run_in_thread_pool(pool, async_killable((success, error) => {
     const children = [];
@@ -397,39 +402,36 @@ const set_children_observe_list = (pool, x, observe, a) => {
       }
     };
 
-    run_in_thread_pool(pool, observe(a, (a) =>
-      sync(() => {
-        switch (a.$) {
-        // *set
-        case 0:
-          if (children["length"] !== 0) {
-            kill();
-            children["length"] = 0;
-            // TODO is there a faster way to clear the children ?
-            x["innerHTML"] = "";
-          }
-
-          push_children(children, error, x, a.a);
-          break;
-
-        // *insert
-        case 1:
-          insert_before(children, error, x, a.a, a.b);
-          break;
-
-        // *update
-        case 2:
-          replace_child(children, error, x, a.a, a.b);
-          break;
-
-        // *remove
-        case 3:
-          remove_child(children, x, a.a);
-          break;
+    each(pool, a, (a) => {
+      switch (a.$) {
+      // *set
+      case 0:
+        if (children["length"] !== 0) {
+          kill();
+          children["length"] = 0;
+          // TODO is there a faster way to clear the children ?
+          x["innerHTML"] = "";
         }
 
-        return _null;
-      })));
+        push_children(children, error, x, a.a);
+        break;
+
+      // *insert
+      case 1:
+        insert_before(children, error, x, a.a, a.b);
+        break;
+
+      // *update
+      case 2:
+        replace_child(children, error, x, a.a, a.b);
+        break;
+
+      // *remove
+      case 3:
+        remove_child(children, x, a.a);
+        break;
+      }
+    });
 
     return kill;
   }));
@@ -443,10 +445,10 @@ const html_parent_list = (pool, a) => {
   return x;
 };
 
-const html_parent_observe_list = (pool, a) => {
-  const x = document["createElement"](a.b);
-  set_attributes(pool, x, a.c);
-  set_children_observe_list(pool, x, a.a, a.d);
+const html_parent_stream = (pool, a) => {
+  const x = document["createElement"](a.a);
+  set_attributes(pool, x, a.b);
+  set_children_stream(pool, x, a.c);
   return x;
 };
 
@@ -456,15 +458,13 @@ const html_child = (pool, a) => {
   return x;
 };
 
-const html_text_observe = (pool, a) => {
+const html_text_stream = (pool, a) => {
   const x = document["createTextNode"]("");
 
-  run_in_thread_pool(pool, a.a(a.b, (text) =>
-    sync(() => {
-      // http://jsperf.com/textnode-performance
-      x["data"] = text;
-      return _null;
-    })));
+  each(pool, a.a, (text) => {
+    // http://jsperf.com/textnode-performance
+    x["data"] = text;
+  });
 
   return x;
 };
@@ -483,13 +483,13 @@ const html = (pool, a) => {
   case 2:
     return document["createTextNode"](a.a);
 
-  // *text-observe
+  // *text-stream
   case 3:
-    return html_text_observe(pool, a);
+    return html_text_stream(pool, a);
 
-  // *parent-observe-list
+  // *parent-stream
   case 4:
-    return html_parent_observe_list(pool, a);
+    return html_parent_stream(pool, a);
   }
 };
 
