@@ -265,9 +265,16 @@ const set_attribute_stream = (pool, x, attr) => {
   });
 };
 
-const set_attribute_classes_stream = (pool, x, attr) => {
-  each(pool, attr.a, (a) => {
-    x["className"] = a["join"](" ");
+const set_attribute_class_stream = (pool, x, attr) => {
+  each(pool, attr.b, (a) => {
+    // *false
+    if (a === 0) {
+      x["classList"]["remove"](attr.a);
+
+    // *true
+    } else {
+      x["classList"]["add"](attr.a);
+    }
   });
 };
 
@@ -297,29 +304,29 @@ const set_attribute = (pool, x, attr) => {
     x["setAttribute"](attr.a, attr.b);
     break;
 
-  // *attribute-classes
+  // *attribute-class
   case 1:
-    x["className"] = attr.a["join"](" ");
+    x["classList"]["add"](attr.a);
+    break;
+
+  // *attribute-class-stream
+  case 2:
+    set_attribute_class_stream(pool, x, attr);
     break;
 
   // *attribute-events
-  case 2:
+  case 3:
     set_attribute_events(pool, x, attr.a);
     break;
 
   // *attribute-styles
-  case 3:
+  case 4:
     set_attribute_styles(pool, x["style"], attr.a);
     break;
 
   // *attribute-text-stream
-  case 4:
-    set_attribute_stream(pool, x, attr);
-    break;
-
-  // *attribute-classes-stream
   case 5:
-    set_attribute_classes_stream(pool, x, attr);
+    set_attribute_stream(pool, x, attr);
     break;
   }
 };

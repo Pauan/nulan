@@ -17,6 +17,10 @@
 (IMPORT (file "../stream")
 | Stream)
 
+(IMPORT (file "../mutable")
+| Mutable
+| set!)
+
 
 (TYPE Root)
 (TYPE Event)
@@ -33,23 +37,23 @@
 
 | (*on-click (-> {} (Task Null)))
 
-| (*on-hover (-> { hovering? :: Boolean } (Task Null)))
+| (*on-hover (-> { hovering :: Boolean } (Task Null)))
 
-| (*on-hold (-> { holding? :: Boolean } (Task Null))))
+| (*on-hold (-> { holding :: Boolean } (Task Null))))
 
 
 (TYPE Attribute
 | (*attribute-text Text Text)
 
-| (*attribute-classes (List Text))
+| (*attribute-class Text)
+
+| (*attribute-class-stream Text (Stream Boolean))
 
 | (*attribute-events (List Attribute-Event))
 
 | (*attribute-styles (List Style))
 
-| (*attribute-text-stream Text (Stream (Maybe Text)))
-
-| (*attribute-classes-stream (Stream (List Text))))
+| (*attribute-text-stream Text (Stream (Maybe Text))))
 
 
 (TYPE HTML
@@ -73,6 +77,17 @@
 | render :: (-> Root HTML (Task Null)))
 
 
+(FUNCTION set-hover! :: (-> (Mutable Boolean) Attribute-Event)
+| (set-hover! a)
+    (on-hover -> { hovering }
+      (set! a hovering)))
+
+(FUNCTION set-hold! :: (-> (Mutable Boolean) Attribute-Event)
+| (set-hold! a)
+    (on-hold -> { holding }
+      (set! a holding)))
+
+
 (EXPORT-CONSTANT
 | events <= *attribute-events
 | event <= *attribute-event
@@ -83,8 +98,8 @@
 | attr <= *attribute-text
 | attr-stream <= *attribute-text-stream
 
-| classes <= *attribute-classes
-| classes-stream <= *attribute-classes-stream
+| class <= *attribute-class
+| class-stream <= *attribute-class-stream
 
 | styles <= *attribute-styles
 
@@ -102,10 +117,13 @@
 (EXPORT
 | Root
 | Attribute
+| Attribute-Event
 | Style
 | HTML
 
 | root
 | render
 | stylesheet
-| stylesheet-class <= stylesheet_class)
+| stylesheet-class <= stylesheet_class
+| set-hover!
+| set-hold!)
