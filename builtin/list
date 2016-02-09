@@ -1,0 +1,67 @@
+(IMPORT (file "iterator")
+| Iterator)
+
+
+(TYPE (List a))
+
+
+(UNSAFE-FFI-LOAD { target <= javascript
+                 | file <= "../ffi/list" }
+| iterator_from :: (-> (List a) (Iterator a))
+| from_iterator :: (-> (Iterator a) (List a))
+| size :: (-> (List a) Integer)
+| push :: (-> (List a) a (List a))
+| insert :: (-> (List a) Integer a (List a))
+| update :: (-> (List a) Integer a (List a))
+| remove :: (-> (List a) Integer (List a))
+| nth :: (-> (List a) Integer a))
+
+
+(EXPORT
+| List
+| iterator<- <= iterator_from
+| <-iterator <= from_iterator
+| size
+| push
+| insert
+| update
+| remove
+| nth)
+
+
+
+(IMPORT (file "iterator")
+| Iterator
+| *iterator
+| *done
+| *state
+| *step)
+
+
+(TYPE (List a)
+| *empty
+| (*value a (List a)))
+
+
+(FUNCTION iterator<- :: (INLINE (-> (List a) (Iterator a)))
+| (iterator<- a)
+    (*iterator a -> a
+      (MATCH a
+      | *empty
+          *done
+      | (*value a b)
+          (*step a b))))
+
+(FUNCTION <-iterator :: (INLINE (-> (Iterator a) (List a)))
+| (<-iterator (*iterator initial next))
+    (WITH-LOOP loop
+    | state <= initial
+    | list <= *empty
+      (MATCH (next state)
+      | *done
+          list
+      | (*state state)
+          (loop state list)
+      | (*step value state)
+          (loop state
+            (*value value list)))))
