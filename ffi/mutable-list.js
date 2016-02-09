@@ -1,7 +1,8 @@
-import { sync, async_killable, make_thread_pool, kill_thread_pool,
-         run_in_thread_pool } from "./task";
+import { sync } from "./task";
 import { _null } from "./types";
 import { crash } from "../util/error";
+import { make_stream } from "./stream";
+import * as $list from "./list";
 import * as $array from "../util/array";
 
 
@@ -20,8 +21,7 @@ const _trigger = (mutable, value) => {
 export const mutable_list = (value) =>
   sync(() => {
     return {
-      // TODO use immutable arrays instead ?
-      a: $array.copy(value),
+      a: value,
       b: []
     };
   });
@@ -29,14 +29,12 @@ export const mutable_list = (value) =>
 
 // TODO code duplication with mutable.js
 export const get = (mutable) =>
-  // TODO use immutable arrays instead ?
-  sync(() => $array.copy(mutable.a));
+  sync(() => mutable.a);
 
 
 export const set = (mutable, a) =>
   sync(() => {
-    // TODO use immutable arrays instead ?
-    mutable.a = $array.copy(a);
+    mutable.a = a;
 
     _trigger(mutable, {
       $: 0,
@@ -49,7 +47,10 @@ export const set = (mutable, a) =>
 
 export const push = (mutable, a) =>
   sync(() => {
-    const index = mutable.a["push"](a) - 1;
+    // TODO slightly hacky
+    const index = mutable.a["length"];
+
+    mutable.a = $list.push(mutable.a, a);
 
     _trigger(mutable, {
       $: 1,
@@ -61,83 +62,72 @@ export const push = (mutable, a) =>
   });
 
 
-export const insert = (mutable, index, a) =>
+export const insert = (mutable, index1, a) =>
   sync(() => {
-    if (index >= 0 && index <= mutable.a["length"]) {
-      mutable.a["splice"](index, 0, a);
+    // TODO very slightly hacky
+    // TODO what about errors ?
+    const index2 = $list.get_index(index1, mutable.a["length"] + 1);
 
-      _trigger(mutable, {
-        $: 1,
-        a: index,
-        b: a
-      });
+    mutable.a = $list.insert(mutable.a, index2, a);
 
-      return _null;
+    _trigger(mutable, {
+      $: 1,
+      a: index2,
+      b: a
+    });
 
-    } else {
-      crash(new Error("Invalid index: " + index));
-    }
+    return _null;
   });
 
 
-export const update = (mutable, index, a) =>
+export const update = (mutable, index1, a) =>
   sync(() => {
-    if (index >= 0 && index < mutable.a["length"]) {
-      mutable.a[index] = a;
+    // TODO very slightly hacky
+    // TODO what about errors ?
+    const index2 = $list.get_index(index1, mutable.a["length"]);
 
-      _trigger(mutable, {
-        $: 2,
-        a: index,
-        b: a
-      });
+    mutable.a = $list.update(mutable.a, index2, a);
 
-      return _null;
+    _trigger(mutable, {
+      $: 2,
+      a: index2,
+      b: a
+    });
 
-    } else {
-      crash(new Error("Invalid index: " + index));
-    }
+    return _null;
   });
 
 
-export const remove = (mutable, index) =>
+export const remove = (mutable, index1) =>
   sync(() => {
-    if (index >= 0 && index < mutable.a["length"]) {
-      mutable.a["splice"](index, 1);
+    // TODO very slightly hacky
+    // TODO what about errors ?
+    const index2 = $list.get_index(index1, mutable.a["length"]);
 
-      _trigger(mutable, {
-        $: 3,
-        a: index
-      });
+    mutable.a = $list.remove(mutable.a, index2);
 
-      return _null;
+    _trigger(mutable, {
+      $: 3,
+      a: index2
+    });
 
-    } else {
-      crash(new Error("Invalid index: " + index));
-    }
+    return _null;
   });
 
 
 // TODO is this correct ?
-// TODO code duplication with mutable.js
-export const observe_list = (mutable, fn) =>
-  async_killable((success, error) => {
-    const pool = make_thread_pool(error);
-
-    const on_change = (value) => {
-      run_in_thread_pool(pool, fn(value));
-    };
-
-    on_change({
+export const stream_from = (mutable) =>
+  make_stream((push, complete, error) => {
+    // TODO what if an error happens ?
+    push({
       $: 0,
-      // TODO use immutable arrays instead ?
-      a: $array.copy(mutable.a)
+      a: mutable.a
     });
 
-    mutable.b["push"](on_change);
+    mutable.b["push"](push);
 
     // TODO what if an error happens ?
     return () => {
-      $array.remove(mutable.b, on_change);
-      kill_thread_pool(pool);
+      $array.remove(mutable.b, push);
     };
   });

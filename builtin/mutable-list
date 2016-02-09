@@ -1,12 +1,25 @@
 (TYPE (Mutable-List a))
 
+
 (UNSAFE-FFI-LOAD { file <= "../fii/mutable-list.js"
                  | target <= javascript }
 | mutable_list :: (-> (List a) (Task (Mutable-List a)))
-# nonce ?
-| current :: (-> (Mutable-List a) (Task (List a)))
+| get :: (-> (Mutable-List a) (Task (List a)))
+| set :: (-> (Mutable-List a) (List a) (Task Null))
 | push :: (-> (Mutable-List a) a (Task Null))
 | insert :: (-> (Mutable-List a) Integer a (Task Null))
 | update :: (-> (Mutable-List a) Integer a (Task Null))
 | remove :: (-> (Mutable-List a) Integer (Task Null))
-| observe_list :: (-> (Mutable-List a) (-> (List-Delta a) (Task Null)) (Task Null)))
+| stream_from :: (-> (Mutable-List a) (Stream (List-Delta a))))
+
+
+(EXPORT
+| Mutable-List
+| mutable-list <= mutable_list
+| get
+| set! <= set
+| push! <= push
+| insert! <= insert
+| update! <= update
+| remove! <= remove
+| stream<- <= stream_from)
