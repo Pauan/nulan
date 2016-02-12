@@ -1,26 +1,105 @@
-(IMPORT (file "maybe")
-  | Maybe
-  | *some
-  | *none)
-
-(IMPORT (file "null")
-  | Null
-  | *null)
-
-(IMPORT (file "task")
-  | Task)
-
-(IMPORT (file "monad")
-  | DO)
-
-
-(TYPE (Step value state)
-  | *done
-  | (*skip state)
-  | (*value value state))
-
 (TYPE (Stream a)
-  (*stream b (-> b (Task (Step a b)))))
+| (*stream (-> b (-> b a (Task b)) (Task b))))
+
+
+(UNSAFE-FFI-LOAD { target <= javascript
+                 | file "../ffi/stream.js" }
+| transform-pair :: (-> (Stream a) (Stream b) (Stream (Pair a b))))
+
+
+(FUNCTION accumulate :: (-> a (Stream b) (-> a b a) (Stream a))
+| (accumulate init (*stream each) f)
+    (*stream -> init push
+      (each init -> a b
+        (push a (f a b)))))
+
+# TODO should this inline ?
+(FUNCTION reduce-left :: (INLINE (-> a (Stream b) (-> a b (Task a)) (Task a)))
+| (reduce-left init (*stream each) f)
+    (each init -> a b
+      (f a b)))
+
+# TODO should this inline ?
+(FUNCTION each :: (INLINE (-> (Stream a) (-> a (Task Null)) (Task Null)))
+| (each a f)
+    (reduce-left null a -> _ a
+      (f a)))
+
+(FUNCTION transform-maybe :: (-> (Stream a) (-> a (Maybe b)) (Stream b))
+| (transform-maybe (*stream each) f)
+    (*stream -> init push
+      (each init -> a b
+        (MATCH (f b)
+        | *none
+            (yield a)
+        | (*some b)
+            (push a b)))))
+
+(FUNCTION transform :: (INLINE (-> (Stream a) (-> a b) (Stream b)))
+| (transform a f)
+    (transform-maybe a -> a
+      (*some (f a))))
+
+(FUNCTION concat :: (-> (Stream a) (Stream a) (Stream a))
+| (concat (*stream each1) (*stream each2))
+    (*stream init1 -> push
+      (DO init2 <= (each1 init1 push)
+          (each2 init2 push))))
+
+(FUNCTION flatten :: (-> (Stream (Stream a)) (Stream a))
+| (flatten (*stream each))
+    (*stream -> init push
+      (each init -> a (*stream each)
+        (each a push))))
+
+(FUNCTION yield :: (-> a (Stream a))
+| (yield a)
+    (*stream -> init push
+      (push init a)))
+
+# TODO should this inline ?
+(FUNCTION list<- :: (INLINE (-> (Stream a) (Task (List a))))
+| (list<- a)
+    (reduce-left [] a -> list a
+      (yield (unsafe-push! list a))))
+
+# TODO should this inline ?
+(FUNCTION size :: (INLINE (-> (Stream a) (Task Integer)))
+| (size a)
+    (reduce-left 0 a -> sum _
+      (yield (+ sum 1))))
+
+# TODO is this correct ?
+(FUNCTION stream<- :: (REQUIRE ($iterator<- a)
+                        (-> (a b) (Stream b)))
+| (stream<- a)
+    (*stream -> init push
+      (reduce-left init a push)))
+
+
+(FUNCTION time-more? :: (-> Integer (Maybe Integer) Boolean)
+| (time-more? _ *none)
+    true
+| (time-more? a (*some b))
+    (more? a b))
+
+# TODO is this useful ?
+(FUNCTION throttle :: (-> (Stream a) Integer (Stream a))
+| (throttle stream delay)
+    (*stream -> state push
+      (LET result <= (reduce-left { state
+                                  | waiting <= *none } stream -> { state waiting } value
+                       (DO now <= current-time
+                           (IF (time-more? now waiting)
+                           | (DO state <= (push state value)
+                                 (yield { state
+                                        | waiting <= (*some (+ now delay)) }))
+                           | (yield { state waiting }))))
+      | (DO { state waiting } <= result
+            (yield state)))))
+
+
+
 
 (TYPE (Stream a)
   (*stream (-> b (-> b a (Task b)) (Task b))))
@@ -116,77 +195,7 @@
         (DO value <= pull
             (push (f value))))))
 
-(REWRITE-RULE
-  (TRANSFORM-STREAM a @body)
-    (WITH-UNIQUE initial next state step
-      &(MATCH (STREAM-FROM ~a)
-         (*stream ~initial ~next)
-           (FROM-STREAM
-             (*stream ~initial -> ~state
-               (transform (~next ~state) -> ~step
-                 (MATCH ~step
-                   ~@body)))))))
 
-(FUNCTION reduce-left :: (INLINE
-                           (REQUIRE ($stream-from a)
-                             (-> b (a c) (-> b c (Task b)) (Task b))))
-  (reduce-left initial a f)
-    (MATCH (STREAM-FROM a)
-      (*stream state next)
-        (LOOP initial <= initial
-              state <= state
-          (DO step <= (next state)
-              (MATCH step
-                *done
-                  (wrap initial)
-
-                (*skip state)
-                  (loop initial state)
-
-                (*value value state)
-                  (DO initial <= (f initial value)
-                      (loop initial state)))))))
-
-(FUNCTION each :: (INLINE
-                    (REQUIRE ($stream-from a)
-                      (-> (a b) (-> b (Task Null)) (Task Null))))
-  (each a f)
-    (reduce-left *null a -> _ value
-      (f value))
-
-    (MATCH (STREAM-FROM a)
-      (*stream state next)
-        (LOOP state <= state
-          (DO step <= (next state)
-              (MATCH step
-                *done
-                  (wrap *null)
-
-                (*skip state)
-                  (loop state)
-
-                (*value value state)
-                  (DO (f value)
-                      (loop state)))))))
-
-(FUNCTION transform-maybe :: (INLINE
-                               (REQUIRE ($stream-from a) ($from-stream a)
-                                 (-> (a b) (-> b (Maybe c)) (a c))))
-  (transform-maybe a f)
-    (TRANSFORM-STREAM a
-      *done
-        *done
-
-      (*skip state)
-        (*skip state)
-
-      (*value value state)
-        (MATCH (f value)
-          *none
-            (*skip state)
-
-          (*some value)
-            (*value value state))))
 
 (FUNCTION reduce-left :: (-> a (Stream b) (-> a b (Task a)) (Task a))
   (reduce-left a s f)
@@ -243,14 +252,3 @@
   (from-list a)
     (*stream -> initial step
       (reduce-left initial a step)))
-
-
-(EXPORT
-  | Stream
-  | reduce-left
-  | each
-  | transform-maybe
-  | transform
-  | concat
-  | wrap
-  | flatten)
