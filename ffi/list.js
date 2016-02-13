@@ -17,16 +17,16 @@ export const copy = (a) => {
 };
 
 
-export const get_index = (index, length) => {
-  if (index < 0) {
-    index += length;
-  }
+export const get_index = (index1, length) => {
+  const index2 = (index1 < 0
+                   ? index1 + length
+                   : index1);
 
-  if (index >= 0 && index < length) {
-    return index;
+  if (index2 >= 0 && index2 < length) {
+    return index2;
 
   } else {
-    crash(new Error("Invalid index: " + index));
+    crash(new Error("invalid index: " + index1));
   }
 };
 
@@ -74,11 +74,17 @@ export const insert = (a, index, b) => {
 export const update = (a, index, b) => {
   index = get_index(index, a["length"]);
 
-  const output = copy(a);
+  // TODO test this
+  if (a[index] === b) {
+    return a;
 
-  output[index] = b;
+  } else {
+    const output = copy(a);
 
-  return output;
+    output[index] = b;
+
+    return output;
+  }
 };
 
 
@@ -102,6 +108,63 @@ export const remove = (a, index) => {
   }
 
   return output;
+};
+
+
+export const slice = (a, start1, end1) => {
+  const length = a["length"];
+
+  const start2 = get_index(start1, length + 1);
+  const end2   = get_index(end1, length + 1);
+
+  if (start2 === 0 && end2 === length) {
+    return a;
+
+  } else if (start2 > end2) {
+    crash(new Error("start index " + start1 + " is greater than end index " + end1));
+
+  } else {
+    const diff = end2 - start2;
+    const out = new Array(diff);
+
+    for (let i = 0; i < diff; ++i) {
+      out[i] = a[i + start2];
+    }
+
+    return out;
+  }
+};
+
+
+// TODO faster implementation of this ?
+// TODO test this
+export const chunks = (a, size) => {
+  if (size < 1) {
+    crash(new Error("chunk size must be 1 or greater"));
+  }
+
+  const length = a["length"];
+
+  const out = [];
+
+  let i = 0;
+
+  while (i < length) {
+    const chunk = [];
+
+    let values = 0;
+
+    // TODO what if the size is 0 ?
+    while (i < length && values < size) {
+      chunk["push"](a[i]);
+      ++i;
+      ++values;
+    }
+
+    out["push"](chunk);
+  }
+
+  return out;
 };
 
 

@@ -1,59 +1,61 @@
 (IMPORT (nulan "unsafe/ffi")
-  | UNSAFE-FFI-LOAD
-  | javascript)
+| UNSAFE-FFI-LOAD
+| javascript)
 
 (IMPORT (file "null")
-  | *null)
+| Null)
 
 (IMPORT (file "protocol")
-  | $transform
-  | transform
+| $transform
+| transform
 
-  | $flatten
-  | flatten
+| $flatten
+| flatten
 
-  | $wrap
-  | wrap
+| $yield
+| yield
 
-  | $reduce-left
-  | reduce-left)
+| $reduce-left
+| reduce-left)
 
 (IMPORT (file "list")
-  | List)
+| List)
 
 
 (REWRITE-RULE
-  (DO a)
-    &(wrap ~a)
+| (DO ~a <= ~b ~c)
+    &(flatten (transform ~b -> ~a ~c))
 
-  (DO a b)
-    (MATCH a
-      &(~pattern <= ~value)
-        &(transform ~value -> ~pattern ~b)
-      value
-        &(transform ~value -> *null ~b))
+| (DO ~a ~b)
+    &(flatten (transform ~a -> _ :: Null ~b))
 
-  (DO a @b)
-    (MATCH a
-      &(~pattern <= ~value)
-        &(flatten (transform ~value -> ~pattern (DO ~@b)))
-      value
-        &(flatten (transform ~value -> *null (DO ~@b)))))
+| (DO ~a ~@b)
+    &(DO ~a (DO ~@b)))
 
 (REWRITE-RULE
-  (MATCH-DO a @b)
+| (DO-MATCH ~a ~@b)
     (WITH-UNIQUE c
-      &(flatten
-         (transform ~a -> ~c
-           (MATCH ~c ~@b)))))
+      &(DO ~c <= ~a
+           (MATCH ~c ~@b))))
+
+(REWRITE-RULE
+| (DO-IF ~test
+  | ~then
+  | ~else)
+    (WITH-UNIQUE a
+      &(DO ~a <= ~test
+           (IF ~a
+           | ~then
+           | ~else))))
 
 (UNSAFE-FFI-LOAD { target <= javascript
                  | file <= "../ffi/monad.js" }
-  | sequential :: (REQUIRE ($transform a) ($flatten a) ($wrap a)
-                    (-> (List (a b)) (a (List b)))))
+| sequential :: (REQUIRE ($transform a) ($flatten a) ($yield a)
+                  (-> (List (a b)) (a (List b)))))
 
 
 (EXPORT
-  | sequential
-  | DO
-  | MATCH-DO)
+| sequential
+| DO
+| DO-MATCH
+| DO-IF)

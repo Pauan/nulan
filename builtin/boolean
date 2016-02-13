@@ -1,39 +1,53 @@
+(PROTOCOL ($and a)
+| and :: (-> a a a))
+
+(PROTOCOL ($or a)
+| or :: (-> a a a))
+
+(PROTOCOL ($not a)
+| not :: (-> a a))
+
+
 (TYPE Boolean
-  | *true
-  | *false)
+| *false
+| *true)
 
 (FUNCTION not :: (-> Boolean Boolean)
-  (not *true)
+| (not *true)
     *false
-  (not *false)
+| (not *false)
     *true)
 
 (REWRITE-RULE
-  (IF test then else)
+| (IF ~test
+  | ~then
+  | ~else)
     &(MATCH ~test
-       *true
+     | *true
          ~then
-       *false
+     | *false
          ~else))
 
 (REWRITE-RULE
-  (AND a b)
+| (AND ~a ~b)
     &(IF ~a ~b *false)
-  (AND a @b)
+| (AND ~a ~@b)
     &(AND ~a (AND ~@b)))
 
 (REWRITE-RULE
-  (OR a b)
+| (OR ~a ~b)
     &(IF ~a *true ~b)
-  (OR a @b)
+| (OR ~a ~@b)
     &(OR ~a (OR ~@b)))
 
 
+(EXPORT-CONSTANT
+| true <= *true
+| false <= *false)
+
 (EXPORT
-  | Boolean
-  | *true
-  | *false
-  | not
-  | IF
-  | AND
-  | OR)
+| Boolean
+| not
+| IF
+| AND
+| OR)

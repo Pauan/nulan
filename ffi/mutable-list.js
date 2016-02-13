@@ -1,7 +1,5 @@
 import { sync } from "./task";
 import { _null } from "./types";
-import { crash } from "../util/error";
-import { make_stream } from "./stream";
 import * as $list from "./list";
 import * as $array from "../util/array";
 
@@ -34,12 +32,16 @@ export const get = (mutable) =>
 
 export const set = (mutable, a) =>
   sync(() => {
-    mutable.a = a;
+    // TODO does this affect the semantics ?
+    // TODO test this
+    if (mutable.a !== a) {
+      mutable.a = a;
 
-    _trigger(mutable, {
-      $: 0,
-      a: a
-    });
+      _trigger(mutable, {
+        $: 0,
+        a: a
+      });
+    }
 
     return _null;
   });
@@ -68,6 +70,7 @@ export const insert = (mutable, index1, a) =>
     // TODO what about errors ?
     const index2 = $list.get_index(index1, mutable.a["length"] + 1);
 
+    // TODO slightly inefficient
     mutable.a = $list.insert(mutable.a, index2, a);
 
     _trigger(mutable, {
@@ -86,13 +89,20 @@ export const update = (mutable, index1, a) =>
     // TODO what about errors ?
     const index2 = $list.get_index(index1, mutable.a["length"]);
 
-    mutable.a = $list.update(mutable.a, index2, a);
+    // TODO slightly inefficient
+    const b = $list.update(mutable.a, index2, a);
 
-    _trigger(mutable, {
-      $: 2,
-      a: index2,
-      b: a
-    });
+    // TODO test this
+    // TODO does this affect the semantics ?
+    if (mutable.a !== b) {
+      mutable.a = b;
+
+      _trigger(mutable, {
+        $: 2,
+        a: index2,
+        b: a
+      });
+    }
 
     return _null;
   });
@@ -104,6 +114,7 @@ export const remove = (mutable, index1) =>
     // TODO what about errors ?
     const index2 = $list.get_index(index1, mutable.a["length"]);
 
+    // TODO slightly inefficient
     mutable.a = $list.remove(mutable.a, index2);
 
     _trigger(mutable, {
@@ -115,10 +126,8 @@ export const remove = (mutable, index1) =>
   });
 
 
-// TODO is this correct ?
-export const stream_from = (mutable) =>
-  make_stream((push, complete, error) => {
-    // TODO what if an error happens ?
+export const changing_list_from = (mutable) =>
+  (push) => {
     push({
       $: 0,
       a: mutable.a
@@ -126,8 +135,23 @@ export const stream_from = (mutable) =>
 
     mutable.b["push"](push);
 
-    // TODO what if an error happens ?
     return () => {
       $array.remove(mutable.b, push);
     };
-  });
+  };
+
+
+export const changing_from = (mutable) =>
+  (push) => {
+    const on_change = () => {
+      push(mutable.a);
+    };
+
+    on_change();
+
+    mutable.b["push"](on_change);
+
+    return () => {
+      $array.remove(mutable.b, on_change);
+    };
+  };

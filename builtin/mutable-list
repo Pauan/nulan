@@ -10,7 +10,8 @@
 | insert :: (-> (Mutable-List a) Integer a (Task Null))
 | update :: (-> (Mutable-List a) Integer a (Task Null))
 | remove :: (-> (Mutable-List a) Integer (Task Null))
-| stream_from :: (-> (Mutable-List a) (Stream (List-Delta a))))
+| changing_list_from :: (-> (Mutable-List a) (Changing-List a))
+| changing_from :: (-> (Mutable-List a) (Changing (List a))))
 
 
 (EXPORT
@@ -22,4 +23,5 @@
 | insert! <= insert
 | update! <= update
 | remove! <= remove
-| stream<- <= stream_from)
+| changing-list<- <= changing_list_from
+| changing<- <= changing_from)

@@ -1,43 +1,53 @@
-(PROTOCOL ($wrap a)
-  | wrap :: (-> b (a b)))
+(PROTOCOL ($yield a)
+| yield :: (-> b (a b)))
 
 (PROTOCOL ($transform a)
-  | transform :: (-> (a b) (-> b c) (a c)))
+| transform :: (-> (a b) (-> b c) (a c)))
 
 (PROTOCOL ($transform2 a)
-  | transform2 :: (-> (a b) (a c) (-> b c d) (a d)))
+| transform2 :: (-> (a b) (a c) (-> b c d) (a d)))
+
+(PROTOCOL ($transform-pair a)
+| transform-pair :: (-> (a b) (a c) (a (Pair b c))))
 
 (PROTOCOL ($flatten a)
-  | flatten :: (-> (a (a b)) (a b)))
+| flatten :: (-> (a (a b)) (a b)))
 
 (PROTOCOL ($empty a)
-  | empty :: a)
+| empty :: a)
 
 (PROTOCOL ($concat a)
-  | concat :: (-> a a a))
+| concat :: (-> a a a))
 
 (PROTOCOL ($reduce-left a)
-  | reduce-left :: (-> b (a c) (-> b c b) b))
+| reduce-left :: (-> b (a c) (-> b c b) b))
+
+
+(REWRITE-RULE
+| (++ a b)
+    &(concat ~a ~b)
+| (++ a @b)
+    &(++ ~a (++ ~@b)))
 
 
 (EXPORT
-  | $wrap
-  | wrap
+| $yield
+| yield
 
-  | $transform
-  | transform
+| $transform
+| transform
 
-  | $transform2
-  | transform2
+| $transform2
+| transform2
 
-  | $flatten
-  | flatten
+| $flatten
+| flatten
 
-  | $empty
-  | empty
+| $empty
+| empty
 
-  | $concat
-  | concat
+| $concat
+| concat
 
-  | $reduce-left
-  | reduce-left)
+| $reduce-left
+| reduce-left)

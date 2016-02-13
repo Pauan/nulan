@@ -1,14 +1,106 @@
 (TYPE (Result a b)
-  (*success a)
-  (*failure b))
+| (*success a)
+| (*failure b))
 
-(TYPE Failure
-  *does-not-exist)
+
+(TYPE Failure-mkdir
+| *ENOENT
+| *EEXIST)
+
+(TYPE Failure-unlink
+| *EISDIR)
+
+(TYPE Failure-rmdir
+| *ENOTEMPTY)
+
+(TYPE Path
+| (*path Text))
+
 
 (UNSAFE-FFI-LOAD { target <= javascript-node
-                 | file <= "../ffi/node.js" }
-  )
+                 | file <= "../ffi/node/fs.js" }
+| mkdir :: (-> Path (Task (Result Null Failure-mkdir)))
+| is_directory :: (-> Path (Task Boolean))
+| readdir :: (-> Path (Task (Maybe (List Path))))
+| unlink :: (-> Path (Task (Result Null Failure-unlink)))
+| rmdir :: (-> Path (Task (Result Null Failure-rmdir)))
+| realpath :: (-> Path (Task (Maybe Path)))
+| read_file :: (-> Path (Task (Maybe Text)))
+| write_file :: (-> Path Text (Task Null)))
+
+
+(UNSAFE-FFI-LOAD { target <= javascript-node
+                 | file <= "../ffi/node/path.js" }
+| parent :: (-> Path Path)
+| concat :: (-> Path Path Path)
+| filename :: (-> Path Text)
+| extension :: (-> Path Text))
+
 
 (UNSAFE-FFI-LOAD { target <= javascript-node
                  | file <= "../ffi/node/random.js" }
-  | random-string :: (-> Integer (Task String)))
+| random-text :: (-> Integer (Task Text)))
+
+
+(FUNCTION text<- :: (-> Path Text)
+| (text<- (*path a))
+    a)
+
+
+(FUNCTION make-directories! :: (-> Path (Task Null))
+| (make-directories! path)
+    (DO-MATCH (mkdir path)
+    | (*success _)
+        (yield null)
+
+    | (*failure *ENOENT)
+        (DO (make-directories! (parent path))
+            # TODO can this cause an infinite recursion ?
+            (make-directories! path))
+
+    | (*failure *EEXIST)
+        (DO-IF (is_directory path)
+        | (yield null)
+        | (throw (error (++ "not a directory: " (text<- path)))))))
+
+
+(FUNCTION remove-file! :: (-> Path (Task Null))
+| (remove-file! path)
+    (DO-MATCH (unlink path)
+    | (*success _)
+        (yield null)
+    | (*failure *EISDIR)
+        (throw (error (++ "not a file: " (text<- path))))))
+
+
+(MUTUALLY-RECURSIVE
+  (FUNCTION remove-directory-children! :: (-> Path (Task Null))
+  | (remove-directory-children! path)
+      (DO-MATCH (readdir path)
+      | (*some files)
+          # TODO put some kind of limit on this ?
+          (concurrent-null
+            (transform files -> x
+              (LET y <= (++ path x)
+                (DO-MATCH (unlink y)
+                | (*success _)
+                    (yield null)
+                | (*failure *EISDIR)
+                    (remove-directory! y)))))
+      | *none
+          (yield null)))
+
+  (FUNCTION remove-directory! :: (-> Path (Task Null))
+  | (remove-directory! path)
+      (DO-MATCH (rmdir path)
+      | (*success _)
+          (yield null)
+      | (*failure *ENOTEMPTY)
+          # TODO can this cause an infinite recursion ?
+          (DO (remove-directory-children! path)
+              (remove-directory! path)))))
+
+
+(EXPORT
+| files-in-directory <= readdir
+| normalize-path <= realpath)

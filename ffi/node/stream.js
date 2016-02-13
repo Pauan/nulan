@@ -1,4 +1,25 @@
+import { async_killable, make_thread, kill_thread,
+         run_in_thread, async_unkillable, with_resource } from "../task";
 import { _null } from "../types";
+import { make_stream } from "../stream";
+import { open, close, DEFAULT_MODE } from "./fs";
+import * as $fs from "fs";
+
+
+export const read_file = (path) =>
+  (push) =>
+    with_resource(open(path, "r", DEFAULT_MODE),
+      (fd) =>
+        // TODO is it okay for make_read_stream to be impure ?
+        read_from_stream(make_read_stream(fd), push);
+      close);
+
+export const write_file = (path, input) =>
+  with_resource(open(path, "wx", DEFAULT_MODE),
+    (fd) =>
+      // TODO is it okay for make_write_stream to be impure ?
+      write_to_stream(input, make_write_stream(fd));
+    close);
 
 
 export const make_read_stream = (fd) =>
@@ -16,7 +37,7 @@ export const make_write_stream = (fd) =>
   });
 
 
-export const read = (input, push) =>
+export const read_from_stream = (input, push) =>
   async_killable((success, error) => {
     let finished = false;
 
@@ -24,7 +45,7 @@ export const read = (input, push) =>
 
     const cleanup = () => {
       if (finished) {
-        throw new Error("Invalid cleanup");
+        throw new Error("invalid cleanup");
 
       } else {
         finished = true;
@@ -60,7 +81,7 @@ export const read = (input, push) =>
       const chunk = input["read"]();
       if (chunk !== null) {
         // TODO is it possible for a "readable" event to trigger even if `chunk` is not `null` ?
-        run(push(chunk), thread, onReadable, onError);
+        run_in_thread(thread, push(chunk), onReadable, onError);
       }
     };
 
@@ -76,7 +97,7 @@ export const read = (input, push) =>
   });
 
 
-export const write = (output, pull) =>
+export const write_to_stream = (input, output) =>
   async_killable((success, error) => {
     let cleaned = false;
 
@@ -85,10 +106,11 @@ export const write = (output, pull) =>
     // TODO should this end the output ?
     const cleanup = () => {
       if (cleaned) {
-        throw new Error("Invalid cleanup");
+        throw new Error("invalid cleanup");
 
       } else {
         cleaned = true;
+        _success = null;
 
         // TODO is this correct ?
         output["destroy"]();
@@ -105,17 +127,10 @@ export const write = (output, pull) =>
       success(_null);
     };
 
-    const onSuccess = (value) => {
-      if (value.$ === 0) {
-        // We don't cleanup, because that's handled by `onFinish`
-        // TODO what if `onDrain` gets called before `onFinish` ?
-        output["end"]();
-
-      } else {
-        if (output["write"](value.a, "utf8")) {
-          onDrain();
-        }
-      }
+    const onComplete = () => {
+      // We don't cleanup, because that's handled by `onFinish`
+      // TODO what if `onDrain` gets called before `onFinish` ?
+      output["end"]();
     };
 
     const onError = (e) => {
@@ -123,13 +138,18 @@ export const write = (output, pull) =>
       error(e);
     };
 
+
+    let _success = null;
+
     const onDrain = () => {
       // TODO remove this later
       if (cleaned) {
         throw new Error("HI!!!!");
       }
 
-      run(pull, thread, onSuccess, onError);
+      const x = _success;
+      _success = null;
+      x(_null);
     };
 
     // TODO this doesn't work
@@ -139,7 +159,23 @@ export const write = (output, pull) =>
     output["on"]("error", onError);
     output["on"]("drain", onDrain);
 
-    onDrain();
+    run_in_thread(thread, input((value) =>
+      async_killable((success, error) => {
+        // Continue writing
+        if (output["write"](value, "utf8")) {
+          success(_null);
+
+        // Wait for drain event
+        // TODO verify that _success is null ?
+        } else {
+          _success = success;
+        }
+
+        // TODO is this correct ?
+        return () => {
+          cleanup();
+        };
+      })), onComplete, onError);
 
     return cleanup;
   });

@@ -1,6 +1,5 @@
 (IMPORT (file "../list")
-| List
-| List-Delta)
+| List)
 
 (IMPORT (file "../text")
 | Text)
@@ -14,8 +13,11 @@
 (IMPORT (file "../maybe")
 | Maybe)
 
-(IMPORT (file "../stream")
-| Stream)
+(IMPORT (file "../changing")
+| Changing)
+
+(IMPORT (file "../changing-list")
+| Changing-List)
 
 (IMPORT (file "../mutable")
 | Mutable
@@ -29,7 +31,7 @@
 (TYPE Style
 | (*style Text Text)
 
-| (*style-stream Text (Stream (Maybe Text))))
+| (*changing-style Text (Changing (Maybe Text))))
 
 
 (TYPE Attribute-Event
@@ -47,13 +49,13 @@
 
 | (*attribute-class Text)
 
-| (*attribute-class-stream Text (Stream Boolean))
+| (*attribute-changing-class Text (Changing Boolean))
 
 | (*attribute-events (List Attribute-Event))
 
 | (*attribute-styles (List Style))
 
-| (*attribute-text-stream Text (Stream (Maybe Text))))
+| (*attribute-changing-text Text (Changing (Maybe Text))))
 
 
 (TYPE HTML
@@ -63,9 +65,9 @@
 
 | (*text Text)
 
-| (*text-stream (Stream Text))
+| (*changing-text (Changing Text))
 
-| (*parent-stream Text (List Attribute) (Stream (List-Delta HTML))))
+| (*changing-parent Text (List Attribute) (Changing-List HTML)))
 
 
 (UNSAFE-FFI-LOAD { target <= javascript-browser
@@ -96,21 +98,21 @@
 | on-hold <= *on-hold
 
 | attr <= *attribute-text
-| attr-stream <= *attribute-text-stream
+| changing-attr <= *attribute-changing-text
 
 | class <= *attribute-class
-| class-stream <= *attribute-class-stream
+| changing-class <= *attribute-changing-class
 
 | styles <= *attribute-styles
 
 | style <= *style
-| style-stream <= *style-stream
+| changing-style <= *changing-style
 
 | parent <= *parent-list
-| parent-stream <= *parent-stream
+| changing-parent <= *changing-parent
 
 | text <= *text
-| text-stream <= *text-stream
+| changing-text <= *changing-text
 
 | child <= *child)
 

@@ -15,7 +15,7 @@
     | concurrent    :: (-> (List (Task a)) (Task (List a)))
     | fastest       :: (-> (Task a) (Task a) (Task a))
     | delay         :: (-> Integer (Task Null))
-    | log           :: (-> String (Task Null))
+    | log           :: (-> Text (Task Null))
     | with_resource :: (-> (Task a)
                            (-> a (Task b))
                            (-> a (Task Null))

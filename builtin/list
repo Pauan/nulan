@@ -14,7 +14,9 @@
 | insert :: (-> (List a) Integer a (List a))
 | update :: (-> (List a) Integer a (List a))
 | remove :: (-> (List a) Integer (List a))
-| nth :: (-> (List a) Integer a))
+| nth :: (-> (List a) Integer a)
+| slice :: (-> (List a) Integer Integer (List a))
+| chunks :: (-> (List a) Integer (List (List a))))
 
 
 (EXPORT
@@ -26,7 +28,9 @@
 | insert
 | update
 | remove
-| nth)
+| nth
+| slice
+| chunks)
 
 
 

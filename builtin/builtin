@@ -1,3 +1,20 @@
+(REWRITE-RULE
+  (IMPORT-BUILTINS)
+    &(STATEMENTS
+       (IMPORT (nulan "boolean")
+         | ~(SYMBOL Boolean)
+         | ~(SYMBOL true)
+         | ~(SYMBOL false)
+         | ~(SYMBOL not)
+         | ~(SYMBOL IF)
+         | ~(SYMBOL AND)
+         | ~(SYMBOL OR))))
+
+(EXPORT
+  | IMPORT-BUILTINS)
+
+
+
 (LOAD-FILE "protocol.nul")
 (LOAD-FILE "boolean.nul")
 

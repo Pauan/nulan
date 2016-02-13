@@ -13,25 +13,25 @@ export const make_thread = () => {
 
 const _set_kill = (thread, f) => {
   if (thread.a) {
-    crash(new Error("Invalid set_kill: thread is already killed"));
+    crash(new Error("invalid set_kill: thread is already killed"));
 
   } else if (f === null) {
-    crash(new Error("Invalid set_kill: use reset_kill instead"));
+    crash(new Error("invalid set_kill: use reset_kill instead"));
 
   } else if (thread.b === null) {
     thread.b = f;
 
   } else {
-    crash(new Error("Invalid set_kill: thread is already set"));
+    crash(new Error("invalid set_kill: thread is already set"));
   }
 };
 
 const _reset_kill = (thread) => {
   if (thread.a) {
-    crash(new Error("Invalid reset_kill: thread is already killed"));
+    crash(new Error("invalid reset_kill: thread is already killed"));
 
   } else if (thread.b === null) {
-    crash(new Error("Invalid reset_kill: thread is already reset"));
+    crash(new Error("invalid reset_kill: thread is already reset"));
 
   } else {
     thread.b = null;
@@ -40,7 +40,7 @@ const _reset_kill = (thread) => {
 
 export const kill_thread = (thread) => {
   if (thread.a) {
-    crash(new Error("Invalid kill: thread is already killed"));
+    crash(new Error("invalid kill: thread is already killed"));
 
   } else {
     const kill = thread.b;
@@ -63,7 +63,7 @@ export const kill_threads = (a) => {
 // TODO rename to run_in_thread
 export const run = (task, thread, on_success, on_error) => {
   if (thread.a) {
-    crash(new Error("Cannot run: thread is killed"));
+    crash(new Error("cannot run: thread is killed"));
 
   } else {
     task(thread, on_success, on_error);
@@ -90,7 +90,7 @@ export const make_thread_pool = (on_error) => {
 
 export const kill_thread_pool = (pool) => {
   if (pool.a) {
-    crash(new Error("Invalid kill: thread pool is already killed"));
+    crash(new Error("invalid kill: thread pool is already killed"));
 
   } else {
     const threads = pool.b;
@@ -105,7 +105,7 @@ export const kill_thread_pool = (pool) => {
 
 export const run_in_thread_pool = (pool, task) => {
   if (pool.a) {
-    crash(new Error("Cannot run: thread pool is killed"));
+    crash(new Error("cannot run: thread pool is killed"));
 
   } else {
     const thread = make_thread();
@@ -182,7 +182,7 @@ export const async_killable = (f) =>
 
     const on_success = (value) => {
       if (done) {
-        crash(new Error("Invalid success"));
+        crash(new Error("invalid success"));
 
       } else {
         done = true;
@@ -193,7 +193,7 @@ export const async_killable = (f) =>
 
     const on_error = (value) => {
       if (done) {
-        crash(new Error("Invalid error"));
+        crash(new Error("invalid error"));
 
       } else {
         done = true;
@@ -205,7 +205,7 @@ export const async_killable = (f) =>
     // TODO is this check needed ?
     _set_kill(thread, () => {
       if (done) {
-        crash(new Error("Invalid kill"));
+        crash(new Error("invalid kill"));
 
       } else {
         done = true;
@@ -543,11 +543,11 @@ export const _yield =
 
 export const delay = (ms) => {
   if (ms === 0) {
-    crash(new Error("Cannot delay for 0 milliseconds (maybe use yield instead?)"));
+    crash(new Error("cannot delay for 0 milliseconds (maybe use yield instead?)"));
   }
 
   if (ms < 0) {
-    crash(new Error("Expected positive number but got " + ms));
+    crash(new Error("expected positive number but got " + ms));
   }
 
   return async_killable((success, error) => {
