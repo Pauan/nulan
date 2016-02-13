@@ -370,23 +370,37 @@ const set_attributes = (running, x, a) => {
 const set_children_list = (running, x, a) => {
   const length = a["length"];
 
+  // TODO is it faster or slower to use a document fragment ?
+  const fragment = document["createDocumentFragment"]();
+
   for (let i = 0; i < length; ++i) {
-    x["appendChild"](html(running, a[i]));
+    fragment["appendChild"](html(running, a[i]));
   }
+
+  x["appendChild"](fragment);
 };
 
 
-// TODO set the children's length and then assign, rather than using push ?
-const push_children = (children, x, a) => {
+const push_children = (x, a) => {
   const length = a["length"];
+
+  // TODO test this
+  const children = new Array(length);
+
+  // TODO is it faster or slower to use a document fragment ?
+  const fragment = document["createDocumentFragment"]();
 
   for (let i = 0; i < length; ++i) {
     const running = [];
 
-    children["push"](running);
+    children[i] = running;
 
-    x["appendChild"](html(running, a[i]));
+    fragment["appendChild"](html(running, a[i]));
   }
+
+  x["appendChild"](fragment);
+
+  return children;
 };
 
 // TODO test this
@@ -427,7 +441,7 @@ const remove_child = (children, x, index) => {
 
 // TODO test this
 const set_changing_children = (running, x, a) => {
-  const children = [];
+  let children = null;
 
   // TODO should this remove the children from the DOM ?
   // TODO prevent double kill
@@ -443,14 +457,13 @@ const set_changing_children = (running, x, a) => {
     switch (a.$) {
     // *set
     case 0:
-      if (children["length"] !== 0) {
+      if (children !== null) {
         kill();
-        children["length"] = 0;
         // TODO is there a faster way to clear the children ?
         x["innerHTML"] = "";
       }
 
-      push_children(children, x, a.a);
+      children = push_children(x, a.a);
       break;
 
     // *insert
