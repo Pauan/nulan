@@ -1,0 +1,44 @@
+(TYPE (List-Delta a)
+| (*set (List a))
+| (*insert Integer a)
+| (*update Integer a)
+| (*remove Integer))
+
+
+(TYPE (Changing-List a)
+| (*changing-list (Changing (List-Delta a))))
+
+
+(UNSAFE-FFI-LOAD { target <= javascript
+                 | file <= "../ffi/changing-list.js" }
+| transform_maybe :: (-> (Changing-List a) (-> a (Maybe b)) (Changing-List b)))
+
+
+# TODO maybe inline this ?
+(FUNCTION transform :: (-> (Changing-List a) (-> a b) (Changing-List b))
+| (transform (*changing-list a) b)
+    (*changing-list
+      (changing-transform a -> a
+        (MATCH a
+        | (*set a)
+            (*set (list-transform a b))
+        | (*insert index a)
+            (*insert index (b a))
+        | (*update index a)
+            (*update index (b a))
+        | (*remove index)
+            (*remove index)))))
+
+
+(FUNCTION changing-list<- :: (INLINE (-> (Changing (List a)) (Changing-List a)))
+| (changing-list<- a)
+    (*changing-list
+      (changing-transform a -> a
+        (*set a))))
+
+
+(EXPORT
+| Changing-List
+| transform
+| transform-maybe <= transform_maybe
+| changing-list<-)

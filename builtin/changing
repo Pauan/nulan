@@ -1,0 +1,17 @@
+(TYPE (Changing a))
+
+
+(UNSAFE-FFI-LOAD { target <= javascript
+                 | file <= "../ffi/changing.js" }
+| observe :: (-> (Changing a) (-> a (Task Null)) (Task Null))
+| transform :: (-> (Changing a) (-> a b) (Changing b))
+| transform_pair :: (-> (Changing a) (Changing b) (Changing (Pair a b)))
+| throttle :: (-> (Changing a) Integer (Changing a)))
+
+
+(EXPORT
+| Changing
+| observe
+| transform
+| transform-pair <= transform_pair
+| throttle)

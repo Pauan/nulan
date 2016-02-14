@@ -1,0 +1,62 @@
+(TYPE (Queue a)
+| (*queue (Stack a) (Stack a)))
+
+
+(CONSTANT
+| empty :: (Queue a)
+| empty <= (*queue *empty *empty))
+
+
+# TODO can this be made more efficient ?
+(FUNCTION iterator<- :: (-> (Queue a) (Iterator a))
+| (iterator<- a)
+    (*iterator a -> a
+      (MATCH a
+      | (*queue *empty *empty)
+          *done
+      | (*queue *empty a)
+          (*state (*queue (reverse a) *empty))
+      | (*queue (*push a b) c)
+          (*step (*queue a c) b))))
+
+
+(FUNCTION <-iterator :: (REQUIRE ($empty a) ($push a)
+                          (-> (Iterator b) (a b)))
+| (<-iterator (*iterator state next))
+    (WITH-LOOP loop
+    | state <= state
+    | a <= empty
+      (MATCH (next state)
+      | *done
+          a
+      | (*state state)
+          (loop state a)
+      | (*step state value)
+          (loop state (push a value)))))
+
+
+# TODO test this
+(FUNCTION push :: (-> (Queue a) a (Queue a))
+| (push (*queue *empty a) b)
+    (*queue (*push *empty b) a)
+| (push (*queue a b) c)
+    (*queue a (*push b c)))
+
+
+# TODO test this
+(FUNCTION peek :: (-> (Queue a) (Maybe a))
+| (peek (*queue *empty _))
+    *none
+| (peek (*queue (*push _ a) _))
+    (*some a))
+
+
+# TODO test this
+(FUNCTION pop :: (-> (Queue a) (Queue a))
+# TODO throw an error in this case ?
+| (pop (*queue *empty a))
+    (*queue *empty a)
+| (pop (*queue (*push *empty _) b))
+    (*queue (reverse b) *empty)
+| (pop (*queue (*push a _) b))
+    (*queue a b))

@@ -1,0 +1,168 @@
+(TYPE (Step value state)
+| *done
+| (*state state)
+| (*step state value))
+
+(TYPE (Iterator a)
+| (*iterator b (-> b (Step a b))))
+
+
+(PROTOCOL ($iterator<- a)
+| iterator<- :: (-> (a b) (Iterator b)))
+
+(PROTOCOL ($<-iterator a)
+| <-iterator :: (-> (Iterator b) (a b)))
+
+
+(MUTUALLY-RECURSIVE
+| (REWRITE-RULE
+  | (<-ITERATOR (ITERATOR<- ~a))
+      a
+  | (<-ITERATOR ~a)
+      &(<-iterator ~a))
+
+| (REWRITE-RULE
+  | (ITERATOR<- (<-ITERATOR ~a))
+      a
+  | (ITERATOR<- ~a)
+      &(iterator<- ~a)))
+
+
+(REWRITE-RULE
+| (TRANSFORM-ITERATOR ~a ~@body)
+    (WITH-UNIQUES initial next state
+      &(MATCH (ITERATOR<- ~a)
+       | (*iterator ~initial ~next)
+           (<-ITERATOR
+             (*iterator ~initial -> ~state
+               (MATCH (~next ~state)
+                 ~@body))))))
+
+
+(FUNCTION reduce-left :: (REQUIRE ($iterator<- a)
+                           (INLINE (-> b (a c) (-> b c b) b)))
+| (reduce-left initial a f)
+    (MATCH (ITERATOR<- a)
+    | (*iterator state next)
+        (WITH-LOOP loop
+        | initial <= initial
+        | state <= state
+          (MATCH (next state)
+          | *done
+              initial
+
+          | (*state state)
+              (loop initial state)
+
+          | (*step state value)
+              (loop (f initial value) state)))))
+
+
+(FUNCTION transform-maybe :: (REQUIRE ($iterator<- a) ($<-iterator a)
+                               (INLINE (-> (a b) (-> b (Maybe c)) (a c))))
+| (transform-maybe a f)
+    (TRANSFORM-ITERATOR a
+    | *done
+        *done
+
+    | (*state state)
+        (*state state)
+
+    | (*step state value)
+        (MATCH (f value)
+        | *none
+            (*state state)
+
+        | (*some value)
+            (*step state value))))
+
+
+(FUNCTION concat :: (REQUIRE ($iterator<- a) ($<-iterator a)
+                      (INLINE (-> (a b) (a b) (a b))))
+| (concat a b))
+
+
+# TOOD should this be inlined ?
+(FUNCTION size :: (REQUIRE ($iterator<- a)
+                    (INLINE (-> (a b) Integer)))
+| (size a)
+    (reduce-left 0 a -> sum _
+      (+ sum 1)))
+
+
+# TODO is this correct ?
+(FUNCTION limit-max :: (REQUIRE ($iterator<- a) ($<-iterator a)
+                         (INLINE (-> (a b) Integer (a b))))
+| (limit-max a max)
+    (MATCH (ITERATOR<- a)
+    | (*iterator state next)
+        (<-ITERATOR
+          (*iterator { state | values <= 0 } -> { state values }
+            (IF (less? values max)
+            | (MATCH (next state)
+              | *done
+                  *done
+              | (*state state)
+                  (*state { state values })
+              | (*step state value)
+                  (*step { state | values <= (+ values 1) } value))
+            | *done)))))
+
+
+(FUNCTION infinite :: (REQUIRE ($<-iterator a)
+                        (INLINE (-> b (a b))))
+| (infinite a)
+    (<-ITERATOR
+      (*iterator null -> _
+        (*step null a))))
+
+
+(FUNCTION repeat :: (REQUIRE ($<-iterator a)
+                      (INLINE (-> Integer b (a b))))
+| (repeat amount a)
+    (<-ITERATOR
+      # TODO make `a` a part of the iterator's state ?
+      (*iterator 0 -> times
+        (IF (less? times amount)
+        | (*step (+ times 1) a)
+        | *done))))
+
+
+(FUNCTION repeat :: (REQUIRE ($iterator<- a) ($<-iterator a)
+                      (INLINE (-> Integer b (a b))))
+| (repeat amount a)
+    (limit-max (infinite a) amount))
+
+
+(TYPE (Mix a b)
+| (*none a)
+| (*left a)
+| (*right a b))
+
+# TODO test this
+(FUNCTION intermix :: (REQUIRE ($iterator<- a) ($<-iterator a)
+                        (INLINE (-> (a b) b (a b))))
+| (intermix a b)
+    (MATCH (ITERATOR<- a)
+    | (*iterator state next)
+        (<-ITERATOR
+          (*iterator (*none state) -> state
+            (MATCH state
+            | (*none state)
+                (MATCH (next state)
+                | *done
+                    *done
+                | (*state state)
+                    (*state (*none state))
+                | (*step state value)
+                    (*step (*left state) value))
+            | (*left state)
+                (MATCH (next state)
+                | *done
+                    *done
+                | (*state state)
+                    (*state (*left state))
+                | (*step state value)
+                    (*step (*right state value) b))
+            | (*right state value)
+                (*step (*left state) value))))))

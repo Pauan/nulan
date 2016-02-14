@@ -1,0 +1,60 @@
+(TYPE (Stack a)
+| *empty
+| (*push (Stack a) a))
+
+
+(FUNCTION peek :: (-> (Stack a) (Maybe a))
+| (peek *empty)
+    *none
+| (peek (*push _ a))
+    (*some a))
+
+
+(FUNCTION pop :: (-> (Stack a) (Stack a))
+# TODO throw an error in this case ?
+| (pop *empty)
+    *empty
+| (pop (*push a _))
+    a)
+
+
+(FUNCTION reverse :: (-> (Stack a) (Stack a))
+| (reverse input)
+    (WITH-LOOP loop
+    | input <= input
+    | output <= *empty
+      (MATCH input
+      | *empty
+          output
+      | (*push input value)
+          (loop input (*push output value)))))
+
+
+# TODO more efficient implementation of this ?
+(FUNCTION iterator<- :: (-> (Stack a) (Iterator a))
+| (iterator<- a)
+    (*iterator (reverse a) -> a
+      (MATCH a
+      | *empty
+          *done
+      | (*push a b)
+          (*step a b))))
+
+
+(FUNCTION <-iterator :: (-> (Iterator a) (Stack a))
+| (<-iterator (*iterator state next))
+    (WITH-LOOP loop
+    | state <= state
+    | stack <= *empty
+      (MATCH (next state)
+      | *done
+          stack
+      | (*state state)
+          (loop state stack)
+      | (*step state value)
+          (loop state (*push stack value)))))
+
+
+(EXPORT-CONSTANT
+| empty <= *empty
+| push <= *push)

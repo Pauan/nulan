@@ -1,0 +1,50 @@
+(IMPORT (file "mutable-list")
+| Mutable-List
+| mutable-list
+| _get <= get
+| insert!
+| remove!
+| _changing-list<- <= changing-list<-
+| _changing<- <= changing<-
+| List-Delta)
+
+
+(TYPE (Mutable-Sorted-List a)
+| (*sorted-list (Mutable-List a) (-> a a Order)))
+
+
+(UNSAFE-FFI-LOAD { target <= javascript
+                 | file <= "../ffi/mutable-sorted-list.js" }
+| insert_sorted_index :: (-> (List a) (-> a a Order) a Integer)
+| get_sorted_index :: (-> (List a) (-> a a Order) a Integer))
+
+
+(FUNCTION mutable-sorted-list :: (-> (-> a a Order) (Task (Mutable-Sorted-List a)))
+| (mutable-sorted-list sort)
+    (DO a <= (mutable-list [])
+        (yield (*sorted-list a sort))))
+
+
+(FUNCTION insert-sorted! :: (-> (Mutable-Sorted-List a) a (Task Null))
+| (insert-sorted! (*sorted-list a sort) b)
+    (DO list <= (_get a)
+        (insert! a (insert_sorted_index list sort b) b)))
+
+
+(FUNCTION remove-sorted! :: (-> (Mutable-Sorted-List a) a (Task Null))
+| (remove-sorted! (*sorted-list a sort) b)
+    (DO list <= (_get a)
+        (remove! a (get_sorted_index list sort b))))
+
+
+(FUNCTION get :: (INLINE (-> (Mutable-Sorted-List a) (Task (List a))))
+| (get (*sorted-list a _))
+    (_get a))
+
+(FUNCTION changing-list<- :: (INLINE (-> (Mutable-Sorted-List a) (Changing-List a)))
+| (changing-list<- (*sorted-list a _))
+    (_changing-list<- a))
+
+(FUNCTION changing<- :: (INLINE (-> (Mutable-Sorted-List a) (Changing (List a))))
+| (changing<- (*sorted-list a _))
+    (_changing<- a))
