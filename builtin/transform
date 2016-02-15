@@ -17,6 +17,27 @@
 
       &(transform2 ~value3 ~value2 -> ~name3 ~name2 ~body)))
 
+(REWRITE-RULE
+| (TRANSFORM
+  | ~name <= ~value
+  \ ~body)
+    &(transform ~value -> ~name ~body)
+| (TRANSFORM
+  | ~name1 <= ~value1
+  | ~name2 <= ~value2
+  \ ~body)
+    &(transform2 ~value1 ~value2 -> ~name1 ~name2 ~body)
+| (TRANSFORM
+  | ~name1 <= ~value1
+  | ~name2 <= ~value2
+  ~@rest
+  \ ~body)
+    &(TRANSFORM
+     | (*pair ~name1 ~name2) <= (transform2 ~value1 ~value2 pair)
+     ~@rest
+     \ ~body))
+
+
 (EXPORT
   | Pair
   | TRANSFORM)

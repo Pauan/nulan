@@ -5,8 +5,22 @@
                  | file <= "../ffi/changing.js" }
 | observe :: (-> (Changing a) (-> a (Task Null)) (Task Null))
 | transform :: (-> (Changing a) (-> a b) (Changing b))
+| transform2 :: (-> (Changing a) (Changing b) (-> a b c) (Changing c))
+| transform_many :: (-> Unknown (-> Unknown a) (Changing a))
 | transform_pair :: (-> (Changing a) (Changing b) (Changing (Pair a b)))
-| throttle :: (-> (Changing a) Integer (Changing a)))
+| throttle :: (-> (Changing a) Integer (Changing a))
+| _yield :: (-> a (Changing a)))
+
+
+#/
+(REWRITE-RULE
+| (TRANSFORM | ~name <= ~value \ ~body)
+    &(transform ~value -> ~name ~body)
+| (TRANSFORM ~@rest \ ~body)
+    &(transform-many [~@(transform rest -> &| ~name <= ~value value)] ->
+                     [~@(transform rest -> &| ~name <= ~value name)]
+       ~body))
+/#
 
 
 (EXPORT
@@ -14,4 +28,6 @@
 | observe
 | transform
 | transform-pair <= transform_pair
-| throttle)
+| transform-many <= transform_many
+| throttle
+| yield <= _yield)

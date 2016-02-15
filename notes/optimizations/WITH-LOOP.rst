@@ -121,19 +121,16 @@ Here is an example of the output of the Nulan -> JavaScript compiler:
           return a;
 
         } else {
-          let a2 = a;
-
           loop2: for (;;) {
-            if (a2 === 5) {
-              const b = a2 + 1;
-              a2 = b;
+            if (a === 5) {
+              a = a + 1;
               continue loop2;
 
-            } else if (a2 === 20) {
-              return a2;
+            } else if (a === 20) {
+              return a;
 
             } else {
-              a = a2 + 1;
+              a = a + 1;
               continue loop;
             }
           }

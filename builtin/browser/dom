@@ -58,6 +58,18 @@
 | (*attribute-changing-text Text (Changing (Maybe Text))))
 
 
+(TYPE Animation-State
+| *play
+| *pause
+| *reverse)
+
+(TYPE Animation
+| (*animate-set Text Animation-State)
+| (*animate-insert Text Animation-State)
+| (*animate-update Text Animation-State)
+| (*animate-remove Text Animation-State))
+
+
 (TYPE HTML
 | (*parent-list Text (List Attribute) (List HTML))
 
@@ -67,7 +79,9 @@
 
 | (*changing-text (Changing Text))
 
-| (*changing-parent Text (List Attribute) (Changing-List HTML)))
+| (*changing-parent Text (List Attribute) (Changing-List HTML))
+
+| (*animated-parent Text (List Animation) (List Attribute) (Changing-List HTML)))
 
 
 (UNSAFE-FFI-LOAD { target <= javascript-browser

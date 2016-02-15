@@ -168,6 +168,12 @@ export const chunks = (a, size) => {
 };
 
 
+export const unsafe_push = (a, b) => {
+  a["push"](b);
+  return a;
+};
+
+
 export const iterator_from = (a) =>
   // TODO include the list in the state ?
   ({

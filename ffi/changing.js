@@ -2,6 +2,10 @@ import { async_killable, make_thread_pool, run_in_thread_pool,
          kill_thread_pool } from "./task";
 
 
+// TODO move into another module
+const noop = () => {};
+
+
 // TODO test this
 export const observe = (a, b) =>
   async_killable((success, error) => {
@@ -57,6 +61,77 @@ export const transform_pair = (a, b) =>
       kill1();
       kill2();
     };
+  };
+
+
+// TODO test this
+// TODO don't push if the values are the same ?
+export const transform2 = (a, b, c) =>
+  (push) => {
+    let value1 = empty;
+    let value2 = empty;
+
+    const kill1 = a((value) => {
+      value1 = value;
+
+      if (value2 !== empty) {
+        push(c(value1, value2));
+      }
+    });
+
+    const kill2 = b((value) => {
+      value2 = value;
+
+      // TODO is this needed ?
+      if (value1 !== empty) {
+        push(c(value1, value2));
+      }
+    });
+
+    return () => {
+      kill1();
+      kill2();
+    };
+  };
+
+
+// TODO test this
+export const transform_many = (a, b) =>
+  (push) => {
+    const length = a["length"];
+
+    const stops = new Array(length);
+    const values = new Array(length);
+
+    let pending = length - 1;
+
+    for (let i = 0; i < length; ++i) {
+      stops[i] = a[i]((value) => {
+        values[i] = value;
+
+        // TODO is there a better way to accomplish this ?
+        if (pending === 0) {
+          // TODO don't push if the values are the same ?
+          push(b(values));
+
+        } else {
+          --pending;
+        }
+      });
+    }
+
+    return () => {
+      for (let i = 0; i < length; ++i) {
+        stops[i]();
+      }
+    };
+  };
+
+
+export const _yield = (a) =>
+  (push) => {
+    push(a);
+    return noop;
   };
 
 

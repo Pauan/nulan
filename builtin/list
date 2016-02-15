@@ -11,6 +11,7 @@
 | from_iterator :: (-> (Iterator a) (List a))
 | size :: (-> (List a) Integer)
 | push :: (-> (List a) a (List a))
+| unsafe_push :: (-> (List a) a (List a))
 | insert :: (-> (List a) Integer a (List a))
 | update :: (-> (List a) Integer a (List a))
 | remove :: (-> (List a) Integer (List a))
@@ -21,8 +22,8 @@
 
 (EXPORT
 | List
-| iterator<- <= iterator_from
-| <-iterator <= from_iterator
+| iterator<| <= iterator_from
+| <|iterator <= from_iterator
 | size
 | push
 | insert
@@ -30,7 +31,8 @@
 | remove
 | nth
 | slice
-| chunks)
+| chunks
+| unsafe-push! <= unsafe_push)
 
 
 

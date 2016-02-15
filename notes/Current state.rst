@@ -16,6 +16,10 @@
 | *empty
 | (*value a (List a)))
 
+(TYPE Foo
+| (REQUIRE ($foo a)
+    (*foo a)))
+
 (PROTOCOL ($transform a)
 | transform :: (-> (a b) (-> b c) (a c)))
 
@@ -50,12 +54,6 @@
 | (PROVIDE ($yield Maybe)
   | yield))
 
-(PROVIDE ($transform Maybe)
-| transform <= map)
-
-(PROVIDE ($transform Maybe)
-| transform <= (-> a a))
-
 (EXPORT
 | d <= a
 | b
@@ -74,41 +72,41 @@
 (IMPORT-BUILTINS)
 
 (IMPORT (nulan "unsafe/ffi")
-| UNSAFE-FFI-LOAD
+| UNSAFE-FFI-IMPORT
 | javascript)
 
-(UNSAFE-FFI-LOAD { target <= javascript
-                 | file <= "foo/bar" }
+(UNSAFE-FFI-IMPORT { target <= javascript
+                   | file <= "foo/bar" }
 | a :: (-> Integer Integer Integer)
 | b :: Integer
 | c :: Integer
 | d :: (Foo Integer))
 
+(FUNCTION foo<| :: (-> a Foo)
+| (foo<| a)
+    ...)
+
+(FUNCTION <|foo :: (-> Foo a)
+| (<|foo a)
+    ...)
+
 (CONSTANT
 | foo :: (-> (-> Integer Integer Integer) Integer)
 | foo <= (-> a (a 1 2)))
 
-(MUTUALLY-RECURSIVE
-  (FUNCTION even? :: (-> Integer Boolean)
-  | (even? 0)
-      true
-  | (even? a)
-      (odd? (- a 1)))
+(LOCAL
+| a <= 1
+\ (+ a 2))
 
-  (FUNCTION odd? :: (-> Integer Boolean)
-  | (odd? 0)
-      false
-  | (odd? a)
-      (even? (- a 1))))
-
-(LET a <= 1
-     b <= 2
-  (+ a b))
-
-(WITH-LOOP loop
+(LOCAL
 | a <= 1
 | b <= 2
-  (loop a b))
+\ (+ a b))
+
+(LOOP loop
+| a <= 1
+| b <= 2
+\ (loop a b))
 
 (FUNCTION foo :: (-> (-> Integer Integer Integer) Integer)
 | (foo a)
@@ -129,13 +127,42 @@
     &(+ ~@a))
 
 (MUTUALLY-RECURSIVE
-  (REWRITE-RULE
+| (FUNCTION even? :: (-> Integer Boolean)
+  | (even? 0)
+      true
+  | (even? a)
+      (odd? (- a 1)))
+
+| (FUNCTION odd? :: (-> Integer Boolean)
+  | (odd? 0)
+      false
+  | (odd? a)
+      (even? (- a 1))))
+
+(MUTUALLY-RECURSIVE
+| (PROTOCOL ($foo a)
+  | foo :: (REQUIRE ($bar a)
+             (-> a a)))
+
+| (PROTOCOL ($bar a)
+  | bar :: (REQUIRE ($foo a)
+             (-> a a))))
+
+(MUTUALLY-RECURSIVE
+| (TYPE Foo
+  | (*foo Bar))
+
+| (TYPE Bar
+  | (*bar Foo)))
+
+(MUTUALLY-RECURSIVE
+| (REWRITE-RULE
   | (FOO ~n <= ~v)
       &(BAR ~n ~v)
   | (FOO ~v)
       &(BAR ~v))
 
-  (REWRITE-RULE
+| (REWRITE-RULE
   | (BAR ~a ~@b)
       (MATCH a
       | &~n <= ~v
@@ -152,31 +179,34 @@ FOO
 (((FOO)))
 
 (MUTUALLY-RECURSIVE
-  (REWRITE-RULE
+| (REWRITE-RULE
   | (UNSTREAM (STREAM ~a))
       a
   | (UNSTREAM ~a)
       &(unstream ~a))
 
-  (REWRITE-RULE
+| (REWRITE-RULE
   | (STREAM (UNSTREAM ~a))
       a
   | (STREAM ~a)
       &(stream ~a)))
 
-(DO a <= a
-    b <= b
-    c)
+(FLATTEN-TRANSFORM
+| a <= a
+| b <= b
+\ c)
 
-(DO x <= (read-file "foo")
-    (log x)
-    (write-file "bar" x)
-    (yield null))
+(FLATTEN-TRANSFORM
+| x <= (read-file "foo")
+| (log x)
+| (write-file "bar" x)
+\ (yield null))
 
-(TRANSFORM a <= 1
-           b <= 2
-           c <= 3
-  (+ a b c))
+(TRANSFORM
+| a <= 1
+| b <= 2
+| c <= 3
+\ (+ a b c))
 
 (MATCHES [ a b c ]
 | [ 1 2 3 ]
@@ -200,6 +230,10 @@ FOO
 
 { a <= 1
 | b <= 2 }
+
+{ @a
+| b <= 2
+| c <= 3 }
 
 (MATCH a
 | _
@@ -234,8 +268,34 @@ FOO
     9)
 
 (MATCH a
-| (LET a <= a (equal? a 1))
+| (LOCAL
+  | a <= a
+  \ (equal? a 1))
     9)
+
+# foo :: (POLYMORPH
+#          (-> Integer Integer)
+#          (-> Text Text))
+(POLYMORPHIC
+| (FUNCTION foo :: (-> Integer Integer)
+  | (foo a)
+      a)
+
+| (FUNCTION foo :: (-> Text Text)
+  | (foo a)
+      a))
+
+(FUNCTION bar :: (POLYMORPH
+                   (-> Integer Integer)
+                   (-> Text Text))
+| (bar a)
+    (foo a))
+
+(UNSAFE-DEFAULT-PROVIDE ($transform Maybe)
+| transform <= map)
+
+(UNSAFE-DEFAULT-PROVIDE ($transform Maybe)
+| transform <= (-> a a))
 
 (IMPORT (nulan "unsafe")
 | UNSAFE-OPTIMIZATION-RULE)
