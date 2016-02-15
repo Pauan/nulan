@@ -1,0 +1,8 @@
+[submodule "lib/codemirror"]
+	path = lib/codemirror
+	url = https://github.com/codemirror/CodeMirror.git
+	branch = master
+[submodule "lib/nino"]
+	path = lib/nino
+	url = https://github.com/Pauan/nino.git
+	branch = master
