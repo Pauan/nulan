@@ -671,6 +671,7 @@ var doc = (function (n) {
 
           y = x.insertCell(0)
           y.width = "50%"
+          y.height = "100%";
           y.setAttribute("rowspan", "2")
           z = document.createElement("div")
           z.className = "wrapper-for-firefox"
