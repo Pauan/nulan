@@ -3,173 +3,173 @@
     (TYPE (Foo a))
 
     (TYPE Color
-    | *red
-    | *orange
-    | *yellow
-    | *green
-    | *blue
-    | *indigo
-    | *violet)
+      *red
+      *orange
+      *yellow
+      *green
+      *blue
+      *indigo
+      *violet)
 
     (TYPE RGB
-    | (*rgba Integer Integer Integer))
+      (*rgba Integer Integer Integer))
 
     (TYPE (List a)
-    | *empty
-    | (*value a (List a)))
+      *empty
+      (*value a (List a)))
 
     (TYPE Foo
-    | (REQUIRE ($foo a)
+      (REQUIRE ($foo a)
         (*foo a)))
 
     (PROTOCOL ($transform a)
-    | transform :: (-> (a b) (-> b c) (a c)))
+      transform :: (-> (a b) (-> b c) (a c)))
 
     (CONSTANT
-    | after :: (REQUIRE ($transform a) ($flatten a)
+      after :: (REQUIRE ($transform a) ($flatten a)
                  (-> (a b) (-> b (a c)) (a c)))
-    | after <= (-> a fn
+      after <= (-> a fn
                  (flatten (transform a fn))))
 
     (FUNCTION after :: (REQUIRE ($transform a) ($flatten a)
                          (-> (a b) (-> b (a c)) (a c)))
-    | (after a fn)
+      (after a fn)
         (flatten (transform a fn)))
 
     (IMPORT (github { name <= "nulan/flatten"
-                    | file <= "src/flatten.nul"
-                    | version <= (major 2) })
-    | $flatten
-    | flatten)
+                      file <= "src/flatten.nul"
+                      version <= (major 2) })
+      $flatten
+      flatten)
 
     (IMPORT (file "foo/bar")
-    | a <= d
-    | b
-    | c
-    | Maybe
-    | *some
-    | *none
-    | (PROVIDE ($flatten Maybe)
-      | flatten)
-    | (PROVIDE ($transform Maybe)
-      | transform <= map)
-    | (PROVIDE ($yield Maybe)
-      | yield))
+      a <= d
+      b
+      c
+      Maybe
+      *some
+      *none
+      (PROVIDE ($flatten Maybe)
+        flatten)
+      (PROVIDE ($transform Maybe)
+        transform <= map)
+      (PROVIDE ($yield Maybe)
+        yield))
 
     (EXPORT
-    | d <= a
-    | b
-    | c
-    | Maybe
-    | *some
-    | *none)
+      d <= a
+      b
+      c
+      Maybe
+      *some
+      *none)
 
     (IF test
-    | then
-    | else)
+      then
+      else)
 
     (EXPORT-CONSTANT
-    | foo <= *foo)
+      foo <= *foo)
 
     (IMPORT-BUILTINS)
 
     (IMPORT (nulan "unsafe/ffi")
-    | UNSAFE-FFI-IMPORT
-    | javascript)
+      UNSAFE-FFI-IMPORT
+      javascript)
 
     (UNSAFE-FFI-IMPORT { target <= javascript
-                       | file <= "foo/bar" }
-    | a :: (-> Integer Integer Integer)
-    | b :: Integer
-    | c :: Integer
-    | d :: (Foo Integer))
+                         file <= "foo/bar" }
+      a :: (-> Integer Integer Integer)
+      b :: Integer
+      c :: Integer
+      d :: (Foo Integer))
 
     (FUNCTION foo<| :: (-> a Foo)
-    | (foo<| a)
+      (foo<| a)
         ...)
 
     (FUNCTION <|foo :: (-> Foo a)
-    | (<|foo a)
+      (<|foo a)
         ...)
 
     (CONSTANT
-    | foo :: (-> (-> Integer Integer Integer) Integer)
-    | foo <= (-> a (a 1 2)))
+      foo :: (-> (-> Integer Integer Integer) Integer)
+      foo <= (-> a (a 1 2)))
 
     (LOCAL
-    | a <= 1
-    \ (+ a 2))
+      a <= 1
+      (+ a 2))
 
     (LOCAL
-    | a <= 1
-    | b <= 2
-    \ (+ a b))
+      a <= 1
+      b <= 2
+      (+ a b))
 
     (LOOP loop
-    | a <= 1
-    | b <= 2
-    \ (loop a b))
+      a <= 1
+      b <= 2
+      (loop a b))
 
     (FUNCTION foo :: (-> (-> Integer Integer Integer) Integer)
-    | (foo a)
+      (foo a)
         (a 1 2))
 
     (FUNCTION foo :: (-> Text Text)
-    | (foo a)
+      (foo a)
         a)
 
     (FUNCTION bar :: (-> Integer Integer)
-    | (bar 1)
+      (bar 1)
         2
-    | (bar a)
+      (bar a)
         (+ (bar 1) a))
 
     (REWRITE-RULE
-    | (QUX ~@a)
+      (QUX ~@a)
         &(+ ~@a))
 
     (MUTUALLY-RECURSIVE
-    | (FUNCTION even? :: (-> Integer Boolean)
-      | (even? 0)
+      (FUNCTION even? :: (-> Integer Boolean)
+        (even? 0)
           true
-      | (even? a)
+        (even? a)
           (odd? (- a 1)))
 
-    | (FUNCTION odd? :: (-> Integer Boolean)
-      | (odd? 0)
+      (FUNCTION odd? :: (-> Integer Boolean)
+        (odd? 0)
           false
-      | (odd? a)
+        (odd? a)
           (even? (- a 1))))
 
     (MUTUALLY-RECURSIVE
-    | (PROTOCOL ($foo a)
-      | foo :: (REQUIRE ($bar a)
+      (PROTOCOL ($foo a)
+        foo :: (REQUIRE ($bar a)
                  (-> a a)))
 
-    | (PROTOCOL ($bar a)
-      | bar :: (REQUIRE ($foo a)
+      (PROTOCOL ($bar a)
+        bar :: (REQUIRE ($foo a)
                  (-> a a))))
 
     (MUTUALLY-RECURSIVE
-    | (TYPE Foo
-      | (*foo Bar))
+      (TYPE Foo
+        (*foo Bar))
 
-    | (TYPE Bar
-      | (*bar Foo)))
+      (TYPE Bar
+        (*bar Foo)))
 
     (MUTUALLY-RECURSIVE
-    | (REWRITE-RULE
-      | (FOO ~n <= ~v)
+      (REWRITE-RULE
+        (FOO ~n <= ~v)
           &(BAR ~n ~v)
-      | (FOO ~v)
+        (FOO ~v)
           &(BAR ~v))
 
-    | (REWRITE-RULE
-      | (BAR ~a ~@b)
+      (REWRITE-RULE
+        (BAR ~a ~@b)
           (MATCH a
-          | &~n <= ~v
+            &~n <= ~v
               &(QUX ~n ~v ~@b)
-          | v
+            v
               &(QUX 1 ~v ~@b))))
 
     (foo -> a b (+ a b))
@@ -181,85 +181,85 @@
     (((FOO)))
 
     (MUTUALLY-RECURSIVE
-    | (REWRITE-RULE
-      | (UNSTREAM (STREAM ~a))
+      (REWRITE-RULE
+        (UNSTREAM (STREAM ~a))
           a
-      | (UNSTREAM ~a)
+        (UNSTREAM ~a)
           &(unstream ~a))
 
-    | (REWRITE-RULE
-      | (STREAM (UNSTREAM ~a))
+      (REWRITE-RULE
+        (STREAM (UNSTREAM ~a))
           a
-      | (STREAM ~a)
+        (STREAM ~a)
           &(stream ~a)))
 
     (FLATTEN-TRANSFORM
-    | a <= a
-    | b <= b
-    \ c)
+      a <= a
+      b <= b
+      c)
 
     (FLATTEN-TRANSFORM
-    | x <= (read-file "foo")
-    | (log x)
-    | (write-file "bar" x)
-    \ (yield null))
+      x <= (read-file "foo")
+      (log x)
+      (write-file "bar" x)
+      (yield null))
 
     (TRANSFORM
-    | a <= 1
-    | b <= 2
-    | c <= 3
-    \ (+ a b c))
+      a <= 1
+      b <= 2
+      c <= 3
+      (+ a b c))
 
     (MATCHES [ a b c ]
-    | [ 1 2 3 ]
+      [ 1 2 3 ]
         1
-    | [ 1 2 a ]
+      [ 1 2 a ]
         2
-    | [ 1 a b ]
+      [ 1 a b ]
         3
-    | [ a b c ]
+      [ a b c ]
         4)
 
     [ 1 2 3 ]
 
     [ 1
-    | 2
-    | 3 ]
+      2
+      3 ]
 
     { a b }
 
-    { a <= 1 | b <= 2 }
+    { a <= 1 b <= 2 }
 
     { a <= 1
-    | b <= 2 }
+      b <= 2 }
 
     { @a
-    | b <= 2
-    | c <= 3 }
+      b <= 2
+      c <= 3 }
 
     (MATCH a
-    | _
+      _
         1
-    | a
+      a
         2
-    | 1
+      1
         3
-    | "foo"
+      "foo"
         4
-    | { a b c }
+      { a b c }
         5
-    | { a <= b | c <= d }
-        { b <= a | d <= c }
-    | (*foo 1)
+      { a <= b c <= d }
+        { b <= a d <= c }
+      (*foo 1)
         6)
 
 
-Unsure
+    Unsure
 
-::
+    ::
 
     (PRAGMA { phase <= run-time
-            | target <= javascript }
+              target <= javascript }
       foo)
 
     (METADATA impure inline-function synchronous
@@ -269,58 +269,58 @@ Unsure
       (-> foo bar))
 
     (MATCH a
-    | (-> view a)
+      (-> view a)
         9)
 
     (MATCH a
-    | (LOCAL
-      | a <= a
-      \ (equal? a 1))
+      (LOCAL
+        a <= a
+        (equal? a 1))
         9)
 
     # foo :: (POLYMORPH
     #          (-> Integer Integer)
     #          (-> Text Text))
     (POLYMORPHIC
-    | (FUNCTION foo :: (-> Integer Integer)
-      | (foo a)
+      (FUNCTION foo :: (-> Integer Integer)
+        (foo a)
           a)
 
-    | (FUNCTION foo :: (-> Text Text)
-      | (foo a)
+      (FUNCTION foo :: (-> Text Text)
+        (foo a)
           a))
 
     (FUNCTION bar :: (POLYMORPH
                        (-> Integer Integer)
                        (-> Text Text))
-    | (bar a)
+      (bar a)
         (foo a))
 
     (UNSAFE-DEFAULT-PROVIDE ($transform Maybe)
-    | transform <= map)
+      transform <= map)
 
     (UNSAFE-DEFAULT-PROVIDE ($transform Maybe)
-    | transform <= (-> a a))
+      transform <= (-> a a))
 
     (IMPORT (nulan "unsafe")
-    | UNSAFE-OPTIMIZATION-RULE)
+      UNSAFE-OPTIMIZATION-RULE)
 
     (UNSAFE-OPTIMIZATION-RULE
-    | (after a b)
+      (after a b)
         (flatten (transform a b)))
 
     (UNSAFE-OPTIMIZATION-RULE
-    | (reduce-left [] a -> b c (push b d))
+      (reduce-left [] a -> b c (push b d))
         (reduce-left [] a -> b c (unsafe-push! b d)))
 
     (UNSAFE-OPTIMIZATION-RULE
-    | (unstream (stream a))
+      (unstream (stream a))
         a)
 
     (UNSAFE-OPTIMIZATION-RULE
-    | (stream (unstream a))
+      (stream (unstream a))
         a)
 
     (UNSAFE-OPTIMIZATION-RULE
-    | (add a b)
+      (add a b)
         (ADD a b))
