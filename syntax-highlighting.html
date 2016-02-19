@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8' />
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        height: 100%;
+      }
+
+      body {
+        background-color: #0f171f;
+        color: #8EB6E0; /* #7ea9d7 */
+        margin: 15px;
+        height: 100%;
+      }
+
+      #container {
+        margin: 0px;
+        position: relative;
+        line-height: 1.2em;
+        min-height: 50em;
+        padding: 10px;
+        border: 1px solid #192D42;
+      }
+
+      #container::after {
+        position: absolute;
+        left: calc(78ch + 10px);
+        top: 0px;
+        height: 100%;
+        border-left: 1px solid #192D42;
+        content: " ";
+      }
+
+      .comment {
+        color: #616467; /* #4d769f #3a5572 #5E6F82 #243547 #38516B */
+      }
+
+      .syntax {
+        color: #FF9B5F; /* #E2E2E2 #e7915d */
+      }
+
+      .special {
+        color: #D03B3B; /* #b54a4a */
+      }
+
+      .literal {
+        color: #47FF5E; /* #36ce5d #1CE247 */
+      }
+
+      .protocol {
+        color: #E079E6;
+      }
+
+      .type {
+        color: #E079E6; /* #eac06c #e7ce5d */
+      }
+
+      .indent {
+        position: absolute;
+        height: 1.2em;
+        margin-top: -0.1em;
+        margin-left: 0.35em;
+        border-left: 1px solid #192D42;
+      }
+
+      .indent-end {
+        position: absolute;
+        height: 1.1em;
+        margin-top: -0.1em;
+        margin-left: 0.35em;
+        border-left: 1px solid #192D42;
+        border-bottom: 1px solid #192D42;
+        width: 2px;
+        border-bottom-left-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="container" contentEditable="true"></pre>
+
+    <script>
+      "use strict";
+
+
+      const wrap = (type, text) =>
+        "<span class='" + type + "'>" + text + "</span>";
+
+      const bar =
+        "<span class='indent'></span>";
+
+      const bar_end =
+        "<span class='indent-end'></span>";
+
+
+      const syntax1 = (color) =>
+        (output, stack, position, text) => {
+          output.push(wrap(color, text[position.index]));
+          ++position.index;
+          ++position.column;
+        };
+
+      const open = (color) =>
+        (output, stack, position, text) => {
+          stack.push(position.column);
+          output.push(wrap(color, text[position.index]));
+          ++position.index;
+          ++position.column;
+        };
+
+      const close = (color) =>
+        (output, stack, position, text) => {
+          stack.pop();
+          output.push(wrap(color, text[position.index]));
+          ++position.index;
+          ++position.column;
+        };
+
+
+      // TODO is this correct ?
+      const find_endings = (index, text) => {
+        let endings = 0;
+
+        while (index < text.length) {
+          const c = text[index];
+
+          if (c === "\n") {
+            break;
+
+          } else if (c === "(" || c === "[" || c === "{") {
+            ++endings;
+            ++index;
+
+          } else if (c === ")" || c === "]" || c === "}") {
+            --endings;
+            ++index;
+
+          } else {
+            ++index;
+          }
+        }
+
+        return endings;
+      };
+
+      const whitespace = (output, stack, position, text) => {
+        const a = [];
+
+        const start = position.column;
+
+        while (position.index < text.length) {
+          const c = text[position.index];
+
+          if (c === " ") {
+            a.push(c);
+            ++position.index;
+            ++position.column;
+
+          } else {
+            break;
+          }
+        }
+
+        if (stack.length && start === 0) {
+          let max = 0;
+
+          // TODO is this correct ?
+          const endings = find_endings(position.index, text) + stack.length;
+
+          // TODO is the stack always in sorted order ?
+          for (let i = 0; i < stack.length; ++i) {
+            const x = stack[i];
+
+            if (a.length === 0 || x < a.length) {
+              output.push(new Array(x - max + 1).join(" "));
+
+              // TODO is this correct ?
+              if (i >= endings) {
+                output.push(bar_end);
+              } else {
+                output.push(bar);
+              }
+
+              max = x;
+            }
+          }
+
+          // TODO is this correct ?
+          if (a.length > max) {
+            output.push(new Array(a.length - max + 1).join(" "));
+          }
+
+          /*const last = stack[stack.length - 1];
+
+          let i = 0;
+
+          while (i < last) {
+            output.push(" ");
+            ++i;
+          }
+
+          output.push(bar);
+
+          while (i < a.length) {
+            output.push(" ");
+            ++i;
+          }*/
+
+        } else {
+          output.push(a.join(""));
+        }
+      };
+
+
+      const specials = {
+        "\n": (output, stack, position, text) => {
+          output.push(text[position.index]);
+          ++position.index;
+          ++position.line;
+          position.column = 0;
+
+          whitespace(output, stack, position, text);
+        },
+
+        " ": whitespace,
+
+        "#": (output, stack, position, text) => {
+          const a = [];
+
+          while (position.index < text.length) {
+            const c = text[position.index];
+
+            if (c === "\n") {
+              break;
+
+            } else {
+              a.push(c);
+              ++position.index;
+              ++position.column;
+            }
+          }
+
+          output.push(wrap("comment", a.join("")));
+        },
+
+        // TODO handle newlines
+        // TODO handle escapes, etc.
+        "\"": (output, stack, position, text) => {
+          const a = [text[position.index]];
+
+          ++position.index;
+          ++position.column;
+
+          while (position.index < text.length) {
+            const c = text[position.index];
+
+            a.push(c);
+            ++position.index;
+            ++position.column;
+
+            if (c === "\"") {
+              break;
+            }
+          }
+
+          output.push(wrap("literal", a.join("")));
+        },
+
+        "&": syntax1("comment"),
+        "~": syntax1("comment"),
+        "@": syntax1("syntax"),
+        ".": syntax1("syntax"),
+
+        "(": open("syntax"),
+        "[": open("syntax"),
+        "{": open("syntax"),
+        ")": close("syntax"),
+        "]": close("syntax"),
+        "}": close("syntax")
+      };
+
+
+      const variable = (s) => {
+        if (s === "_") {
+          return wrap("comment", s);
+
+        } else if (s === "->" || s === "<=") {
+          return wrap("syntax", s);
+
+        } else if (s === "::") {
+          return wrap("comment", s);
+
+        } else if (s[0] === "*") {
+          return wrap("literal", s);
+
+        } else if (s[0] === "$") {
+          return wrap("protocol", s);
+
+        } else if (/^[0-9]+$/.test(s)) {
+          return wrap("literal", s);
+
+        } else if (/^[^a-z]+$/.test(s)) {
+          return wrap("special", s);
+
+        } else if (/^[A-Z]/.test(s)) {
+          return wrap("type", s);
+
+        } else {
+          return s;
+        }
+      };
+
+
+      const markup = (text) => {
+        const output = [];
+        const stack = [];
+
+        const position = { column: 0, line: 0, index: 0 };
+
+        while (position.index < text.length) {
+          const c = text[position.index];
+
+          if (specials[c]) {
+            specials[c](output, stack, position, text);
+
+          } else {
+            const a = [];
+
+            while (position.index < text.length) {
+              const c = text[position.index];
+
+              if (specials[c]) {
+                break;
+
+              } else {
+                a.push(c);
+                ++position.index;
+                ++position.column;
+              }
+            }
+
+            output.push(variable(a.join("")));
+          }
+        }
+
+        return output.join("");
+      };
+
+
+      const container = document.getElementById("container");
+
+      container.innerHTML = markup(localStorage["text"] || "");
+
+      container.addEventListener("focus", () => {
+        container.textContent = container.textContent;
+      }, true);
+
+      container.addEventListener("blur", () => {
+        const text = container.textContent;
+        localStorage["text"] = text;
+        container.innerHTML = markup(text);
+      }, true);
+    </script>
+  </body>
+</html>
