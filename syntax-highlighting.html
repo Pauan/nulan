@@ -101,9 +101,9 @@
           ++position.column;
         };
 
-      const open = (color) =>
+      const open = (color, is_record) =>
         (output, stack, position, text) => {
-          stack.push(position.column);
+          stack.push({ column: position.column, is_record });
           output.push(wrap(color, text[position.index]));
           ++position.index;
           ++position.column;
@@ -172,7 +172,7 @@
 
           // TODO is the stack always in sorted order ?
           for (let i = 0; i < stack.length; ++i) {
-            const x = stack[i];
+            const x = stack[i].column;
 
             if (next === "\n" || x < a.length) {
               output.push(new Array(x - max + 1).join(" "));
@@ -263,16 +263,16 @@
           output.push(wrap("literal", parse_variable(position, text)));
         },
 
-        "(": open("syntax"),
-        "[": open("literal"),
-        "{": open("literal"),
+        "(": open("syntax", false),
+        "[": open("syntax", false),
+        "{": open("syntax", true),
         ")": close("syntax"),
-        "]": close("literal"),
-        "}": close("literal")
+        "]": close("syntax"),
+        "}": close("syntax")
       };
 
 
-      const variable = (s) => {
+      const variable = (stack, position, text, s) => {
         if (s === "_") {
           return wrap("syntax", s);
 
@@ -298,8 +298,51 @@
           return wrap("type", s);
 
         } else {
-          return escape(s);
+          // TODO hacky
+          // TODO is this correct ?
+          if (stack.length &&
+              stack[stack.length - 1].is_record &&
+              (find(position.index, text, "<=") ||
+               find(position.index, text, "::") ||
+               find_end(position.index, text))) {
+            return wrap("literal", s);
+          } else {
+            return escape(s);
+          }
         }
+      };
+
+
+      // TODO hacky
+      const find = (index, text, s) => {
+        const a = [];
+
+        while (index < text.length) {
+          if (text[index] === " ") {
+            ++index;
+          } else {
+            break;
+          }
+        }
+
+        return parse_variable({ index, column: 0 }, text) === s;
+      };
+
+      // TODO hacky
+      const find_end = (index, text) => {
+        const a = [];
+
+        while (index < text.length) {
+          const c = text[index];
+
+          if (c === " " || c === "\n" || !specials[c]) {
+            ++index;
+          } else {
+            break;
+          }
+        }
+
+        return text[index] === "}";
       };
 
 
@@ -341,7 +384,7 @@
             specials[c](output, stack, position, text);
 
           } else {
-            output.push(variable(parse_variable(position, text)));
+            output.push(variable(stack, position, text, parse_variable(position, text)));
           }
         }
 
