@@ -13,83 +13,79 @@
       }
 
       body {
-        background-color: #0f171f;
-        color: #8EB6E0; /* #7ea9d7 */
-        margin: 15px;
-        height: 100%;
+        background-color: #080D11; /* #0f171f */
+        color: #64B5F6; /* #7ea9d7 #8EB6E0 #78BAFF */
+        margin: 0px;
+
+        display: flex;
+        flex-direction: horizontal;
       }
 
-      #container {
+      #input {
+        border-right: 1px solid #0D47A1;
+      }
+
+      #output {
+
+      }
+
+      #input, #output {
         margin: 0px;
         position: relative;
         line-height: 1.2em;
         min-height: 50em;
-        padding: 10px;
-        border: 1px solid #192D42;
-      }
-
-      #container::after {
-        position: absolute;
-        left: calc(78ch + 10px);
-        top: 0px;
-        height: 100%;
-        border-left: 1px solid #192D42;
-        content: " ";
-      }
-
-      .comment {
-        color: #616467; /* #4d769f #3a5572 #5E6F82 #243547 #38516B */
+        padding: 25px;
+        width: calc(78ch + 25px);
       }
 
       .syntax {
-        color: #FF9B5F; /* #E2E2E2 #e7915d */
+        color: #0D47A1; /* #E2E2E2 #e7915d #4d769f #3a5572 #5E6F82 #243547 #38516B #616467 #B1B1B1 #6F6F6F #006584 */
       }
 
       .special {
-        color: #D03B3B; /* #b54a4a */
+        color: #D32F2F; /* #b54a4a #D03B3B */
       }
 
       .literal {
-        color: #47FF5E; /* #36ce5d #1CE247 */
+        color: #26D92C; /* #36ce5d #1CE247 #47FF5E #24FF40 #49FF60 #1CEF37 #3EF355 */
       }
 
       .protocol {
-        color: #E079E6;
+        color: #FDD835; /* #F882FF #E654EF #BA68C8 */
       }
 
       .type {
-        color: #E079E6; /* #eac06c #e7ce5d */
+        color: #FF8F00; /* #eac06c #e7ce5d #FFFA54 #FF9B5F */
       }
 
       .indent {
         position: absolute;
         height: 1.2em;
-        margin-top: -0.1em;
         margin-left: 0.35em;
-        border-left: 1px solid #192D42;
+        border-left: 1px solid #0D47A1; /* #131E27 */
       }
 
       .indent-end {
         position: absolute;
-        height: 1.1em;
-        margin-top: -0.1em;
+        height: 1em;
         margin-left: 0.35em;
-        border-left: 1px solid #192D42;
-        border-bottom: 1px solid #192D42;
-        width: 2px;
-        border-bottom-left-radius: 4px;
+        border-left: 1px solid #0D47A1;
+        border-bottom: 1px solid #0D47A1;
+        width: 3px;
+        border-bottom-left-radius: 3px;
       }
     </style>
   </head>
   <body>
-    <pre id="container" contentEditable="true"></pre>
+    <pre id="input" contentEditable="true"></pre>
+    <pre id="output"></pre>
 
     <script>
       "use strict";
 
 
       const wrap = (type, text) =>
-        "<span class='" + type + "'>" + text + "</span>";
+        "<span class='" + type + "'>" + escape(text) + "</span>";
 
       const bar =
         "<span class='indent'></span>";
@@ -166,6 +162,8 @@
           }
         }
 
+        const next = text[position.index];
+
         if (stack.length && start === 0) {
           let max = 0;
 
@@ -176,7 +174,7 @@
           for (let i = 0; i < stack.length; ++i) {
             const x = stack[i];
 
-            if (a.length === 0 || x < a.length) {
+            if (next === "\n" || x < a.length) {
               output.push(new Array(x - max + 1).join(" "));
 
               // TODO is this correct ?
@@ -194,22 +192,6 @@
           if (a.length > max) {
             output.push(new Array(a.length - max + 1).join(" "));
           }
-
-          /*const last = stack[stack.length - 1];
-
-          let i = 0;
-
-          while (i < last) {
-            output.push(" ");
-            ++i;
-          }
-
-          output.push(bar);
-
-          while (i < a.length) {
-            output.push(" ");
-            ++i;
-          }*/
 
         } else {
           output.push(a.join(""));
@@ -245,7 +227,7 @@
             }
           }
 
-          output.push(wrap("comment", a.join("")));
+          output.push(wrap("syntax", a.join("")));
         },
 
         // TODO handle newlines
@@ -271,29 +253,34 @@
           output.push(wrap("literal", a.join("")));
         },
 
-        "&": syntax1("comment"),
-        "~": syntax1("comment"),
+        "&": syntax1("syntax"),
+        "~": syntax1("syntax"),
         "@": syntax1("syntax"),
-        ".": syntax1("syntax"),
+
+        ".": (output, stack, position, text) => {
+          // TODO a tiny bit hacky
+          syntax1("syntax")(output, stack, position, text);
+          output.push(wrap("literal", parse_variable(position, text)));
+        },
 
         "(": open("syntax"),
-        "[": open("syntax"),
-        "{": open("syntax"),
+        "[": open("literal"),
+        "{": open("literal"),
         ")": close("syntax"),
-        "]": close("syntax"),
-        "}": close("syntax")
+        "]": close("literal"),
+        "}": close("literal")
       };
 
 
       const variable = (s) => {
         if (s === "_") {
-          return wrap("comment", s);
+          return wrap("syntax", s);
 
         } else if (s === "->" || s === "<=") {
           return wrap("syntax", s);
 
         } else if (s === "::") {
-          return wrap("comment", s);
+          return wrap("syntax", s);
 
         } else if (s[0] === "*") {
           return wrap("literal", s);
@@ -311,8 +298,33 @@
           return wrap("type", s);
 
         } else {
-          return s;
+          return escape(s);
         }
+      };
+
+
+      // TODO handle the other entities ?
+      const escape = (s) =>
+        // TODO is this correct ?
+        s.replace(/</g, "&lt;");
+
+      const parse_variable = (position, text) => {
+        const a = [];
+
+        while (position.index < text.length) {
+          const c = text[position.index];
+
+          if (specials[c]) {
+            break;
+
+          } else {
+            a.push(c);
+            ++position.index;
+            ++position.column;
+          }
+        }
+
+        return a.join("");
       };
 
 
@@ -329,22 +341,7 @@
             specials[c](output, stack, position, text);
 
           } else {
-            const a = [];
-
-            while (position.index < text.length) {
-              const c = text[position.index];
-
-              if (specials[c]) {
-                break;
-
-              } else {
-                a.push(c);
-                ++position.index;
-                ++position.column;
-              }
-            }
-
-            output.push(variable(a.join("")));
+            output.push(variable(parse_variable(position, text)));
           }
         }
 
@@ -352,18 +349,21 @@
       };
 
 
-      const container = document.getElementById("container");
+      const input = document.getElementById("input");
+      const output = document.getElementById("output");
 
-      container.innerHTML = markup(localStorage["text"] || "");
+      input.textContent = localStorage["text"] || "";
+      output.innerHTML = markup(input.textContent);
 
-      container.addEventListener("focus", () => {
-        container.textContent = container.textContent;
-      }, true);
+      let timer = null;
 
-      container.addEventListener("blur", () => {
-        const text = container.textContent;
-        localStorage["text"] = text;
-        container.innerHTML = markup(text);
+      input.addEventListener("input", () => {
+        clearTimeout(timer);
+
+        timer = setTimeout(() => {
+          localStorage["text"] = input.textContent;
+          output.innerHTML = markup(input.textContent);
+        }, 300);
       }, true);
     </script>
   </body>

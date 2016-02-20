@@ -82,12 +82,12 @@
   c :: Integer
   d :: (Foo Integer))
 
-(FUNCTION foo<| :: (-> a Foo)
-  (foo<| a)
+(FUNCTION foo<< :: (-> a Foo)
+  (foo<< a)
     ...)
 
-(FUNCTION <|foo :: (-> Foo a)
-  (<|foo a)
+(FUNCTION <<foo :: (-> Foo a)
+  (<<foo a)
     ...)
 
 (CONSTANT
@@ -252,9 +252,7 @@ FOO
     6)
 
 
-Unsure
-
-::
+# Unsure
 
 (PRAGMA { phase <= run-time
           target <= javascript }
