@@ -82,10 +82,10 @@ const test_crash = (task, value) =>
 
 
 export default [
-  expect_crash("Expected positive number but got -5",
+  expect_crash("expected positive number but got -5",
     catch_error(() => wait(-5))),
 
-  expect_crash("Cannot wait for 0 milliseconds (maybe use yield instead?)",
+  expect_crash("cannot wait for 0 milliseconds (maybe use yield instead?)",
     catch_error(() => wait(0))),
 
 
@@ -165,7 +165,7 @@ export default [
 
       assert_crash(() => {
         success("2");
-      }, "Invalid success");
+      }, "invalid success");
     })),
 
   expect("1",
@@ -174,7 +174,7 @@ export default [
 
       assert_crash(() => {
         error(new Error("2"));
-      }, "Invalid error");
+      }, "invalid error");
     })),
 
   expect_crash("1",
@@ -183,7 +183,7 @@ export default [
 
       assert_crash(() => {
         error(new Error("2"));
-      }, "Invalid error");
+      }, "invalid error");
     })),
 
   expect_crash("1",
@@ -192,7 +192,7 @@ export default [
 
       assert_crash(() => {
         success("2");
-      }, "Invalid success");
+      }, "invalid success");
     })),
 
   expect("2",
@@ -200,7 +200,7 @@ export default [
       return () => {
         assert_crash(() => {
           success("1");
-        }, "Invalid success");
+        }, "invalid success");
       };
     }), wrap("2"))),
 
@@ -209,7 +209,7 @@ export default [
       return () => {
         assert_crash(() => {
           error(new Error("1"));
-        }, "Invalid error");
+        }, "invalid error");
       };
     }), wrap("2"))),
 
@@ -218,7 +218,7 @@ export default [
       setTimeout(() => {
         assert_crash(() => {
           success("1");
-        }, "Invalid success");
+        }, "invalid success");
       }, 0);
       return () => {};
     }), wrap("2"))),
@@ -228,7 +228,7 @@ export default [
       setTimeout(() => {
         assert_crash(() => {
           error(new Error("1"));
-        }, "Invalid error");
+        }, "invalid error");
       }, 0);
       return () => {};
     }), wrap("2"))),
@@ -240,7 +240,7 @@ export default [
 
       assert_crash(() => {
         success("2");
-      }, "Invalid success");
+      }, "invalid success");
     })),
 
   expect("1",
@@ -249,7 +249,7 @@ export default [
 
       assert_crash(() => {
         error(new Error("2"));
-      }, "Invalid error");
+      }, "invalid error");
     })),
 
   expect_crash("1",
@@ -258,7 +258,7 @@ export default [
 
       assert_crash(() => {
         error(new Error("2"));
-      }, "Invalid error");
+      }, "invalid error");
     })),
 
   expect_crash("1",
@@ -267,7 +267,7 @@ export default [
 
       assert_crash(() => {
         success("2");
-      }, "Invalid success");
+      }, "invalid success");
     })),
 
   expect("2",
