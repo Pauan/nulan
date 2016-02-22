@@ -16,15 +16,23 @@ const each = (running, observe, f) => {
 };
 
 
-const root_style = document["createElement"]("style");
-root_style["type"] = "text/css";
-document["head"]["appendChild"](root_style);
+let root_style = null;
 
-// TODO test if this works in all browsers
-const root_sheet = root_style["sheet"];
-const css_rules = root_sheet["cssRules"];
+const get_root_style = () => {
+  if (root_style === null) {
+    root_style = document["createElement"]("style");
+    root_style["type"] = "text/css";
+    document["head"]["appendChild"](root_style);
+  }
+
+  return root_style;
+};
 
 const insert_rule = (rule) => {
+  // TODO test if this works in all browsers
+  const root_sheet = get_root_style()["sheet"];
+  const css_rules = root_sheet["cssRules"];
+
   // TODO test if this works in all browsers
   const index = root_sheet["insertRule"](rule + " {}", css_rules["length"]);
 
@@ -40,7 +48,7 @@ export const stylesheet = (name, rules) =>
 
     const rule = insert_rule(name);
 
-    set_attribute_styles(running, rule["style"], rules);
+    set_attributes(running, rule["style"], rules);
 
     return () => {
       kill_all(running);
@@ -48,105 +56,12 @@ export const stylesheet = (name, rules) =>
   });
 
 
-const escape_class = (s) => {
-  if (s["length"] === 0) {
-    crash(new Error("class cannot be empty"));
-  }
-
-  const out = [];
-
-  // TODO test the performance of this
-  switch (s[0]) {
-  case "0":
-  case "1":
-  case "2":
-  case "3":
-  case "4":
-  case "5":
-  case "6":
-  case "7":
-  case "8":
-  case "9":
-    out["push"]("\\00003");
-    break;
-  }
-
-  const length = s["length"];
-
-  for (let i = 0; i < length; ++i) {
-    const c = s[i];
-
-    // TODO test the performance of this
-    switch (c) {
-    case "!":
-    case "\"":
-    case "#":
-    case "$":
-    case "%":
-    case "&":
-    case "'":
-    case "(":
-    case ")":
-    case "*":
-    case "+":
-    case ",":
-    case "-":
-    case ".":
-    case "/":
-    case ":":
-    case ";":
-    case "<":
-    case "=":
-    case ">":
-    case "?":
-    case "@":
-    case "[":
-    case "\\":
-    case "]":
-    case "^":
-    case "`":
-    case "{":
-    case "|":
-    case "}":
-    case "~":
-    case " ":
-    case "_":
-      out["push"]("\\");
-      out["push"](c);
-      break;
-
-    case "\t":
-    case "\n":
-    case "\v":
-    case "\f":
-    case "\r":
-      out["push"]("\\");
-      out["push"](c["charCodeAt"](0)["toString"](16));
-      out["push"](" ");
-      break;
-
-    default:
-      out["push"](c);
-      break;
-    }
-  }
-
-  return out["join"]("");
-};
+// TODO faster implementation of this ?
+const escape_class = (s) =>
+  s["replace"](/^[0-9]/, "\\3$& ");
 
 export const stylesheet_class = (name, rules) =>
   stylesheet("." + escape_class(name), rules);
-
-
-/*let class_id = 0;
-
-export const make_class = (rules) => {
-  const class_name = "__" + (++class_id);
-
-  stylesheet("." + class_name, rules);
-
-  return class_name;
-};*/
 
 
 // TODO check that the property and value is valid
@@ -155,22 +70,34 @@ const set_style = (style, name, value) => {
   style[name] = value;
 };
 
-const set_changing_style = (running, style, attr) => {
-  each(running, attr.b, (maybe) => {
+
+const style_style = (running, style, attr) => {
+  set_style(style, attr.b, attr.c);
+};
+
+export const style = (b, c) =>
+  ({ a: style_style, b, c });
+
+
+const style_changing_style = (running, style, attr) => {
+  each(running, attr.c, (maybe) => {
     switch (maybe.$) {
     // *none
     case 0:
       // TODO set it to "" instead ?
-      style["removeProperty"](attr.a);
+      style["removeProperty"](attr.b);
       break;
 
     // *some
     case 1:
-      set_style(style, attr.a, maybe.a);
+      set_style(style, attr.b, maybe.a);
       break;
     }
   });
 };
+
+export const changing_style = (b, c) =>
+  ({ a: style_changing_style, b, c });
 
 
 const make_event_pool = (running) => {
@@ -186,8 +113,9 @@ const make_event_pool = (running) => {
   return pool;
 };
 
+
 // TODO test this
-const set_attribute_event = (running, x, name, f) => {
+const set_event = (running, x, name, f) => {
   const pool = make_event_pool(running);
 
   x["addEventListener"](name, (e) => {
@@ -195,12 +123,27 @@ const set_attribute_event = (running, x, name, f) => {
   }, true);
 };
 
-const set_on_click = (running, x, f) => {
-  set_attribute_event(running, x, "click", (e) =>
-    f({}));
+
+const event_event = (running, x, event) => {
+  set_event(running, x, event.b, event.c);
 };
 
-const set_on_hover = (running, x, f) => {
+export const event = (b, c) =>
+  ({ a: event_event, b, c });
+
+
+const event_on_mouse_click = (running, x, event) => {
+  const f = event.b;
+
+  set_event(running, x, "click", (e) => f({}));
+};
+
+export const on_mouse_click = (b) =>
+  ({ a: event_on_mouse_click, b });
+
+
+const event_on_mouse_hover = (running, x, event) => {
+  const f = event.b;
   const pool = make_event_pool(running);
 
     // TODO check for descendents
@@ -218,8 +161,13 @@ const set_on_hover = (running, x, f) => {
   }, true);
 };
 
+export const on_mouse_hover = (b) =>
+  ({ a: event_on_mouse_hover, b });
+
+
 // TODO test this
-const set_on_hold = (running, x, f) => {
+const event_on_mouse_hold = (running, x, event) => {
+  const f = event.b;
   const pool = make_event_pool(running);
 
   const mouseup = (e) => {
@@ -240,129 +188,86 @@ const set_on_hold = (running, x, f) => {
   }, true);
 };
 
-const set_event = (running, x, attr) => {
-  switch (attr.$) {
-  // *attribute-event
-  case 0:
-    set_attribute_event(running, x, attr.a, attr.b);
-    break;
+export const on_mouse_hold = (b) =>
+  ({ a: event_on_mouse_hold, b });
 
-  // *on-click
-  case 1:
-    set_on_click(running, x, attr.a);
-    break;
 
-  // *on-hover
-  case 2:
-    set_on_hover(running, x, attr.a);
-    break;
-
-  // *on-hold
-  case 3:
-    set_on_hold(running, x, attr.a);
-    break;
-  }
+const attribute_attr = (running, x, attr) => {
+  x["setAttribute"](attr.b, attr.c);
 };
 
-const set_attribute_events = (running, x, a) => {
-  const length = a["length"];
+export const attr = (b, c) =>
+  ({ a: attribute_attr, b, c });
 
-  for (let i = 0; i < length; ++i) {
-    set_event(running, x, a[i]);
-  }
+
+const attribute_class = (running, x, attr) => {
+  x["classList"]["add"](attr.b);
 };
 
+export const _class = (b) =>
+  ({ a: attribute_class, b });
 
-const set_changing_attribute = (running, x, attr) => {
-  each(running, attr.b, (maybe) => {
+
+const attribute_changing_class = (running, x, attr) => {
+  each(running, attr.c, (a) => {
+    // *false
+    if (a === 0) {
+      x["classList"]["remove"](attr.b);
+
+    // *true
+    } else {
+      x["classList"]["add"](attr.b);
+    }
+  });
+};
+
+export const changing_class = (b, c) =>
+  ({ a: attribute_changing_class, b, c });
+
+
+const attribute_events = (running, x, attr) => {
+  set_attributes(running, x, attr.b);
+};
+
+export const events = (b) =>
+  ({ a: attribute_events, b });
+
+
+const attribute_changing_attr = (running, x, attr) => {
+  each(running, attr.c, (maybe) => {
     switch (maybe.$) {
     // *none
     case 0:
-      x["removeAttribute"](attr.a);
+      x["removeAttribute"](attr.b);
       break;
 
     // *some
     case 1:
-      x["setAttribute"](attr.a, maybe.a);
+      x["setAttribute"](attr.b, maybe.a);
       break;
     }
   });
 };
 
-const set_attribute_changing_class = (running, x, attr) => {
-  each(running, attr.b, (a) => {
-    // *false
-    if (a === 0) {
-      x["classList"]["remove"](attr.a);
+export const changing_attr = (b, c) =>
+  ({ a: attribute_changing_attr, b, c });
 
-    // *true
-    } else {
-      x["classList"]["add"](attr.a);
-    }
-  });
+
+const attribute_styles = (running, x, attr) => {
+  set_attributes(running, x["style"], attr.b);
 };
 
-// TODO duplicate style checks ?
-const set_attribute_styles = (running, style, styles) => {
-  const length = styles["length"];
+export const styles = (b) =>
+  ({ a: attribute_styles, b });
 
-  for (let i = 0; i < length; ++i) {
-    const a = styles[i];
-
-    switch (a.$) {
-    // *style
-    case 0:
-      set_style(style, a.a, a.b);
-      break;
-    // *changing-style
-    case 1:
-      set_changing_style(running, style, a);
-      break;
-    }
-  }
-};
-
-
-const set_attribute = (running, x, attr) => {
-  switch (attr.$) {
-  // *attribute-text
-  case 0:
-    x["setAttribute"](attr.a, attr.b);
-    break;
-
-  // *attribute-class
-  case 1:
-    x["classList"]["add"](attr.a);
-    break;
-
-  // *attribute-changing-class
-  case 2:
-    set_attribute_changing_class(running, x, attr);
-    break;
-
-  // *attribute-events
-  case 3:
-    set_attribute_events(running, x, attr.a);
-    break;
-
-  // *attribute-styles
-  case 4:
-    set_attribute_styles(running, x["style"], attr.a);
-    break;
-
-  // *attribute-changing-text
-  case 5:
-    set_changing_attribute(running, x, attr);
-    break;
-  }
-};
 
 // TODO duplicate attribute checks ?
 const set_attributes = (running, x, a) => {
   const length = a["length"];
 
   for (let i = 0; i < length; ++i) {
-    set_attribute(running, x, a[i]);
+    const b = a[i];
+    b.a(running, x, b);
   }
 };
 
@@ -374,7 +279,8 @@ const set_children_list = (running, x, a) => {
   const fragment = document["createDocumentFragment"]();
 
   for (let i = 0; i < length; ++i) {
-    fragment["appendChild"](html(running, a[i]));
+    const b = a[i];
+    fragment["appendChild"](b.a(running, b));
   }
 
   x["appendChild"](fragment);
@@ -395,7 +301,8 @@ const push_children = (x, a) => {
 
     children[i] = running;
 
-    fragment["appendChild"](html(running, a[i]));
+    const b = a[i];
+    fragment["appendChild"](b.a(running, b));
   }
 
   x["appendChild"](fragment);
@@ -411,12 +318,12 @@ const insert_before = (children, x, index, a) => {
   if (index === children["length"]) {
     children["push"](running);
 
-    x["appendChild"](html(running, a));
+    x["appendChild"](a.a(running, a));
 
   } else {
     children["splice"](index, 0, running);
 
-    x["insertBefore"](html(running, a), x["childNodes"][index]);
+    x["insertBefore"](a.a(running, a), x["childNodes"][index]);
   }
 };
 
@@ -427,7 +334,7 @@ const replace_child = (children, x, index, a) => {
   kill_all(children[index]);
   children[index] = running;
 
-  x["replaceChild"](html(running, a), x["childNodes"][index]);
+  x["replaceChild"](a.a(running, a), x["childNodes"][index]);
 };
 
 // TODO test this
@@ -488,30 +395,49 @@ const set_changing_children = (running, x, a) => {
 };
 
 
-const html_parent_list = (running, a) => {
-  const x = document["createElement"](a.a);
-  set_attributes(running, x, a.b);
-  set_children_list(running, x, a.c);
+const html_parent = (running, a) => {
+  const x = document["createElement"](a.b);
+  set_attributes(running, x, a.c);
+  set_children_list(running, x, a.d);
   return x;
 };
 
-const html_changing_parent = (running, a) => {
-  const x = document["createElement"](a.a);
-  set_attributes(running, x, a.b);
-  set_changing_children(running, x, a.c);
-  return x;
-};
+export const parent = (b, c, d) =>
+  ({ a: html_parent, b, c, d });
+
 
 const html_child = (running, a) => {
-  const x = document["createElement"](a.a);
-  set_attributes(running, x, a.b);
+  const x = document["createElement"](a.b);
+  set_attributes(running, x, a.c);
   return x;
 };
+
+export const child = (b, c) =>
+  ({ a: html_child, b, c });
+
+
+const html_changing_parent = (running, a) => {
+  const x = document["createElement"](a.b);
+  set_attributes(running, x, a.c);
+  set_changing_children(running, x, a.d);
+  return x;
+};
+
+export const changing_parent = (b, c, d) =>
+  ({ a: html_changing_parent, b, c, d });
+
+
+const html_text = (running, a) =>
+  document["createTextNode"](a.b);
+
+export const text = (b) =>
+  ({ a: html_text, b });
+
 
 const html_changing_text = (running, a) => {
   const x = document["createTextNode"]("");
 
-  each(running, a.a, (text) => {
+  each(running, a.b, (text) => {
     // http://jsperf.com/textnode-performance
     x["data"] = text;
   });
@@ -519,36 +445,15 @@ const html_changing_text = (running, a) => {
   return x;
 };
 
-const html = (running, a) => {
-  switch (a.$) {
-  // *parent-list
-  case 0:
-    return html_parent_list(running, a);
-
-  // *child
-  case 1:
-    return html_child(running, a);
-
-  // *text
-  case 2:
-    return document["createTextNode"](a.a);
-
-  // *changing-text
-  case 3:
-    return html_changing_text(running, a);
-
-  // *changing-parent
-  case 4:
-    return html_changing_parent(running, a);
-  }
-};
+export const changing_text = (b) =>
+  ({ a: html_changing_text, b });
 
 
 export const render = (parent, a) =>
   async_killable((success, error) => {
     const running = [];
 
-    const x = html(running, a);
+    const x = a.a(running, a);
 
     parent["appendChild"](x);
 

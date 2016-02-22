@@ -42,7 +42,7 @@ export const modify = (mutable, fn) =>
   });
 
 
-export const observer_from = (mutable) =>
+export const changing_from = (mutable) =>
   (push) => {
     push(mutable.a);
 
