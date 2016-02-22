@@ -3,7 +3,7 @@ import { pretty, eol, get_message } from "../util/node";
 import { indent } from "../util/string";
 import { map, length } from "../util/array";
 import { fastest, flatten, transform, wrap, throw_error,
-         delay, concurrent_null, log, on_error, make_thread_run } from "../ffi/task";
+         wait, concurrent_null, log, on_error, make_thread_run } from "../ffi/task";
 
 
 const isObject = (x) =>
@@ -88,7 +88,7 @@ export const test_group = (group_name, a) => {
         }
       })),
 
-      flatten(transform(delay(10000), (_) =>
+      flatten(transform(wait(10000), (_) =>
         throw_error(new Error(name + " took too long"))))
     );
   });

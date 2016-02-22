@@ -2,7 +2,7 @@ import { expect, expect_crash, assert_crash } from "../assert";
 import { crash } from "../../util/error";
 import { get_message } from "../../util/node";
 import { sync, transform, flatten, wrap, concurrent, concurrent_null,
-         delay, fastest, _yield, throw_error, ignore_kill, async_killable,
+         wait, fastest, _yield, throw_error, ignore_kill, async_killable,
          async_unkillable, never, kill_thread,
          catch_error, on_error, make_thread_run, with_resource } from "../../ffi/task";
 import { _null } from "../../ffi/types";
@@ -77,16 +77,16 @@ const test_crash = (task, value) =>
 
 /*make_thread_run(fastest(
   ignore_kill(forever(then(_yield, log("Hi")))),
-  delay(1000)
+  wait(1000)
 ));*/
 
 
 export default [
   expect_crash("Expected positive number but got -5",
-    catch_error(() => delay(-5))),
+    catch_error(() => wait(-5))),
 
-  expect_crash("Cannot delay for 0 milliseconds (maybe use yield instead?)",
-    catch_error(() => delay(0))),
+  expect_crash("Cannot wait for 0 milliseconds (maybe use yield instead?)",
+    catch_error(() => wait(0))),
 
 
   expect(_null,
@@ -136,7 +136,7 @@ export default [
 
   expect(3,
     fastest(
-      on_error(delay(100), (_) => 1, (_) => 2),
+      on_error(wait(100), (_) => 1, (_) => 2),
       wrap(3)
     )),
 
@@ -320,19 +320,19 @@ export default [
   expect("1",
     fastest(
       forever(ignore_kill(then(_yield, wrap("2")))),
-      then(delay(100), wrap("1"))
+      then(wait(100), wrap("1"))
     )),
 
   expect("1",
     fastest(
       forever(ignore_kill(then(ignore_kill(_yield), wrap("2")))),
-      then(delay(100), wrap("1"))
+      then(wait(100), wrap("1"))
     )),
 
   expect("1",
     fastest(
       then(then(_yield, _yield), wrap("1")),
-      then(delay(100), wrap("2"))
+      then(wait(100), wrap("2"))
     )),
 
   expect("1",
@@ -345,26 +345,26 @@ export default [
 
   expect("1",
     fastest(
-      forever(delay(10)),
-      then(delay(100), wrap("1"))
+      forever(wait(10)),
+      then(wait(100), wrap("1"))
     )),
 
   expect("1",
     fastest(
-      forever(ignore_kill(delay(10))),
-      then(delay(100), wrap("1"))
+      forever(ignore_kill(wait(10))),
+      then(wait(100), wrap("1"))
     )),
 
   expect("1",
     fastest(
       forever(_yield),
-      then(delay(100), wrap("1"))
+      then(wait(100), wrap("1"))
     )),
 
   expect("1",
     fastest(
       forever(ignore_yield),
-      then(delay(100), wrap("1"))
+      then(wait(100), wrap("1"))
     )),
 
   expect("1",
@@ -379,19 +379,19 @@ export default [
   expect("1",
     fastest(
       fastest(
-        then(delay(10), wrap("1")),
-        then(delay(10), wrap("2"))
+        then(wait(10), wrap("1")),
+        then(wait(10), wrap("2"))
       ),
-      then(delay(100), wrap("3"))
+      then(wait(100), wrap("3"))
     )),
 
   expect("3",
     fastest(
       fastest(
-        then(delay(100), wrap("1")),
-        then(delay(100), wrap("2"))
+        then(wait(100), wrap("1")),
+        then(wait(100), wrap("2"))
       ),
-      then(delay(10), wrap("3"))
+      then(wait(10), wrap("3"))
     )),
 
   expect("1",
@@ -525,7 +525,7 @@ export default [
           crash(new Error("2"));
         };
       }), never),
-      then(delay(100), wrap("4"))
+      then(wait(100), wrap("4"))
     ))),
 
 
@@ -563,11 +563,11 @@ export default [
     value: 50,
     error: null
   }, queue((push) =>
-       killed(with_resource(then(then(delay(10), push("create")), wrap(1)),
+       killed(with_resource(then(then(wait(10), push("create")), wrap(1)),
                 (id) => push(["use", id]),
                 (id) => push(["destroy", id])),
               then(push("killed"),
-                   then(delay(100), wrap(50)))))),
+                   then(wait(100), wrap(50)))))),
 
   // Success create | Error use | Success destroy -> Error use
   expect({
@@ -617,7 +617,7 @@ export default [
        killed(with_resource(then(push("create"),
                                  wrap(1)),
                 (id) => then(push(["use", id]),
-                             then(delay(10),
+                             then(wait(10),
                                   throw_error(new Error("Fail")))),
                 (id) => then(push(["destroy", id]),
                              wrap(id + 6))),

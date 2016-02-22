@@ -541,9 +541,9 @@ export const _yield =
   });
 
 
-export const delay = (ms) => {
+export const wait = (ms) => {
   if (ms === 0) {
-    crash(new Error("cannot delay for 0 milliseconds (maybe use yield instead?)"));
+    crash(new Error("cannot wait for 0 milliseconds (maybe use yield instead?)"));
   }
 
   if (ms < 0) {
@@ -578,7 +578,7 @@ export const make_thread_run = (task) => {
 
 /*const x = fastest(
             forever(_yield),
-            delay(10000)
+            wait(10000)
           );
 
 var start = Date.now();
