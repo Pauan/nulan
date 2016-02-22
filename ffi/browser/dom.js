@@ -56,6 +56,22 @@ export const stylesheet = (name, rules) =>
   });
 
 
+// TODO remove the stylesheet when it is errored or killed ?
+export const keyframes = (name, rules) =>
+  async_killable((success, error) => {
+    const running = [];
+
+    // TODO escape the name ?
+    const rule = insert_rule("@keyframes " + name);
+
+    set_attributes(running, rule, rules);
+
+    return () => {
+      kill_all(running);
+    };
+  });
+
+
 // TODO faster implementation of this ?
 const escape_class = (s) =>
   s["replace"](/^[0-9]/, "\\3$& ");
@@ -69,6 +85,20 @@ export const stylesheet_class = (name, rules) =>
 const set_style = (style, name, value) => {
   style[name] = value;
 };
+
+
+const set_frame = (running, keyframes, attr) => {
+  const css_rules = keyframes["cssRules"];
+
+  keyframes["appendRule"](attr.b + "% {}");
+
+  const rule = css_rules[css_rules["length"] - 1];
+
+  set_attributes(running, rule["style"], attr.c);
+};
+
+export const frame = (b, c) =>
+  ({ a: set_frame, b, c });
 
 
 const style_style = (running, style, attr) => {
