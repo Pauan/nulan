@@ -4,217 +4,258 @@ import { noop, try_catch } from "./util";
 import * as $array from "../util/array";
 
 
+const thread_crash = (thread, value) =>
+  crash(value);
+
 export const make_thread = () => {
   return {
-    a: false, // is_killed
-    b: null   // on_kill
+    a: false,        // is_killed
+    b: noop,         // on_success
+    c: thread_crash, // on_error
+    d: noop,         // on_kill
+    e: {}            // state
   };
-};
-
-const _set_kill = (thread, f) => {
-  if (thread.a) {
-    crash(new Error("invalid set_kill: thread is already killed"));
-
-  } else if (f === null) {
-    crash(new Error("invalid set_kill: use reset_kill instead"));
-
-  } else if (thread.b === null) {
-    thread.b = f;
-
-  } else {
-    crash(new Error("invalid set_kill: thread is already set"));
-  }
-};
-
-const _reset_kill = (thread) => {
-  if (thread.a) {
-    crash(new Error("invalid reset_kill: thread is already killed"));
-
-  } else if (thread.b === null) {
-    crash(new Error("invalid reset_kill: thread is already reset"));
-
-  } else {
-    thread.b = null;
-  }
 };
 
 export const kill_thread = (thread) => {
   if (thread.a) {
-    crash(new Error("invalid kill: thread is already killed"));
+    return crash(new Error("invalid kill: thread is already killed"));
 
   } else {
-    const kill = thread.b;
-
     thread.a = true;
-    thread.b = null;
-
-    if (kill !== null) {
-      kill();
-    }
+    return thread.d(thread);
   }
 };
 
 export const kill_threads = (a) => {
-  for (let i = 0; i < a["length"]; ++i) {
+  const length = a["length"];
+
+  for (let i = 0; i < length; ++i) {
     kill_thread(a[i]);
   }
 };
 
-// TODO rename to run_in_thread
-export const run = (task, thread, on_success, on_error) => {
+const _run = (task, thread) =>
+  task.a(task, thread);
+
+export const run_in_thread = (task, thread, on_success, on_error) => {
   if (thread.a) {
-    crash(new Error("cannot run: thread is killed"));
+    return crash(new Error("cannot run: thread is killed"));
 
   } else {
-    task(thread, on_success, on_error);
+    // TODO is this a good idea ?
+    // TODO declosureize these
+    thread.b = (thread, value) => on_success(value);
+    thread.c = (thread, value) => on_error(value);
+    return _run(task, thread);
   }
 };
 
 export const make_thread_pool = (on_error) => {
-  const pool = {
-    // is_killed
-    a: false,
-
-    // threads
-    b: [],
-
-    // on_error
-    c: (e) => {
-      kill_thread_pool(pool);
-      on_error(e);
-    }
+  return {
+    a: false,   // is_killed
+    b: [],      // threads
+    // TODO is this a good idea ?
+    c: on_error // on_error
   };
-
-  return pool;
 };
 
 export const kill_thread_pool = (pool) => {
   if (pool.a) {
-    crash(new Error("invalid kill: thread pool is already killed"));
+    return crash(new Error("invalid kill: thread pool is already killed"));
 
   } else {
-    const threads = pool.b;
-
     pool.a = true;
-    pool.b = null;
-    pool.c = null;
-
-    kill_threads(threads);
+    return kill_threads(pool.b);
   }
+};
+
+const run_in_thread_pool_success = (thread, value) =>
+  $array.remove(thread.e.b, thread);
+
+// TODO is this a good idea ?
+const run_in_thread_pool_error = (thread, value) => {
+  const pool = thread.e;
+  kill_thread_pool(pool);
+  return pool.c(value);
 };
 
 export const run_in_thread_pool = (pool, task) => {
   if (pool.a) {
-    crash(new Error("cannot run: thread pool is killed"));
+    return crash(new Error("cannot run: thread pool is killed"));
 
   } else {
     const thread = make_thread();
 
+    thread.b = run_in_thread_pool_success;
+    thread.c = run_in_thread_pool_error;
+    thread.e = pool;
+
     pool.b["push"](thread);
 
-    task(thread, () => {
-      $array.remove(pool.b, thread);
-    }, pool.c);
+    return _run(task, thread);
   }
 };
 
 
-export const sync = (f) =>
-  (thread, success, error) => {
-    // TODO maybe use try/catch ?
-    success(f());
-  };
+const success = (thread, value) =>
+  thread.b(thread, value);
+
+const error = (thread, value) =>
+  thread.c(thread, value);
+
+
+const run_sync = (task, thread) =>
+  // TODO maybe use try/catch ?
+  success(thread, task.b());
+
+export const sync = (b) =>
+  ({ a: run_sync, b });
+
+
+const run_catch_error = (task, thread) => {
+  const x = try_catch(task.b);
+
+  if (x.$ === 0) {
+    return success(thread, x.a);
+
+  } else {
+    return error(thread, x.a);
+  }
+};
 
 // TODO merge this into sync ?
-export const catch_error = (f) =>
-  (thread, success, error) => {
-    const x = try_catch(f);
+export const catch_error = (b) =>
+  ({ a: run_catch_error, b });
 
-    if (x.$ === 0) {
-      success(x.a);
 
-    } else {
-      error(x.a);
-    }
+const run_ignore_kill_success = (thread, value) => {
+  const state = thread.e;
+
+  if (!state.a) {
+    const old_thread = state.b;
+    old_thread.d = noop;
+    // TODO is this correct ?
+    // TODO test this
+    old_thread.e = state.c;
+    return success(old_thread, value);
+  }
+};
+
+const run_ignore_kill_error = (thread, value) => {
+  const state = thread.e;
+
+  // Never silently ignore errors
+  if (state.a) {
+    return crash(value);
+
+  } else {
+    const old_thread = state.b;
+    old_thread.d = noop;
+    // TODO is this correct ?
+    // TODO test this
+    old_thread.e = state.c;
+    return error(old_thread, value);
+  }
+};
+
+const run_ignore_kill_kill = (thread) => {
+  const state = thread.e;
+
+  state.a = true;
+};
+
+const run_ignore_kill = (task, thread) => {
+  const state = {
+    a: false,   // killed
+    b: thread,  // old_thread
+    c: thread.e // old_state
   };
+
+  const x = make_thread();
+
+  x.b = run_ignore_kill_success;
+  x.c = run_ignore_kill_error;
+  x.e = state;
+
+  thread.d = run_ignore_kill_kill;
+  thread.e = state;
+
+  return _run(task.b, x);
+};
 
 // Guarantees:
 // * success is ignored after being killed
 // * does nothing when killed
-export const ignore_kill = (task) =>
-  (thread, success, error) => {
-    let killed = false;
+export const ignore_kill = (b) =>
+  ({ a: run_ignore_kill, b });
 
-    _set_kill(thread, () => {
-      killed = true;
-    });
 
-    const x = make_thread();
+const run_async_killable_success = (thread, state, value) => {
+  if (state.a) {
+    return crash(new Error("invalid success"));
 
-    const on_success = (value) => {
-      if (!killed) {
-        _reset_kill(thread);
-        success(value);
-      }
-    };
+  } else {
+    state.a = true;
+    thread.d = noop;
+    thread.e = state.b;
+    return success(thread, value);
+  }
+};
 
-    const on_error = (value) => {
-      // Never silently ignore errors
-      if (killed) {
-        crash(value);
+const run_async_killable_error = (thread, state, value) => {
+  if (state.a) {
+    return crash(new Error("invalid error"));
 
-      } else {
-        _reset_kill(thread);
-        error(value);
-      }
-    };
+  } else {
+    state.a = true;
+    thread.d = noop;
+    thread.e = state.b;
+    return error(thread, value);
+  }
+};
 
-    task(x, on_success, on_error);
+// TODO is this check needed ?
+const run_async_killable_kill = (thread) => {
+  const state = thread.e;
+
+  if (state.a) {
+    return crash(new Error("invalid kill"));
+
+  } else {
+    state.a = true;
+    return state.c();
+  }
+};
+
+const run_async_killable = (task, thread) => {
+  const state = {
+    a: false,    // done
+    b: thread.e, // old_state
+    c: noop      // kill
   };
+
+  thread.d = run_async_killable_kill;
+  thread.e = state;
+
+  const on_success = (value) => {
+    run_async_killable_success(thread, state, value);
+  };
+
+  const on_error = (value) => {
+    run_async_killable_error(thread, state, value);
+  };
+
+  state.c = task.b(on_success, on_error);
+};
 
 // Guarantees:
 // * success cannot be called after success, error, or kill
 // * error cannot be called after success, error, or kill
 // * will not be killed after success, error, or kill
-export const async_killable = (f) =>
-  (thread, success, error) => {
-    let done = false;
+export const async_killable = (b) =>
+  ({ a: run_async_killable, b });
 
-    const on_success = (value) => {
-      if (done) {
-        crash(new Error("invalid success"));
-
-      } else {
-        done = true;
-        _reset_kill(thread);
-        success(value);
-      }
-    };
-
-    const on_error = (value) => {
-      if (done) {
-        crash(new Error("invalid error"));
-
-      } else {
-        done = true;
-        _reset_kill(thread);
-        error(value);
-      }
-    };
-
-    // TODO is this check needed ?
-    _set_kill(thread, () => {
-      if (done) {
-        crash(new Error("invalid kill"));
-
-      } else {
-        done = true;
-        kill();
-      }
-    });
-
-    const kill = f(on_success, on_error);
-  };
 
 // Guarantees:
 // * success cannot be called after success or error
@@ -233,194 +274,517 @@ export const async_unkillable = (f) =>
 export const Promise_from = (task) =>
   new Promise((resolve, reject) => {
     const x = make_thread();
-    task(x, resolve, reject);
+    return run_in_thread(task, x, resolve, reject);
   });
 
 // TODO handle cancellation ?
 export const from_Promise = (f) =>
   // TODO should this use a raw Task or async_unkillable ?
-  async_unkillable((success, error) => {
-    f()["then"](success, error);
-  });
+  async_unkillable((success, error) =>
+    f()["then"](success, error));
 
 
-export const never = (thread, success, error) => {};
+export const never = { a: noop };
 
-export const wrap = (value) =>
-  (thread, success, error) => {
-    success(value);
+
+const run_wrap = (task, thread) =>
+  success(thread, task.b);
+
+export const wrap = (b) =>
+  ({ a: run_wrap, b });
+
+
+const run_throw_error = (task, thread) =>
+  error(thread, task.b);
+
+export const throw_error = (b) =>
+  ({ a: run_throw_error, b });
+
+
+const run_transform_success = (thread, value) => {
+  const state = thread.e;
+
+  thread.b = state.b;
+  thread.c = state.c;
+  thread.d = noop;
+  thread.e = state.d;
+
+  return success(thread, state.a(value));
+};
+
+// TODO is this correct ?
+// TODO is this needed ?
+const run_transform_error = (thread, value) => {
+  const state = thread.e;
+
+  thread.b = state.b;
+  thread.c = state.c;
+  thread.d = noop;
+  thread.e = state.d;
+
+  return error(thread, value);
+};
+
+const run_transform = (task, thread) => {
+  const state = {
+    a: task.c,   // map
+    b: thread.b, // old_success
+    c: thread.c, // old_error
+    d: thread.e  // old_state
   };
 
-export const throw_error = (value) =>
-  (thread, success, error) => {
-    error(value);
+  thread.b = run_transform_success;
+  thread.c = run_transform_error;
+  thread.e = state;
+
+  return _run(task.b, thread);
+};
+
+export const transform = (b, c) =>
+  ({ a: run_transform, b, c });
+
+
+const run_flatten_success = (thread, value) => {
+  const state = thread.e;
+
+  thread.b = state.a;
+  thread.c = state.b;
+  thread.e = state.c;
+
+  return _run(value, thread);
+};
+
+// TODO is this correct ?
+// TODO is this needed ?
+const run_flatten_error = (thread, value) => {
+  const state = thread.e;
+
+  thread.b = state.a;
+  thread.c = state.b;
+  thread.d = noop;
+  thread.e = state.c;
+
+  return error(thread, value);
+};
+
+const run_flatten = (task, thread) => {
+  const state = {
+    a: thread.b, // old_success
+    b: thread.c, // old_error
+    c: thread.e  // old_state
   };
 
-export const transform = (task, f) =>
-  (thread, success, error) => {
-    task(thread, (value) => {
-      success(f(value));
-    }, error);
-  };
+  thread.b = run_flatten_success;
+  thread.c = run_flatten_error;
+  thread.e = state;
 
-export const flatten = (task) =>
-  (thread, success, error) => {
-    task(thread, (task) => {
-      // Tail call, to allow for infinite recursion
-      task(thread, success, error);
-    }, error);
-  };
+  return _run(task.b, thread);
+};
+
+export const flatten = (b) =>
+  ({ a: run_flatten, b });
+
+
+const run_concurrent_null_success = (thread, value) => {
+  const state = thread.e;
+
+  --state.b;
+
+  // TODO what about setting `running` ?
+  if (state.b === 0) {
+    const old_thread = state.d;
+    old_thread.d = noop;
+    old_thread.e = state.e;
+    return success(old_thread, _null);
+  }
+};
+
+const run_concurrent_null_error = (thread, value) => {
+  const state = thread.e;
+  const old_thread = state.d;
+
+  state.a = false;
+  old_thread.d = noop;
+  old_thread.e = state.e;
+  kill_threads(state.c);
+  return error(old_thread, value);
+};
+
+// TODO what about running ?
+const run_concurrent_null_kill = (thread) => {
+  const state = thread.e;
+
+  return kill_threads(state.c);
+};
+
+const run_concurrent_null = (task, thread) => {
+  const a = task.b;
+
+  const length = a["length"];
+
+  if (length === 0) {
+    return success(thread, _null);
+
+  } else {
+    const state = {
+      a: true,    // running
+      b: length,  // pending
+      c: [],      // threads
+      d: thread,  // thread
+      e: thread.e // old_state
+    };
+
+    thread.d = run_concurrent_null_kill;
+    thread.e = state;
+
+    for (let i = 0; i < length; ++i) {
+      if (state.a) {
+        const thread = make_thread();
+
+        thread.b = run_concurrent_null_success;
+        thread.c = run_concurrent_null_error;
+        thread.e = state;
+
+        state.c["push"](thread);
+
+        _run(a[i], thread);
+
+      } else {
+        // TODO is this correct ?
+        break;
+      }
+    }
+  }
+};
 
 // TODO code duplication with concurrent
-export const concurrent_null = (a) =>
-  (thread, success, error) => {
-    let pending = a["length"];
+export const concurrent_null = (b) =>
+  ({ a: run_concurrent_null, b });
 
-    if (pending === 0) {
-      success(_null);
 
-    } else {
-      let running = true;
+const run_concurrent_success = (thread, value) => {
+  const _state = thread.e;
+  const index = _state.a;
+  const state = _state.b;
+  const values = state.f;
 
-      const threads = [];
+  values[index] = value;
 
-      // TODO is this the correct place for this ?
-      // TODO what about running ?
-      _set_kill(thread, () => {
-        kill_threads(threads);
-      });
+  --state.b;
 
-      const on_success = (_) => {
-        --pending;
+  // TODO what about setting `running` ?
+  if (state.b === 0) {
+    const old_thread = state.d;
+    old_thread.d = noop;
+    old_thread.e = state.e;
+    return success(old_thread, values);
+  }
+};
 
-        // TODO what about setting `running` ?
-        if (pending === 0) {
-          _reset_kill(thread);
-          success(_null);
-        }
-      };
+const run_concurrent_error = (thread, value) => {
+  const state = thread.e.b;
+  const old_thread = state.d;
 
-      const on_error = (value) => {
-        running = false;
-        _reset_kill(thread);
-        kill_threads(threads);
-        error(value);
-      };
+  state.a = false;
+  old_thread.d = noop;
+  old_thread.e = state.e;
+  kill_threads(state.c);
+  return error(old_thread, value);
+};
 
-      for (let i = 0; i < a["length"]; ++i) {
-        if (running) {
-          threads["push"](make_thread());
+// TODO what about running ?
+const run_concurrent_kill = (thread) => {
+  const state = thread.e;
 
-          a[i](threads[i], on_success, on_error);
+  return kill_threads(state.c);
+};
 
-        } else {
-          // TODO is this correct ?
-          return;
-        }
-      }
-    }
-  };
+const run_concurrent = (task, thread) => {
+  const a = task.b;
 
-export const concurrent = (a) =>
-  (thread, success, error) => {
-    let pending = a["length"];
+  const length = a["length"];
 
-    const values = new Array(pending);
+  const values = new Array(length);
 
-    if (pending === 0) {
-      success(values);
+  if (length === 0) {
+    return success(thread, values);
 
-    } else {
-      let running = true;
-
-      const threads = [];
-
-      // TODO is this the correct place for this ?
-      // TODO what about running ?
-      _set_kill(thread, () => {
-        kill_threads(threads);
-      });
-
-      const on_success = () => {
-        --pending;
-
-        // TODO what about setting `running` ?
-        if (pending === 0) {
-          _reset_kill(thread);
-          success(values);
-        }
-      };
-
-      const on_error = (value) => {
-        running = false;
-        _reset_kill(thread);
-        kill_threads(threads);
-        error(value);
-      };
-
-      for (let i = 0; i < a["length"]; ++i) {
-        if (running) {
-          threads["push"](make_thread());
-
-          a[i](threads[i], (value) => {
-            values[i] = value;
-            on_success();
-          }, on_error);
-
-        } else {
-          // TODO is this correct ?
-          return;
-        }
-      }
-    }
-  };
-
-export const fastest = (task_a, task_b) =>
-  (thread, success, error) => {
-    let running = true;
-
-    const thread_a = make_thread();
-    const thread_b = make_thread();
-
-    // TODO what about running ?
-    _set_kill(thread, () => {
-      kill_thread(thread_a);
-      kill_thread(thread_b);
-    });
-
-    const on_success = (value) => {
-      running = false;
-      _reset_kill(thread);
-      kill_thread(thread_a);
-      kill_thread(thread_b);
-      success(value);
+  } else {
+    const state = {
+      a: true,     // running
+      b: length,   // pending
+      c: [],       // threads
+      d: thread,   // thread
+      e: thread.e, // old_state
+      f: values    // values
     };
 
-    const on_error = (value) => {
-      running = false;
-      _reset_kill(thread);
-      kill_thread(thread_a);
-      kill_thread(thread_b);
-      error(value);
-    };
+    thread.d = run_concurrent_kill;
+    thread.e = state;
 
-    task_a(thread_a, on_success, on_error);
+    for (let i = 0; i < length; ++i) {
+      if (state.a) {
+        const thread = make_thread();
 
-    if (running) {
-      task_b(thread_b, on_success, on_error);
+        thread.b = run_concurrent_success;
+        thread.c = run_concurrent_error;
+
+        thread.e = {
+          a: i,    // index
+          b: state // state
+        };
+
+        state.c["push"](thread);
+
+        _run(a[i], thread);
+
+      } else {
+        // TODO is this correct ?
+        break;
+      }
     }
+  }
+};
+
+export const concurrent = (b) =>
+  ({ a: run_concurrent, b });
+
+
+const run_fastest_success = (thread, value) => {
+  const state = thread.e;
+  const old_thread = state.d;
+
+  state.a = false;
+
+  old_thread.d = noop;
+  old_thread.e = state.e;
+
+  kill_thread(state.b);
+  kill_thread(state.c);
+
+  return success(old_thread, value);
+};
+
+const run_fastest_error = (thread, value) => {
+  const state = thread.e;
+  const old_thread = state.d;
+
+  state.a = false;
+
+  old_thread.d = noop;
+  old_thread.e = state.e;
+
+  kill_thread(state.b);
+  kill_thread(state.c);
+
+  return error(old_thread, value);
+};
+
+const run_fastest_kill = (thread) => {
+  const state = thread.e;
+
+  kill_thread(state.b);
+  return kill_thread(state.c);
+};
+
+const run_fastest = (task, thread) => {
+  const thread1 = make_thread();
+  const thread2 = make_thread();
+
+  const state = {
+    a: true,    // running
+    b: thread1, // thread1
+    c: thread2, // thread2
+    d: thread,  // old_thread
+    e: thread.e // old_state
   };
 
+  thread.d = run_fastest_kill;
+  thread.e = state;
+
+  thread1.b = run_fastest_success;
+  thread1.c = run_fastest_error;
+  thread1.e = state;
+
+  thread2.b = run_fastest_success;
+  thread2.c = run_fastest_error;
+  thread2.e = state;
+
+  _run(task.b, thread1);
+
+  if (state.a) {
+    return _run(task.c, thread2);
+  }
+};
+
+export const fastest = (b, c) =>
+  ({ a: run_fastest, b, c });
+
+
+const run_on_error_success = (thread, value) => {
+  const state = thread.e;
+
+  thread.b = state.c;
+  thread.c = state.d;
+  thread.d = noop;
+  thread.e = state.e;
+
+  return success(thread, state.a(value));
+};
+
+const run_on_error_error = (thread, value) => {
+  const state = thread.e;
+
+  thread.b = state.c;
+  thread.c = state.d;
+  thread.d = noop;
+  thread.e = state.e;
+
+  return success(thread, state.b(value));
+};
+
+const run_on_error = (task, thread) => {
+  const state = {
+    a: task.c,   // on_success
+    b: task.d,   // on_error
+    c: thread.b, // old_success
+    d: thread.c, // old_error
+    e: thread.e  // old_state
+  };
+
+  thread.b = run_on_error_success;
+  thread.c = run_on_error_error;
+  // TODO handle kill ?
+  thread.e = state;
+
+  return _run(task.b, thread);
+};
 
 // TODO maybe handle kill ?
-export const on_error = (task, on_success, on_error) =>
-  (thread, success, error) => {
-    task(thread, (value) => {
-      success(on_success(value));
-    }, (value) => {
-      success(on_error(value));
-    });
+export const on_error = (b, c, d) =>
+  ({ a: run_on_error, b, c, d });
+
+
+const run_with_resource_destroy_success = (thread, value) => {
+  const state = thread.e;
+  const result = state.c;
+
+  // TODO check for 0 ?
+  switch (result.$) {
+  case 1:
+    if (!state.a) {
+      const old_thread = state.h;
+      old_thread.d = noop;
+      old_thread.e = state.i;
+      return success(old_thread, result.a);
+    }
+    break;
+  case 2:
+    // TODO is this correct ?
+    return run_with_resource_error(thread, result.a);
+  }
+};
+
+const run_with_resource_use = (thread, type, value) => {
+  const state = thread.e;
+  const resource = state.b;
+  const thread_create = state.f;
+
+  state.b = none;
+  state.c = { $: type, a: value };
+
+  thread_create.b = run_with_resource_destroy_success;
+
+  // TODO assert that the resource exists ?
+  return _run(state.e(resource.a), thread_create);
+};
+
+const run_with_resource_use_success = (thread, value) =>
+  run_with_resource_use(thread, 1, value);
+
+const run_with_resource_use_error = (thread, value) =>
+  run_with_resource_use(thread, 2, value);
+
+const run_with_resource_success = (thread, value) => {
+  const state = thread.e;
+
+  if (state.a) {
+    const thread_create = state.f;
+
+    thread_create.b = noop;
+    thread_create.c = thread_crash;
+
+    return _run(state.e(value), thread_create);
+
+  } else {
+    state.b = some(value);
+
+    return _run(state.d(value), state.g);
+  }
+};
+
+// TODO code duplication with ignore_kill
+const run_with_resource_error = (thread, value) => {
+  const state = thread.e;
+
+  if (state.a) {
+    return crash(value);
+
+  } else {
+    const old_thread = state.h;
+    old_thread.d = noop;
+    old_thread.e = state.i;
+    return error(old_thread, value);
+  }
+};
+
+const run_with_resource_kill = (thread) => {
+  const state = thread.e;
+  const resource = state.b;
+
+  state.a = true;
+
+  if (resource.$ === 1) {
+    kill_thread(state.g);
+
+    const thread_create = state.f;
+
+    thread_create.b = noop;
+    thread_create.c = thread_crash;
+
+    return _run(state.e(resource.a), thread_create);
+  }
+};
+
+const run_with_resource = (task, thread) => {
+  const thread_create = make_thread();
+  const thread_use    = make_thread();
+
+  const state = {
+    a: false,         // killed
+    b: none,          // resource
+    c: { $: 0 },      // result
+    d: task.c,        // use
+    e: task.d,        // destroy
+    f: thread_create, // thread_create
+    g: thread_use,    // thread_use
+    h: thread,        // old_thread
+    i: thread.e       // old_state
   };
+
+  thread.d = run_with_resource_kill;
+  thread.e = state;
+
+  thread_create.b = run_with_resource_success;
+  thread_create.c = run_with_resource_error;
+  thread_create.e = state;
+
+  thread_use.b = run_with_resource_use_success;
+  thread_use.c = run_with_resource_use_error;
+  thread_use.e = state;
+
+  return _run(task.b, thread_create);
+};
 
 // TODO is this correct ?
 // TODO test this
@@ -440,66 +804,8 @@ Kill create + Success create |             | Success destroy                -> N
 Kill create + Success create |             | Error destroy                  -> Crash destroy
 Kill create + Error create   |             |                                -> Crash create
 */
-export const with_resource = (create, use, destroy) =>
-  (thread, success, error) => {
-    const x = make_thread();
-    const y = make_thread();
-
-    let killed = false;
-    let resource = none;
-
-    _set_kill(thread, () => {
-      killed = true;
-
-      if (resource.$ === 1) {
-        kill_thread(y);
-        destroy(resource.a)(x, noop, crash);
-      }
-    });
-
-    const on_success = (o) => {
-      if (killed) {
-        destroy(o)(x, noop, crash);
-
-      } else {
-        resource = some(o);
-
-        const _success = (value) => {
-          resource = none;
-
-          destroy(o)(x, (_) => {
-            if (!killed) {
-              _reset_kill(thread);
-              success(value);
-            }
-          }, on_error);
-        };
-
-        const _error = (value) => {
-          resource = none;
-
-          destroy(o)(x, (_) => {
-            on_error(value);
-          }, on_error);
-        };
-
-        use(o)(y, _success, _error);
-      }
-    };
-
-    // TODO code duplication with ignore_kill
-    const on_error = (value) => {
-      if (killed) {
-        crash(value);
-
-      } else {
-        _reset_kill(thread);
-        error(value);
-      }
-    };
-
-    create(x, on_success, on_error);
-  };
+export const with_resource = (b, c, d) =>
+  ({ a: run_with_resource, b, c, d });
 
 
 const _yield_queue = [];
@@ -513,7 +819,7 @@ const _yield_queue_run = () => {
   }
 
   if (_yield_queue["length"] !== 0) {
-    setTimeout(_yield_queue_run, 0);
+    return setTimeout(_yield_queue_run, 0);
   }
 };
 
@@ -521,43 +827,36 @@ const _yield_queue_add = (x) => {
   _yield_queue["push"](x);
 
   if (_yield_queue["length"] === 1) {
-    setTimeout(_yield_queue_run, 0);
+    return setTimeout(_yield_queue_run, 0);
   }
 };
 
 // TODO guarantee that this cannot happen while calling _yield_queue_run ?
-const _yield_queue_remove = (x) => {
+const _yield_queue_remove = (x) =>
   $array.remove(_yield_queue, x);
-};
 
 // TODO is this correct ?
 export const _yield =
   async_killable((success, error) => {
     _yield_queue_add(success);
 
-    return () => {
+    return () =>
       _yield_queue_remove(success);
-    };
   });
 
 
 export const wait = (ms) => {
   if (ms === 0) {
-    crash(new Error("cannot wait for 0 milliseconds (maybe use yield instead?)"));
+    return crash(new Error("cannot wait for 0 milliseconds (maybe use yield instead?)"));
   }
 
   if (ms < 0) {
-    crash(new Error("expected positive number but got " + ms));
+    return crash(new Error("expected positive number but got " + ms));
   }
 
   return async_killable((success, error) => {
-    const x = setTimeout(() => {
-      success(_null);
-    }, ms);
-
-    return () => {
-      clearTimeout(x);
-    };
+    const x = setTimeout(() => success(_null), ms);
+    return () => clearTimeout(x);
   });
 };
 
@@ -570,26 +869,6 @@ export const log = (s) =>
 
 export const make_thread_run = (task) => {
   const x = make_thread();
-  task(x, noop, crash);
+  _run(task, x);
   return x;
 };
-
-
-
-/*const x = fastest(
-            forever(_yield),
-            wait(10000)
-          );
-
-var start = Date.now();
-console.log("STARTING");
-
-x(_make_thread(), (value) => {
-  console.log("VALUE", Date.now() - start, value);
-}, (error) => {
-  console.log("ERROR", Date.now() - start, error);
-});
-
-
-flatten(transform(read_file("foo"), (x) => write_file("bar", x)));
-*/
