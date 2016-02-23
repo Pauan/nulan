@@ -427,10 +427,31 @@ const set_changing_children = (running, x, a) => {
 };
 
 
-const easing = (a) => {
+const easing_step = (a) => {
   switch (a) {
   case 0:
+    return "start";
+  case 1:
+    return "end";
+  }
+};
+
+const easing = (a) => {
+  switch (a.$) {
+  case 0:
+    return "linear";
+  case 1:
+    return "ease";
+  case 2:
+    return "ease-in";
+  case 3:
     return "ease-in-out";
+  case 4:
+    return "ease-out";
+  case 5:
+    return "steps(" + a.a + "," + easing_step(a.b) + ")";
+  case 6:
+    return "cubic-bezier(" + a.a + "," + a.b + "," + a.c + "," + a.d + ")";
   }
 };
 
@@ -482,6 +503,7 @@ const animated_state = (parent, a) => {
 
   const child = a.a(running, a);
 
+  // TODO allow for multiple types of animations to play simultaneously (e.g. insert + update)
   const state = {
     a: child,   // element
     b: running, // running

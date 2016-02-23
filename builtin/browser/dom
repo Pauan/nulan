@@ -27,8 +27,18 @@
   Unique)
 
 
+(TYPE Easing-Step
+  *step-start
+  *step-end)
+
 (TYPE Easing
-  *ease-in-out)
+  *linear
+  *ease
+  *ease-in
+  *ease-in-out
+  *ease-out
+  (*steps Integer Easing-Step)
+  (*cubic-bezier Number Number Number Number))
 
 (TYPE Animation-State
   (*play { duration :: Integer
@@ -126,6 +136,19 @@
   DOM-Element
   Animation
   Frame
+  Easing-Step
+  Easing
+
+  step-start <= *step-start
+  step-end <= *step-end
+
+  linear <= *linear
+  ease <= *ease
+  ease-in <= *ease-in
+  ease-in-out <= *ease-in-out
+  ease-out <= *ease-out
+  steps <= *steps
+  cubic-bezier <= *cubic-bezier
 
   global-stylesheet <= global_stylesheet
   stylesheet
