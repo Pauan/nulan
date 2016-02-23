@@ -254,7 +254,7 @@
         },
 
         "&": syntax1("syntax"),
-        "~": syntax1("syntax"),
+        ",": syntax1("syntax"),
         "@": syntax1("syntax"),
 
         ".": (output, stack, position, text) => {
@@ -276,7 +276,7 @@
         if (s === "_") {
           return wrap("syntax", s);
 
-        } else if (s === "->" || s === "<=") {
+        } else if (s === "->" || s === "<=" || s === "~") {
           return wrap("syntax", s);
 
         } else if (s === "::") {
