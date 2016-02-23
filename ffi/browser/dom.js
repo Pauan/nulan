@@ -42,7 +42,7 @@ const insert_rule = (rule) => {
 
 
 // TODO remove the stylesheet when it is errored or killed ?
-export const stylesheet = (name, rules) =>
+export const global_stylesheet = (name, rules) =>
   async_killable((success, error) => {
     const running = [];
 
@@ -76,8 +76,8 @@ export const keyframes = (name, rules) =>
 const escape_class = (s) =>
   s["replace"](/^[0-9]/, "\\3$& ");
 
-export const stylesheet_class = (name, rules) =>
-  stylesheet("." + escape_class(name), rules);
+export const stylesheet = (name, rules) =>
+  global_stylesheet("." + escape_class(name), rules);
 
 
 // TODO check that the property and value is valid
@@ -323,19 +323,21 @@ const push_children = (x, a) => {
   // TODO test this
   const children = new Array(length);
 
-  // TODO is it faster or slower to use a document fragment ?
-  const fragment = document["createDocumentFragment"]();
+  if (length !== 0) {
+    // TODO is it faster or slower to use a document fragment ?
+    const fragment = document["createDocumentFragment"]();
 
-  for (let i = 0; i < length; ++i) {
-    const running = [];
+    for (let i = 0; i < length; ++i) {
+      const running = [];
 
-    children[i] = running;
+      children[i] = running;
 
-    const b = a[i];
-    fragment["appendChild"](b.a(running, b));
+      const b = a[i];
+      fragment["appendChild"](b.a(running, b));
+    }
+
+    x["appendChild"](fragment);
   }
-
-  x["appendChild"](fragment);
 
   return children;
 };
@@ -423,6 +425,247 @@ const set_changing_children = (running, x, a) => {
   // TODO test this
   running["push"](kill);
 };
+
+
+const easing = (a) => {
+  switch (a) {
+  case 0:
+    return "ease-in-out";
+  }
+};
+
+const get_animations = (animations) => {
+  const output = {
+    a: [],
+    b: [],
+    c: [],
+    d: []
+  };
+
+  const length = animations["length"];
+
+  for (let i = 0; i < length; ++i) {
+    const x = animations[i];
+
+    const state = x.b;
+    const info = state.a;
+
+    // TODO escape the name ?
+    const s = (x.a + " " +
+               info.a + "ms " +
+               easing(info.b) + " " +
+               (state.$ === 0
+                 ? "normal"
+                 : "reverse"));
+
+    switch (x.$) {
+    case 0:
+      output.a["push"](s);
+      break;
+    case 1:
+      output.b["push"](s);
+      break;
+    case 2:
+      output.c["push"](s);
+      break;
+    case 3:
+      output.d["push"](s);
+      break;
+    }
+  }
+
+  return output;
+};
+
+const animated_state = (parent, a) => {
+  const running = [];
+
+  const child = a.a(running, a);
+
+  const state = {
+    a: child,   // element
+    b: running, // running
+    c: 0,       // pending_animations
+    d: false    // pending_removal
+  };
+
+  // TODO use feature testing to detect whether animations are supported or not ?
+  child["addEventListener"]("animationend", (e) => {
+    if (e["target"] === child) {
+      --state.c;
+
+      // TODO test this
+      if (state.c === 0) {
+        if (state.d) {
+          parent["removeChild"](child);
+        }
+
+        child["style"]["animation"] = "";
+      }
+    }
+  }, true);
+
+  return state;
+};
+
+// TODO test this
+const set_animation = (state, child, animations) => {
+  const length = animations["length"];
+
+  // TODO is this correct ?
+  if (length !== 0) {
+    state.c = length;
+
+    child["style"]["animation"] = animations["join"](",");
+  }
+};
+
+const animated_push_children = (animations, parent, a) => {
+  const length = a["length"];
+
+  // TODO test this
+  const children = new Array(length);
+
+  if (length !== 0) {
+    // TODO is it faster or slower to use a document fragment ?
+    const fragment = document["createDocumentFragment"]();
+
+    for (let i = 0; i < length; ++i) {
+      const state = animated_state(parent, a[i]);
+      const child = state.a;
+
+      set_animation(state, child, animations);
+
+      children[i] = state;
+
+      fragment["appendChild"](child);
+    }
+
+    parent["appendChild"](fragment);
+  }
+
+  return children;
+};
+
+// TODO test this
+const animated_insert_before = (animations, children, x, index, a) => {
+  const state = animated_state(x, a);
+  const child = state.a;
+
+  set_animation(state, child, animations);
+
+  // TODO test this
+  // TODO use insertAfter ?
+  if (index === children["length"]) {
+    children["push"](state);
+
+    x["appendChild"](child);
+
+  } else {
+    const old = children[index];
+
+    children["splice"](index, 0, state);
+
+    x["insertBefore"](child, old.a);
+  }
+};
+
+// TODO test this
+const animated_replace_child = (animations, children, x, index, a) => {
+  const old = children[index];
+
+  kill_all(old.b);
+
+  const state = animated_state(x, a);
+  const child = state.a;
+
+  set_animation(state, child, animations);
+
+  children[index] = state;
+
+  x["replaceChild"](child, old.a);
+};
+
+// TODO test this
+const animated_remove_child = (animations, children, x, index) => {
+  const old = children[index];
+  const child = old.a;
+
+  kill_all(old.b);
+
+  children["splice"](index, 1);
+
+  // TODO is this correct ?
+  // TODO test this
+  if (animations["length"] === 0) {
+    x["removeChild"](child);
+
+  } else {
+    old.d = true;
+    set_animation(old, child, animations);
+  }
+};
+
+// TODO test this
+const set_animated_children = (running, x, a, b) => {
+  let children = null;
+
+  const animations = get_animations(a);
+
+  // TODO should this remove the children from the DOM ?
+  // TODO prevent double kill
+  const kill = () => {
+    const length = children["length"];
+
+    for (let i = 0; i < length; ++i) {
+      kill_all(children[i].b);
+    }
+  };
+
+  each(running, b, (a) => {
+    switch (a.$) {
+    // *set
+    case 0:
+      if (children !== null) {
+        kill();
+        // TODO is there a faster way to clear the children ?
+        x["innerHTML"] = "";
+      }
+
+      children = animated_push_children(animations.a, x, a.a);
+      break;
+
+    // *insert
+    case 1:
+      animated_insert_before(animations.b, children, x, a.a, a.b);
+      break;
+
+    // *update
+    case 2:
+      animated_replace_child(animations.c, children, x, a.a, a.b);
+      break;
+
+    // *remove
+    case 3:
+      animated_remove_child(animations.d, children, x, a.a);
+      break;
+    }
+  });
+
+  // TODO test this
+  running["push"](kill);
+};
+
+
+const html_animated_parent = (running, a) => {
+  const x = document["createElement"](a.b);
+  set_attributes(running, x, a.d);
+  set_animated_children(running, x, a.c, a.e);
+  return x;
+};
+
+export const animated_parent = (b, c, d, e) =>
+  ({ a: html_animated_parent, b, c, d, e });
 
 
 const html_parent = (running, a) => {
