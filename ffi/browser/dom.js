@@ -42,13 +42,14 @@ const insert_rule = (rule) => {
 
 
 // TODO remove the stylesheet when it is errored or killed ?
-// TODO check for duplicate styles
+// TODO check for duplicate stylesheets
 export const global_stylesheet = (name, rules) =>
   async_killable((success, error) => {
     const running = [];
 
     const rule = insert_rule(name);
 
+    // TODO check for duplicate styles
     set_attributes(running, rule["style"], rules);
 
     return () => {
@@ -58,6 +59,7 @@ export const global_stylesheet = (name, rules) =>
 
 
 // TODO remove the stylesheet when it is errored or killed ?
+// TODO check for duplicate keyframes
 export const keyframes = (name, rules) =>
   async_killable((success, error) => {
     const running = [];
@@ -122,7 +124,7 @@ const style_changing_style = (running, style, attr) => {
       break;
 
     // *some
-    case 1:
+    default:
       set_style(style, attr.b, maybe.a);
       break;
     }
@@ -261,6 +263,7 @@ export const attr = (b, c) =>
 // TODO duplicate class check
 const attribute_classes = (running, x, attr) => {
   // TODO can this be made more efficient ?
+  // TODO change this so that it doesn't overwrite changing_class ?
   x["className"] = attr.b["join"](" ");
 };
 
@@ -305,7 +308,7 @@ const attribute_changing_attr = (running, x, attr) => {
       break;
 
     // *some
-    case 1:
+    default:
       x["setAttribute"](attr.b, maybe.a);
       break;
     }
@@ -450,7 +453,7 @@ const set_changing_children = (running, x, a) => {
       break;
 
     // *remove
-    case 3:
+    default:
       remove_child(children, x, a.a);
       break;
     }
@@ -463,28 +466,37 @@ const set_changing_children = (running, x, a) => {
 
 const easing_step = (a) => {
   switch (a) {
+  // *step-start
   case 0:
     return "start";
-  case 1:
+  // *step-end
+  default:
     return "end";
   }
 };
 
 const easing = (a) => {
   switch (a.$) {
+  // *linear
   case 0:
     return "linear";
+  // *ease
   case 1:
     return "ease";
+  // *ease-in
   case 2:
     return "ease-in";
+  // *ease-in-out
   case 3:
     return "ease-in-out";
+  // *ease-out
   case 4:
     return "ease-out";
+  // *steps
   case 5:
     return "steps(" + a.a + "," + easing_step(a.b) + ")";
-  case 6:
+  // *cubic-bezier
+  default:
     return "cubic-bezier(" + a.a + "," + a.b + "," + a.c + "," + a.d + ")";
   }
 };
@@ -515,16 +527,20 @@ const get_animations = (animations) => {
                  : "reverse"));
 
     switch (x.$) {
+    // *animate-set
     case 0:
       output.a["push"](s);
       break;
+    // *animate-insert
     case 1:
       output.b["push"](s);
       break;
+    // *animate-update
     case 2:
       output.c["push"](s);
       break;
-    case 3:
+    // *animate-remove
+    default:
       output.d["push"](s);
       break;
     }
@@ -704,7 +720,7 @@ const set_animated_children = (running, x, a, b) => {
       break;
 
     // *remove
-    case 3:
+    default:
       animated_remove_child(animations.d, children, x, a.a);
       break;
     }
