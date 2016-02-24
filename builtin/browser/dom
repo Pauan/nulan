@@ -76,12 +76,23 @@
   style :: (-> Text Text Style)
   changing_style :: (-> Text (Changing (Maybe Text)) Style)
 
-  event :: (-> Text (-> { element :: DOM-Element } (Task Null)) Event)
-  on_left_click :: (-> (-> { element :: DOM-Element } (Task Null)) Event)
+  event :: (-> Text (-> { element :: DOM-Element }
+                      (Task Null))
+             Event)
+
+  on_left_click :: (-> (-> { element :: DOM-Element }
+                         (Task Null))
+                     Event)
+
   on_mouse_hover :: (-> (-> { element :: DOM-Element
-                              hovering :: Boolean } (Task Null)) Event)
+                              hovering :: Boolean }
+                          (Task Null))
+                      Event)
+
   on_mouse_hold :: (-> (-> { element :: DOM-Element
-                             holding :: Boolean } (Task Null)) Event)
+                             holding :: Boolean }
+                         (Task Null))
+                     Event)
 
   attr :: (-> Text Text Attribute)
   changing_attr :: (-> Text (Changing (Maybe Text)) Attribute)
