@@ -26,6 +26,9 @@
 (IMPORT (file "../unique")
   Unique)
 
+(IMPORT (file "../percent")
+  Percent)
+
 
 (TYPE Easing-Step
   *step-start
@@ -40,10 +43,11 @@
   (*steps Integer Easing-Step)
   (*cubic-bezier Number Number Number Number))
 
+# The records are inlined into the data constructors
 (TYPE Animation-State
-  (*play { duration :: Integer
+  (*play { duration :: Number
            easing :: Easing })
-  (*reverse { duration :: Integer
+  (*reverse { duration :: Number
               easing :: Easing }))
 
 (TYPE Animation
@@ -67,21 +71,30 @@
   stylesheet :: (-> Unique (List Style) (Task Null))
   keyframes :: (-> Unique (List Frame) (Task Null))
 
-  frame :: (-> Integer (List Style) Frame)
+  frame :: (-> Percent (List Style) Frame)
 
   style :: (-> Text Text Style)
   changing_style :: (-> Text (Changing (Maybe Text)) Style)
 
-  event :: (-> Text (-> {} (Task Null)) Event)
-  on_mouse_click :: (-> (-> {} (Task Null)) Event)
-  on_mouse_hover :: (-> (-> { hovering :: Boolean } (Task Null)) Event)
-  on_mouse_hold :: (-> (-> { holding :: Boolean } (Task Null)) Event)
+  event :: (-> Text (-> { element :: DOM-Element } (Task Null)) Event)
+  on_left_click :: (-> (-> { element :: DOM-Element } (Task Null)) Event)
+  on_mouse_hover :: (-> (-> { element :: DOM-Element
+                              hovering :: Boolean } (Task Null)) Event)
+  on_mouse_hold :: (-> (-> { element :: DOM-Element
+                             holding :: Boolean } (Task Null)) Event)
 
   attr :: (-> Text Text Attribute)
   changing_attr :: (-> Text (Changing (Maybe Text)) Attribute)
 
   _class :: (-> Unique Attribute)
   changing_class :: (-> Unique (Changing Boolean) Attribute)
+
+  # TODO this is inefficient if used when the DOM is dirty
+  get_position :: (-> DOM-Element
+                    (Task { left :: Number
+                            top :: Number
+                            width :: Number
+                            height :: Number }))
 
   events :: (-> (List Event) Attribute)
   styles :: (-> (List Style) Attribute)
@@ -160,7 +173,7 @@
   changing-style <= changing_style
 
   event
-  on-mouse-click <= on_mouse_click
+  on-left-click <= on_left_click
   on-mouse-hover <= on_mouse_hover
   on-mouse-hold <= on_mouse_hold
 
@@ -181,6 +194,8 @@
 
   text
   changing-text <= changing_text
+
+  get-position <= get_position
 
   root
   render

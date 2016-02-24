@@ -1,0 +1,7 @@
+# TODO verify that the Number is between 0 and 100 ?
+(TYPE Percent
+  (*percent Number))
+
+
+(EXPORT
+  *percent)

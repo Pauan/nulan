@@ -1,5 +1,5 @@
 import { make_thread_pool, kill_thread_pool, run_in_thread_pool,
-         async_killable } from "../task";
+         async_killable, sync } from "../task";
 import { crash } from "../../util/error";
 
 
@@ -115,6 +115,7 @@ const style_changing_style = (running, style, attr) => {
     // *none
     case 0:
       // TODO set it to "" instead ?
+      // TODO use remove_style instead ?
       style["removeProperty"](attr.b);
       break;
 
@@ -145,33 +146,40 @@ const make_event_pool = (running) => {
 
 
 // TODO test this
-const set_event = (running, x, name, f) => {
+const event_event = (running, x, event) => {
+  const f = event.c;
+
   const pool = make_event_pool(running);
 
-  x["addEventListener"](name, (e) => {
-    run_in_thread_pool(pool, f(e));
+  x["addEventListener"](event.b, (e) => {
+    run_in_thread_pool(pool, f({ a: x }));
   }, true);
-};
-
-
-const event_event = (running, x, event) => {
-  set_event(running, x, event.b, event.c);
 };
 
 export const event = (b, c) =>
   ({ a: event_event, b, c });
 
 
-const event_on_mouse_click = (running, x, event) => {
+// TODO test this
+const event_on_left_click = (running, x, event) => {
   const f = event.b;
 
-  set_event(running, x, "click", (e) => f({}));
+  const pool = make_event_pool(running);
+
+  x["addEventListener"]("click", (e) => {
+    // TODO test this
+    if (e["button"] === 0) {
+      // TODO preventDefault ?
+      run_in_thread_pool(pool, f({ a: x }));
+    }
+  }, true);
 };
 
-export const on_mouse_click = (b) =>
-  ({ a: event_on_mouse_click, b });
+export const on_left_click = (b) =>
+  ({ a: event_on_left_click, b });
 
 
+// TODO test this
 const event_on_mouse_hover = (running, x, event) => {
   const f = event.b;
   const pool = make_event_pool(running);
@@ -179,14 +187,16 @@ const event_on_mouse_hover = (running, x, event) => {
     // TODO check for descendents
   x["addEventListener"]("mouseover", (e) => {
     run_in_thread_pool(pool, f({
-      a: true
+      a: x,
+      b: true
     }));
   }, true);
 
   // TODO check for descendents
   x["addEventListener"]("mouseout", (e) => {
     run_in_thread_pool(pool, f({
-      a: false
+      a: x,
+      b: false
     }));
   }, true);
 };
@@ -204,7 +214,8 @@ const event_on_mouse_hold = (running, x, event) => {
     removeEventListener("mouseup", mouseup, true);
 
     run_in_thread_pool(pool, f({
-      a: false
+      a: x,
+      b: false
     }));
   };
 
@@ -213,13 +224,27 @@ const event_on_mouse_hold = (running, x, event) => {
     addEventListener("mouseup", mouseup, true);
 
     run_in_thread_pool(pool, f({
-      a: true
+      a: x,
+      b: true
     }));
   }, true);
 };
 
 export const on_mouse_hold = (b) =>
   ({ a: event_on_mouse_hold, b });
+
+
+export const get_position = (a) =>
+  sync(() => {
+    const x = a["getBoundingClientRect"]();
+
+    return {
+      a: x["left"],
+      b: x["top"],
+      c: x["width"],
+      d: x["height"]
+    };
+  });
 
 
 const attribute_attr = (running, x, attr) => {
@@ -468,13 +493,14 @@ const get_animations = (animations) => {
   for (let i = 0; i < length; ++i) {
     const x = animations[i];
 
+    // The record is inlined into the data constructor
     const state = x.b;
-    const info = state.a;
 
     // TODO escape the name ?
+    // TODO use an animation-fill of `both` ?
     const s = (x.a + " " +
-               info.a + "ms " +
-               easing(info.b) + " " +
+               state.a + "ms " +
+               easing(state.b) + " " +
                (state.$ === 0
                  ? "normal"
                  : "reverse"));
@@ -522,7 +548,8 @@ const animated_state = (parent, a) => {
           parent["removeChild"](child);
         }
 
-        child["style"]["animation"] = "";
+        // TODO use remove_style instead ?
+        set_style(child["style"], "animation", "");
       }
     }
   }, true);
@@ -538,7 +565,7 @@ const set_animation = (state, child, animations) => {
   if (length !== 0) {
     state.c = length;
 
-    child["style"]["animation"] = animations["join"](",");
+    set_style(child["style"], "animation", animations["join"](","));
   }
 };
 
