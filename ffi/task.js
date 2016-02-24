@@ -550,6 +550,92 @@ export const concurrent = (b) =>
   ({ a: run_concurrent, b });
 
 
+const run_transform2_success = (thread, value) => {
+  const _state = thread.e;
+  const state = _state.b;
+
+  const value2 = state.a;
+
+  if (value2.$ === 0) {
+    state.a = { $: 1, a: value };
+
+  } else {
+    const old_thread = state.e;
+
+    old_thread.d = noop;
+    old_thread.e = state.f;
+
+    const output = (_state.a === 0
+                     ? state.b(value, value2.a)
+                     : state.b(value2.a, value));
+
+    return success(old_thread, output);
+  }
+};
+
+const run_transform2_error = (thread, value) => {
+  const _state = thread.e;
+  const state = _state.b;
+
+  const old_thread = state.e;
+
+  old_thread.d = noop;
+  old_thread.e = state.f;
+
+  kill_thread(state.c);
+  kill_thread(state.d);
+
+  return error(old_thread, value);
+};
+
+const run_transform2_kill = (thread) => {
+  const state = thread.e;
+
+  kill_thread(state.c);
+  return kill_thread(state.d);
+};
+
+const run_transform2 = (task, thread) => {
+  const thread1 = make_thread();
+  const thread2 = make_thread();
+
+  const state = {
+    a: none,    // value
+    b: task.d,  // transform
+    c: thread1, // thread1
+    d: thread2, // thread2
+    e: thread,  // old_thread
+    f: thread.e // old_state
+  };
+
+  thread.d = run_transform2_kill;
+  thread.e = state;
+
+  thread1.b = run_transform2_success;
+  thread1.c = run_transform2_error;
+  thread1.e = {
+    a: 0,
+    b: state
+  };
+
+  thread2.b = run_transform2_success;
+  thread2.c = run_transform2_error;
+  thread2.e = {
+    a: 1,
+    b: state
+  };
+
+  _run(task.b, thread1);
+
+  // TODO what if task.b errors synchronously ?
+  return _run(task.c, thread2);
+};
+
+// TODO test this
+export const transform2 = (b, c, d) =>
+  ({ a: run_transform2, b, c, d });
+
+
 const run_fastest_success = (thread, value) => {
   const state = thread.e;
   const old_thread = state.d;
@@ -670,16 +756,15 @@ const run_with_resource_destroy_success = (thread, value) => {
   const result = state.c;
 
   // TODO check for 0 ?
-  switch (result.$) {
-  case 1:
+  if (result.$ === 1) {
     if (!state.a) {
       const old_thread = state.h;
       old_thread.d = noop;
       old_thread.e = state.i;
       return success(old_thread, result.a);
     }
-    break;
-  case 2:
+
+  } else {
     // TODO is this correct ?
     return run_with_resource_error(thread, result.a);
   }

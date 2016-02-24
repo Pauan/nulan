@@ -13,8 +13,9 @@
     | transform     :: (-> (Task a) (-> a b) (Task b))
     | flatten       :: (-> (Task (Task a)) (Task a))
     | concurrent    :: (-> (List (Task a)) (Task (List a)))
+    | transform2    :: (-> (Task a) (Task b) (-> a b c) (Task c))
     | fastest       :: (-> (Task a) (Task a) (Task a))
-    | delay         :: (-> Integer (Task Null))
+    | wait          :: (-> Integer (Task Null))
     | log           :: (-> Text (Task Null))
     | with_resource :: (-> (Task a)
                            (-> a (Task b))
@@ -41,7 +42,7 @@
   (timeout task ms)
     (fastest
       (transform task *some)
-      (transform (delay ms) -> _ *none)))
+      (transform (wait ms) -> _ *none)))
 
 (DEFINE-GROUP (Result a)
   (*value a)
@@ -59,7 +60,7 @@
   | wrap
   | concurrent
   | fastest
-  | delay
+  | wait
   | log
   | timeout)
 
