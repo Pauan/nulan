@@ -43,7 +43,7 @@ const insert_rule = (rule) => {
 
 // TODO remove the stylesheet when it is errored or killed ?
 // TODO check for duplicate stylesheets
-export const global_stylesheet = (name, rules) =>
+export const stylesheet = (name, rules) =>
   async_killable((success, error) => {
     const running = [];
 
@@ -73,14 +73,6 @@ export const keyframes = (name, rules) =>
       kill_all(running);
     };
   });
-
-
-// TODO faster implementation of this ?
-const escape_class = (s) =>
-  s["replace"](/^[0-9]/, "\\3$& ");
-
-export const stylesheet = (name, rules) =>
-  global_stylesheet("." + escape_class(name), rules);
 
 
 // TODO check that the property and value is valid

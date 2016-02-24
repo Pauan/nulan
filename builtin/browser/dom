@@ -23,9 +23,6 @@
   Mutable
   set!)
 
-(IMPORT (file "../unique")
-  Unique)
-
 (IMPORT (file "../percent")
   Percent)
 
@@ -51,10 +48,10 @@
               easing :: Easing }))
 
 (TYPE Animation
-  (*animate-set Unique Animation-State)
-  (*animate-insert Unique Animation-State)
-  (*animate-update Unique Animation-State)
-  (*animate-remove Unique Animation-State))
+  (*animate-set Text Animation-State)
+  (*animate-insert Text Animation-State)
+  (*animate-update Text Animation-State)
+  (*animate-remove Text Animation-State))
 
 
 (TYPE Style)
@@ -67,9 +64,8 @@
 
 (UNSAFE-FFI-LOAD { target <= javascript-browser
                    file <= "../../ffi/browser/dom.js" }
-  global_stylesheet :: (-> Text (List Style) (Task Null))
-  stylesheet :: (-> Unique (List Style) (Task Null))
-  keyframes :: (-> Unique (List Frame) (Task Null))
+  stylesheet :: (-> Text (List Style) (Task Null))
+  keyframes :: (-> Text (List Frame) (Task Null))
 
   frame :: (-> Percent (List Style) Frame)
 
@@ -97,8 +93,8 @@
   attr :: (-> Text Text Attribute)
   changing_attr :: (-> Text (Changing (Maybe Text)) Attribute)
 
-  classes :: (-> (List Unique) Attribute)
-  changing_class :: (-> Unique (Changing Boolean) Attribute)
+  classes :: (-> (List Text) Attribute)
+  changing_class :: (-> Text (Changing Boolean) Attribute)
 
   # TODO this is inefficient if used when the DOM is dirty
   get_position :: (-> DOM-Element
@@ -174,7 +170,6 @@
   steps <= *steps
   cubic-bezier <= *cubic-bezier
 
-  global-stylesheet <= global_stylesheet
   stylesheet
   keyframes
 
