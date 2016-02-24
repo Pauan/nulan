@@ -97,7 +97,7 @@
   attr :: (-> Text Text Attribute)
   changing_attr :: (-> Text (Changing (Maybe Text)) Attribute)
 
-  _class :: (-> Unique Attribute)
+  classes :: (-> (List Unique) Attribute)
   changing_class :: (-> Unique (Changing Boolean) Attribute)
 
   # TODO this is inefficient if used when the DOM is dirty
@@ -191,7 +191,7 @@
   attr
   changing-attr <= changing_attr
 
-  class <= _class
+  classes
   changing-class <= changing_class
 
   events

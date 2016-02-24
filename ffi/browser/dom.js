@@ -42,6 +42,7 @@ const insert_rule = (rule) => {
 
 
 // TODO remove the stylesheet when it is errored or killed ?
+// TODO check for duplicate styles
 export const global_stylesheet = (name, rules) =>
   async_killable((success, error) => {
     const running = [];
@@ -87,6 +88,7 @@ const set_style = (style, name, value) => {
 };
 
 
+// TODO check for duplicate frames
 const set_frame = (running, keyframes, attr) => {
   const css_rules = keyframes["cssRules"];
 
@@ -247,6 +249,7 @@ export const get_position = (a) =>
   });
 
 
+// TODO duplicate attr check
 const attribute_attr = (running, x, attr) => {
   x["setAttribute"](attr.b, attr.c);
 };
@@ -255,14 +258,17 @@ export const attr = (b, c) =>
   ({ a: attribute_attr, b, c });
 
 
-const attribute_class = (running, x, attr) => {
-  x["classList"]["add"](attr.b);
+// TODO duplicate class check
+const attribute_classes = (running, x, attr) => {
+  // TODO can this be made more efficient ?
+  x["className"] = attr.b["join"](" ");
 };
 
-export const _class = (b) =>
-  ({ a: attribute_class, b });
+export const classes = (b) =>
+  ({ a: attribute_classes, b });
 
 
+// TODO duplicate class check
 const attribute_changing_class = (running, x, attr) => {
   each(running, attr.c, (a) => {
     // *false
@@ -280,6 +286,7 @@ export const changing_class = (b, c) =>
   ({ a: attribute_changing_class, b, c });
 
 
+// TODO duplicate event check
 const attribute_events = (running, x, attr) => {
   set_attributes(running, x, attr.b);
 };
@@ -288,6 +295,7 @@ export const events = (b) =>
   ({ a: attribute_events, b });
 
 
+// TODO duplicate attr check
 const attribute_changing_attr = (running, x, attr) => {
   each(running, attr.c, (maybe) => {
     switch (maybe.$) {
@@ -308,6 +316,7 @@ export const changing_attr = (b, c) =>
   ({ a: attribute_changing_attr, b, c });
 
 
+// TODO duplicate style check
 const attribute_styles = (running, x, attr) => {
   set_attributes(running, x["style"], attr.b);
 };
