@@ -253,10 +253,16 @@ export const attr = (b, c) =>
 
 
 // TODO duplicate class check
+// http://jsperf.com/classname-vs-classlist-multiple-classes/2
 const attribute_classes = (running, x, attr) => {
-  // TODO can this be made more efficient ?
-  // TODO change this so that it doesn't overwrite changing_class ?
-  x["className"] = attr.b["join"](" ");
+  const a = x["className"];
+  const b = attr.b["join"](" ");
+
+  if (a === "") {
+    x["className"] = b;
+  } else {
+    x["className"] = a + " " + b;
+  }
 };
 
 export const classes = (b) =>
