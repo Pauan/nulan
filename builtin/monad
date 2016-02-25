@@ -1,61 +1,74 @@
 (IMPORT (nulan "unsafe/ffi")
-| UNSAFE-FFI-LOAD
-| javascript)
+  UNSAFE-FFI-LOAD
+  javascript)
 
 (IMPORT (file "null")
-| Null)
+  Null)
 
 (IMPORT (file "protocol")
-| $transform
-| transform
+  $transform
+  transform
 
-| $flatten
-| flatten
+  $flatten
+  flatten
 
-| $yield
-| yield
+  $yield
+  yield
 
-| $reduce-left
-| reduce-left)
+  $reduce-left
+  reduce-left)
 
 (IMPORT (file "list")
-| List)
+  List)
 
 
 (REWRITE-RULE
-| (DO ~a <= ~b ~c)
-    &(flatten (transform ~b -> ~a ~c))
+  (DO ,a <= ,b ,c)
+  ~ &(flatten (transform ,b -> ,a ,c))
 
-| (DO ~a ~b)
-    &(flatten (transform ~a -> _ :: Null ~b))
+  (DO ,a ,b)
+  ~ &(flatten (transform ,a -> _ :: Null ,b))
 
-| (DO ~a ~@b)
-    &(DO ~a (DO ~@b)))
-
-(REWRITE-RULE
-| (DO-MATCH ~a ~@b)
-    (WITH-UNIQUE c
-      &(DO ~c <= ~a
-           (MATCH ~c ~@b))))
+  (DO ,a ,@b)
+  ~ &(DO ,a (DO ,@b)))
 
 (REWRITE-RULE
-| (DO-IF ~test
-  | ~then
-  | ~else)
-    (WITH-UNIQUE a
-      &(DO ~a <= ~test
-           (IF ~a
-           | ~then
-           | ~else))))
+  (DO-MATCH ,a ,@b)
+  ~ (WITH-UNIQUE c
+      &(DO
+         ,c <= ,a
+         (MATCH ,c ,@b))))
+
+(REWRITE-RULE
+  (DO-IF ,test
+    ,then
+    ,else)
+  ~ (WITH-UNIQUE a
+      &(DO
+         ,a <= ,test
+         (IF ,a
+           ,then
+           ,else))))
+
 
 (UNSAFE-FFI-LOAD { target <= javascript
-                 | file <= "../ffi/monad.js" }
-| sequential :: (REQUIRE ($transform a) ($flatten a) ($yield a)
-                  (-> (List (a b)) (a (List b)))))
+                   file <= "../ffi/monad.js" }
+  sequential :: (REQUIRE ($transform a) ($flatten a) ($yield a)
+                  (-> (List (a b)) (a (List b))))
+  sequential_null :: (REQUIRE ($transform a) ($flatten a) ($yield a)
+                       (-> (List (a Null)) (a Null))))
+
+
+(FUNCTION each :: (REQUIRE ($transform a) ($flatten a) ($yield a)
+                    (-> (List b) (-> b (a Null)) (a Null)))
+  (each a b)
+  ~ (sequential_null (transform a b)))
 
 
 (EXPORT
-| sequential
-| DO
-| DO-MATCH
-| DO-IF)
+  sequential
+  sequential-null <= sequential_null
+  each
+  DO
+  DO-MATCH
+  DO-IF)
