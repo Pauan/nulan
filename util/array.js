@@ -2,9 +2,11 @@ import { crash } from "./error";
 
 
 export const copy = (a) => {
-  const b = new Array(a["length"]);
+  const length = a["length"];
 
-  for (let i = 0; i < a["length"]; ++i) {
+  const b = new Array(length);
+
+  for (let i = 0; i < length; ++i) {
     b[i] = a[i];
   }
 
@@ -31,7 +33,9 @@ export const peek = (a, i) => {
 };
 
 export const foldl = (init, x, f) => {
-  for (let i = 0; i < x["length"]; ++i) {
+  const length = x["length"];
+
+  for (let i = 0; i < length; ++i) {
     init = f(init, x[i]);
   }
 
@@ -39,7 +43,9 @@ export const foldl = (init, x, f) => {
 };
 
 export const all = (a, f) => {
-  for (let i = 0; i < a["length"]; ++i) {
+  const length = a["length"];
+
+  for (let i = 0; i < length; ++i) {
     if (!f(a[i])) {
       return false;
     }
@@ -49,15 +55,18 @@ export const all = (a, f) => {
 };
 
 export const each = (a, f) => {
-  for (let i = 0; i < a["length"]; ++i) {
+  const length = a["length"];
+
+  for (let i = 0; i < length; ++i) {
     f(a[i], i);
   }
 };
 
 export const map = (a, f) => {
-  const out = new Array(a["length"]);
+  const length = a["length"];
+  const out = new Array(length);
 
-  for (let i = 0; i < a["length"]; ++i) {
+  for (let i = 0; i < length; ++i) {
     out[i] = f(a[i], i);
   }
 
