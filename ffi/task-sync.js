@@ -2,20 +2,23 @@ import { _null } from "./types";
 import { async_unkillable } from "./task";
 
 
-export const wrap = (a) =>
+export const sync = (a) =>
   ({ $: 0, a });
 
-export const sync = (a) =>
+export const wrap = (a) =>
   ({ $: 1, a });
 
-export const transform = (a, b) =>
+export const after = (a, b) =>
   ({ $: 2, a, b });
 
+export const transform = (a, b) =>
+  ({ $: 3, a, b });
+
 export const flatten = (a) =>
-  ({ $: 3, a });
+  ({ $: 4, a });
 
 export const transform2 = (a, b, c) =>
-  ({ $: 4, a, b, c });
+  ({ $: 5, a, b, c });
 
 
 export const log = (s) =>
@@ -28,16 +31,30 @@ export const log = (s) =>
 const run = (task) => {
   for (;;) {
     switch (task.$) {
+    // *sync
     case 0:
-      return task.a;
-    case 1:
       return task.a();
+
+    // *yield
+    case 1:
+      return task.a;
+
+    // *after
     case 2:
-      return task.b(run(task.a));
+      task = task.b(run(task.a));
+      break;
+
+    // *transform
     case 3:
+      return task.b(run(task.a));
+
+    // *flatten
+    case 4:
       // Tail recursive
       task = run(task.a);
       break;
+
+    // *transform2
     default:
       return task.c(run(task.a), run(task.b));
     }

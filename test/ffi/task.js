@@ -5,6 +5,8 @@ import { transform, flatten, wrap, concurrent, concurrent_null,
          wait, fastest, _yield, throw_error, ignore_kill, async_killable,
          async_unkillable, never, kill_thread,
          make_thread_run, with_resource, catch_error } from "../../ffi/task";
+import * as $sync from "../../ffi/task-sync";
+import * as $mutable from "../../ffi/mutable";
 import { _null } from "../../ffi/types";
 
 
@@ -92,7 +94,24 @@ const test_crash = (task, value) =>
 ));*/
 
 
+// TODO move this into test/ffi/task-sync.js ?
+const loop = (mut, max) =>
+  $sync.after($mutable.get(mut), (i) => {
+    if (i < max) {
+      return $sync.after($mutable.set(mut, i + 1), (_) =>
+                         loop(mut, max));
+    } else {
+      return $sync.wrap(i);
+    }
+  });
+
+
 export default [
+  // TODO move this into test/ffi/task-sync.js ?
+  expect(1000000,
+    $sync.task_from($sync.after($mutable.mutable(0), (mut) =>
+                                loop(mut, 1000000)))),
+
   expect_crash("expected positive number but got -5", () =>
     wait(-5)),
 
