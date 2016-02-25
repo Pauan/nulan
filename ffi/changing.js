@@ -1,9 +1,6 @@
 import { async_killable, make_thread_pool, run_in_thread_pool,
          kill_thread_pool } from "./task";
-
-
-// TODO move into another module
-const noop = () => {};
+import { noop } from "./util";
 
 
 // TODO test this

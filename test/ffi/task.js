@@ -4,7 +4,7 @@ import { get_message } from "../../util/node";
 import { sync, transform, flatten, wrap, concurrent, concurrent_null,
          wait, fastest, _yield, throw_error, ignore_kill, async_killable,
          async_unkillable, never, kill_thread,
-         catch_error, on_error, make_thread_run, with_resource } from "../../ffi/task";
+         make_thread_run, with_resource, catch_error } from "../../ffi/task";
 import { _null } from "../../ffi/types";
 
 
@@ -47,21 +47,27 @@ const counter = (f) => {
 
 const queue = (f) =>
   after(sync(() => []), (queue) =>
-    on_error(f((value) =>
-                 sync(() => {
-                   queue["push"](value);
-                   return _null;
-                 })),
-      (value) => ({
-        queue: queue,
-        value: value,
-        error: null
-      }),
-      (error) => ({
-        queue: queue,
-        value: null,
-        error: get_message(error)
-      })));
+    transform(catch_error(() =>
+                f((value) =>
+                  sync(() => {
+                    queue["push"](value);
+                    return _null;
+                  }))), (result) => {
+      if (result.$ === 0) {
+        return {
+          queue: queue,
+          value: result.a,
+          error: null
+        };
+
+      } else {
+        return {
+          queue: queue,
+          value: null,
+          error: get_message(result.a)
+        };
+      }
+    }));
 
 const test_crash = (task, value) =>
   sync(() => {
@@ -82,11 +88,11 @@ const test_crash = (task, value) =>
 
 
 export default [
-  expect_crash("expected positive number but got -5",
-    catch_error(() => wait(-5))),
+  expect_crash("expected positive number but got -5", () =>
+    wait(-5)),
 
-  expect_crash("cannot wait for 0 milliseconds (maybe use yield instead?)",
-    catch_error(() => wait(0))),
+  expect_crash("cannot wait for 0 milliseconds (maybe use yield instead?)", () =>
+    wait(0)),
 
 
   expect(_null,
@@ -98,7 +104,7 @@ export default [
       wrap("4")
     ])),
 
-  expect_crash("Hi1",
+  expect_crash("Hi1", () =>
     concurrent_null([
       wrap("3"),
       throw_error(new Error("Hi1")),
@@ -113,47 +119,13 @@ export default [
         increment
       ]))),
 
-  expect_crash("Hi",
+  expect_crash("Hi", () =>
     counter((increment) =>
       concurrent_null([
         throw_error(new Error("Hi")),
         increment,
         increment
       ]))),
-
-
-  expect(2,
-    on_error(throw_error(new Error("Hi")), (_) => 1, (_) => 2)),
-
-  expect(2,
-    on_error(fastest(throw_error(new Error("Hi")), wrap(3)), (_) => 1, (_) => 2)),
-
-  expect(2,
-    fastest(
-      on_error(throw_error(new Error("Hi")), (_) => 1, (_) => 2),
-      wrap(3)
-    )),
-
-  expect(3,
-    fastest(
-      on_error(wait(100), (_) => 1, (_) => 2),
-      wrap(3)
-    )),
-
-
-  expect(2,
-    test_crash(catch_error(() => 1), 2)),
-
-  expect_crash("3",
-    then(catch_error(() => 1),
-         throw_error(new Error("3")))),
-
-  expect_crash("3",
-    then(on_error(then(catch_error(() => 1),
-                       throw_error(new Error("2"))),
-                  (x) => x,
-                  (_) => null),
-         throw_error(new Error("3")))),
 
 
   expect([],
@@ -177,7 +149,7 @@ export default [
       }, "invalid error");
     })),
 
-  expect_crash("1",
+  expect_crash("1", () =>
     async_killable((success, error) => {
       error(new Error("1"));
 
@@ -186,7 +158,7 @@ export default [
       }, "invalid error");
     })),
 
-  expect_crash("1",
+  expect_crash("1", () =>
     async_killable((success, error) => {
       error(new Error("1"));
 
@@ -252,7 +224,7 @@ export default [
       }, "invalid error");
     })),
 
-  expect_crash("1",
+  expect_crash("1", () =>
     async_unkillable((success, error) => {
       error(new Error("1"));
 
@@ -261,7 +233,7 @@ export default [
       }, "invalid error");
     })),
 
-  expect_crash("1",
+  expect_crash("1", () =>
     async_unkillable((success, error) => {
       error(new Error("1"));
 
@@ -394,12 +366,22 @@ export default [
       then(wait(10), wrap("3"))
     )),
 
+  expect("3",
+    fastest(
+      async_unkillable((success, error) => {
+        success("1");
+      }),
+      wrap("3")
+    )),
+
   expect("1",
     fastest(
       async_unkillable((success, error) => {
         success("1");
       }),
-      wrap("3")
+      async_unkillable((success, error) => {
+        success("3");
+      })
     )),
 
   expect("3",
@@ -430,7 +412,7 @@ export default [
       wrap("3")
     )),
 
-  expect_crash("Hi1",
+  expect_crash("Hi1", () =>
     concurrent([
       wrap("3"),
       throw_error(new Error("Hi1")),
@@ -465,7 +447,7 @@ export default [
       wrap("4")
     )),
 
-  expect("1",
+  expect("3",
     ignore_kill(fastest(
       async_killable((success, error) => {
         success("1");
@@ -474,6 +456,19 @@ export default [
         };
       }),
       wrap("3")
+    ))),
+
+  expect("1",
+    ignore_kill(fastest(
+      async_killable((success, error) => {
+        success("1");
+        return () => {
+          crash(new Error("2"));
+        };
+      }),
+      async_unkillable((success, error) => {
+        success("3");
+      })
     ))),
 
   expect(5,
@@ -493,7 +488,7 @@ export default [
         increment
       ]))),
 
-  expect_crash("Hi",
+  expect_crash("Hi", () =>
     counter((increment) =>
       concurrent([
         throw_error(new Error("Hi")),
@@ -586,14 +581,14 @@ export default [
   expect({
     queue: ["create", ["use", 1], ["destroy", 1]],
     value: null,
-    error: "Hi"
+    error: "Hi2"
   }, queue((push) =>
        with_resource(then(push("create"),
                           wrap(1)),
          (id) => then(push(["use", id]),
                       wrap(id + 5)),
          (id) => then(push(["destroy", id]),
-                      throw_error(new Error("Hi")))))),
+                      throw_error(new Error("Hi2")))))),
 
   // Success create | Error use | Error destroy -> Error destroy
   expect({

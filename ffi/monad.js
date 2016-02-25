@@ -4,6 +4,7 @@ import { _null } from "./types";
 // TODO is this correct ?
 export const sequential = (transform, flatten, wrap, a) => {
   const length = a["length"];
+  // TODO this is probably impure / wrong
   const values = new Array(length);
 
   const loop = (i) =>
@@ -17,7 +18,7 @@ export const sequential = (transform, flatten, wrap, a) => {
   return loop(0);
 };
 
-// TODO is this correct ?
+
 export const sequential_null = (transform, flatten, wrap, a) => {
   const length = a["length"];
 

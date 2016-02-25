@@ -35,8 +35,15 @@ export const kill_threads = (a) => {
   }
 };
 
-const _run = (task, thread) =>
-  task.a(task, thread);
+const _run = (task, thread) => {
+  switch (task.$) {
+  case 0:
+    // TODO catch errors ?
+    return success(thread, task.a(task));
+  default:
+    return task.a(task, thread);
+  }
+};
 
 export const run_in_thread = (task, thread, on_success, on_error) => {
   if (thread.a) {
@@ -105,28 +112,73 @@ const error = (thread, value) =>
   thread.c(thread, value);
 
 
-const run_sync = (task, thread) =>
+const run_sync = (task) =>
   // TODO maybe use try/catch ?
-  success(thread, task.b());
+  task.b();
 
 export const sync = (b) =>
-  ({ a: run_sync, b });
+  ({ $: 0, a: run_sync, b });
 
+
+const run_catch_error_success = (thread, value) => {
+  const state = thread.e;
+
+  thread.b = state.a;
+  thread.c = state.b;
+  thread.d = noop;
+  thread.e = state.c;
+
+  return success(thread, { $: 0, a: value });
+};
+
+const run_catch_error_error = (thread, value) => {
+  const state = thread.e;
+
+  thread.b = state.a;
+  thread.c = state.b;
+  thread.d = noop;
+  thread.e = state.c;
+
+  return success(thread, { $: 1, a: value });
+};
 
 const run_catch_error = (task, thread) => {
   const x = try_catch(task.b);
 
   if (x.$ === 0) {
-    return success(thread, x.a);
+    const state = {
+      a: thread.b, // old_success
+      b: thread.c, // old_error
+      c: thread.e  // old_state
+    };
+
+    thread.b = run_catch_error_success;
+    thread.c = run_catch_error_error;
+    thread.e = state;
+
+    // TODO can this be made more efficient ?
+    const y = try_catch(() => _run(x.a, thread));
+
+    // TODO is this correct ?
+    if (y.$ === 1) {
+      thread.b = state.a;
+      thread.c = state.b;
+      thread.d = noop;
+      thread.e = state.c;
+
+      return success(thread, y);
+    }
 
   } else {
-    return error(thread, x.a);
+    return success(thread, x);
   }
 };
 
 // TODO merge this into sync ?
+// TODO optimization for sync ?
+// TODO test this
 export const catch_error = (b) =>
-  ({ a: run_catch_error, b });
+  ({ $: 1, a: run_catch_error, b });
 
 
 const run_ignore_kill_success = (thread, value) => {
@@ -187,8 +239,16 @@ const run_ignore_kill = (task, thread) => {
 // Guarantees:
 // * success is ignored after being killed
 // * does nothing when killed
-export const ignore_kill = (b) =>
-  ({ a: run_ignore_kill, b });
+export const ignore_kill = (b) => {
+  // TODO test this
+  switch (b.$) {
+  case 0:
+    // TODO is this correct ?
+    return b;
+  default:
+    return { $: 1, a: run_ignore_kill, b };
+  }
+};
 
 
 const run_async_killable_success = (thread, state, value) => {
@@ -254,7 +314,7 @@ const run_async_killable = (task, thread) => {
 // * error cannot be called after success, error, or kill
 // * will not be killed after success, error, or kill
 export const async_killable = (b) =>
-  ({ a: run_async_killable, b });
+  ({ $: 1, a: run_async_killable, b });
 
 
 // Guarantees:
@@ -284,21 +344,23 @@ export const from_Promise = (f) =>
     f()["then"](success, error));
 
 
-export const never = { a: noop };
+// TODO can this be made sync ?
+export const never = { $: 1, a: noop };
 
 
-const run_wrap = (task, thread) =>
-  success(thread, task.b);
+const run_wrap = (task) =>
+  task.b;
 
 export const wrap = (b) =>
-  ({ a: run_wrap, b });
+  ({ $: 0, a: run_wrap, b });
 
 
-const run_throw_error = (task, thread) =>
-  error(thread, task.b);
+const run_throw_error = (task) => {
+  throw task.b;
+};
 
 export const throw_error = (b) =>
-  ({ a: run_throw_error, b });
+  ({ $: 0, a: run_throw_error, b });
 
 
 const run_transform_success = (thread, value) => {
@@ -340,10 +402,23 @@ const run_transform = (task, thread) => {
   return _run(task.b, thread);
 };
 
-export const transform = (b, c) =>
-  ({ a: run_transform, b, c });
+const run_transform_sync = (task) => {
+  const b = task.b;
+  return task.c(b.a(b));
+};
+
+export const transform = (b, c) => {
+  // TODO test this
+  switch (b.$) {
+  case 0:
+    return { $: 0, a: run_transform_sync, b, c };
+  default:
+    return { $: 1, a: run_transform, b, c };
+  }
+};
 
 
+// TODO does this need to set thread.d to noop ?
 const run_flatten_success = (thread, value) => {
   const state = thread.e;
 
@@ -381,8 +456,21 @@ const run_flatten = (task, thread) => {
   return _run(task.b, thread);
 };
 
-export const flatten = (b) =>
-  ({ a: run_flatten, b });
+// TODO can this be optimized further ?
+const run_flatten_sync = (task, thread) => {
+  const b = task.b;
+  return _run(b.a(b), thread);
+};
+
+export const flatten = (b) => {
+  // TODO test this
+  switch (b.$) {
+  case 0:
+    return { $: 1, a: run_flatten_sync, b };
+  default:
+    return { $: 1, a: run_flatten, b };
+  }
+};
 
 
 const run_concurrent_null_success = (thread, value) => {
@@ -458,8 +546,9 @@ const run_concurrent_null = (task, thread) => {
 };
 
 // TODO code duplication with concurrent
+// TODO can this be optimized for sync tasks ?
 export const concurrent_null = (b) =>
-  ({ a: run_concurrent_null, b });
+  ({ $: 1, a: run_concurrent_null, b });
 
 
 const run_concurrent_success = (thread, value) => {
@@ -546,8 +635,9 @@ const run_concurrent = (task, thread) => {
   }
 };
 
+// TODO can this be optimized for sync tasks ?
 export const concurrent = (b) =>
-  ({ a: run_concurrent, b });
+  ({ $: 1, a: run_concurrent, b });
 
 
 const run_transform2_success = (thread, value) => {
@@ -631,9 +721,21 @@ const run_transform2 = (task, thread) => {
   return _run(task.c, thread2);
 };
 
+const run_transform2_sync = (task) => {
+  const b = task.b;
+  const c = task.c;
+  return task.d(b.a(b), c.a(c));
+};
+
 // TODO test this
-export const transform2 = (b, c, d) =>
-  ({ a: run_transform2, b, c, d });
+export const transform2 = (b, c, d) => {
+  // TODO test this
+  if (b.$ === 0 && c.$ === 0) {
+    return { $: 0, a: run_transform2_sync, b, c, d };
+  } else {
+    return { $: 1, a: run_transform2, b, c, d };
+  }
+};
 
 
 const run_fastest_success = (thread, value) => {
@@ -698,97 +800,66 @@ const run_fastest = (task, thread) => {
 
   _run(task.b, thread1);
 
+  // TODO is this necessary ?
   if (state.a) {
     return _run(task.c, thread2);
   }
 };
 
-export const fastest = (b, c) =>
-  ({ a: run_fastest, b, c });
+export const fastest = (b, c) => {
+  // TODO test this
+  if (b.$ === 0) {
+    return b;
 
+  // TODO test this
+  // TODO does this change the semantics of async_unkillable ?
+  } else if (c.$ === 0) {
+    return c;
 
-const run_on_error_success = (thread, value) => {
-  const state = thread.e;
-
-  thread.b = state.c;
-  thread.c = state.d;
-  thread.d = noop;
-  thread.e = state.e;
-
-  return success(thread, state.a(value));
+  } else {
+    return { $: 1, a: run_fastest, b, c };
+  }
 };
-
-const run_on_error_error = (thread, value) => {
-  const state = thread.e;
-
-  thread.b = state.c;
-  thread.c = state.d;
-  thread.d = noop;
-  thread.e = state.e;
-
-  return success(thread, state.b(value));
-};
-
-const run_on_error = (task, thread) => {
-  const state = {
-    a: task.c,   // on_success
-    b: task.d,   // on_error
-    c: thread.b, // old_success
-    d: thread.c, // old_error
-    e: thread.e  // old_state
-  };
-
-  thread.b = run_on_error_success;
-  thread.c = run_on_error_error;
-  // TODO handle kill ?
-  thread.e = state;
-
-  return _run(task.b, thread);
-};
-
-// TODO maybe handle kill ?
-export const on_error = (b, c, d) =>
-  ({ a: run_on_error, b, c, d });
 
 
 const run_with_resource_destroy_success = (thread, value) => {
-  const state = thread.e;
-  const result = state.c;
+  if (value.$ === 0) {
+    const state = thread.e;
+    const result = state.c;
 
-  // TODO check for 0 ?
-  if (result.$ === 1) {
-    if (!state.a) {
-      const old_thread = state.h;
-      old_thread.d = noop;
-      old_thread.e = state.i;
-      return success(old_thread, result.a);
+    if (result.$ === 0) {
+      if (!state.a) {
+        const old_thread = state.h;
+        old_thread.d = noop;
+        old_thread.e = state.i;
+        return success(old_thread, result.a);
+      }
+
+    } else {
+      // TODO is this correct ?
+      return run_with_resource_error(thread, result.a);
     }
 
   } else {
     // TODO is this correct ?
-    return run_with_resource_error(thread, result.a);
+    return run_with_resource_error(thread, value.a);
   }
 };
 
-const run_with_resource_use = (thread, type, value) => {
+const run_with_resource_use_success = (thread, value) => {
   const state = thread.e;
   const resource = state.b;
   const thread_create = state.f;
 
   state.b = none;
-  state.c = { $: type, a: value };
+  state.c = value;
 
   thread_create.b = run_with_resource_destroy_success;
 
   // TODO assert that the resource exists ?
-  return _run(state.e(resource.a), thread_create);
+  // TODO can this be made more efficient ?
+  return _run(catch_error(() => state.e(resource.a)), thread_create);
 };
-
-const run_with_resource_use_success = (thread, value) =>
-  run_with_resource_use(thread, 1, value);
-
-const run_with_resource_use_error = (thread, value) =>
-  run_with_resource_use(thread, 2, value);
 
 const run_with_resource_success = (thread, value) => {
   const state = thread.e;
@@ -799,12 +870,14 @@ const run_with_resource_success = (thread, value) => {
     thread_create.b = noop;
     thread_create.c = thread_crash;
 
+    // TODO does this need to use catch_error ?
     return _run(state.e(value), thread_create);
 
   } else {
     state.b = some(value);
 
-    return _run(state.d(value), state.g);
+    // TODO can this be made more efficient ?
+    return _run(catch_error(() => state.d(value)), state.g);
   }
 };
 
@@ -837,6 +910,7 @@ const run_with_resource_kill = (thread) => {
     thread_create.b = noop;
     thread_create.c = thread_crash;
 
+    // TODO does this need to use catch_error ?
     return _run(state.e(resource.a), thread_create);
   }
 };
@@ -848,7 +922,8 @@ const run_with_resource = (task, thread) => {
   const state = {
     a: false,         // killed
     b: none,          // resource
-    c: { $: 0 },      // result
+    // TODO the type changes from null to object
+    c: null,          // result
     d: task.c,        // use
     e: task.d,        // destroy
     f: thread_create, // thread_create
@@ -865,7 +940,6 @@ const run_with_resource = (task, thread) => {
   thread_create.e = state;
 
   thread_use.b = run_with_resource_use_success;
-  thread_use.c = run_with_resource_use_error;
   thread_use.e = state;
 
   return _run(task.b, thread_create);
@@ -889,8 +963,9 @@ Kill create + Success create |             | Success destroy                -> N
 Kill create + Success create |             | Error destroy                  -> Crash destroy
 Kill create + Error create   |             |                                -> Crash create
 */
+// TODO can this be optimized for sync tasks ?
 export const with_resource = (b, c, d) =>
-  ({ a: run_with_resource, b, c, d });
+  ({ $: 1, a: run_with_resource, b, c, d });
 
 
 const _yield_queue = [];

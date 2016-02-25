@@ -1,5 +1,5 @@
 import { expect, expect_crash } from "../assert";
-import { wrap, catch_error } from "../../ffi/task";
+import { wrap, sync } from "../../ffi/task";
 import { tokenize } from "../../src/parser/tokenize";
 import { parse } from "../../src/parser/parse";
 import { lines, repeat } from "../../util/string";
@@ -24,8 +24,8 @@ const test = (input, f) => {
 };
 
 const test_crash = (input, expected) =>
-  expect_crash("Error: " + expected,
-    catch_error(() => {
+  expect_crash("Error: " + expected, () =>
+    sync(() => {
       const x = lines(input);
       return parse(tokenize(x, file));
     }));
