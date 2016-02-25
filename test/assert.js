@@ -3,7 +3,8 @@ import { pretty, eol, get_message } from "../util/node";
 import { indent } from "../util/string";
 import { map, length } from "../util/array";
 import { fastest, flatten, transform, wrap, throw_error,
-         wait, concurrent_null, log, catch_error, make_thread_run } from "../ffi/task";
+         wait, concurrent_null, catch_error, make_thread_run } from "../ffi/task";
+import { task_from, log } from "../ffi/task-sync";
 
 
 const isObject = (x) =>
@@ -94,7 +95,7 @@ export const test_group = (group_name, a) => {
   });
 
   return flatten(transform(concurrent_null(tasks), (_) =>
-           log(group_name + ": " + length(tasks) + " tests succeeded\n")));
+           task_from(log(group_name + ": " + length(tasks) + " tests succeeded\n"))));
 };
 
 export const expect = (expected, task) =>
@@ -114,9 +115,9 @@ export const expect_crash = (expected, f) =>
             : throw_error(new Error(format_error(name, get_message(e.a), expected)))))));
 
 export const run_tests = (a) => {
-  make_thread_run(flatten(transform(log("---- Starting unit tests\n"), (_) =>
+  make_thread_run(flatten(transform(task_from(log("---- Starting unit tests\n")), (_) =>
                   flatten(transform(concurrent_null(a), (_) =>
-                          log("---- All unit tests succeeded"))))));
+                          task_from(log("---- All unit tests succeeded")))))));
 };
 
 

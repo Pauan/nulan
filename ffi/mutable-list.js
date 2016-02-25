@@ -1,4 +1,4 @@
-import { sync } from "./task";
+import { sync } from "./task-sync";
 import { _null } from "./types";
 import * as $list from "./list";
 import * as $array from "../util/array";

@@ -1,5 +1,5 @@
 import { expect, expect_crash } from "../assert";
-import { wrap, sync } from "../../ffi/task";
+import { wrap } from "../../ffi/task";
 import { loc, text, symbol, integer } from "../../src/parser/ast";
 import { tokenize } from "../../src/parser/tokenize";
 import { lines } from "../../util/string";
@@ -20,11 +20,10 @@ const test = (input, f) => {
 };
 
 const test_crash = (input, expected) =>
-  expect_crash("Error: " + expected, () =>
-    sync(() => {
-      const x = lines(input);
-      return tokenize(x, file);
-    }));
+  expect_crash("Error: " + expected, () => {
+    const x = lines(input);
+    return wrap(tokenize(x, file));
+  });
 
 
 export default [

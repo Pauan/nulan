@@ -1,5 +1,5 @@
 import { expect, expect_crash } from "../assert";
-import { wrap, sync } from "../../ffi/task";
+import { wrap } from "../../ffi/task";
 import { tokenize } from "../../src/parser/tokenize";
 import { parse } from "../../src/parser/parse";
 import { lines, repeat } from "../../util/string";
@@ -24,11 +24,10 @@ const test = (input, f) => {
 };
 
 const test_crash = (input, expected) =>
-  expect_crash("Error: " + expected, () =>
-    sync(() => {
-      const x = lines(input);
-      return parse(tokenize(x, file));
-    }));
+  expect_crash("Error: " + expected, () => {
+    const x = lines(input);
+    return wrap(parse(tokenize(x, file)));
+  });
 
 const marker = (name) =>
   "^" + repeat("-", name["length"] - 1);

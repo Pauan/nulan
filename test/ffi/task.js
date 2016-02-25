@@ -1,7 +1,7 @@
 import { expect, expect_crash, assert_crash } from "../assert";
 import { crash } from "../../util/error";
 import { get_message } from "../../util/node";
-import { sync, transform, flatten, wrap, concurrent, concurrent_null,
+import { transform, flatten, wrap, concurrent, concurrent_null,
          wait, fastest, _yield, throw_error, ignore_kill, async_killable,
          async_unkillable, never, kill_thread,
          make_thread_run, with_resource, catch_error } from "../../ffi/task";
@@ -17,6 +17,11 @@ const then = (a, b) =>
 const forever = (a) =>
   after(a, (_) =>
     forever(a));
+
+const sync = (a) =>
+  async_unkillable((success, error) => {
+    success(a());
+  });
 
 const killed = (a, value) =>
   after(sync(() => {
@@ -366,7 +371,7 @@ export default [
       then(wait(10), wrap("3"))
     )),
 
-  expect("3",
+  expect("1",
     fastest(
       async_unkillable((success, error) => {
         success("1");
@@ -447,7 +452,7 @@ export default [
       wrap("4")
     )),
 
-  expect("3",
+  expect("1",
     ignore_kill(fastest(
       async_killable((success, error) => {
         success("1");

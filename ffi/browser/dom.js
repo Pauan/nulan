@@ -1,5 +1,6 @@
 import { make_thread_pool, kill_thread_pool, run_in_thread_pool,
-         async_killable, sync } from "../task";
+         async_killable } from "../task";
+import { sync } from "../task-sync";
 import { crash } from "../../util/error";
 
 
