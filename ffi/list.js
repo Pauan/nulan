@@ -212,3 +212,15 @@ export const from_iterator = (a) => {
     }
   }
 };
+
+
+export const transform = (a, f) => {
+  const length = a["length"];
+  const out = new Array(length);
+
+  for (let i = 0; i < length; ++i) {
+    out[i] = f(a[i]);
+  }
+
+  return out;
+};
