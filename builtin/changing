@@ -9,7 +9,7 @@
 | transform_many :: (-> Unknown (-> Unknown a) (Changing a))
 | transform_pair :: (-> (Changing a) (Changing b) (Changing (Pair a b)))
 | throttle :: (-> (Changing a) Integer (Changing a))
-| _yield :: (-> a (Changing a)))
+| reply :: (-> a (Changing a)))
 
 
 #/
@@ -30,4 +30,4 @@
 | transform-pair <= transform_pair
 | transform-many <= transform_many
 | throttle
-| yield <= _yield)
+| reply)

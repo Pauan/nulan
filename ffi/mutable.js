@@ -1,4 +1,4 @@
-import { sync } from "./task-sync";
+import { blocking } from "./blocking-task";
 import { _null } from "./types";
 import * as $array from "../util/array";
 
@@ -18,7 +18,7 @@ const _set = (mutable, value) => {
 
 
 export const mutable = (value) =>
-  sync(() => {
+  blocking(() => {
     return {
       a: value,
       b: []
@@ -26,16 +26,16 @@ export const mutable = (value) =>
   });
 
 export const get = (mutable) =>
-  sync(() => mutable.a);
+  blocking(() => mutable.a);
 
 export const set = (mutable, value) =>
-  sync(() => {
+  blocking(() => {
     _set(mutable, value);
     return _null;
   });
 
 export const modify = (mutable, fn) =>
-  sync(() => {
+  blocking(() => {
     const value = mutable.a;
     _set(mutable, fn(value));
     return _null;

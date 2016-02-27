@@ -1,5 +1,5 @@
-(PROTOCOL ($yield a)
-| yield :: (-> b (a b)))
+(PROTOCOL ($reply a)
+| reply :: (-> b (a b)))
 
 (PROTOCOL ($transform a)
 | transform :: (-> (a b) (-> b c) (a c)))
@@ -31,8 +31,8 @@
 
 
 (EXPORT
-| $yield
-| yield
+| $reply
+| reply
 
 | $transform
 | transform

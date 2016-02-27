@@ -1,4 +1,4 @@
-import { sync } from "./task-sync";
+import { blocking } from "./blocking-task";
 import { _null } from "./types";
 import * as $list from "./list";
 import * as $array from "../util/array";
@@ -17,7 +17,7 @@ const _trigger = (mutable, value) => {
 
 // TODO code duplication with mutable.js
 export const mutable_list = (value) =>
-  sync(() => {
+  blocking(() => {
     return {
       a: value,
       b: []
@@ -27,11 +27,11 @@ export const mutable_list = (value) =>
 
 // TODO code duplication with mutable.js
 export const get = (mutable) =>
-  sync(() => mutable.a);
+  blocking(() => mutable.a);
 
 
 export const set = (mutable, a) =>
-  sync(() => {
+  blocking(() => {
     // TODO does this affect the semantics ?
     // TODO test this
     if (mutable.a !== a) {
@@ -48,7 +48,7 @@ export const set = (mutable, a) =>
 
 
 export const push = (mutable, a) =>
-  sync(() => {
+  blocking(() => {
     // TODO slightly hacky
     const index = mutable.a["length"];
 
@@ -65,7 +65,7 @@ export const push = (mutable, a) =>
 
 
 export const insert = (mutable, index1, a) =>
-  sync(() => {
+  blocking(() => {
     // TODO very slightly hacky
     // TODO what about errors ?
     const index2 = $list.get_index(index1, mutable.a["length"] + 1);
@@ -84,7 +84,7 @@ export const insert = (mutable, index1, a) =>
 
 
 export const update = (mutable, index1, a) =>
-  sync(() => {
+  blocking(() => {
     // TODO very slightly hacky
     // TODO what about errors ?
     const index2 = $list.get_index(index1, mutable.a["length"]);
@@ -109,7 +109,7 @@ export const update = (mutable, index1, a) =>
 
 
 export const remove = (mutable, index1) =>
-  sync(() => {
+  blocking(() => {
     // TODO very slightly hacky
     // TODO what about errors ?
     const index2 = $list.get_index(index1, mutable.a["length"]);

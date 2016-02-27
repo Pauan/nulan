@@ -2,15 +2,16 @@ import { _null } from "./types";
 import { async_unkillable } from "./task";
 
 
-export const sync = (a) =>
+export const blocking = (a) =>
   ({ $: 0, a });
 
-export const wrap = (a) =>
+export const reply = (a) =>
   ({ $: 1, a });
 
-export const after = (a, b) =>
+export const chain = (a, b) =>
   ({ $: 2, a, b });
 
+// TODO remove transform and flatten, since they are redundant ?
 export const transform = (a, b) =>
   ({ $: 3, a, b });
 
@@ -22,7 +23,7 @@ export const transform2 = (a, b, c) =>
 
 
 export const log = (s) =>
-  sync(() => {
+  blocking(() => {
     console["log"](s);
     return _null;
   });
@@ -31,16 +32,17 @@ export const log = (s) =>
 const run = (task) => {
   for (;;) {
     switch (task.$) {
-    // *sync
+    // *blocking
     case 0:
       return task.a();
 
-    // *yield
+    // *reply
     case 1:
       return task.a;
 
-    // *after
+    // *chain
     case 2:
+      // Tail recursive
       task = task.b(run(task.a));
       break;
 

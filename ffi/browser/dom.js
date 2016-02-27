@@ -1,6 +1,6 @@
 import { make_thread_pool, kill_thread_pool, run_in_thread_pool,
          async_killable } from "../task";
-import { sync } from "../task-sync";
+import { blocking } from "../blocking-task";
 import { crash } from "../../util/error";
 
 
@@ -12,9 +12,8 @@ const kill_all = (running) => {
   }
 };
 
-const each = (running, observe, f) => {
+const each = (running, observe, f) =>
   running["push"](observe(f));
-};
 
 
 let root_style = null;
@@ -53,9 +52,8 @@ export const stylesheet = (name, rules) =>
     // TODO check for duplicate styles
     set_attributes(running, rule["style"], rules);
 
-    return () => {
+    return () =>
       kill_all(running);
-    };
   });
 
 
@@ -70,16 +68,122 @@ export const keyframes = (name, rules) =>
 
     set_attributes(running, rule, rules);
 
-    return () => {
+    return () =>
       kill_all(running);
-    };
   });
 
 
+const get_transform = (style) => {
+  // TODO handle this better
+  // TODO verify that style["transform"] is ""
+  if (style.__transforms__ == null) {
+    // TODO is it faster to use an object ?
+    style.__transforms__ = [];
+  }
+
+  return style.__transforms__;
+};
+
+// TODO test this
+const special_styles_transform_change = (style, name, value, visible) => {
+  const transforms = get_transform(style);
+
+  const length = transforms["length"];
+
+  const out = [];
+
+  let seen = false;
+
+  for (let i = 0; i < length; ++i) {
+    const x = transforms[i];
+
+    if (x.a === name) {
+      seen = true;
+      x.b = value;
+      x.c = visible;
+    }
+
+    if (x.c) {
+      out["push"](x.a + "(" + x.b + ")");
+    }
+  }
+
+  if (!seen) {
+    transforms["push"]({ a: name, b: value, c: visible });
+
+    if (visible) {
+      out["push"](name + "(" + value + ")");
+    }
+  }
+
+  style["transform"] = out["join"](" ");
+};
+
+const special_styles_transform_set = (style, name, value) =>
+  special_styles_transform_change(style, name, value, true);
+
+const special_styles_transform_remove = (style, name) =>
+  special_styles_transform_change(style, name, "", false);
+
+const special_styles_remove = {
+  "translateX": special_styles_transform_remove,
+  "translateY": special_styles_transform_remove,
+  "translateZ": special_styles_transform_remove,
+  "scaleX": special_styles_transform_remove,
+  "scaleY": special_styles_transform_remove,
+  "scaleZ": special_styles_transform_remove,
+  "rotate": special_styles_transform_remove,
+  "rotateX": special_styles_transform_remove,
+  "rotateY": special_styles_transform_remove,
+  "rotateZ": special_styles_transform_remove,
+  "skewX": special_styles_transform_remove,
+  "skewY": special_styles_transform_remove,
+  "perspective": special_styles_transform_remove
+};
+
+const special_styles_set = {
+  "translateX": special_styles_transform_set,
+  "translateY": special_styles_transform_set,
+  "translateZ": special_styles_transform_set,
+  "scaleX": special_styles_transform_set,
+  "scaleY": special_styles_transform_set,
+  "scaleZ": special_styles_transform_set,
+  "rotate": special_styles_transform_set,
+  "rotateX": special_styles_transform_set,
+  "rotateY": special_styles_transform_set,
+  "rotateZ": special_styles_transform_set,
+  "skewX": special_styles_transform_set,
+  "skewY": special_styles_transform_set,
+  "perspective": special_styles_transform_set
+};
+
+// TODO test this
+const remove_style = (style, name) => {
+  const x = special_styles_remove[name];
+
+  if (x == null) {
+    // TODO set it to "" instead ?
+    return style["removeProperty"](name);
+
+  } else {
+    return x(style, name);
+  }
+};
+
 // TODO check that the property and value is valid
 // TODO vendor prefixes
+// TODO can this be made faster ?
+// TODO test this
 const set_style = (style, name, value) => {
-  style[name] = value;
+  const x = special_styles_set[name];
+
+  if (x == null) {
+    // TODO is it faster to use this or setProperty ?
+    style[name] = value;
+
+  } else {
+    return x(style, name, value);
+  }
 };
 
 
@@ -91,7 +195,7 @@ const set_frame = (running, keyframes, attr) => {
 
   const rule = css_rules[css_rules["length"] - 1];
 
-  set_attributes(running, rule["style"], attr.c);
+  return set_attributes(running, rule["style"], attr.c);
 };
 
 export const frame = (b, c) =>
@@ -99,7 +203,7 @@ export const frame = (b, c) =>
 
 
 const style_style = (running, style, attr) => {
-  set_style(style, attr.b, attr.c);
+  return set_style(style, attr.b, attr.c);
 };
 
 export const style = (b, c) =>
@@ -107,19 +211,15 @@ export const style = (b, c) =>
 
 
 const style_changing_style = (running, style, attr) => {
-  each(running, attr.c, (maybe) => {
+  return each(running, attr.c, (maybe) => {
     switch (maybe.$) {
     // *none
     case 0:
-      // TODO set it to "" instead ?
-      // TODO use remove_style instead ?
-      style["removeProperty"](attr.b);
-      break;
+      return remove_style(style, attr.b);
 
     // *some
     default:
-      set_style(style, attr.b, maybe.a);
-      break;
+      return set_style(style, attr.b, maybe.a);
     }
   });
 };
@@ -134,9 +234,8 @@ const make_event_pool = (running) => {
   const pool = make_thread_pool(crash);
 
   // TODO remove the event listener ?
-  running["push"](() => {
-    kill_thread_pool(pool);
-  });
+  running["push"](() =>
+    kill_thread_pool(pool));
 
   return pool;
 };
@@ -148,13 +247,26 @@ const event_event = (running, x, event) => {
 
   const pool = make_event_pool(running);
 
-  x["addEventListener"](event.b, (e) => {
-    run_in_thread_pool(pool, f({ a: x }));
-  }, true);
+  return x["addEventListener"](event.b, (e) =>
+    run_in_thread_pool(pool, f({ a: x })), true);
 };
 
 export const event = (b, c) =>
   ({ a: event_event, b, c });
+
+
+const event_on_create = (running, x, event) => {
+  const f = event.b;
+
+  // TODO does this need a thread pool or can it use a single thread ?
+  const pool = make_event_pool(running);
+
+  return run_in_thread_pool(pool, f({ a: x }));
+};
+
+// TODO is this a good idea ?
+export const on_create = (b) =>
+  ({ a: event_on_create, b });
 
 
 // TODO test this
@@ -163,11 +275,11 @@ const event_on_left_click = (running, x, event) => {
 
   const pool = make_event_pool(running);
 
-  x["addEventListener"]("click", (e) => {
+  return x["addEventListener"]("click", (e) => {
     // TODO test this
     if (e["button"] === 0) {
       // TODO preventDefault ?
-      run_in_thread_pool(pool, f({ a: x }));
+      return run_in_thread_pool(pool, f({ a: x }));
     }
   }, true);
 };
@@ -182,20 +294,18 @@ const event_on_mouse_hover = (running, x, event) => {
   const pool = make_event_pool(running);
 
     // TODO check for descendents
-  x["addEventListener"]("mouseover", (e) => {
+  x["addEventListener"]("mouseover", (e) =>
     run_in_thread_pool(pool, f({
       a: x,
       b: true
-    }));
-  }, true);
+    })), true);
 
   // TODO check for descendents
-  x["addEventListener"]("mouseout", (e) => {
+  return x["addEventListener"]("mouseout", (e) =>
     run_in_thread_pool(pool, f({
       a: x,
       b: false
-    }));
-  }, true);
+    })), true);
 };
 
 export const on_mouse_hover = (b) =>
@@ -210,17 +320,17 @@ const event_on_mouse_hold = (running, x, event) => {
   const mouseup = (e) => {
     removeEventListener("mouseup", mouseup, true);
 
-    run_in_thread_pool(pool, f({
+    return run_in_thread_pool(pool, f({
       a: x,
       b: false
     }));
   };
 
-  x["addEventListener"]("mousedown", (e) => {
+  return x["addEventListener"]("mousedown", (e) => {
     // TODO use the blur event as well ?
     addEventListener("mouseup", mouseup, true);
 
-    run_in_thread_pool(pool, f({
+    return run_in_thread_pool(pool, f({
       a: x,
       b: true
     }));
@@ -232,7 +342,7 @@ export const on_mouse_hold = (b) =>
 
 
 export const get_position = (a) =>
-  sync(() => {
+  blocking(() => {
     const x = a["getBoundingClientRect"]();
 
     return {
@@ -246,7 +356,7 @@ export const get_position = (a) =>
 
 // TODO duplicate attr check
 const attribute_attr = (running, x, attr) => {
-  x["setAttribute"](attr.b, attr.c);
+  return x["setAttribute"](attr.b, attr.c);
 };
 
 export const attr = (b, c) =>
@@ -272,14 +382,14 @@ export const classes = (b) =>
 
 // TODO duplicate class check
 const attribute_changing_class = (running, x, attr) => {
-  each(running, attr.c, (a) => {
+  return each(running, attr.c, (a) => {
     // *false
     if (a === 0) {
-      x["classList"]["remove"](attr.b);
+      return x["classList"]["remove"](attr.b);
 
     // *true
     } else {
-      x["classList"]["add"](attr.b);
+      return x["classList"]["add"](attr.b);
     }
   });
 };
@@ -290,7 +400,7 @@ export const changing_class = (b, c) =>
 
 // TODO duplicate event check
 const attribute_events = (running, x, attr) => {
-  set_attributes(running, x, attr.b);
+  return set_attributes(running, x, attr.b);
 };
 
 export const events = (b) =>
@@ -299,17 +409,15 @@ export const events = (b) =>
 
 // TODO duplicate attr check
 const attribute_changing_attr = (running, x, attr) => {
-  each(running, attr.c, (maybe) => {
+  return each(running, attr.c, (maybe) => {
     switch (maybe.$) {
     // *none
     case 0:
-      x["removeAttribute"](attr.b);
-      break;
+      return x["removeAttribute"](attr.b);
 
     // *some
     default:
-      x["setAttribute"](attr.b, maybe.a);
-      break;
+      return x["setAttribute"](attr.b, maybe.a);
     }
   });
 };
@@ -320,7 +428,7 @@ export const changing_attr = (b, c) =>
 
 // TODO duplicate style check
 const attribute_styles = (running, x, attr) => {
-  set_attributes(running, x["style"], attr.b);
+  return set_attributes(running, x["style"], attr.b);
 };
 
 export const styles = (b) =>
@@ -349,7 +457,7 @@ const set_children_list = (running, x, a) => {
     fragment["appendChild"](b.a(running, b));
   }
 
-  x["appendChild"](fragment);
+  return x["appendChild"](fragment);
 };
 
 
@@ -386,12 +494,12 @@ const insert_before = (children, x, index, a) => {
   if (index === children["length"]) {
     children["push"](running);
 
-    x["appendChild"](a.a(running, a));
+    return x["appendChild"](a.a(running, a));
 
   } else {
     children["splice"](index, 0, running);
 
-    x["insertBefore"](a.a(running, a), x["childNodes"][index]);
+    return x["insertBefore"](a.a(running, a), x["childNodes"][index]);
   }
 };
 
@@ -402,7 +510,7 @@ const replace_child = (children, x, index, a) => {
   kill_all(children[index]);
   children[index] = running;
 
-  x["replaceChild"](a.a(running, a), x["childNodes"][index]);
+  return x["replaceChild"](a.a(running, a), x["childNodes"][index]);
 };
 
 // TODO test this
@@ -411,7 +519,7 @@ const remove_child = (children, x, index) => {
 
   children["splice"](index, 1);
 
-  x["removeChild"](x["childNodes"][index]);
+  return x["removeChild"](x["childNodes"][index]);
 };
 
 // TODO test this
@@ -428,7 +536,10 @@ const set_changing_children = (running, x, a) => {
     }
   };
 
-  each(running, a, (a) => {
+  // TODO test this
+  running["push"](kill);
+
+  return each(running, a, (a) => {
     switch (a.$) {
     // *set
     case 0:
@@ -443,23 +554,17 @@ const set_changing_children = (running, x, a) => {
 
     // *insert
     case 1:
-      insert_before(children, x, a.a, a.b);
-      break;
+      return insert_before(children, x, a.a, a.b);
 
     // *update
     case 2:
-      replace_child(children, x, a.a, a.b);
-      break;
+      return replace_child(children, x, a.a, a.b);
 
     // *remove
     default:
-      remove_child(children, x, a.a);
-      break;
+      return remove_child(children, x, a.a);
     }
   });
-
-  // TODO test this
-  running["push"](kill);
 };
 
 
@@ -572,8 +677,7 @@ const animated_state = (parent, a) => {
           parent["removeChild"](child);
         }
 
-        // TODO use remove_style instead ?
-        set_style(child["style"], "animation", "");
+        return remove_style(child["style"], "animation");
       }
     }
   }, true);
@@ -589,7 +693,7 @@ const set_animation = (state, child, animations) => {
   if (length !== 0) {
     state.c = length;
 
-    set_style(child["style"], "animation", animations["join"](","));
+    return set_style(child["style"], "animation", animations["join"](","));
   }
 };
 
@@ -632,14 +736,14 @@ const animated_insert_before = (animations, children, x, index, a) => {
   if (index === children["length"]) {
     children["push"](state);
 
-    x["appendChild"](child);
+    return x["appendChild"](child);
 
   } else {
     const old = children[index];
 
     children["splice"](index, 0, state);
 
-    x["insertBefore"](child, old.a);
+    return x["insertBefore"](child, old.a);
   }
 };
 
@@ -656,7 +760,7 @@ const animated_replace_child = (animations, children, x, index, a) => {
 
   children[index] = state;
 
-  x["replaceChild"](child, old.a);
+  return x["replaceChild"](child, old.a);
 };
 
 // TODO test this
@@ -671,11 +775,11 @@ const animated_remove_child = (animations, children, x, index) => {
   // TODO is this correct ?
   // TODO test this
   if (animations["length"] === 0) {
-    x["removeChild"](child);
+    return x["removeChild"](child);
 
   } else {
     old.d = true;
-    set_animation(old, child, animations);
+    return set_animation(old, child, animations);
   }
 };
 
@@ -695,7 +799,10 @@ const set_animated_children = (running, x, a, b) => {
     }
   };
 
-  each(running, b, (a) => {
+  // TODO test this
+  running["push"](kill);
+
+  return each(running, b, (a) => {
     switch (a.$) {
     // *set
     case 0:
@@ -710,23 +817,17 @@ const set_animated_children = (running, x, a, b) => {
 
     // *insert
     case 1:
-      animated_insert_before(animations.b, children, x, a.a, a.b);
-      break;
+      return animated_insert_before(animations.b, children, x, a.a, a.b);
 
     // *update
     case 2:
-      animated_replace_child(animations.c, children, x, a.a, a.b);
-      break;
+      return animated_replace_child(animations.c, children, x, a.a, a.b);
 
     // *remove
     default:
-      animated_remove_child(animations.d, children, x, a.a);
-      break;
+      return animated_remove_child(animations.d, children, x, a.a);
     }
   });
-
-  // TODO test this
-  running["push"](kill);
 };
 
 
@@ -806,7 +907,7 @@ export const render = (parent, a) =>
     return () => {
       kill_all(running);
       // TODO test this
-      parent["removeChild"](x);
+      return parent["removeChild"](x);
     };
   });
 

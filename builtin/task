@@ -9,7 +9,7 @@
 
 (WITH-TARGET javascript
   (UNSAFE-FFI-LOAD "../ffi/task.js"
-    | wrap          :: (-> a (Task a))
+    | reply         :: (-> a (Task a))
     | transform     :: (-> (Task a) (-> a b) (Task b))
     | flatten       :: (-> (Task (Task a)) (Task a))
     | concurrent    :: (-> (List (Task a)) (Task (List a)))
@@ -25,9 +25,9 @@
 (stream -> push!
   (with-resource (open-file "foo" "r")
     (-> fd
-      (DO-MATCH (read fd)
+      (CHAIN-MATCH (read fd)
         *none
-          (wrap *null)
+          (reply null)
         (*some x)
           (push! x)))
     close-file))
@@ -57,7 +57,7 @@
   | Task
   | transform
   | flatten
-  | wrap
+  | reply
   | concurrent
   | fastest
   | wait
@@ -70,10 +70,11 @@
   (read fd)
   (close-file fd))
 
-(DO fd = (open-file "foo")
-    (finally
-      (read fd)
-      (close-file fd)))
+(CHAIN
+  fd = (open-file "foo")
+  (finally
+    (read fd)
+    (close-file fd)))
 
 a = (Task a)
 b = (Task b)

@@ -9,11 +9,11 @@
   $transform
   transform
 
-  $flatten
-  flatten
+  $chain
+  chain
 
-  $yield
-  yield
+  $reply
+  reply
 
   $reduce-left
   reduce-left)
@@ -23,28 +23,46 @@
 
 
 (REWRITE-RULE
-  (DO ,a <= ,b ,c)
-  ~ &(flatten (transform ,b -> ,a ,c))
+  # TODO what if a is not Null ?
+  (CHAIN (reply ,a) ,b)
+  ~ b
 
-  (DO ,a ,b)
-  ~ &(flatten (transform ,a -> _ :: Null ,b))
+  (CHAIN ,a <= (reply ,b) ,c)
+  ~ &(LOCAL ,a <= ,b ,c)
 
-  (DO ,a ,@b)
-  ~ &(DO ,a (DO ,@b)))
+  #(CHAIN ,a <= (CHAIN ,@b ,c) ,d)
+  #~ &(CHAIN ,@b ,a <= ,c ,d)
+
+  (CHAIN ,a <= ,b (reply ,c))
+  ~ &(transform ,b -> ,a ,c)
+
+  (CHAIN ,a <= ,b ,c)
+  ~ &(chain ,b -> ,a ,c)
+
+  (CHAIN ,a (reply ,b))
+  ~ &(transform ,a -> _ :: Null ,b)
+
+  (CHAIN ,a ,b)
+  ~ &(chain ,a -> _ :: Null ,b)
+
+  (CHAIN ,a ,@b)
+  ~ &(CHAIN ,a (CHAIN ,@b)))
+
 
 (REWRITE-RULE
-  (DO-MATCH ,a ,@b)
+  (CHAIN-MATCH ,a ,@b)
   ~ (WITH-UNIQUE c
-      &(DO
+      &(CHAIN
          ,c <= ,a
          (MATCH ,c ,@b))))
 
+
 (REWRITE-RULE
-  (DO-IF ,test
+  (CHAIN-IF ,test
     ,then
     ,else)
   ~ (WITH-UNIQUE a
-      &(DO
+      &(CHAIN
          ,a <= ,test
          (IF ,a
            ,then
@@ -53,13 +71,13 @@
 
 (UNSAFE-FFI-LOAD { target <= javascript
                    file <= "../ffi/monad.js" }
-  sequential :: (REQUIRE ($transform a) ($flatten a) ($yield a)
+  sequential :: (REQUIRE ($chain a) ($reply a)
                   (-> (List (a b)) (a (List b))))
-  sequential_null :: (REQUIRE ($transform a) ($flatten a) ($yield a)
+  sequential_null :: (REQUIRE ($chain a) ($reply a)
                        (-> (List (a Null)) (a Null))))
 
 
-(FUNCTION each :: (REQUIRE ($transform a) ($flatten a) ($yield a)
+(FUNCTION each :: (REQUIRE ($chain a) ($reply a)
                     (-> (List b) (-> b (a Null)) (a Null)))
   (each a b)
   ~ (sequential_null (transform a b)))
@@ -69,6 +87,6 @@
   sequential
   sequential-null <= sequential_null
   each
-  DO
-  DO-MATCH
-  DO-IF)
+  CHAIN
+  CHAIN-MATCH
+  CHAIN-IF)

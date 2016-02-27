@@ -3,12 +3,12 @@
   | order)
 
 (IMPORT (file "monad")
-  | DO)
+  | CHAIN)
 
 (IMPORT (file "task")
   | Task
   | concurrent-null
-  | wrap)
+  | reply)
 
 (IMPORT (file "null")
   | Null
@@ -57,7 +57,7 @@
           (*some a)
             (send a)
           *none
-            (wrap *null)))))
+            (reply *null)))))
 
 (FUNCTION transform :: (-> (Events a) (-> a b) (Events b))
   (transform e f)
@@ -67,8 +67,9 @@
 (FUNCTION concat :: (-> (Events a) (Events a) (Events a))
   (concat a b)
     (*events -> send
-      (DO (receive a send)
-          (receive b send))))
+      (CHAIN
+        (receive a send)
+        (receive b send))))
 
 (FUNCTION over-threshold? :: (-> Integer (Maybe Integer) Boolean)
   (over-threshold? time (*some threshold))
@@ -80,22 +81,25 @@
 (FUNCTION throttle :: (-> Integer (Events a) (Events a))
   (throttle delay events)
     (*events -> send
-      (DO old <= (make-mutable *none)
-          (receive events -> a
-            (DO time <= current-time
-                threshold <= (get old)
-                (IF (over-threshold? time threshold)
-                  (DO (set! old (*some (+ time delay)))
-                      (send a))
-                  (wrap *null)))))))
+      (CHAIN
+        old <= (make-mutable *none)
+        (receive events -> a
+          (CHAIN
+            time <= current-time
+            threshold <= (get old)
+            (IF (over-threshold? time threshold)
+              (CHAIN
+                (set! old (*some (+ time delay)))
+                (send a))
+              (reply *null)))))))
 
 (DEFINE
   | empty :: (Events a)
   | empty <= (*events -> _
-               (wrap *null)))
+               (reply *null)))
 
-(FUNCTION wrap :: (-> a (Events a))
-  (wrap a)
+(FUNCTION reply :: (-> a (Events a))
+  (reply a)
     (*events -> send
       (send a)))
 
@@ -108,7 +112,7 @@
   | transform
   | concat
   | empty
-  | wrap)
+  | reply)
 
 (EXPORT-DEFINE
   | make-events <= *events)

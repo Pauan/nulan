@@ -15,26 +15,30 @@
 
 (UNSAFE-FFI-LOAD { target <= javascript
                  | file <= "../ffi/mutable-sorted-list.js" }
-| insert_sorted_index :: (-> (List a) (-> a a Order) a Integer)
-| get_sorted_index :: (-> (List a) (-> a a Order) a Integer))
+  insert_sorted_index :: (-> (List a) (-> a a Order) a Integer)
+  get_sorted_index :: (-> (List a) (-> a a Order) a Integer)
+  change_sort :: (-> (Mutable-Sorted-List a) (-> a a Order) (Task Null)))
 
 
 (FUNCTION mutable-sorted-list :: (-> (-> a a Order) (Task (Mutable-Sorted-List a)))
 | (mutable-sorted-list sort)
-    (DO a <= (mutable-list [])
-        (yield (*sorted-list a sort))))
+    (CHAIN
+      a <= (mutable-list [])
+      (reply (*sorted-list a sort))))
 
 
 (FUNCTION insert-sorted! :: (-> (Mutable-Sorted-List a) a (Task Null))
 | (insert-sorted! (*sorted-list a sort) b)
-    (DO list <= (_get a)
-        (insert! a (insert_sorted_index list sort b) b)))
+    (CHAIN
+      list <= (_get a)
+      (insert! a (insert_sorted_index list sort b) b)))
 
 
 (FUNCTION remove-sorted! :: (-> (Mutable-Sorted-List a) a (Task Null))
 | (remove-sorted! (*sorted-list a sort) b)
-    (DO list <= (_get a)
-        (remove! a (get_sorted_index list sort b))))
+    (CHAIN
+      list <= (_get a)
+      (remove! a (get_sorted_index list sort b))))
 
 
 (FUNCTION get :: (INLINE (-> (Mutable-Sorted-List a) (Task (List a))))

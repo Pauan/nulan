@@ -1,0 +1,15 @@
+(TYPE (Blocking-Task a)
+  (*blocking (-> Null a)) # TODO
+  (*reply a)
+  (*chain (Blocking-Task b) (-> b (Blocking-Task a)))
+  (*transform (Blocking-Task b) (-> b a))
+  (*flatten (Blocking-Task (Blocking-Task a)))
+  (*transform2 (Blocking-Task b) (Blocking-Task c) (-> b c a)))
+
+
+(EXPORT-CONSTANT
+  reply <= *reply
+  chain <= *chain
+  transform <= *transform
+  flatten <= *flatten
+  transform2 <= *transform2)

@@ -125,7 +125,7 @@ export const transform_many = (a, b) =>
   };
 
 
-export const _yield = (a) =>
+export const reply = (a) =>
   (push) => {
     push(a);
     return noop;

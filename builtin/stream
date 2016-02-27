@@ -31,7 +31,7 @@
       (each init -> a b
         (MATCH (f b)
         | *none
-            (yield a)
+            (reply a)
         | (*some b)
             (push a b)))))
 
@@ -43,8 +43,9 @@
 (FUNCTION concat :: (-> (Stream a) (Stream a) (Stream a))
 | (concat (*stream each1) (*stream each2))
     (*stream init1 -> push
-      (DO init2 <= (each1 init1 push)
-          (each2 init2 push))))
+      (CHAIN
+        init2 <= (each1 init1 push)
+        (each2 init2 push))))
 
 (FUNCTION flatten :: (-> (Stream (Stream a)) (Stream a))
 | (flatten (*stream each))
@@ -52,8 +53,8 @@
       (each init -> a (*stream each)
         (each a push))))
 
-(FUNCTION yield :: (-> a (Stream a))
-| (yield a)
+(FUNCTION reply :: (-> a (Stream a))
+| (reply a)
     (*stream -> init push
       (push init a)))
 
@@ -61,13 +62,13 @@
 (FUNCTION list<- :: (INLINE (-> (Stream a) (Task (List a))))
 | (list<- a)
     (reduce-left [] a -> list a
-      (yield (unsafe-push! list a))))
+      (reply (unsafe-push! list a))))
 
 # TODO should this inline ?
 (FUNCTION size :: (INLINE (-> (Stream a) (Task Integer)))
 | (size a)
     (reduce-left 0 a -> sum _
-      (yield (+ sum 1))))
+      (reply (+ sum 1))))
 
 # TODO is this correct ?
 (FUNCTION stream<- :: (REQUIRE ($iterator<- a)
@@ -89,14 +90,17 @@
     (*stream -> state push
       (LET result <= (reduce-left { state
                                   | waiting <= *none } stream -> { state waiting } value
-                       (DO now <= current-time
-                           (IF (time-more? now waiting)
-                           | (DO state <= (push state value)
-                                 (yield { state
-                                        | waiting <= (*some (+ now delay)) }))
-                           | (yield { state waiting }))))
-      | (DO { state waiting } <= result
-            (yield state)))))
+                       (CHAIN
+                         now <= current-time
+                         (IF (time-more? now waiting)
+                         | (CHAIN
+                             state <= (push state value)
+                             (reply { state
+                                    | waiting <= (*some (+ now delay)) }))
+                         | (reply { state waiting }))))
+      | (CHAIN
+          { state waiting } <= result
+          (reply state)))))
 
 
 
@@ -137,17 +141,19 @@
 
 
 (make-stream
-  (DO pull <= (with-stream a)
-      (wrap (transform pull -> value
-              (MATCH value
-                *done
-                  *done
+  (CHAIN
+    pull <= (with-stream a)
+    (reply
+      (transform pull -> value
+        (MATCH value
+          *done
+            *done
 
-                *skip
-                  *skip
+          *skip
+            *skip
 
-                (*value value)
-                  (*value (f value)))))))
+          (*value value)
+            (*value (f value)))))))
 
 
 (TYPE (Stream a)
@@ -156,7 +162,7 @@
 (FUNCTION with-stream :: (-> (Stream a) (-> (Task a) (Task Null)) (Task Null))
   (with-stream (*stream each) f)
     (each -> value
-      (f (wrap value))))
+      (f (reply value))))
 
 
 # TODO test this
@@ -164,36 +170,42 @@
 (FUNCTION queue :: (-> Integer (Stream a) (Stream a))
   (queue max stream)
     (make-stream -> push
-      (DO pull <= (with-stream stream)
-          (LOOP queue <= empty :: (Queue a)
-            (LET l <= (length queue)
-              (IF (equal? l 0)
-                (DO value <= pull
-                    (loop (push queue value)))
+      (CHAIN
+        pull <= (with-stream stream)
+        (LOOP queue <= empty :: (Queue a)
+          (LET l <= (length queue)
+            (IF (equal? l 0)
+              (CHAIN
+                value <= pull
+                (loop (push queue value)))
 
-                (IF (equal? l max)
-                  (DO (push (peek queue))
-                      (loop (pop queue)))
+              (IF (equal? l max)
+                (CHAIN
+                  (push (peek queue))
+                  (loop (pop queue)))
 
-                  (flatten
-                    (fastest
-                      (transform pull -> value
-                        (loop (push queue value)))
-                      (transform (push (peek queue)) -> _
-                        (loop (pop queue))))))))))))
+                (flatten
+                  (fastest
+                    (transform pull -> value
+                      (loop (push queue value)))
+                    (transform (push (peek queue)) -> _
+                      (loop (pop queue))))))))))))
 
 
 (make-stream -> push
   (with-stream a -> pull
     (forever
-      (DO value <= pull
-          (push (f value))))))
+      (CHAIN
+        value <= pull
+        (push (f value))))))
 
 (make-stream -> push
-  (DO pull <= (with-stream a)
-      (forever
-        (DO value <= pull
-            (push (f value))))))
+  (CHAIN
+    pull <= (with-stream a)
+    (forever
+      (CHAIN
+        value <= pull
+        (push (f value))))))
 
 
 
@@ -201,9 +213,10 @@
   (reduce-left a s f)
     (with-stream s -> pull
       (LOOP init <= a
-        (DO value <= pull
-            init <= (f init value)
-            (next init)))))
+        (CHAIN
+          value <= pull
+          init <= (f init value)
+          (next init)))))
 
 (FUNCTION reduce-left :: (-> a (Stream b) (-> a b (Task a)) (Task a))
   (reduce-left a (*stream fold) f)
@@ -222,7 +235,7 @@
           (*some a)
             (step old a)
           *none
-            (wrap old)))))
+            (reply old)))))
 
 (FUNCTION transform :: (-> (Stream a) (-> a b) (Stream b))
   (transform a b)
@@ -232,12 +245,12 @@
 (FUNCTION concat :: (-> (Stream a) (Stream a) (Stream a))
   (concat (*stream fold1) (*stream fold2))
     (*stream -> initial step
-      (DO a <= (fold1 initial step)
-          b <= (fold2 a step)
-          b)))
+      (CHAIN
+        a <= (fold1 initial step)
+        (fold2 a step))))
 
-(FUNCTION wrap :: (-> a (Stream a))
-  (wrap a)
+(FUNCTION reply :: (-> a (Stream a))
+  (reply a)
     (*stream -> initial step
       (step initial a)))
 

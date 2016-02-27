@@ -319,11 +319,11 @@ export const from_Promise = (f) =>
 export const never = { a: noop };
 
 
-const run_wrap = (task, thread) =>
+const run_reply = (task, thread) =>
   success(thread, task.b);
 
-export const wrap = (b) =>
-  ({ a: run_wrap, b });
+export const reply = (b) =>
+  ({ a: run_reply, b });
 
 
 const run_throw_error = (task, thread) =>

@@ -23,14 +23,14 @@
 (PROTOCOL ($transform a)
   transform :: (-> (a b) (-> b c) (a c)))
 
-(CONSTANT after :: (REQUIRE ($transform a) ($flatten a)
+(CONSTANT chain :: (REQUIRE ($transform a) ($flatten a)
                      (-> (a b) (-> b (a c)) (a c)))
   (-> a fn
     (flatten (transform a fn))))
 
-(FUNCTION after :: (REQUIRE ($transform a) ($flatten a)
+(FUNCTION chain :: (REQUIRE ($transform a) ($flatten a)
                      (-> (a b) (-> b (a c)) (a c)))
-  (after a fn)
+  (chain a fn)
   ~ (flatten (transform a fn)))
 
 (IMPORT (github { name <= "nulan/flatten"
@@ -50,8 +50,8 @@
     flatten)
   (PROVIDE ($transform Maybe)
     transform <= map)
-  (PROVIDE ($yield Maybe)
-    yield))
+  (PROVIDE ($reply Maybe)
+    reply))
 
 (EXPORT
   d <= a
@@ -189,16 +189,21 @@ FOO
     (STREAM ,a)
     ~ &(stream ,a)))
 
-(FLATTEN-TRANSFORM
+(CHAIN
   a <= a
   b <= b
   c)
 
-(FLATTEN-TRANSFORM
+(CHAIN
   x <= (read-file "foo")
   (log x)
   (write-file "bar" x)
-  (yield null))
+  (reply null))
+
+(chain (read-file "foo") -> x
+  (chain (log x) -> _ :: Null
+    (transform (write-file "bar" x) -> _ :: Null
+      null)))
 
 (TRANSFORM
   a <= 1
@@ -232,6 +237,8 @@ FOO
 { @a
   b <= 2
   c <= 3 }
+
+foo.bar
 
 (MATCH a
   _
@@ -300,7 +307,7 @@ FOO
   UNSAFE-OPTIMIZATION-RULE)
 
 (UNSAFE-OPTIMIZATION-RULE
-  (after a b)
+  (chain a b)
   ~ (flatten (transform a b)))
 
 (UNSAFE-OPTIMIZATION-RULE

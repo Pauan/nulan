@@ -2,9 +2,9 @@ import { crash } from "../util/error";
 import { pretty, eol, get_message } from "../util/node";
 import { indent } from "../util/string";
 import { map, length } from "../util/array";
-import { fastest, flatten, transform, wrap, throw_error,
+import { fastest, flatten, transform, reply, throw_error,
          wait, concurrent_null, catch_error, make_thread_run } from "../ffi/task";
-import { task_from, log } from "../ffi/task-sync";
+import { task_from, log } from "../ffi/blocking-task";
 
 
 const isObject = (x) =>
@@ -83,7 +83,7 @@ export const test_group = (group_name, a) => {
     return fastest(
       flatten(transform(f(name), (x) => {
         if (x === token) {
-          return wrap(x);
+          return reply(x);
         } else {
           return throw_error(new Error(name + " invalid unit test"));
         }
@@ -102,7 +102,7 @@ export const expect = (expected, task) =>
   (name) =>
     flatten(transform(task, (value) =>
       (equal(value, expected)
-        ? wrap(token)
+        ? reply(token)
         : throw_error(new Error(format_pretty(name, value, expected))))));
 
 export const expect_crash = (expected, f) =>
@@ -111,7 +111,7 @@ export const expect_crash = (expected, f) =>
       (e.$ === 0
         ? throw_error(new Error(format_error(name, null, expected)))
         : (get_message(e.a) === expected
-            ? wrap(token)
+            ? reply(token)
             : throw_error(new Error(format_error(name, get_message(e.a), expected)))))));
 
 export const run_tests = (a) => {
