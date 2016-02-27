@@ -17,7 +17,9 @@
 | remove :: (-> (List a) Integer (List a))
 | nth :: (-> (List a) Integer a)
 | slice :: (-> (List a) Integer Integer (List a))
-| chunks :: (-> (List a) Integer (List (List a))))
+| chunks :: (-> (List a) Integer (List (List a)))
+| shuffle :: (-> (List a) (Blocking-Task (List a)))
+| range :: (-> Integer Integer (List Integer)))
 
 
 (EXPORT

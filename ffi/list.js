@@ -1,4 +1,5 @@
 import { crash } from "../util/error";
+import { blocking } from "./blocking-task";
 
 
 export const size = (a) =>
@@ -224,3 +225,39 @@ export const transform = (a, f) => {
 
   return out;
 };
+
+
+// TODO test this
+// TODO can this be made more efficient ?
+// TODO handle incorrect min / max
+export const range = (min, max) => {
+  const array = new Array(max - min);
+
+  for (let i = min; i < max; ++i) {
+    array[i - min] = i;
+  }
+
+  return array;
+};
+
+
+// TODO test this
+// https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+export const shuffle = (array) =>
+  blocking(() => {
+    const length = array["length"];
+
+    const out = new Array(length);
+
+    for (let i = 0; i < length; ++i) {
+      const j = Math["floor"](Math["random"]() * (i + 1));
+
+      if (j !== i) {
+        out[i] = out[j];
+      }
+
+      out[j] = array[i];
+    }
+
+    return out;
+  });
