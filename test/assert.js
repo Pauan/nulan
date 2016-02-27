@@ -2,7 +2,7 @@ import { crash } from "../util/error";
 import { pretty, eol, get_message } from "../util/node";
 import { indent } from "../util/string";
 import { map, length } from "../util/array";
-import { fastest, flatten, transform, reply, throw_error,
+import { fastest, chain, reply, throw_error,
          wait, concurrent_null, catch_error, make_thread_run } from "../ffi/task";
 import { task_from, log } from "../ffi/blocking-task";
 
@@ -81,43 +81,43 @@ export const test_group = (group_name, a) => {
     const name = group_name + " (test " + (index + 1) + ")";
 
     return fastest(
-      flatten(transform(f(name), (x) => {
+      chain(f(name), (x) => {
         if (x === token) {
           return reply(x);
         } else {
           return throw_error(new Error(name + " invalid unit test"));
         }
-      })),
+      }),
 
-      flatten(transform(wait(10000), (_) =>
-        throw_error(new Error(name + " took too long"))))
+      chain(wait(10000), (_) =>
+        throw_error(new Error(name + " took too long")))
     );
   });
 
-  return flatten(transform(concurrent_null(tasks), (_) =>
-           task_from(log(group_name + ": " + length(tasks) + " tests succeeded\n"))));
+  return chain(concurrent_null(tasks), (_) =>
+           task_from(log(group_name + ": " + length(tasks) + " tests succeeded\n")));
 };
 
 export const expect = (expected, task) =>
   (name) =>
-    flatten(transform(task, (value) =>
+    chain(task, (value) =>
       (equal(value, expected)
         ? reply(token)
-        : throw_error(new Error(format_pretty(name, value, expected))))));
+        : throw_error(new Error(format_pretty(name, value, expected)))));
 
 export const expect_crash = (expected, f) =>
   (name) =>
-    flatten(transform(catch_error(f), (e) =>
+    chain(catch_error(f), (e) =>
       (e.$ === 0
         ? throw_error(new Error(format_error(name, null, expected)))
         : (get_message(e.a) === expected
             ? reply(token)
-            : throw_error(new Error(format_error(name, get_message(e.a), expected)))))));
+            : throw_error(new Error(format_error(name, get_message(e.a), expected))))));
 
 export const run_tests = (a) => {
-  make_thread_run(flatten(transform(task_from(log("---- Starting unit tests\n")), (_) =>
-                  flatten(transform(concurrent_null(a), (_) =>
-                          task_from(log("---- All unit tests succeeded")))))));
+  make_thread_run(chain(task_from(log("---- Starting unit tests\n")), (_) =>
+                  chain(concurrent_null(a), (_) =>
+                        task_from(log("---- All unit tests succeeded")))));
 };
 
 

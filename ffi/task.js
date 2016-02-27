@@ -110,7 +110,6 @@ const run_catch_error_success = (thread, value) => {
 
   thread.b = state.a;
   thread.c = state.b;
-  thread.d = noop;
   thread.e = state.c;
 
   return success(thread, { $: 0, a: value });
@@ -121,7 +120,6 @@ const run_catch_error_error = (thread, value) => {
 
   thread.b = state.a;
   thread.c = state.b;
-  thread.d = noop;
   thread.e = state.c;
 
   return success(thread, { $: 1, a: value });
@@ -333,97 +331,11 @@ export const throw_error = (b) =>
   ({ a: run_throw_error, b });
 
 
-const run_transform_success = (thread, value) => {
-  const state = thread.e;
-
-  thread.b = state.b;
-  thread.c = state.c;
-  thread.d = noop;
-  thread.e = state.d;
-
-  return success(thread, state.a(value));
-};
-
-// TODO is this correct ?
-// TODO is this needed ?
-const run_transform_error = (thread, value) => {
-  const state = thread.e;
-
-  thread.b = state.b;
-  thread.c = state.c;
-  thread.d = noop;
-  thread.e = state.d;
-
-  return error(thread, value);
-};
-
-const run_transform = (task, thread) => {
-  const state = {
-    a: task.c,   // map
-    b: thread.b, // old_success
-    c: thread.c, // old_error
-    d: thread.e  // old_state
-  };
-
-  thread.b = run_transform_success;
-  thread.c = run_transform_error;
-  thread.e = state;
-
-  return _run(task.b, thread);
-};
-
-export const transform = (b, c) =>
-  ({ a: run_transform, b, c });
-
-
-// TODO does this need to set thread.d to noop ?
-const run_flatten_success = (thread, value) => {
-  const state = thread.e;
-
-  thread.b = state.a;
-  thread.c = state.b;
-  thread.e = state.c;
-
-  return _run(value, thread);
-};
-
-// TODO is this correct ?
-// TODO is this needed ?
-const run_flatten_error = (thread, value) => {
-  const state = thread.e;
-
-  thread.b = state.a;
-  thread.c = state.b;
-  thread.d = noop;
-  thread.e = state.c;
-
-  return error(thread, value);
-};
-
-const run_flatten = (task, thread) => {
-  const state = {
-    a: thread.b, // old_success
-    b: thread.c, // old_error
-    c: thread.e  // old_state
-  };
-
-  thread.b = run_flatten_success;
-  thread.c = run_flatten_error;
-  thread.e = state;
-
-  return _run(task.b, thread);
-};
-
-export const flatten = (b) =>
-  ({ a: run_flatten, b });
-
-
 const run_chain_success = (thread, value) => {
   const state = thread.e;
 
   thread.b = state.b;
   thread.c = state.c;
-  thread.d = noop;
   thread.e = state.d;
 
   return _run(state.a(value), thread);
@@ -436,7 +348,6 @@ const run_chain_error = (thread, value) => {
 
   thread.b = state.b;
   thread.c = state.c;
-  thread.d = noop;
   thread.e = state.d;
 
   return error(thread, value);

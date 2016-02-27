@@ -1,4 +1,4 @@
-import { async_unkillable, transform } from "../task";
+import { async_unkillable, chain, reply } from "../task";
 import { callback } from "./util";
 import { randomBytes } from "crypto";
 
@@ -27,5 +27,5 @@ export const random_bytes = (limit) =>
   });
 
 export const random_characters = (limit, chars) =>
-  transform(random_bytes(limit), (bytes) =>
-    chars_from_bytes(chars, bytes));
+  chain(random_bytes(limit), (bytes) =>
+    reply(chars_from_bytes(chars, bytes)));

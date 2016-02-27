@@ -1,7 +1,7 @@
 import { expect, expect_crash, assert_crash } from "../assert";
 import { crash } from "../../util/error";
 import { get_message } from "../../util/node";
-import { transform, chain, reply, concurrent, concurrent_null,
+import { chain, reply, concurrent, concurrent_null,
          wait, fastest, _yield, throw_error, ignore_kill, async_killable,
          async_unkillable, never, kill_thread,
          make_thread_run, with_resource, catch_error } from "../../ffi/task";
@@ -46,30 +46,30 @@ const counter = (f) => {
     return null;
   });
 
-  return transform(f(increment), (_) => _counter);
+  return chain(f(increment), (_) => reply(_counter));
 };
 
 const queue = (f) =>
   chain(sync(() => []), (queue) =>
-    transform(catch_error(() =>
-                f((value) =>
-                  sync(() => {
-                    queue["push"](value);
-                    return _null;
-                  }))), (result) => {
+    chain(catch_error(() =>
+            f((value) =>
+              sync(() => {
+                queue["push"](value);
+                return _null;
+              }))), (result) => {
       if (result.$ === 0) {
-        return {
+        return reply({
           queue: queue,
           value: result.a,
           error: null
-        };
+        });
 
       } else {
-        return {
+        return reply({
           queue: queue,
           value: null,
           error: get_message(result.a)
-        };
+        });
       }
     }));
 
