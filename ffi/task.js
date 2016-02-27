@@ -418,6 +418,49 @@ export const flatten = (b) =>
   ({ a: run_flatten, b });
 
 
+const run_chain_success = (thread, value) => {
+  const state = thread.e;
+
+  thread.b = state.b;
+  thread.c = state.c;
+  thread.d = noop;
+  thread.e = state.d;
+
+  return _run(state.a(value), thread);
+};
+
+// TODO is this correct ?
+// TODO is this needed ?
+const run_chain_error = (thread, value) => {
+  const state = thread.e;
+
+  thread.b = state.b;
+  thread.c = state.c;
+  thread.d = noop;
+  thread.e = state.d;
+
+  return error(thread, value);
+};
+
+const run_chain = (task, thread) => {
+  const state = {
+    a: task.c,   // map
+    b: thread.b, // old_success
+    c: thread.c, // old_error
+    d: thread.e  // old_state
+  };
+
+  thread.b = run_chain_success;
+  thread.c = run_chain_error;
+  thread.e = state;
+
+  return _run(task.b, thread);
+};
+
+export const chain = (b, c) =>
+  ({ a: run_chain, b, c });
+
+
 const run_concurrent_null_success = (thread, value) => {
   const state = thread.e;
 
