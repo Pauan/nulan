@@ -3,16 +3,20 @@ import { _null } from "./types";
 import * as $array from "../util/array";
 
 
+export const trigger = (listeners, value) => {
+  const length = listeners["length"];
+
+  for (let i = 0; i < length; ++i) {
+    listeners[i](value);
+  }
+};
+
+
 const _set = (mutable, value) => {
   if (mutable.a !== value) {
     mutable.a = value;
 
-    const listeners = mutable.b;
-    const length = listeners["length"];
-
-    for (let i = 0; i < length; ++i) {
-      listeners[i](value);
-    }
+    trigger(mutable.b, value);
   }
 };
 

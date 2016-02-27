@@ -19,7 +19,9 @@
 | slice :: (-> (List a) Integer Integer (List a))
 | chunks :: (-> (List a) Integer (List (List a)))
 | shuffle :: (-> (List a) (Blocking-Task (List a)))
-| range :: (-> Integer Integer (List Integer)))
+| range :: (-> Integer Integer (List Integer))
+| order :: (REQUIRE ($order a)
+             (-> (List a) (List a) Order)))
 
 
 (EXPORT

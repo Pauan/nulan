@@ -261,3 +261,80 @@ export const shuffle = (array) =>
 
     return out;
   });
+
+
+// TODO is this correct ?
+export const order = (order, a, b) => {
+  const length1 = a["length"];
+  const length2 = b["length"];
+  const length = Math["min"](length1, length2);
+
+  for (let i = 0; i < length; ++i) {
+    switch (order(a[i], b[i])) {
+    // *less
+    case 0:
+      return 0;
+    // *more
+    case 2:
+      return 2;
+    }
+  }
+
+  if (length1 === length2) {
+    // *equal
+    return 1;
+
+  } else if (length1 < length2) {
+    // *less
+    return 0;
+
+  } else {
+    // *more
+    return 2;
+  }
+};
+
+
+// Insertion sort (https://en.wikipedia.org/wiki/Insertion_sort)
+export const sort = (a, order) => {
+  const array = copy(a);
+  const length = array["length"];
+
+  const operations = [];
+
+  for (let i = 1; i < length; ++i) {
+    const x = array[i];
+
+    let j = i - 1;
+
+    // *more
+    if (order(array[j], x) === 2) {
+      do {
+        array[j + 1] = array[j];
+        --j;
+      // *more
+      } while (j >= 0 && order(array[j], x) === 2);
+
+      array[j + 1] = x;
+
+      operations["push"]({
+        $: 3,
+        a: i
+      });
+
+      operations["push"]({
+        $: 1,
+        a: j + 1,
+        b: x
+      });
+    }
+  }
+
+  return {
+    // TODO test this
+    a: (operations["length"] === 0
+         ? a
+         : array),
+    b: operations
+  };
+};

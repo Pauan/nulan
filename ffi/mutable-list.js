@@ -2,32 +2,9 @@ import { blocking } from "./blocking-task";
 import { _null } from "./types";
 import * as $list from "./list";
 import * as $array from "../util/array";
+import { trigger } from "./mutable";
 
-
-// TODO code duplication with mutable.js
-const _trigger = (mutable, value) => {
-  const listeners = mutable.b;
-  const length = listeners["length"];
-
-  for (let i = 0; i < length; ++i) {
-    listeners[i](value);
-  }
-};
-
-
-// TODO code duplication with mutable.js
-export const mutable_list = (value) =>
-  blocking(() => {
-    return {
-      a: value,
-      b: []
-    };
-  });
-
-
-// TODO code duplication with mutable.js
-export const get = (mutable) =>
-  blocking(() => mutable.a);
+export { get, mutable as mutable_list } from "./mutable";
 
 
 export const set = (mutable, a) =>
@@ -37,7 +14,7 @@ export const set = (mutable, a) =>
     if (mutable.a !== a) {
       mutable.a = a;
 
-      _trigger(mutable, {
+      trigger(mutable.b, {
         $: 0,
         a: a
       });
@@ -54,7 +31,7 @@ export const push = (mutable, a) =>
 
     mutable.a = $list.push(mutable.a, a);
 
-    _trigger(mutable, {
+    trigger(mutable.b, {
       $: 1,
       a: index,
       b: a
@@ -73,7 +50,7 @@ export const insert = (mutable, index1, a) =>
     // TODO slightly inefficient
     mutable.a = $list.insert(mutable.a, index2, a);
 
-    _trigger(mutable, {
+    trigger(mutable.b, {
       $: 1,
       a: index2,
       b: a
@@ -97,7 +74,7 @@ export const update = (mutable, index1, a) =>
     if (mutable.a !== b) {
       mutable.a = b;
 
-      _trigger(mutable, {
+      trigger(mutable.b, {
         $: 2,
         a: index2,
         b: a
@@ -117,7 +94,7 @@ export const remove = (mutable, index1) =>
     // TODO slightly inefficient
     mutable.a = $list.remove(mutable.a, index2);
 
-    _trigger(mutable, {
+    trigger(mutable.b, {
       $: 3,
       a: index2
     });

@@ -1,47 +1,65 @@
 import { crash } from "../util/error";
+import { blocking } from "./blocking-task";
+import { _null } from "./types";
+import { trigger } from "./mutable";
+import * as $list from "./list";
+
+export { get } from "./mutable";
+export { changing_list_from, changing_from } from "./mutable-list";
 
 
+// TODO test this
+// TODO can this be made more efficient ?
 const sorted_index = (list, sort, a) => {
   let start = 0;
   let end   = list["length"];
+
+  let found = false;
 
   while (start < end) {
     // TODO is this faster/slower than using Math.floor ?
     const pivot = (start + end) >> 1;
 
-    switch (sort(a, list[pivot])) {
+    const order = sort(a, list[pivot]);
+
     // *less
-    case 0:
+    if (order === 0) {
       end = pivot;
-      break;
 
     // *equal
-    case 1:
-      // TODO return the left-most index ?
-      return {
-        $: 0,
-        a: pivot
-      };
-
     // *more
-    case 2:
+    } else {
+      // *equal
+      // Find the right-most index
+      if (order === 1) {
+        found = true;
+      }
+
       start = pivot + 1;
-      break;
     }
   }
 
-  return {
-    $: 1,
-    a: start
-  };
+  if (found) {
+    return {
+      $: 0,
+      a: start - 1
+    };
+
+  } else {
+    return {
+      $: 1,
+      a: start
+    };
+  }
 };
 
 
-export const insert_sorted_index = (list, sort, a) => {
+const insert_sorted_index = (list, sort, a) => {
   const x = sorted_index(list, sort, a);
 
+  // TODO test this
   if (x.$ === 0) {
-    crash(new Error("value already exists in list"));
+    return x.a + 1;
 
   } else {
     return x.a;
@@ -49,13 +67,102 @@ export const insert_sorted_index = (list, sort, a) => {
 };
 
 
-export const get_sorted_index = (list, sort, a) => {
+const get_sorted_index = (list, sort, a) => {
   const x = sorted_index(list, sort, a);
 
   if (x.$ === 0) {
     return x.a;
 
   } else {
-    crash(new Error("value does not exist in list"));
+    // TODO is this a good idea ?
+    crash(new Error("value does not exist in sorted list"));
   }
 };
+
+
+export const mutable_sorted_list = (list, order) => {
+  // TODO this can be made more efficient
+  const x = $list.sort(list, order).a;
+
+  return blocking(() => {
+    return {
+      a: x,
+      b: [],
+      c: order
+    };
+  });
+};
+
+
+// TODO code duplication with mutable-list.js
+export const set = (mutable, list) =>
+  blocking(() => {
+    // TODO this can be made more efficient
+    const a = $list.sort(list, mutable.c).a;
+
+    // TODO does this affect the semantics ?
+    // TODO test this
+    if (mutable.a !== a) {
+      mutable.a = a;
+
+      trigger(mutable.b, {
+        $: 0,
+        a: a
+      });
+    }
+
+    return _null;
+  });
+
+
+// TODO code duplication with mutable-list.js
+export const insert_sorted = (mutable, a) =>
+  blocking(() => {
+    const index = insert_sorted_index(mutable.a, mutable.c, a);
+
+    // TODO slightly inefficient
+    mutable.a = $list.insert(mutable.a, index, a);
+
+    trigger(mutable.b, {
+      $: 1,
+      a: index,
+      b: a
+    });
+
+    return _null;
+  });
+
+
+// TODO code duplication with mutable-list.js
+export const remove_sorted = (mutable, a) =>
+  blocking(() => {
+    const index = get_sorted_index(mutable.a, mutable.c, a);
+
+    // TODO slightly inefficient
+    mutable.a = $list.remove(mutable.a, index);
+
+    trigger(mutable.b, {
+      $: 3,
+      a: index
+    });
+
+    return _null;
+  });
+
+
+export const set_sort = (mutable, order) =>
+  blocking(() => {
+    const x = $list.sort(mutable.a, order);
+
+    mutable.a = x.a;
+    mutable.c = order;
+
+    const ops = x.b;
+    const length = ops["length"];
+
+    for (let i = 0; i < length; ++i) {
+      trigger(mutable.b, ops[i]);
+    }
+
+    return _null;
+  });
