@@ -1,6 +1,5 @@
 import { make_thread_pool, kill_thread_pool, run_in_thread_pool,
          async_killable } from "../task";
-import { blocking } from "../blocking-task";
 import { crash } from "../../util/error";
 
 
@@ -341,16 +340,23 @@ export const on_mouse_hold = (b) =>
   ({ a: event_on_mouse_hold, b });
 
 
+// TODO if the DOM isn't dirty, should this return immediately ?
 export const get_position = (a) =>
-  blocking(() => {
-    const x = a["getBoundingClientRect"]();
+  async_killable((success, error) => {
+    // TODO use separate read/write queues ?
+    const id = requestAnimationFrame(() => {
+      const x = a["getBoundingClientRect"]();
 
-    return {
-      a: x["left"],
-      b: x["top"],
-      c: x["width"],
-      d: x["height"]
-    };
+      success({
+        a: x["left"],
+        b: x["top"],
+        c: x["width"],
+        d: x["height"]
+      });
+    });
+
+    return () =>
+      cancelAnimationFrame(id);
   });
 
 

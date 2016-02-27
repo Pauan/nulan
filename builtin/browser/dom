@@ -96,8 +96,6 @@
   classes :: (-> (List Text) Attribute)
   changing_class :: (-> Text (Changing Boolean) Attribute)
 
-  # TODO this is inefficient if used when the DOM is dirty
-  # TODO should this use a Blocking-Task ?
   get_position :: (-> DOM-Element
                     (Task { left :: Number
                             top :: Number
