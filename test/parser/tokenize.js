@@ -198,16 +198,16 @@ export default [
                     0, 9))
   ]),
 
-  test("~foo~bar~", (loc) => [
-    symbol("~", loc(0, 0,
+  test(",foo,bar,", (loc) => [
+    symbol(",", loc(0, 0,
                     0, 1)),
     symbol("foo", loc(0, 1,
                       0, 4)),
-    symbol("~", loc(0, 4,
+    symbol(",", loc(0, 4,
                     0, 5)),
     symbol("bar", loc(0, 5,
                       0, 8)),
-    symbol("~", loc(0, 8,
+    symbol(",", loc(0, 8,
                     0, 9))
   ]),
 
@@ -329,14 +329,14 @@ export default [
                     0, 5))
   ]),
 
-  test(".~.~.", (loc) => [
+  test(".,.,.", (loc) => [
     symbol(".", loc(0, 0,
                     0, 1)),
-    symbol("~", loc(0, 1,
+    symbol(",", loc(0, 1,
                     0, 2)),
     symbol(".", loc(0, 2,
                     0, 3)),
-    symbol("~", loc(0, 3,
+    symbol(",", loc(0, 3,
                     0, 4)),
     symbol(".", loc(0, 4,
                     0, 5))
@@ -704,7 +704,7 @@ export default [
   ]),
 
 
-  test("1 1.5 1,5 (foo bar qux) u@q\nqux\n(nou)\n~\n~foo\n~@foo", (loc) => [
+  test("1 1.5 1,5 (foo bar qux) u@q\nqux\n(nou)\n,\n,foo\n,@foo", (loc) => [
     integer(1, loc(0, 0,
                    0, 1)),
     integer(1, loc(0, 2,
@@ -713,8 +713,12 @@ export default [
                     0, 4)),
     integer(5, loc(0, 4,
                    0, 5)),
-    symbol("1,5", loc(0, 6,
-                      0, 9)),
+    integer(1, loc(0, 6,
+                   0, 7)),
+    symbol(",", loc(0, 7,
+                    0, 8)),
+    integer(5, loc(0, 8,
+                   0, 9)),
     symbol("(", loc(0, 10,
                     0, 11)),
     symbol("foo", loc(0, 11,
@@ -739,13 +743,13 @@ export default [
                       2, 4)),
     symbol(")", loc(2, 4,
                     2, 5)),
-    symbol("~", loc(3, 0,
+    symbol(",", loc(3, 0,
                     3, 1)),
-    symbol("~", loc(4, 0,
+    symbol(",", loc(4, 0,
                     4, 1)),
     symbol("foo", loc(4, 1,
                       4, 4)),
-    symbol("~", loc(5, 0,
+    symbol(",", loc(5, 0,
                     5, 1)),
     symbol("@", loc(5, 1,
                     5, 2)),

@@ -197,7 +197,7 @@ export default [
 
   ...test_prefix("|", bar),
   ...test_prefix("&", quote),
-  ...test_prefix("~", unquote),
+  ...test_prefix(",", unquote),
   ...test_prefix("@", splice),
 
   ...test_infix("<=", assign, true),
@@ -334,7 +334,7 @@ export default [
                0, 21))
   ]),
 
-  test("-> 1 &-> 2 ~@3", (loc) => [
+  test("-> 1 &-> 2 ,@3", (loc) => [
     lambda([integer(1, loc(0, 3,
                            0, 4))],
            quote(lambda([integer(2, loc(0, 9,
@@ -391,7 +391,7 @@ export default [
   ]),
 
 
-  test("&a.~b", (loc) => [
+  test("&a.,b", (loc) => [
     quote(dot(symbol("a", loc(0, 1,
                               0, 2)),
               unquote(symbol("b", loc(0, 4,
@@ -405,7 +405,7 @@ export default [
   ]),
 
 
-  test("(REWRITE-RULE\n| (IF test &| ~then &| ~else)\n    &(MATCH ~test\n     | *true\n         ~then\n     | *false\n         ~else))", (loc) => [
+  test("(REWRITE-RULE\n| (IF test &| ,then &| ,else)\n    &(MATCH ,test\n     | *true\n         ,then\n     | *false\n         ,else))", (loc) => [
     call([symbol("REWRITE-RULE", loc(0, 1,
                                      0, 13)),
           bar(call([symbol("IF", loc(1, 3,
