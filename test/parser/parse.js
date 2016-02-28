@@ -195,7 +195,7 @@ export default [
   ...test_brackets("[", "]", list),
   ...test_brackets("{", "}", record),
 
-  ...test_prefix("|", bar),
+  ...test_prefix("~", bar),
   ...test_prefix("&", quote),
   ...test_prefix(",", unquote),
   ...test_prefix("@", splice),
@@ -212,7 +212,7 @@ export default [
                0, 6))
   ]),
 
-  test("{ foo <= 1 | bar <= 2 }", (loc) => [
+  test("{ foo <= 1 ~ bar <= 2 }", (loc) => [
     record([assign(symbol("foo", loc(0, 2,
                                      0, 5)),
                    integer(1, loc(0, 9,
@@ -405,7 +405,7 @@ export default [
   ]),
 
 
-  test("(REWRITE-RULE\n| (IF test &| ,then &| ,else)\n    &(MATCH ,test\n     | *true\n         ,then\n     | *false\n         ,else))", (loc) => [
+  test("(REWRITE-RULE\n~ (IF test &~ ,then &~ ,else)\n    &(MATCH ,test\n     ~ *true\n         ,then\n     ~ *false\n         ,else))", (loc) => [
     call([symbol("REWRITE-RULE", loc(0, 1,
                                      0, 13)),
           bar(call([symbol("IF", loc(1, 3,

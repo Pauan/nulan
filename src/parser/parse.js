@@ -189,7 +189,7 @@ const specials = {
 
   "->": parse_lambda(10, $ast.lambda),
 
-  "|": parse_prefix(10, $ast.bar),
+  "~": parse_prefix(10, $ast.bar),
   "&": parse_prefix(10, $ast.quote),
   ",": parse_prefix(20, $ast.unquote),
   "@": parse_prefix(20, $ast.splice),
