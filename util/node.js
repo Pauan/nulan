@@ -3,7 +3,7 @@ export { EOL as eol } from "os";
 
 
 export const pretty = (x) =>
-  inspect(x, { "colors": true, "depth": 5 });
+  inspect(x, { "colors": true, "depth": 100 });
 
 export const get_stack = (err) =>
   err["stack"] || get_message(err);

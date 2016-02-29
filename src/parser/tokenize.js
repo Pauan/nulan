@@ -11,7 +11,7 @@ const SUFFIX = 3;
 
 
 const tokenize_delimiter = (whitespace) =>
-  (output, file, lines, line, column) => {
+  (output, file, lines, line, column, indents) => {
     const chars = lines[line];
 
     const prev = peek(chars, column - 1);
@@ -53,8 +53,51 @@ const tokenize_delimiter = (whitespace) =>
 
     output["push"](token);
 
-    return tokenize1(output, file, lines, line, column);
+    return tokenize1(output, file, lines, line, column, indents);
   };
+
+
+const tokenize_start = (whitespace, right) => {
+  const f = tokenize_delimiter(whitespace);
+
+  return (output, file, lines, line, column, indents) => {
+    indents["push"]({
+      end: right,
+      column: column + 2
+    });
+
+    return f(output, file, lines, line, column, indents);
+  };
+};
+
+
+const tokenize_end = (whitespace, left) => {
+  const f = tokenize_delimiter(whitespace);
+
+  return (output, file, lines, line, column, indents) => {
+    const last = indents[indents["length"] - 1];
+
+    const char = lines[line][column];
+
+    if (last.end !== null && last.end === char) {
+      indents["pop"]();
+
+      return f(output, file, lines, line, column, indents);
+
+    // TODO code duplication
+    } else {
+      const start = { line, column };
+
+      column += 1;
+
+      const end = { line, column };
+
+      const token = $ast.symbol(char, $ast.loc(file, lines, start, end));
+
+      error(token, "missing starting " + left);
+    }
+  };
+};
 
 
 const tokenize_symbol1 = (value, loc) => {
@@ -67,7 +110,7 @@ const tokenize_symbol1 = (value, loc) => {
   }
 };
 
-const consume_symbol = (output, file, lines, line, column, f) => {
+const consume_symbol = (output, file, lines, line, column, indents, f) => {
   const start = { line, column };
 
   const chars = lines[line];
@@ -82,7 +125,7 @@ const consume_symbol = (output, file, lines, line, column, f) => {
     if (char === null || specials[char] != null) {
       const end = { line, column };
       output["push"](f(value, $ast.loc(file, lines, start, end)));
-      return tokenize1(output, file, lines, line, column);
+      return tokenize1(output, file, lines, line, column, indents);
 
     } else {
       value += char;
@@ -91,8 +134,8 @@ const consume_symbol = (output, file, lines, line, column, f) => {
   }
 };
 
-const tokenize_symbol = (output, file, lines, line, column) =>
-  consume_symbol(output, file, lines, line, column, tokenize_symbol1);
+const tokenize_symbol = (output, file, lines, line, column, indents) =>
+  consume_symbol(output, file, lines, line, column, indents, tokenize_symbol1);
 
 
 const consume_spaces = (file, lines, line, column) => {
@@ -240,7 +283,7 @@ const tokenize_escape = (value, file, lines, line, column) => {
   return column;
 };
 
-const indent_error = (indent, file, lines, line, column1, column2) => {
+const text_indent_error = (indent, file, lines, line, column1, column2) => {
   const start = { line, column: column1 };
   const end   = { line, column: column2 };
 
@@ -248,7 +291,7 @@ const indent_error = (indent, file, lines, line, column1, column2) => {
         "there must be " + indent + " or more spaces (U+0020)");
 };
 
-const tokenize_text = (output, file, lines, line, column) => {
+const tokenize_text = (output, file, lines, line, column, indents) => {
   const start = { line, column };
 
   column += 1;
@@ -272,7 +315,7 @@ const tokenize_text = (output, file, lines, line, column) => {
 
         output["push"]($ast.text(value["join"](""), $ast.loc(file, lines, start, end)));
 
-        return tokenize1(output, file, lines, line, column);
+        return tokenize1(output, file, lines, line, column, indents);
 
       } else if (char === "\\") {
         column = tokenize_escape(value, file, lines, line, column);
@@ -299,14 +342,14 @@ const tokenize_text = (output, file, lines, line, column) => {
             column = consume_spaces(file, lines, line, column);
 
             if (column < indent) {
-              indent_error(indent, file, lines, line, 0, column);
+              text_indent_error(indent, file, lines, line, 0, column);
 
             } else {
               value["push"](repeat(" ", column - indent));
             }
 
           } else if (char !== null) {
-            indent_error(indent, file, lines, line, 0, 1);
+            text_indent_error(indent, file, lines, line, 0, 1);
           }
         }
 
@@ -324,7 +367,7 @@ const tokenize_text = (output, file, lines, line, column) => {
 };
 
 
-const tokenize_block_comment = (output, file, lines, line, column) => {
+const tokenize_block_comment = (output, file, lines, line, column, indents) => {
   const pending = [];
 
   const start = { line, column };
@@ -347,6 +390,7 @@ const tokenize_block_comment = (output, file, lines, line, column) => {
       } else if (next1 === null) {
         line += 1;
         column = 0;
+        check_indent(file, lines, line, column, indents);
 
       } else {
         const next2 = peek(chars, column + 1);
@@ -357,7 +401,7 @@ const tokenize_block_comment = (output, file, lines, line, column) => {
           pending["pop"]();
 
           if (pending["length"] === 0) {
-            return tokenize1(output, file, lines, line, column);
+            return tokenize1(output, file, lines, line, column, indents);
           }
 
         // Allow for nested comment blocks
@@ -382,7 +426,7 @@ const tokenize_block_comment = (output, file, lines, line, column) => {
   }
 };
 
-const tokenize_line_comment = (output, file, lines, line, column) => {
+const tokenize_line_comment = (output, file, lines, line, column, indents) => {
   const chars = lines[line];
 
   column += 1;
@@ -394,7 +438,7 @@ const tokenize_line_comment = (output, file, lines, line, column) => {
       column = consume_spaces(file, lines, line, column);
 
     } else if (char === null) {
-      return tokenize1(output, file, lines, line, column);
+      return tokenize1(output, file, lines, line, column, indents);
 
     } else {
       column += 1;
@@ -402,21 +446,21 @@ const tokenize_line_comment = (output, file, lines, line, column) => {
   }
 };
 
-const tokenize_comment = (output, file, lines, line, column) => {
+const tokenize_comment = (output, file, lines, line, column, indents) => {
   const chars = lines[line];
 
   const next = peek(chars, column + 1);
 
   if (next === "/") {
-    return tokenize_block_comment(output, file, lines, line, column);
+    return tokenize_block_comment(output, file, lines, line, column, indents);
 
   } else {
-    return tokenize_line_comment(output, file, lines, line, column);
+    return tokenize_line_comment(output, file, lines, line, column, indents);
   }
 };
 
 
-const tokenize_tab = (output, file, lines, line, column) => {
+const tokenize_tab = (output, file, lines, line, column, indents) => {
   const chars = lines[line];
 
   const start = { line, column };
@@ -439,9 +483,9 @@ const tokenize_tab = (output, file, lines, line, column) => {
 };
 
 
-const tokenize_space = (output, file, lines, line, column) => {
+const tokenize_space = (output, file, lines, line, column, indents) => {
   column = consume_spaces(file, lines, line, column);
-  return tokenize1(output, file, lines, line, column);
+  return tokenize1(output, file, lines, line, column, indents);
 };
 
 
@@ -451,16 +495,16 @@ const specials = {
   "#":  tokenize_comment, // TODO require " " or null to the left ?
   "\"": tokenize_text,
 
-  "(":  tokenize_delimiter(PREFIX),
-  ")":  tokenize_delimiter(SUFFIX),
+  "(":  tokenize_start(PREFIX, ")"),
+  ")":  tokenize_end(SUFFIX, "("),
 
   // TODO figure out what to do about these
-  "[":  tokenize_delimiter(NONE),
-  "]":  tokenize_delimiter(NONE),
+  "[":  tokenize_start(NONE, "]"),
+  "]":  tokenize_end(NONE, "["),
 
   // TODO figure out what to do about these
-  "{":  tokenize_delimiter(NONE),
-  "}":  tokenize_delimiter(NONE),
+  "{":  tokenize_start(NONE, "}"),
+  "}":  tokenize_end(NONE, "{"),
 
   "&":  tokenize_delimiter(PREFIX),
   ",":  tokenize_delimiter(PREFIX),
@@ -469,7 +513,32 @@ const specials = {
 };
 
 
-const tokenize1 = (output, file, lines, line, column) => {
+const check_indent = (file, lines, line, column, indents) => {
+  const chars = peek(lines, line);
+
+  if (chars !== null) {
+    const char = peek(chars, column);
+
+    if (char === " ") {
+      column = consume_spaces(file, lines, line, column);
+    }
+
+    const last = indents[indents["length"] - 1];
+
+    if (last.column !== column) {
+      indent_error(file, lines, line, column, last.column);
+    }
+  }
+};
+
+const indent_error = (file, lines, line, column, indent) => {
+  error($ast.symbol(" ", $ast.loc(file, lines,
+                                  { line, column: 0 },
+                                  { line, column })),
+        "expected " + indent + " spaces but got " + column);
+};
+
+const tokenize1 = (output, file, lines, line, column, indents) => {
   for (;;) {
     const chars = peek(lines, line);
 
@@ -478,15 +547,16 @@ const tokenize1 = (output, file, lines, line, column) => {
 
       if (char !== null) {
         if (specials[char] != null) {
-          return specials[char](output, file, lines, line, column);
+          return specials[char](output, file, lines, line, column, indents);
 
         } else {
-          return tokenize_symbol(output, file, lines, line, column);
+          return tokenize_symbol(output, file, lines, line, column, indents);
         }
 
       } else {
         line += 1;
         column = 0;
+        check_indent(file, lines, line, column, indents);
       }
 
     } else {
@@ -495,5 +565,11 @@ const tokenize1 = (output, file, lines, line, column) => {
   }
 };
 
+// TODO a tiny bit hacky
+const tokenize_top = (output, file, lines, line, column, indents) => {
+  check_indent(file, lines, line, column, indents);
+  return tokenize1(output, file, lines, line, column, indents);
+};
+
 export const tokenize = (lines, file) =>
-  tokenize1([], file, lines, 0, 0);
+  tokenize_top([], file, lines, 0, 0, [{ end: null, column: 0 }]);
