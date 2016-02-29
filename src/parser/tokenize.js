@@ -440,15 +440,17 @@ const tokenize_space = (output, file, lines, line, column) => {
 const specials = {
   "\t": tokenize_tab,
   " ":  tokenize_space,
-  "#":  tokenize_comment,
+  "#":  tokenize_comment, // TODO require " " or null to the left ?
   "\"": tokenize_text,
 
   "(":  tokenize_delimiter(PREFIX),
   ")":  tokenize_delimiter(SUFFIX),
 
+  // TODO figure out what to do about these
   "[":  tokenize_delimiter(NONE),
   "]":  tokenize_delimiter(NONE),
 
+  // TODO figure out what to do about these
   "{":  tokenize_delimiter(NONE),
   "}":  tokenize_delimiter(NONE),
 

@@ -6,7 +6,7 @@ import { lines, repeat } from "../../util/string";
 import { loc, text, symbol, integer,
          call, list, record, lambda,
          dot, bar, assign, type,
-         quote, unquote, splice } from "../../src/parser/ast";
+         quote, unquote, splice, number } from "../../src/parser/ast";
 
 
 const file = "parse.test";
@@ -93,11 +93,11 @@ const test_infix = (name, make, right_associative, space) => {
                   ? " " + name + " "
                   : name);
   const test2 = (space
-                  ? name + " 2"
-                  : name + "2");
+                  ? name + " b"
+                  : name + "b");
   const test3 = (space
-                  ? "1 " + name
-                  : "1" + name);
+                  ? "a " + name
+                  : "a" + name);
   return [
     test_crash(name,
       "missing expression on the left side of " + name + "  (parse.test 1:1)\n" +
@@ -116,37 +116,37 @@ const test_infix = (name, make, right_associative, space) => {
         ? "    " + marker(name)
         : "   " + marker(name))),
 
-    test("1" + name2 + "2", (loc) => [
-      make(integer(1, loc(0, 0,
-                          0, 1)),
-           integer(2, loc(0, name2["length"] + 1,
-                          0, name2["length"] + 2)),
+    test("a" + name2 + "b", (loc) => [
+      make(symbol("a", loc(0, 0,
+                           0, 1)),
+           symbol("b", loc(0, name2["length"] + 1,
+                           0, name2["length"] + 2)),
            loc(0, 0,
                0, name2["length"] + 2))
     ]),
 
     (right_associative
-      ? test("1" + name2 + "2" + name2 + "3", (loc) => [
-          make(integer(1, loc(0, 0,
-                              0, 1)),
-               make(integer(2, loc(0, name2["length"] + 1,
-                                   0, name2["length"] + 2)),
-                    integer(3, loc(0, name2["length"] + name2["length"] + 2,
-                                   0, name2["length"] + name2["length"] + 3)),
+      ? test("a" + name2 + "b" + name2 + "c", (loc) => [
+          make(symbol("a", loc(0, 0,
+                               0, 1)),
+               make(symbol("b", loc(0, name2["length"] + 1,
+                                    0, name2["length"] + 2)),
+                    symbol("c", loc(0, name2["length"] + name2["length"] + 2,
+                                    0, name2["length"] + name2["length"] + 3)),
                     loc(0, name2["length"] + 1,
                         0, name2["length"] + name2["length"] + 3)),
                loc(0, 0,
                    0, name2["length"] + name2["length"] + 3))
         ])
-      : test("1" + name2 + "2" + name2 + "3", (loc) => [
-          make(make(integer(1, loc(0, 0,
-                                   0, 1)),
-                    integer(2, loc(0, name2["length"] + 1,
-                                   0, name2["length"] + 2)),
+      : test("a" + name2 + "b" + name2 + "c", (loc) => [
+          make(make(symbol("a", loc(0, 0,
+                                    0, 1)),
+                    symbol("b", loc(0, name2["length"] + 1,
+                                    0, name2["length"] + 2)),
                     loc(0, 0,
                         0, name2["length"] + 2)),
-               integer(3, loc(0, name2["length"] + name2["length"] + 2,
-                              0, name2["length"] + name2["length"] + 3)),
+               symbol("c", loc(0, name2["length"] + name2["length"] + 2,
+                               0, name2["length"] + name2["length"] + 3)),
                loc(0, 0,
                    0, name2["length"] + name2["length"] + 3))
         ])),
@@ -393,6 +393,11 @@ export default [
                         0, 3)),
         loc(0, 0,
             0, 3))
+  ]),
+
+  test("0.1", (loc) => [
+    number(0.1, loc(0, 0,
+                    0, 3))
   ]),
 
   test("a.b <= c.d", (loc) => [

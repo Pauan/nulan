@@ -156,6 +156,35 @@ const parse_infix = (priority, make, right_associative) =>
     }
   });
 
+// TODO code duplication with parse_infix
+const parse_dot = (priority, make, right_associative) =>
+  parsed({
+    priority: priority,
+    right_associative: right_associative,
+    parse: (left, middle, right) => {
+      if (left["length"] === 0) {
+        error(middle, "missing expression on the left side of " + middle.value);
+
+      } else if (right["length"] === 0) {
+        error(middle, "missing expression on the right side of " + middle.value);
+
+      } else {
+        const l = left["pop"]();
+        const r = right["shift"]();
+
+        if (l.type === $ast.INTEGER && r.type === $ast.INTEGER) {
+          // TODO a little hacky
+          const x = $ast.number(+(l.value + "." + r.value), $ast.concat_loc(l.loc, r.loc));
+          return left["concat"]([x], right);
+
+        } else {
+          const x = make(l, r, $ast.concat_loc(l.loc, r.loc));
+          return left["concat"]([x], right);
+        }
+      }
+    }
+  });
+
 const parse_lambda = (priority, make) =>
   parsed({
     priority: priority,
@@ -194,7 +223,7 @@ const specials = {
   ",": parse_prefix(20, $ast.unquote),
   "@": parse_prefix(20, $ast.splice),
 
-  ".":  parse_infix(10, $ast.dot, false),
+  ".":  parse_dot(10, $ast.dot, false),
   "<=": parse_infix(10, $ast.assign, true),
   "::": parse_infix(10, $ast.type, false),
 };
