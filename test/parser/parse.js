@@ -165,9 +165,14 @@ const test_brackets = (start, end, make) =>
       "  " + start + "foo\n" +
       "  ^"),
 
-    test_crash("foo" + end + "bar" + end,
+    test_crash(start + "#foo",
+      "missing ending " + end + "  (parse.test 1:1)\n" +
+      "  " + start + "#foo\n" +
+      "  ^"),
+
+    test_crash("foo" + end + " bar" + end,
       "missing starting " + start + "  (parse.test 1:4)\n" +
-      "  foo" + end + "bar" + end + "\n" +
+      "  foo" + end + " bar" + end + "\n" +
       "     ^"),
 
     test_crash(start + "foo " + start + "bar",

@@ -27,9 +27,23 @@ const test_crash = (input, expected) =>
 
 
 const test_prefix = (input) => [
-  test("0" + input + "1", (loc) => [
-    integer(0, loc(0, 0,
-                   0, 1)),
+  test_crash("0" + input + "1",
+    "cannot have an expression on the left side of " + input + "  (tokenize.test 1:2)\n" +
+    "  0" + input + "1\n" +
+    "   ^"),
+
+  test("(" + input + "1", (loc) => [
+    symbol("(", loc(0, 0,
+                    0, 1)),
+    symbol(input, loc(0, 1,
+                      0, 2)),
+    integer(1, loc(0, 2,
+                   0, 3))
+  ]),
+
+  test(input + input + "1", (loc) => [
+    symbol(input, loc(0, 0,
+                      0, 1)),
     symbol(input, loc(0, 1,
                       0, 2)),
     integer(1, loc(0, 2,
@@ -45,31 +59,45 @@ const test_prefix = (input) => [
                    0, 4))
   ]),
 
-  test_crash("0" + input + " 1",
-    "spaces (U+0020) are not allowed after " + input + "  (tokenize.test 1:2)\n" +
-    "  0" + input + " 1\n" +
-    "   ^"),
+  test_crash("0 " + input + " 1",
+    "spaces (U+0020) are not allowed after " + input + "  (tokenize.test 1:3)\n" +
+    "  0 " + input + " 1\n" +
+    "    ^"),
 
-  test_crash("0" + input,
-    "missing expression on the right side of " + input + "  (tokenize.test 1:2)\n" +
-    "  0" + input + "\n" +
-    "   ^"),
+  test_crash("0 " + input,
+    "missing expression on the right side of " + input + "  (tokenize.test 1:3)\n" +
+    "  0 " + input + "\n" +
+    "    ^"),
 
-  test_crash("0" + input + "\n",
-    "missing expression on the right side of " + input + "  (tokenize.test 1:2)\n" +
-    "  0" + input + "\n" +
-    "   ^")
+  test_crash("0 " + input + "\n",
+    "missing expression on the right side of " + input + "  (tokenize.test 1:3)\n" +
+    "  0 " + input + "\n" +
+    "    ^")
 ];
 
 
 const test_suffix = (input) => [
-  test("0" + input + "1", (loc) => [
+  test_crash("0" + input + "1",
+    "cannot have an expression on the right side of " + input + "  (tokenize.test 1:2)\n" +
+    "  0" + input + "1\n" +
+    "   ^"),
+
+  test("0" + input + ")", (loc) => [
     integer(0, loc(0, 0,
                    0, 1)),
     symbol(input, loc(0, 1,
                       0, 2)),
-    integer(1, loc(0, 2,
-                   0, 3))
+    symbol(")", loc(0, 2,
+                    0, 3))
+  ]),
+
+  test("0" + input + input, (loc) => [
+    integer(0, loc(0, 0,
+                   0, 1)),
+    symbol(input, loc(0, 1,
+                      0, 2)),
+    symbol(input, loc(0, 2,
+                      0, 3))
   ]),
 
   test("0" + input + " 1", (loc) => [
@@ -231,26 +259,26 @@ export default [
                       0, 8))
   ]),
 
-  test("(foo(bar", (loc) => [
+  test("(foo (bar", (loc) => [
     symbol("(", loc(0, 0,
                     0, 1)),
     symbol("foo", loc(0, 1,
                       0, 4)),
-    symbol("(", loc(0, 4,
-                    0, 5)),
-    symbol("bar", loc(0, 5,
-                      0, 8))
+    symbol("(", loc(0, 5,
+                    0, 6)),
+    symbol("bar", loc(0, 6,
+                      0, 9))
   ]),
 
-  test("foo)bar)", (loc) => [
+  test("foo) bar)", (loc) => [
     symbol("foo", loc(0, 0,
                       0, 3)),
     symbol(")", loc(0, 3,
                     0, 4)),
-    symbol("bar", loc(0, 4,
-                      0, 7)),
-    symbol(")", loc(0, 7,
-                    0, 8))
+    symbol("bar", loc(0, 5,
+                      0, 8)),
+    symbol(")", loc(0, 8,
+                    0, 9))
   ]),
 
   test("[foo[bar[", (loc) => [
@@ -305,37 +333,37 @@ export default [
                     0, 9))
   ]),
 
-  test("&foo&bar", (loc) => [
+  test("&foo &bar", (loc) => [
     symbol("&", loc(0, 0,
                     0, 1)),
     symbol("foo", loc(0, 1,
                       0, 4)),
-    symbol("&", loc(0, 4,
-                    0, 5)),
-    symbol("bar", loc(0, 5,
-                      0, 8))
+    symbol("&", loc(0, 5,
+                    0, 6)),
+    symbol("bar", loc(0, 6,
+                      0, 9))
   ]),
 
-  test(",foo,bar", (loc) => [
+  test(",foo ,bar", (loc) => [
     symbol(",", loc(0, 0,
                     0, 1)),
     symbol("foo", loc(0, 1,
                       0, 4)),
-    symbol(",", loc(0, 4,
-                    0, 5)),
-    symbol("bar", loc(0, 5,
-                      0, 8))
+    symbol(",", loc(0, 5,
+                    0, 6)),
+    symbol("bar", loc(0, 6,
+                      0, 9))
   ]),
 
-  test("@foo@bar", (loc) => [
+  test("@foo @bar", (loc) => [
     symbol("@", loc(0, 0,
                     0, 1)),
     symbol("foo", loc(0, 1,
                       0, 4)),
-    symbol("@", loc(0, 4,
-                    0, 5)),
-    symbol("bar", loc(0, 5,
-                      0, 8))
+    symbol("@", loc(0, 5,
+                    0, 6)),
+    symbol("bar", loc(0, 6,
+                      0, 9))
   ]),
 
   test("foo.bar", (loc) => [
@@ -683,7 +711,7 @@ export default [
   ]),
 
 
-  test("1 1.5 1,5 (foo bar qux) u@q\nqux\n(nou)\n,foo\n,@foo", (loc) => [
+  test("1 1.5 1 ,5 (foo bar qux) u @q\nqux\n(nou)\n,foo\n,@foo", (loc) => [
     integer(1, loc(0, 0,
                    0, 1)),
     integer(1, loc(0, 2,
@@ -694,26 +722,26 @@ export default [
                    0, 5)),
     integer(1, loc(0, 6,
                    0, 7)),
-    symbol(",", loc(0, 7,
-                    0, 8)),
-    integer(5, loc(0, 8,
-                   0, 9)),
-    symbol("(", loc(0, 10,
-                    0, 11)),
-    symbol("foo", loc(0, 11,
-                      0, 14)),
-    symbol("bar", loc(0, 15,
-                      0, 18)),
-    symbol("qux", loc(0, 19,
-                      0, 22)),
-    symbol(")", loc(0, 22,
-                    0, 23)),
-    symbol("u", loc(0, 24,
-                    0, 25)),
-    symbol("@", loc(0, 25,
+    symbol(",", loc(0, 8,
+                    0, 9)),
+    integer(5, loc(0, 9,
+                   0, 10)),
+    symbol("(", loc(0, 11,
+                    0, 12)),
+    symbol("foo", loc(0, 12,
+                      0, 15)),
+    symbol("bar", loc(0, 16,
+                      0, 19)),
+    symbol("qux", loc(0, 20,
+                      0, 23)),
+    symbol(")", loc(0, 23,
+                    0, 24)),
+    symbol("u", loc(0, 25,
                     0, 26)),
-    symbol("q", loc(0, 26,
-                    0, 27)),
+    symbol("@", loc(0, 27,
+                    0, 28)),
+    symbol("q", loc(0, 28,
+                    0, 29)),
     symbol("qux", loc(1, 0,
                       1, 3)),
     symbol("(", loc(2, 0,

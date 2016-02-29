@@ -43,6 +43,14 @@ const tokenize_delimiter = (whitespace) =>
       }
     }
 
+    if (whitespace === PREFIX && prev !== null && specials[prev] == null) {
+      error(token, "cannot have an expression on the left side of " + char);
+    }
+
+    if (whitespace === SUFFIX && next !== null && specials[next] == null) {
+      error(token, "cannot have an expression on the right side of " + char);
+    }
+
     output["push"](token);
 
     return tokenize1(output, file, lines, line, column);
