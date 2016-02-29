@@ -1,31 +1,31 @@
 import * as $array from "../../util/array";
 
 
+// Literals
 export const SYMBOL  = 0;
 export const INTEGER = 1;
 export const NUMBER  = 2;
 export const TEXT    = 3;
-export const BOX     = 4;
 
-export const CALL    = 5;
-export const LIST    = 6;
-export const RECORD  = 7;
+// Lists
+export const CALL    = 4;
+export const LIST    = 5;
+export const RECORD  = 6;
 
-export const LAMBDA  = 8;
+// Lambda
+export const LAMBDA  = 7;
 
-export const ASSIGN  = 9;
-export const DOT     = 10;
-export const TYPE    = 11;
+// Infix
+export const ASSIGN  = 8;
+export const DOT     = 9;
+export const TYPE    = 10;
 
-export const BAR     = 12;
-export const QUOTE   = 13;
-export const UNQUOTE = 14;
-export const SPLICE  = 15;
+// Prefix
+export const BAR     = 11;
+export const QUOTE   = 12;
+export const UNQUOTE = 13;
+export const SPLICE  = 14;
 
-
-export const box = (module, id, name, loc) => {
-  return { type: BOX, module, id, name, loc };
-};
 
 export const symbol = (value, loc) => {
   return { type: SYMBOL, value, loc };
@@ -71,20 +71,20 @@ export const lambda = (parameters, body, loc) => {
   return { type: LAMBDA, parameters, body, loc };
 };
 
-export const bar = (value, loc) => {
-  return { type: BAR, value, loc };
+export const bar = (right, loc) => {
+  return { type: BAR, right, loc };
 };
 
-export const quote = (value, loc) => {
-  return { type: QUOTE, value, loc };
+export const quote = (right, loc) => {
+  return { type: QUOTE, right, loc };
 };
 
-export const unquote = (value, loc) => {
-  return { type: UNQUOTE, value, loc };
+export const unquote = (right, loc) => {
+  return { type: UNQUOTE, right, loc };
 };
 
-export const splice = (value, loc) => {
-  return { type: SPLICE, value, loc };
+export const splice = (right, loc) => {
+  return { type: SPLICE, right, loc };
 };
 
 
@@ -131,7 +131,7 @@ export const map = (x, f) => {
   case SPLICE:
     return {
       type: x.type,
-      value: f(x.value),
+      right: f(x.right),
       loc: x.loc
     };
 
