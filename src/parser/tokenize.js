@@ -14,11 +14,8 @@ const tokenize_delimiter = (whitespace) =>
   (output, file, lines, line, column) => {
     const chars = lines[line];
 
-    // TODO a bit hacky
-    const prev_pos = { line, column: column - 1 };
-
-    // TODO hacky
     const prev = peek(chars, column - 1);
+    const next = peek(chars, column + 1);
 
     const char = chars[column];
 
@@ -28,33 +25,27 @@ const tokenize_delimiter = (whitespace) =>
 
     const end = { line, column };
 
-    // TODO hacky
-    const next = peek(chars, column);
+    const token = $ast.symbol(char, $ast.loc(file, lines, start, end));
 
-    // TODO a bit hacky
-    const next_pos = { line, column: column + 1 };
-
-    if (next === " " && (whitespace === PREFIX || whitespace === INFIX)) {
-      error($ast.symbol(" ", $ast.loc(file, lines, end, next_pos)),
-            "spaces (U+0020) are not allowed after " + char);
-
-    } else if (prev === " " && (whitespace === SUFFIX || whitespace === INFIX)) {
-      error($ast.symbol(" ", $ast.loc(file, lines, prev_pos, start)),
-            "spaces (U+0020) are not allowed before " + char);
-
-    } else if (prev === null && (whitespace === SUFFIX || whitespace === INFIX)) {
-      error($ast.symbol(char, $ast.loc(file, lines, start, end)),
-            "missing expression on the left side of " + char);
-
-    } else if (next === null && (whitespace === PREFIX || whitespace === INFIX)) {
-      error($ast.symbol(char, $ast.loc(file, lines, start, end)),
-            "missing expression on the right side of " + char);
-
-    } else {
-      output["push"]($ast.symbol(char, $ast.loc(file, lines, start, end)));
-
-      return tokenize1(output, file, lines, line, column);
+    if (whitespace === INFIX || whitespace === SUFFIX) {
+      if (prev === " ") {
+        error(token, "spaces (U+0020) are not allowed before " + char);
+      } else if (prev === null) {
+        error(token, "missing expression on the left side of " + char);
+      }
     }
+
+    if (whitespace === INFIX || whitespace === PREFIX) {
+      if (next === " ") {
+        error(token, "spaces (U+0020) are not allowed after " + char);
+      } else if (next === null) {
+        error(token, "missing expression on the right side of " + char);
+      }
+    }
+
+    output["push"](token);
+
+    return tokenize1(output, file, lines, line, column);
   };
 
 

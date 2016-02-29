@@ -46,9 +46,9 @@ const test_prefix = (input) => [
   ]),
 
   test_crash("0" + input + " 1",
-    "spaces (U+0020) are not allowed after " + input + "  (tokenize.test 1:3)\n" +
+    "spaces (U+0020) are not allowed after " + input + "  (tokenize.test 1:2)\n" +
     "  0" + input + " 1\n" +
-    "    ^"),
+    "   ^"),
 
   test_crash("0" + input,
     "missing expression on the right side of " + input + "  (tokenize.test 1:2)\n" +
@@ -82,9 +82,9 @@ const test_suffix = (input) => [
   ]),
 
   test_crash("0 " + input + "1",
-    "spaces (U+0020) are not allowed before " + input + "  (tokenize.test 1:2)\n" +
+    "spaces (U+0020) are not allowed before " + input + "  (tokenize.test 1:3)\n" +
     "  0 " + input + "1\n" +
-    "   ^"),
+    "    ^"),
 
   test_crash(input,
     "missing expression on the left side of " + input + "  (tokenize.test 1:1)\n" +
@@ -104,14 +104,19 @@ const test_infix = (input) => [
   ]),
 
   test_crash("0" + input + " 1",
-    "spaces (U+0020) are not allowed after " + input + "  (tokenize.test 1:3)\n" +
+    "spaces (U+0020) are not allowed after " + input + "  (tokenize.test 1:2)\n" +
     "  0" + input + " 1\n" +
-    "    ^"),
+    "   ^"),
 
   test_crash("0 " + input + "1",
-    "spaces (U+0020) are not allowed before " + input + "  (tokenize.test 1:2)\n" +
+    "spaces (U+0020) are not allowed before " + input + "  (tokenize.test 1:3)\n" +
     "  0 " + input + "1\n" +
-    "   ^"),
+    "    ^"),
+
+  test_crash("0 " + input + " 1",
+    "spaces (U+0020) are not allowed before " + input + "  (tokenize.test 1:3)\n" +
+    "  0 " + input + " 1\n" +
+    "    ^"),
 
   test_crash(input,
     "missing expression on the left side of " + input + "  (tokenize.test 1:1)\n" +
