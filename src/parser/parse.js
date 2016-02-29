@@ -126,7 +126,7 @@ const parse_prefix = (priority, make) =>
     right_associative: true,
     parse: (left, middle, right) => {
       if (right["length"] === 0) {
-        error(middle, "missing expression on the right side");
+        error(middle, "missing expression on the right side of " + middle.value);
 
       } else {
         const r = right["shift"]();
@@ -142,10 +142,10 @@ const parse_infix = (priority, make, right_associative) =>
     right_associative: right_associative,
     parse: (left, middle, right) => {
       if (left["length"] === 0) {
-        error(middle, "missing expression on the left side");
+        error(middle, "missing expression on the left side of " + middle.value);
 
       } else if (right["length"] === 0) {
-        error(middle, "missing expression on the right side");
+        error(middle, "missing expression on the right side of " + middle.value);
 
       } else {
         const l = left["pop"]();

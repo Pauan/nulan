@@ -25,7 +25,7 @@ export const remove = (a, x) => {
 };
 
 export const peek = (a, i) => {
-  if (i < a["length"]) {
+  if (i >= 0 && i < a["length"]) {
     return a[i];
   } else {
     return null;

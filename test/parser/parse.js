@@ -40,7 +40,12 @@ const test_prefix = (name, make, space) => {
 
   return [
     test_crash(name,
-      "missing expression on the right side  (parse.test 1:1)\n" +
+      "missing expression on the right side of " + name + "  (parse.test 1:1)\n" +
+      "  " + name + "\n" +
+      "  ^"),
+
+    test_crash(name + "\n",
+      "missing expression on the right side of " + name + "  (parse.test 1:1)\n" +
       "  " + name + "\n" +
       "  ^"),
 
@@ -95,17 +100,17 @@ const test_infix = (name, make, right_associative, space) => {
                   : "1" + name);
   return [
     test_crash(name,
-      "missing expression on the left side  (parse.test 1:1)\n" +
+      "missing expression on the left side of " + name + "  (parse.test 1:1)\n" +
       "  " + name + "\n" +
       "  " + marker(name)),
 
     test_crash(test2,
-      "missing expression on the left side  (parse.test 1:1)\n" +
+      "missing expression on the left side of " + name + "  (parse.test 1:1)\n" +
       "  " + test2 + "\n" +
       "  " + marker(name)),
 
     test_crash(test3,
-      "missing expression on the right side  (parse.test 1:" + (space ? "3" : "2") + ")\n" +
+      "missing expression on the right side of " + name + "  (parse.test 1:" + (space ? "3" : "2") + ")\n" +
       "  " + test3 + "\n" +
       (space
         ? "    " + marker(name)

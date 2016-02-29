@@ -42,6 +42,14 @@ const tokenize_delimiter = (whitespace) =>
       error($ast.symbol(" ", $ast.loc(file, lines, prev_pos, start)),
             "spaces (U+0020) are not allowed before " + char);
 
+    } else if (prev === null && (whitespace === SUFFIX || whitespace === INFIX)) {
+      error($ast.symbol(char, $ast.loc(file, lines, start, end)),
+            "missing expression on the left side of " + char);
+
+    } else if (next === null && (whitespace === PREFIX || whitespace === INFIX)) {
+      error($ast.symbol(char, $ast.loc(file, lines, start, end)),
+            "missing expression on the right side of " + char);
+
     } else {
       output["push"]($ast.symbol(char, $ast.loc(file, lines, start, end)));
 
