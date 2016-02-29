@@ -4,19 +4,50 @@ import { peek } from "../../util/array";
 import * as $ast from "./ast";
 
 
-const tokenize_delimiter = (output, file, lines, line, column) => {
-  const char = lines[line][column];
+const NONE   = 0;
+const PREFIX = 1;
+const INFIX  = 2;
+const SUFFIX = 3;
 
-  const start = { line, column };
 
-  column += 1;
+const tokenize_delimiter = (whitespace) =>
+  (output, file, lines, line, column) => {
+    const chars = lines[line];
 
-  const end = { line, column };
+    // TODO a bit hacky
+    const prev_pos = { line, column: column - 1 };
 
-  output["push"]($ast.symbol(char, $ast.loc(file, lines, start, end)));
+    // TODO hacky
+    const prev = peek(chars, column - 1);
 
-  return tokenize1(output, file, lines, line, column);
-};
+    const char = chars[column];
+
+    const start = { line, column };
+
+    column += 1;
+
+    const end = { line, column };
+
+    // TODO hacky
+    const next = peek(chars, column);
+
+    // TODO a bit hacky
+    const next_pos = { line, column: column + 1 };
+
+    if (next === " " && (whitespace === PREFIX || whitespace === INFIX)) {
+      error($ast.symbol(" ", $ast.loc(file, lines, end, next_pos)),
+            "spaces (U+0020) are not allowed after " + char);
+
+    } else if (prev === " " && (whitespace === SUFFIX || whitespace === INFIX)) {
+      error($ast.symbol(" ", $ast.loc(file, lines, prev_pos, start)),
+            "spaces (U+0020) are not allowed before " + char);
+
+    } else {
+      output["push"]($ast.symbol(char, $ast.loc(file, lines, start, end)));
+
+      return tokenize1(output, file, lines, line, column);
+    }
+  };
 
 
 const tokenize_symbol1 = (value, loc) => {
@@ -413,19 +444,19 @@ const specials = {
   "#":  tokenize_comment,
   "\"": tokenize_text,
 
-  "(":  tokenize_delimiter,
-  ")":  tokenize_delimiter,
+  "(":  tokenize_delimiter(PREFIX),
+  ")":  tokenize_delimiter(SUFFIX),
 
-  "[":  tokenize_delimiter,
-  "]":  tokenize_delimiter,
+  "[":  tokenize_delimiter(NONE),
+  "]":  tokenize_delimiter(NONE),
 
-  "{":  tokenize_delimiter,
-  "}":  tokenize_delimiter,
+  "{":  tokenize_delimiter(NONE),
+  "}":  tokenize_delimiter(NONE),
 
-  "&":  tokenize_delimiter,
-  ",":  tokenize_delimiter,
-  "@":  tokenize_delimiter,
-  ".":  tokenize_delimiter
+  "&":  tokenize_delimiter(PREFIX),
+  ",":  tokenize_delimiter(PREFIX),
+  "@":  tokenize_delimiter(PREFIX),
+  ".":  tokenize_delimiter(INFIX)
 };
 
 

@@ -26,7 +26,91 @@ const test_crash = (input, expected) =>
   });
 
 
+const test_prefix = (input) => [
+  test("0" + input + "1", (loc) => [
+    integer(0, loc(0, 0,
+                   0, 1)),
+    symbol(input, loc(0, 1,
+                      0, 2)),
+    integer(1, loc(0, 2,
+                   0, 3))
+  ]),
+
+  test("0 " + input + "1", (loc) => [
+    integer(0, loc(0, 0,
+                   0, 1)),
+    symbol(input, loc(0, 2,
+                      0, 3)),
+    integer(1, loc(0, 3,
+                   0, 4))
+  ]),
+
+  test_crash("0" + input + " 1",
+    "spaces (U+0020) are not allowed after " + input + "  (tokenize.test 1:3)\n" +
+    "  0" + input + " 1\n" +
+    "    ^")
+];
+
+
+const test_suffix = (input) => [
+  test("0" + input + "1", (loc) => [
+    integer(0, loc(0, 0,
+                   0, 1)),
+    symbol(input, loc(0, 1,
+                      0, 2)),
+    integer(1, loc(0, 2,
+                   0, 3))
+  ]),
+
+  test("0" + input + " 1", (loc) => [
+    integer(0, loc(0, 0,
+                   0, 1)),
+    symbol(input, loc(0, 1,
+                      0, 2)),
+    integer(1, loc(0, 3,
+                   0, 4))
+  ]),
+
+  test_crash("0 " + input + "1",
+    "spaces (U+0020) are not allowed before " + input + "  (tokenize.test 1:2)\n" +
+    "  0 " + input + "1\n" +
+    "   ^")
+];
+
+
+const test_infix = (input) => [
+  test("0" + input + "1", (loc) => [
+    integer(0, loc(0, 0,
+                   0, 1)),
+    symbol(input, loc(0, 1,
+                      0, 2)),
+    integer(1, loc(0, 2,
+                   0, 3))
+  ]),
+
+  test_crash("0" + input + " 1",
+    "spaces (U+0020) are not allowed after " + input + "  (tokenize.test 1:3)\n" +
+    "  0" + input + " 1\n" +
+    "    ^"),
+
+  test_crash("0 " + input + "1",
+    "spaces (U+0020) are not allowed before " + input + "  (tokenize.test 1:2)\n" +
+    "  0 " + input + "1\n" +
+    "   ^")
+];
+
+
 export default [
+  ...test_prefix("("),
+  ...test_suffix(")"),
+
+  ...test_prefix("&"),
+  ...test_prefix(","),
+  ...test_prefix("@"),
+
+  ...test_infix("."),
+
+
   test("", (loc) =>
     []),
 

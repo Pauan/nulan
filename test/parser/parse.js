@@ -33,103 +33,120 @@ const marker = (name) =>
   "^" + repeat("-", name["length"] - 1);
 
 
-const test_prefix = (name, make) =>
-  [
+const test_prefix = (name, make, space) => {
+  const name2 = (space
+                  ? name + " "
+                  : name);
+
+  return [
     test_crash(name,
       "missing expression on the right side  (parse.test 1:1)\n" +
       "  " + name + "\n" +
       "  ^"),
 
-    test(name + " 1", (loc) => [
-      make(integer(1, loc(0, name["length"] + 1,
-                          0, name["length"] + 2)),
+    test(name2 + "1", (loc) => [
+      make(integer(1, loc(0, name2["length"],
+                          0, name2["length"] + 1)),
            loc(0, 0,
-               0, name["length"] + 2))
+               0, name2["length"] + 1))
     ]),
 
-    test(name + " " + name + " 1", (loc) => [
-      make(make(integer(1, loc(0, name["length"] + name["length"] + 2,
-                               0, name["length"] + name["length"] + 3)),
-                loc(0, name["length"] + 1,
-                    0, name["length"] + name["length"] + 3)),
+    test(name2 + name2 + "1", (loc) => [
+      make(make(integer(1, loc(0, name2["length"] + name2["length"],
+                               0, name2["length"] + name2["length"] + 1)),
+                loc(0, name2["length"],
+                    0, name2["length"] + name2["length"] + 1)),
            loc(0, 0,
-               0, name["length"] + name["length"] + 3))
+               0, name2["length"] + name2["length"] + 1))
     ]),
 
     test("(a\n" +
-         "  " + name + " b\n" +
-         "  " + name + " (c d))", (loc) => [
+         "  " + name2 + "b\n" +
+         "  " + name2 + "(c d))", (loc) => [
       call([symbol("a", loc(0, 1,
                             0, 2)),
-            make(symbol("b", loc(1, name["length"] + 3,
-                                 1, name["length"] + 4)),
+            make(symbol("b", loc(1, name2["length"] + 2,
+                                 1, name2["length"] + 3)),
                  loc(1, 2,
-                     1, name["length"] + 4)),
-            make(call([symbol("c", loc(2, name["length"] + 4,
-                                       2, name["length"] + 5)),
-                       symbol("d", loc(2, name["length"] + 6,
-                                       2, name["length"] + 7))],
-                      loc(2, name["length"] + 3,
-                          2, name["length"] + 8)),
+                     1, name2["length"] + 3)),
+            make(call([symbol("c", loc(2, name2["length"] + 3,
+                                       2, name2["length"] + 4)),
+                       symbol("d", loc(2, name2["length"] + 5,
+                                       2, name2["length"] + 6))],
+                      loc(2, name2["length"] + 2,
+                          2, name2["length"] + 7)),
                  loc(2, 2,
-                     2, name["length"] + 8))],
+                     2, name2["length"] + 7))],
            loc(0, 0,
-               2, name["length"] + 9))
+               2, name2["length"] + 8))
     ])
   ];
+};
 
-const test_infix = (name, make, right_associative) =>
-  [
+const test_infix = (name, make, right_associative, space) => {
+  const name2 = (space
+                  ? " " + name + " "
+                  : name);
+  const test2 = (space
+                  ? name + " 2"
+                  : name + "2");
+  const test3 = (space
+                  ? "1 " + name
+                  : "1" + name);
+  return [
     test_crash(name,
       "missing expression on the left side  (parse.test 1:1)\n" +
       "  " + name + "\n" +
       "  " + marker(name)),
 
-    test_crash(name + " 2",
+    test_crash(test2,
       "missing expression on the left side  (parse.test 1:1)\n" +
-      "  " + name + " 2\n" +
+      "  " + test2 + "\n" +
       "  " + marker(name)),
 
-    test_crash("1 " + name,
-      "missing expression on the right side  (parse.test 1:3)\n" +
-      "  1 " + name + "\n" +
-      "    " + marker(name)),
+    test_crash(test3,
+      "missing expression on the right side  (parse.test 1:" + (space ? "3" : "2") + ")\n" +
+      "  " + test3 + "\n" +
+      (space
+        ? "    " + marker(name)
+        : "   " + marker(name))),
 
-    test("1 " + name + " 2", (loc) => [
+    test("1" + name2 + "2", (loc) => [
       make(integer(1, loc(0, 0,
                           0, 1)),
-           integer(2, loc(0, name["length"] + 3,
-                          0, name["length"] + 4)),
+           integer(2, loc(0, name2["length"] + 1,
+                          0, name2["length"] + 2)),
            loc(0, 0,
-               0, name["length"] + 4))
+               0, name2["length"] + 2))
     ]),
 
     (right_associative
-      ? test("1 " + name + " 2 " + name + " 3", (loc) => [
+      ? test("1" + name2 + "2" + name2 + "3", (loc) => [
           make(integer(1, loc(0, 0,
                               0, 1)),
-               make(integer(2, loc(0, name["length"] + 3,
-                                   0, name["length"] + 4)),
-                    integer(3, loc(0, name["length"] + name["length"] + 6,
-                                   0, name["length"] + name["length"] + 7)),
-                    loc(0, name["length"] + 3,
-                        0, name["length"] + name["length"] + 7)),
+               make(integer(2, loc(0, name2["length"] + 1,
+                                   0, name2["length"] + 2)),
+                    integer(3, loc(0, name2["length"] + name2["length"] + 2,
+                                   0, name2["length"] + name2["length"] + 3)),
+                    loc(0, name2["length"] + 1,
+                        0, name2["length"] + name2["length"] + 3)),
                loc(0, 0,
-                   0, name["length"] + name["length"] + 7))
+                   0, name2["length"] + name2["length"] + 3))
         ])
-      : test("1 " + name + " 2 " + name + " 3", (loc) => [
+      : test("1" + name2 + "2" + name2 + "3", (loc) => [
           make(make(integer(1, loc(0, 0,
                                    0, 1)),
-                    integer(2, loc(0, name["length"] + 3,
-                                   0, name["length"] + 4)),
+                    integer(2, loc(0, name2["length"] + 1,
+                                   0, name2["length"] + 2)),
                     loc(0, 0,
-                        0, name["length"] + 4)),
-               integer(3, loc(0, name["length"] + name["length"] + 6,
-                              0, name["length"] + name["length"] + 7)),
+                        0, name2["length"] + 2)),
+               integer(3, loc(0, name2["length"] + name2["length"] + 2,
+                              0, name2["length"] + name2["length"] + 3)),
                loc(0, 0,
-                   0, name["length"] + name["length"] + 7))
+                   0, name2["length"] + name2["length"] + 3))
         ])),
   ];
+};
 
 const test_brackets = (start, end, make) =>
   [
@@ -195,14 +212,14 @@ export default [
   ...test_brackets("[", "]", list),
   ...test_brackets("{", "}", record),
 
-  ...test_prefix("~", bar),
-  ...test_prefix("&", quote),
-  ...test_prefix(",", unquote),
-  ...test_prefix("@", splice),
+  ...test_prefix("~", bar, true),
+  ...test_prefix("&", quote, false),
+  ...test_prefix(",", unquote, false),
+  ...test_prefix("@", splice, false),
 
-  ...test_infix("<=", assign, true),
-  ...test_infix(".", dot, false),
-  ...test_infix("::", type, false),
+  ...test_infix("<=", assign, true, true),
+  ...test_infix(".", dot, false, false),
+  ...test_infix("::", type, false, true),
 
 
   test("{ hi }", (loc) => [
