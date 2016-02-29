@@ -6,7 +6,7 @@ import { lines, repeat } from "../../util/string";
 import { loc, text, symbol, integer,
          call, list, record, lambda,
          dot, bar, assign, type,
-         quote, unquote, splice, number } from "../../src/parser/ast";
+         quote, unquote, splice, number } from "../../src/parser/type";
 
 
 const file = "parse.test";

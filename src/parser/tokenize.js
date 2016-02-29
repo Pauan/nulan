@@ -1,7 +1,7 @@
 import { error } from "./error";
 import { repeat } from "../../util/string";
 import { peek } from "../../util/array";
-import * as $ast from "./ast";
+import * as $ast from "./type";
 
 
 const NONE   = 0;

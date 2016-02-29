@@ -1,6 +1,6 @@
 import { expect, expect_crash } from "../assert";
 import { reply } from "../../ffi/task";
-import { loc, text, symbol, integer } from "../../src/parser/ast";
+import { loc, text, symbol, integer } from "../../src/parser/type";
 import { tokenize } from "../../src/parser/tokenize";
 import { lines } from "../../util/string";
 

@@ -1,6 +1,6 @@
 import { error } from "./error";
 import { peek } from "../../util/array";
-import * as $ast from "./ast";
+import * as $ast from "./type";
 
 
 const is_symbol = (x, s) =>
