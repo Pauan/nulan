@@ -4,77 +4,91 @@ import { peek } from "../../util/array";
 import * as $ast from "./type";
 
 
-const NONE   = 0;
-const PREFIX = 1;
-const INFIX  = 2;
-const SUFFIX = 3;
+const PREFIX = 0;
+const INFIX  = 1;
+const SUFFIX = 2;
 
 
-const tokenize_delimiter = (whitespace) =>
-  (output, file, lines, line, column, indents) => {
-    const chars = lines[line];
+const tokenize_delimiter1 = (output, file, lines, line, column, indents, whitespace, space) => {
+  const chars = lines[line];
 
-    const prev = peek(chars, column - 1);
-    const next = peek(chars, column + 1);
+  const prev = peek(chars, column - 1);
+  const next = peek(chars, column + 1);
 
-    const char = chars[column];
+  const char = chars[column];
 
-    const start = { line, column };
+  const start = { line, column };
 
-    column += 1;
+  column += 1;
 
-    const end = { line, column };
+  const end = { line, column };
 
-    const token = $ast.symbol(char, $ast.loc(file, lines, start, end));
+  const token = $ast.symbol(char, $ast.loc(file, lines, start, end));
 
-    if (whitespace === INFIX || whitespace === SUFFIX) {
+  // TODO hacky
+  if (whitespace === INFIX || whitespace === SUFFIX) {
+    if (prev === null) {
+      error(token, "missing expression on the left side of " + char);
+
+    } else if (space === null) {
       if (prev === " ") {
         error(token, "spaces (U+0020) are not allowed before " + char);
-      } else if (prev === null) {
-        error(token, "missing expression on the left side of " + char);
       }
-    }
 
-    if (whitespace === INFIX || whitespace === PREFIX) {
+    } else if (prev !== " " && prev !== space) {
+      error(token, "must have a space or " + space + " on the left side of " + char);
+    }
+  }
+
+  // TODO hacky
+  if (whitespace === INFIX || whitespace === PREFIX) {
+    if (next === null) {
+      error(token, "missing expression on the right side of " + char);
+
+    } else if (space === null) {
       if (next === " ") {
         error(token, "spaces (U+0020) are not allowed after " + char);
-      } else if (next === null) {
-        error(token, "missing expression on the right side of " + char);
       }
+
+    } else if (next !== " " && next !== space) {
+      error(token, "must have a space or " + space + " on the right side of " + char);
     }
+  }
 
-    if (whitespace === PREFIX && prev !== null && specials[prev] == null) {
-      error(token, "cannot have an expression on the left side of " + char);
-    }
+  // TODO hacky
+  if (whitespace === PREFIX && prev !== null && specials[prev] == null) {
+    error(token, "cannot have an expression on the left side of " + char);
+  }
 
-    if (whitespace === SUFFIX && next !== null && specials[next] == null) {
-      error(token, "cannot have an expression on the right side of " + char);
-    }
+  // TODO hacky
+  if (whitespace === SUFFIX && next !== null && specials[next] == null) {
+    error(token, "cannot have an expression on the right side of " + char);
+  }
 
-    output["push"](token);
+  output["push"](token);
 
-    return tokenize1(output, file, lines, line, column, indents);
-  };
+  return tokenize1(output, file, lines, line, column, indents);
+};
+
+const tokenize_delimiter = (whitespace) =>
+  (output, file, lines, line, column, indents) =>
+    tokenize_delimiter1(output, file, lines, line, column, indents, whitespace, null);
 
 
-const tokenize_start = (whitespace, right) => {
-  const f = tokenize_delimiter(whitespace);
-
-  return (output, file, lines, line, column, indents) => {
+const tokenize_start = (whitespace, right, space) =>
+  (output, file, lines, line, column, indents) => {
     indents["push"]({
       end: right,
       column: column + 2
     });
 
-    return f(output, file, lines, line, column, indents);
+    // TODO hacky
+    return tokenize_delimiter1(output, file, lines, line, column, indents, whitespace, (space ? right : null));
   };
-};
 
 
-const tokenize_end = (whitespace, left) => {
-  const f = tokenize_delimiter(whitespace);
-
-  return (output, file, lines, line, column, indents) => {
+const tokenize_end = (whitespace, left, space) =>
+  (output, file, lines, line, column, indents) => {
     const last = indents[indents["length"] - 1];
 
     const char = lines[line][column];
@@ -82,7 +96,8 @@ const tokenize_end = (whitespace, left) => {
     if (last.end !== null && last.end === char) {
       indents["pop"]();
 
-      return f(output, file, lines, line, column, indents);
+      // TODO hacky
+      return tokenize_delimiter1(output, file, lines, line, column, indents, whitespace, (space ? left : null));
 
     // TODO code duplication
     } else {
@@ -97,7 +112,6 @@ const tokenize_end = (whitespace, left) => {
       error(token, "missing starting " + left);
     }
   };
-};
 
 
 const tokenize_symbol1 = (value, loc) => {
@@ -495,16 +509,14 @@ const specials = {
   "#":  tokenize_comment, // TODO require " " or null to the left ?
   "\"": tokenize_text,
 
-  "(":  tokenize_start(PREFIX, ")"),
-  ")":  tokenize_end(SUFFIX, "("),
+  "(":  tokenize_start(PREFIX, ")", false),
+  ")":  tokenize_end(SUFFIX, "(", false),
 
-  // TODO figure out what to do about these
-  "[":  tokenize_start(NONE, "]"),
-  "]":  tokenize_end(NONE, "["),
+  "[":  tokenize_start(PREFIX, "]", true),
+  "]":  tokenize_end(SUFFIX, "[", true),
 
-  // TODO figure out what to do about these
-  "{":  tokenize_start(NONE, "}"),
-  "}":  tokenize_end(NONE, "{"),
+  "{":  tokenize_start(PREFIX, "}", true),
+  "}":  tokenize_end(SUFFIX, "{", true),
 
   "&":  tokenize_delimiter(PREFIX),
   ",":  tokenize_delimiter(PREFIX),

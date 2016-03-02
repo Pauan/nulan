@@ -168,177 +168,199 @@ const test_infix = (input) => [
 ];
 
 
-const test_brackets = (start, end) => [
-  test(start + "foo\n  bar" + end, (loc) => [
-    symbol(start, loc(0, 0,
+const test_brackets = (start, end, is_space) => {
+  const space = (is_space ? " " : "");
+
+  const start2 = start + space;
+
+  const end2 = space + end;
+
+  const l = (is_space ? 2 : 1);
+
+  return [
+    test(start2 + "foo\n  bar" + end2, (loc) => [
+      symbol(start, loc(0, 0,
+                        0, 1)),
+      symbol("foo", loc(0, l,
+                        0, l + 3)),
+      symbol("bar", loc(1, 2,
+                        1, 5)),
+      symbol(end, loc(1, l + 4,
+                      1, l + 5))
+    ]),
+
+    test(start2 + "foo\n  bar " + start2 + "qux\n        corge" + end2 + end2, (loc) => [
+      symbol(start, loc(0, 0,
+                        0, 1)),
+      symbol("foo", loc(0, l,
+                        0, l + 3)),
+      symbol("bar", loc(1, 2,
+                        1, 5)),
+      symbol(start, loc(1, 6,
+                        1, 7)),
+      symbol("qux", loc(1, l + 6,
+                        1, l + 6 + 3)),
+      symbol("corge", loc(2, 8,
+                          2, 13)),
+      symbol(end, loc(2, l + 12,
+                      2, l + 13)),
+      symbol(end, loc(2, l + l + 12,
+                      2, l + l + 13))
+    ]),
+
+    test(start2 + "foo " + start2 + "bar " + start + end + end2 + end2, (loc) => [
+      symbol(start, loc(0, 0,
+                        0, 1)),
+      symbol("foo", loc(0, l,
+                        0, l + 3)),
+      symbol(start, loc(0, l + 4,
+                        0, l + 5)),
+      symbol("bar", loc(0, l + 4 + l,
+                        0, l + 4 + l + 3)),
+      symbol(start, loc(0, l + 4 + l + 4,
+                        0, l + 4 + l + 5)),
+      symbol(end, loc(0, l + 4 + l + 5,
+                      0, l + 4 + l + 6)),
+      symbol(end, loc(0, l + 4 + l + 5 + l,
+                      0, l + 4 + l + 5 + l + 1)),
+      symbol(end, loc(0, l + 4 + l + 5 + l + l,
+                      0, l + 4 + l + 5 + l + l + 1))
+    ]),
+
+    test_crash(start2 + "foo\n  #/foo\n/# nou" + end2,
+      "expected 2 spaces but got 0  (tokenize.test 3:1)\n" +
+      "  /# nou" + end2 + "\n" +
+      "  ^"),
+
+    test_crash(" " + start2 + "foo\n bar" + end2,
+      "expected 0 spaces but got 1  (tokenize.test 1:1)\n" +
+      "   " + start2 + "foo\n" +
+      "  ^"),
+
+    test_crash(start2 + "foo\n bar" + end2,
+      "expected 2 spaces but got 1  (tokenize.test 2:1)\n" +
+      "   bar" + end2 + "\n" +
+      "  ^"),
+
+    test_crash(start2 + "foo\n  " + start2 + "bar\n   qux" + end2 + end2,
+      "expected 4 spaces but got 3  (tokenize.test 3:1)\n" +
+      "     qux" + end2 + end2 + "\n" +
+      "  ^--"),
+
+    test_crash(start2 + "foo   " + start2 + "bar\n        " + space + "qux" + end2 + end2,
+      "expected " + (l + 8) + " spaces but got " + (l + 7) + "  (tokenize.test 2:1)\n" +
+      "          " + space + "qux" + end2 + end2 + "\n" +
+      "  ^-------" + (space ? "-" : "")),
+
+    test(start2 + "foo   " + start2 + "bar\n         " + space + "qux" + end2 + end2, (loc) => [
+      symbol(start, loc(0, 0,
+                        0, 1)),
+      symbol("foo", loc(0, l,
+                        0, l + 3)),
+      symbol(start, loc(0, l + 3 + 3,
+                        0, l + 3 + 4)),
+      symbol("bar", loc(0, l + 3 + 3 + l,
+                        0, l + 3 + 3 + l + 3)),
+      symbol("qux", loc(1, l + 8,
+                        1, l + 8 + 3)),
+      symbol(end, loc(1, l + 8 + l + 2,
+                      1, l + 8 + l + 3)),
+      symbol(end, loc(1, l + 8 + l + 2 + l,
+                      1, l + 8 + l + 3 + l))
+    ]),
+
+    test_crash(start2 + "foo\n    bar" + end2,
+      "expected 2 spaces but got 4  (tokenize.test 2:1)\n" +
+      "      bar" + end2 + "\n" +
+      "  ^---"),
+
+
+    test_crash("0" + start + end + "1",
+      "cannot have an expression on the left side of " + start + "  (tokenize.test 1:2)\n" +
+      "  0" + start + end + "1\n" +
+      "   ^"),
+
+    test_crash("0" + start + end + " 1",
+      "cannot have an expression on the left side of " + start + "  (tokenize.test 1:2)\n" +
+      "  0" + start + end + " 1\n" +
+      "   ^"),
+
+    test_crash("0 " + start + end + "1",
+      "cannot have an expression on the right side of " + end + "  (tokenize.test 1:4)\n" +
+      "  0 " + start + end + "1\n" +
+      "     ^"),
+
+
+    test("&" + start2 + "1" + end2, (loc) => [
+      symbol("&", loc(0, 0,
                       0, 1)),
-    symbol("foo", loc(0, 1,
+      symbol(start, loc(0, 1,
+                        0, 2)),
+      integer(1, loc(0, l + 1,
+                     0, l + 2)),
+      symbol(end, loc(0, l + l + 1,
+                      0, l + l + 2))
+    ]),
+
+    test(start2 + start2 + "1" + end2 + end2, (loc) => [
+      symbol(start, loc(0, 0,
+                        0, 1)),
+      symbol(start, loc(0, l,
+                        0, l + 1)),
+      integer(1, loc(0, l + l,
+                     0, l + l + 1)),
+      symbol(end, loc(0, l + l + l,
+                      0, l + l + l + 1)),
+      symbol(end, loc(0, l + l + l + l,
+                      0, l + l + l + l + 1))
+    ]),
+
+    test("0 " + start + end + " 1", (loc) => [
+      integer(0, loc(0, 0,
+                     0, 1)),
+      symbol(start, loc(0, 2,
+                        0, 3)),
+      symbol(end, loc(0, 3,
                       0, 4)),
-    symbol("bar", loc(1, 2,
-                      1, 5)),
-    symbol(end, loc(1, 5,
-                    1, 6))
-  ]),
-
-  test(start + "foo\n  bar " + start + "qux\n        corge" + end + end, (loc) => [
-    symbol(start, loc(0, 0,
-                      0, 1)),
-    symbol("foo", loc(0, 1,
-                      0, 4)),
-    symbol("bar", loc(1, 2,
-                      1, 5)),
-    symbol(start, loc(1, 6,
-                      1, 7)),
-    symbol("qux", loc(1, 7,
-                      1, 10)),
-    symbol("corge", loc(2, 8,
-                        2, 13)),
-    symbol(end, loc(2, 13,
-                    2, 14)),
-    symbol(end, loc(2, 14,
-                    2, 15))
-  ]),
-
-  test(start + "foo " + start + "bar " + start + end + end + end, (loc) => [
-    symbol(start, loc(0, 0,
-                      0, 1)),
-    symbol("foo", loc(0, 1,
-                      0, 4)),
-    symbol(start, loc(0, 5,
-                      0, 6)),
-    symbol("bar", loc(0, 6,
-                      0, 9)),
-    symbol(start, loc(0, 10,
-                      0, 11)),
-    symbol(end, loc(0, 11,
-                    0, 12)),
-    symbol(end, loc(0, 12,
-                    0, 13)),
-    symbol(end, loc(0, 13,
-                    0, 14))
-  ]),
-
-  test_crash(start + "foo\n  #/foo\n/# nou" + end,
-    "expected 2 spaces but got 0  (tokenize.test 3:1)\n" +
-    "  /# nou" + end + "\n" +
-    "  ^"),
-
-  test_crash(" " + start + "foo\n bar" + end,
-    "expected 0 spaces but got 1  (tokenize.test 1:1)\n" +
-    "   " + start + "foo\n" +
-    "  ^"),
-
-  test_crash(start + "foo\n bar" + end,
-    "expected 2 spaces but got 1  (tokenize.test 2:1)\n" +
-    "   bar" + end + "\n" +
-    "  ^"),
-
-  test_crash(start + "foo\n  " + start + "bar\n   qux" + end + end,
-    "expected 4 spaces but got 3  (tokenize.test 3:1)\n" +
-    "     qux" + end + end + "\n" +
-    "  ^--"),
-
-  test_crash(start + "foo   " + start + "bar\n        qux" + end + end,
-    "expected 9 spaces but got 8  (tokenize.test 2:1)\n" +
-    "          qux" + end + end + "\n" +
-    "  ^-------"),
-
-  test(start + "foo   " + start + "bar\n         qux" + end + end, (loc) => [
-    symbol(start, loc(0, 0,
-                      0, 1)),
-    symbol("foo", loc(0, 1,
-                      0, 4)),
-    symbol(start, loc(0, 7,
-                      0, 8)),
-    symbol("bar", loc(0, 8,
-                      0, 11)),
-    symbol("qux", loc(1, 9,
-                      1, 12)),
-    symbol(end, loc(1, 12,
-                    1, 13)),
-    symbol(end, loc(1, 13,
-                    1, 14))
-  ]),
-
-  test_crash(start + "foo\n    bar" + end,
-    "expected 2 spaces but got 4  (tokenize.test 2:1)\n" +
-    "      bar" + end + "\n" +
-    "  ^---"),
+      integer(1, loc(0, 5,
+                     0, 6))
+    ]),
 
 
-  test_crash("0" + start + end + "1",
-    "cannot have an expression on the left side of " + start + "  (tokenize.test 1:2)\n" +
-    "  0" + start + end + "1\n" +
-    "   ^"),
+    ...(space ? [
+      test_crash("0 " + start + "1",
+        "must have a space or " + end + " on the right side of " + start + "  (tokenize.test 1:3)\n" +
+        "  0 " + start + "1\n" +
+        "    ^"),
 
-  test_crash("0" + start + end + " 1",
-    "cannot have an expression on the left side of " + start + "  (tokenize.test 1:2)\n" +
-    "  0" + start + end + " 1\n" +
-    "   ^"),
+      test_crash("0 " + start2 + "foo" + end + "1",
+        "must have a space or " + start + " on the left side of " + end + "  (tokenize.test 1:8)\n" +
+        "  0 " + start2 + "foo" + end + "1\n" +
+        "         ^")
+    ] : [
+      test_crash("0 " + start + " 1",
+        "spaces (U+0020) are not allowed after " + start + "  (tokenize.test 1:3)\n" +
+        "  0 " + start + " 1\n" +
+        "    ^"),
 
-  test_crash("0 " + start + end + "1",
-    "cannot have an expression on the right side of " + end + "  (tokenize.test 1:4)\n" +
-    "  0 " + start + end + "1\n" +
-    "     ^"),
-
-
-  test("&" + start + "1" + end, (loc) => [
-    symbol("&", loc(0, 0,
-                    0, 1)),
-    symbol(start, loc(0, 1,
-                      0, 2)),
-    integer(1, loc(0, 2,
-                   0, 3)),
-    symbol(end, loc(0, 3,
-                    0, 4))
-  ]),
-
-  test(start + start + "1" + end + end, (loc) => [
-    symbol(start, loc(0, 0,
-                      0, 1)),
-    symbol(start, loc(0, 1,
-                      0, 2)),
-    integer(1, loc(0, 2,
-                   0, 3)),
-    symbol(end, loc(0, 3,
-                    0, 4)),
-    symbol(end, loc(0, 4,
-                    0, 5))
-  ]),
-
-  test("0 " + start + end + " 1", (loc) => [
-    integer(0, loc(0, 0,
-                   0, 1)),
-    symbol(start, loc(0, 2,
-                      0, 3)),
-    symbol(end, loc(0, 3,
-                    0, 4)),
-    integer(1, loc(0, 5,
-                   0, 6))
-  ]),
+      test_crash("0 " + start + "foo " + end + "1",
+        "spaces (U+0020) are not allowed before " + end + "  (tokenize.test 1:8)\n" +
+        "  0 " + start + "foo " + end + "1\n" +
+        "         ^")
+    ]),
 
 
-  test_crash("0 " + start + " 1",
-    "spaces (U+0020) are not allowed after " + start + "  (tokenize.test 1:3)\n" +
-    "  0 " + start + " 1\n" +
-    "    ^"),
+    test_crash("0 " + start,
+      "missing expression on the right side of " + start + "  (tokenize.test 1:3)\n" +
+      "  0 " + start + "\n" +
+      "    ^"),
 
-  test_crash("0 " + start + "foo " + end + "1",
-    "spaces (U+0020) are not allowed before " + end + "  (tokenize.test 1:8)\n" +
-    "  0 " + start + "foo " + end + "1\n" +
-    "         ^"),
-
-
-  test_crash("0 " + start,
-    "missing expression on the right side of " + start + "  (tokenize.test 1:3)\n" +
-    "  0 " + start + "\n" +
-    "    ^"),
-
-  test_crash("0 " + start + "\n",
-    "missing expression on the right side of " + start + "  (tokenize.test 1:3)\n" +
-    "  0 " + start + "\n" +
-    "    ^")
-];
+    test_crash("0 " + start + "\n",
+      "missing expression on the right side of " + start + "  (tokenize.test 1:3)\n" +
+      "  0 " + start + "\n" +
+      "    ^")
+  ];
+};
 
 
 export default [
@@ -348,9 +370,9 @@ export default [
 
   ...test_infix("."),
 
-  ...test_brackets("(", ")"),
-  //...test_brackets("[", "]"),
-  //...test_brackets("{", "}"),
+  ...test_brackets("(", ")", false),
+  ...test_brackets("[", "]", true),
+  ...test_brackets("{", "}", true),
 
 
   test("", (loc) =>

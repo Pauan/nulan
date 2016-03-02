@@ -153,55 +153,69 @@ const test_infix = (name, make, right_associative, space) => {
   ];
 };
 
-const test_brackets = (start, end, make) =>
-  [
-    test_crash("foo" + end,
-      "missing starting " + start + "  (parse.test 1:4)\n" +
-      "  foo" + end + "\n" +
-      "     ^"),
+const test_brackets = (start, end, make, space) => {
+  const start2 = (space
+                   ? start + " "
+                   : start);
+  const end2 = (space
+                 ? " " + end
+                 : end);
+  const marker = (space
+                   ? " "
+                   : "");
 
-    test_crash(start + "foo",
+  const startl = start2["length"];
+
+  const line = (i, x) => (space ? i + x : i);
+
+  return [
+    test_crash("foo" + end2,
+      "missing starting " + start + "  (parse.test 1:" + line(4, 1) + ")\n" +
+      "  foo" + end2 + "\n" +
+      "     " + marker + "^"),
+
+    test_crash(start2 + "foo",
       "missing ending " + end + "  (parse.test 1:1)\n" +
-      "  " + start + "foo\n" +
+      "  " + start2 + "foo\n" +
       "  ^"),
 
-    test_crash(start + "#foo",
+    test_crash(start2 + "#foo",
       "missing ending " + end + "  (parse.test 1:1)\n" +
-      "  " + start + "#foo\n" +
+      "  " + start2 + "#foo\n" +
       "  ^"),
 
-    test_crash("foo" + end + " bar" + end,
-      "missing starting " + start + "  (parse.test 1:4)\n" +
-      "  foo" + end + " bar" + end + "\n" +
-      "     ^"),
+    test_crash("foo" + end2 + " bar" + end2,
+      "missing starting " + start + "  (parse.test 1:" + line(4, 1) + ")\n" +
+      "  foo" + end2 + " bar" + end2 + "\n" +
+      "     " + marker + "^"),
 
-    test_crash(start + "foo " + start + "bar",
-      "missing ending " + end + "  (parse.test 1:6)\n" +
-      "  " + start + "foo " + start + "bar\n" +
-      "       ^"),
+    test_crash(start2 + "foo " + start2 + "bar",
+      "missing ending " + end + "  (parse.test 1:" + line(6, 1) + ")\n" +
+      "  " + start2 + "foo " + start2 + "bar\n" +
+      "       " + marker + "^"),
 
-    test(start + "foo\n  bar" + end, (loc) => [
-      make([symbol("foo", loc(0, 1,
-                              0, 4)),
+    test(start2 + "foo\n  bar" + end2, (loc) => [
+      make([symbol("foo", loc(0, startl,
+                              0, startl + 3)),
             symbol("bar", loc(1, 2,
                               1, 5))],
            loc(0, 0,
-               1, 6))
+               1, startl + 5))
     ]),
 
-    test(start + "foo\n  bar " + start + "qux\n        corge" + end + end, (loc) => [
-      make([symbol("foo", loc(0, 1,
-                              0, 4)),
+    test(start2 + "foo\n  bar " + start2 + "qux\n        corge" + end2 + end2, (loc) => [
+      make([symbol("foo", loc(0, startl,
+                              0, startl + 3)),
             symbol("bar", loc(1, 2,
                               1, 5)),
-            make([symbol("qux", loc(1, 7,
-                                    1, 10)),
+            make([symbol("qux", loc(1, startl + 6,
+                                    1, startl + 9)),
                   symbol("corge", loc(2, 8,
                                       2, 13))],
                  loc(1, 6,
-                     2, 14))],
+                     2, 13 + startl))],
            loc(0, 0,
-               2, 15))
+               2, 13 + startl + startl))
     ]),
 
     test(start + end, (loc) => [
@@ -209,42 +223,43 @@ const test_brackets = (start, end, make) =>
                    0, 2))
     ]),
 
-    test(start + "foo bar qux" + end, (loc) => [
-      make([symbol("foo", loc(0, 1,
-                              0, 4)),
-            symbol("bar", loc(0, 5,
-                              0, 8)),
-            symbol("qux", loc(0, 9,
-                              0, 12))],
+    test(start2 + "foo bar qux" + end2, (loc) => [
+      make([symbol("foo", loc(0, startl,
+                              0, startl + 3)),
+            symbol("bar", loc(0, startl + 4,
+                              0, startl + 7)),
+            symbol("qux", loc(0, startl + 8,
+                              0, startl + 11))],
            loc(0, 0,
-               0, 13))
+               0, startl + startl + 11))
     ]),
 
-    test(start + start + "foo" + end + " " +
-                 start + "bar" + end + " " +
-                 start + "qux" + end + end, (loc) => [
-      make([make([symbol("foo", loc(0, 2,
-                                    0, 5))],
-                 loc(0, 1,
-                     0, 6)),
-            make([symbol("bar", loc(0, 8,
-                                    0, 11))],
-                 loc(0, 7,
-                     0, 12)),
-            make([symbol("qux", loc(0, 14,
-                                    0, 17))],
-                 loc(0, 13,
-                     0, 18))],
+    test(start2 + start2 + "foo" + end2 + " " +
+                  start2 + "bar" + end2 + " " +
+                  start2 + "qux" + end2 + end2, (loc) => [
+      make([make([symbol("foo", loc(0, startl + startl,
+                                    0, startl + startl + 3))],
+                 loc(0, startl,
+                     0, startl + startl + startl + 3)),
+            make([symbol("bar", loc(0, startl + startl + 3 + startl + 1 + startl,
+                                    0, startl + startl + 3 + startl + 1 + startl + 3))],
+                 loc(0, startl + startl + 3 + startl + 1,
+                     0, startl + startl + 3 + startl + 1 + startl + 3 + startl)),
+            make([symbol("qux", loc(0, startl + startl + 3 + startl + 1 + startl + 3 + startl + 1 + startl,
+                                    0, startl + startl + 3 + startl + 1 + startl + 3 + startl + 1 + startl + 3))],
+                 loc(0, startl + startl + 3 + startl + 1 + startl + 3 + startl + 1,
+                     0, startl + startl + 3 + startl + 1 + startl + 3 + startl + 1 + startl + 3 + startl))],
            loc(0, 0,
-               0, 19))
+               0, startl + startl + 3 + startl + 1 + startl + 3 + startl + 1 + startl + 3 + startl + startl))
     ])
   ];
+};
 
 
 export default [
-  ...test_brackets("(", ")", call),
-  ...test_brackets("[", "]", list),
-  ...test_brackets("{", "}", record),
+  ...test_brackets("(", ")", call, false),
+  ...test_brackets("[", "]", list, true),
+  ...test_brackets("{", "}", record, true),
 
   ...test_prefix("~", bar, true),
   ...test_prefix("&", quote, false),
