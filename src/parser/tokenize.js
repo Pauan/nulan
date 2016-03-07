@@ -403,8 +403,7 @@ const tokenize_block_comment = (output, file, lines, line, column, indents) => {
 
       } else if (next1 === null) {
         line += 1;
-        column = 0;
-        check_indent(file, lines, line, column, indents);
+        column = check_indent(file, lines, line, 0, indents);
 
       } else {
         const next2 = peek(chars, column + 1);
@@ -498,8 +497,21 @@ const tokenize_tab = (output, file, lines, line, column, indents) => {
 
 
 const tokenize_space = (output, file, lines, line, column, indents) => {
+  const start = { line, column };
+
   column = consume_spaces(file, lines, line, column);
-  return tokenize1(output, file, lines, line, column, indents);
+
+  const end = { line, column };
+
+  const diff = end.column - start.column;
+
+  if (diff === 1) {
+    return tokenize1(output, file, lines, line, column, indents);
+
+  } else {
+    return error($ast.symbol(" ", $ast.loc(file, lines, start, end)),
+                 "expected 1 space but got " + diff);
+  }
 };
 
 
@@ -541,6 +553,8 @@ const check_indent = (file, lines, line, column, indents) => {
       indent_error(file, lines, line, column, last.column);
     }
   }
+
+  return column;
 };
 
 const indent_error = (file, lines, line, column, indent) => {
@@ -567,8 +581,7 @@ const tokenize1 = (output, file, lines, line, column, indents) => {
 
       } else {
         line += 1;
-        column = 0;
-        check_indent(file, lines, line, column, indents);
+        column = check_indent(file, lines, line, 0, indents);
       }
 
     } else {
@@ -579,7 +592,7 @@ const tokenize1 = (output, file, lines, line, column, indents) => {
 
 // TODO a tiny bit hacky
 const tokenize_top = (output, file, lines, line, column, indents) => {
-  check_indent(file, lines, line, column, indents);
+  column = check_indent(file, lines, line, column, indents);
   return tokenize1(output, file, lines, line, column, indents);
 };
 

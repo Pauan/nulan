@@ -247,26 +247,26 @@ const test_brackets = (start, end, is_space) => {
       "     qux" + end2 + end2 + "\n" +
       "  ^--"),
 
-    test_crash(start2 + "foo   " + start2 + "bar\n        " + space + "qux" + end2 + end2,
-      "expected " + (l + 8) + " spaces but got " + (l + 7) + "  (tokenize.test 2:1)\n" +
+    test_crash(start2 + "foo " + start2 + "bar\n        " + space + "qux" + end2 + end2,
+      "expected " + (l + 6) + " spaces but got " + (l + 7) + "  (tokenize.test 2:1)\n" +
       "          " + space + "qux" + end2 + end2 + "\n" +
       "  ^-------" + (space ? "-" : "")),
 
-    test(start2 + "foo   " + start2 + "bar\n         " + space + "qux" + end2 + end2, (loc) => [
+    test(start2 + "foo " + start2 + "bar\n       " + space + "qux" + end2 + end2, (loc) => [
       symbol(start, loc(0, 0,
                         0, 1)),
       symbol("foo", loc(0, l,
                         0, l + 3)),
-      symbol(start, loc(0, l + 3 + 3,
-                        0, l + 3 + 4)),
-      symbol("bar", loc(0, l + 3 + 3 + l,
-                        0, l + 3 + 3 + l + 3)),
-      symbol("qux", loc(1, l + 8,
-                        1, l + 8 + 3)),
-      symbol(end, loc(1, l + 8 + l + 2,
-                      1, l + 8 + l + 3)),
-      symbol(end, loc(1, l + 8 + l + 2 + l,
-                      1, l + 8 + l + 3 + l))
+      symbol(start, loc(0, l + 3 + 1,
+                        0, l + 3 + 2)),
+      symbol("bar", loc(0, l + 3 + 1 + l,
+                        0, l + 3 + 1 + l + 3)),
+      symbol("qux", loc(1, l + 6,
+                        1, l + 6 + 3)),
+      symbol(end, loc(1, l + 6 + l + 2,
+                      1, l + 6 + l + 3)),
+      symbol(end, loc(1, l + 6 + l + 2 + l,
+                      1, l + 6 + l + 3 + l))
     ]),
 
     test_crash(start2 + "foo\n    bar" + end2,
@@ -380,6 +380,24 @@ export default [
 
   test("\n\n\n\n\n", (loc) =>
     []),
+
+
+  test_crash("foo  bar",
+    "expected 1 space but got 2  (tokenize.test 1:4)\n" +
+    "  foo  bar\n" +
+    "     ^-"),
+
+  test_crash("foo     bar",
+    "expected 1 space but got 5  (tokenize.test 1:4)\n" +
+    "  foo     bar\n" +
+    "     ^----"),
+
+  test("foo bar", (loc) => [
+    symbol("foo", loc(0, 0,
+                      0, 3)),
+    symbol("bar", loc(0, 4,
+                      0, 7))
+  ]),
 
 
   test("foo", (loc) => [
@@ -637,30 +655,27 @@ export default [
     "  foo\"\n" +
     "  ^"),
 
-  test_crash("~   \"\nfoo\"",
-    "there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
+  test_crash("~ \"\nfoo\"",
+    "there must be 3 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
     "  foo\"\n" +
     "  ^"),
 
-  test_crash("~   \"\n foo\"",
-    "there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
+  test_crash("~ \"\n foo\"",
+    "there must be 3 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
     "   foo\"\n" +
     "  ^"),
 
-  test_crash("~   \"\n  foo\"",
-    "there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
+  test_crash("~ \"\n  foo\"",
+    "there must be 3 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
     "    foo\"\n" +
     "  ^-"),
 
-  test_crash("~   \"\n   foo\"",
-    "there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
-    "     foo\"\n" +
-    "  ^--"),
-
-  test_crash("~   \"\n    foo\"",
-    "there must be 5 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
-    "      foo\"\n" +
-    "  ^---"),
+  test("~ \"\n   foo\"", (loc) => [
+    symbol("~", loc(0, 0,
+                    0, 1)),
+    text("\nfoo", loc(0, 2,
+                      1, 7))
+  ]),
 
   test("foo \"\n     bar\"", (loc) => [
     symbol("foo", loc(0, 0,
@@ -669,19 +684,19 @@ export default [
                       1, 9))
   ]),
 
-  test_crash("~   \"\n\n\n     foo\n    bar\"",
-    "there must be 5 or more spaces (U+0020)  (tokenize.test 5:1)\n" +
-    "      bar\"\n" +
-    "  ^---"),
+  test_crash("~ \"\n\n\n   foo\n  bar\"",
+    "there must be 3 or more spaces (U+0020)  (tokenize.test 5:1)\n" +
+    "    bar\"\n" +
+    "  ^-"),
 
-  test("~   \"\n\n\n     foo\n     bar\"", (loc) => [
+  test("~ \"\n\n\n   foo\n   bar\"", (loc) => [
     symbol("~", loc(0, 0,
                     0, 1)),
-    text("\n\n\nfoo\nbar", loc(0, 4,
-                               4, 9))
+    text("\n\n\nfoo\nbar", loc(0, 2,
+                               4, 7))
   ]),
 
-  test_crash("~   \" foo\n       bar\n \n\n     qux\"",
+  test_crash("~ \" foo\n       bar\n \n\n     qux\"",
     "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 3:1)\n" +
     "   \n" +
     "  ^"),
@@ -696,25 +711,25 @@ export default [
                          1, 5))
   ]),
 
-  test("~   \"foo\n     bar\"", (loc) => [
+  test("~ \"foo\n   bar\"", (loc) => [
     symbol("~", loc(0, 0,
                     0, 1)),
-    text("foo\nbar", loc(0, 4,
-                         1, 9))
+    text("foo\nbar", loc(0, 2,
+                         1, 7))
   ]),
 
-  test("~   \" foo\n       bar\"", (loc) => [
+  test("~ \" foo\n     bar\"", (loc) => [
     symbol("~", loc(0, 0,
                     0, 1)),
-    text(" foo\n  bar", loc(0, 4,
-                            1, 11))
+    text(" foo\n  bar", loc(0, 2,
+                            1, 9))
   ]),
 
-  test("~   \" foo\n       bar\n\n\n     qux\"", (loc) => [
+  test("~ \" foo\n     bar\n\n\n   qux\"", (loc) => [
     symbol("~", loc(0, 0,
                     0, 1)),
-    text(" foo\n  bar\n\n\nqux", loc(0, 4,
-                                     4, 9))
+    text(" foo\n  bar\n\n\nqux", loc(0, 2,
+                                     4, 7))
   ]),
 
 
