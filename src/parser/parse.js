@@ -218,12 +218,12 @@ const specials = {
 
   "->": parse_lambda(10, $ast.lambda),
 
-  "~": parse_prefix(10, $ast.bar),
   "&": parse_prefix(10, $ast.quote),
-  ",": parse_prefix(20, $ast.unquote),
+  "~": parse_prefix(20, $ast.unquote),
   "@": parse_prefix(20, $ast.splice),
 
   ".":  parse_dot(10, $ast.dot, false),
+  "=":  parse_infix(10, $ast.bar, true),
   "<=": parse_infix(10, $ast.assign, true),
   "::": parse_infix(10, $ast.type, false),
 };

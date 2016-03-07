@@ -2,33 +2,38 @@ import * as $array from "../../util/array";
 
 
 // Literals
-export const SYMBOL  = 0;
-export const INTEGER = 1;
-export const NUMBER  = 2;
-export const TEXT    = 3;
+export const SYMBOL   = 0;
+export const INTEGER  = 1;
+export const NUMBER   = 2;
+export const TEXT     = 3;
+export const VARIABLE = 4;
 
 // Lists
-export const CALL    = 4;
-export const LIST    = 5;
-export const RECORD  = 6;
+export const CALL     = 5;
+export const LIST     = 6;
+export const RECORD   = 7;
 
 // Lambda
-export const LAMBDA  = 7;
+export const LAMBDA   = 8;
 
 // Infix
-export const ASSIGN  = 8;
-export const DOT     = 9;
-export const TYPE    = 10;
+export const ASSIGN   = 9;
+export const DOT      = 10;
+export const TYPE     = 11;
+export const BAR      = 12;
 
 // Prefix
-export const BAR     = 11;
-export const QUOTE   = 12;
-export const UNQUOTE = 13;
-export const SPLICE  = 14;
+export const QUOTE    = 13;
+export const UNQUOTE  = 14;
+export const SPLICE   = 15;
 
 
 export const symbol = (value, loc) => {
   return { type: SYMBOL, value, loc };
+};
+
+export const variable = (module, id, loc) => {
+  return { type: VARIABLE, module, id, loc };
 };
 
 export const integer = (value, loc) => {
@@ -67,12 +72,12 @@ export const type = (left, right, loc) => {
   return { type: TYPE, left, right, loc };
 };
 
-export const lambda = (parameters, body, loc) => {
-  return { type: LAMBDA, parameters, body, loc };
+export const bar = (left, right, loc) => {
+  return { type: BAR, left, right, loc };
 };
 
-export const bar = (right, loc) => {
-  return { type: BAR, right, loc };
+export const lambda = (parameters, body, loc) => {
+  return { type: LAMBDA, parameters, body, loc };
 };
 
 export const quote = (right, loc) => {
@@ -118,6 +123,7 @@ export const map = (x, f) => {
   case ASSIGN:
   case DOT:
   case TYPE:
+  case BAR:
     return {
       type: x.type,
       left: f(x.left),
@@ -125,7 +131,6 @@ export const map = (x, f) => {
       loc: x.loc
     };
 
-  case BAR:
   case QUOTE:
   case UNQUOTE:
   case SPLICE:

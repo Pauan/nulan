@@ -531,7 +531,7 @@ const specials = {
   "}":  tokenize_end(SUFFIX, "{", true),
 
   "&":  tokenize_delimiter(PREFIX),
-  ",":  tokenize_delimiter(PREFIX),
+  "~":  tokenize_delimiter(PREFIX),
   "@":  tokenize_delimiter(PREFIX),
   ".":  tokenize_delimiter(INFIX)
 };

@@ -261,11 +261,11 @@ export default [
   ...test_brackets("[", "]", list, true),
   ...test_brackets("{", "}", record, true),
 
-  ...test_prefix("~", bar, true),
   ...test_prefix("&", quote, false),
-  ...test_prefix(",", unquote, false),
+  ...test_prefix("~", unquote, false),
   ...test_prefix("@", splice, false),
 
+  ...test_infix("=", bar, true, true),
   ...test_infix("<=", assign, true, true),
   ...test_infix(".", dot, false, false),
   ...test_infix("::", type, false, true),
@@ -278,23 +278,21 @@ export default [
                0, 6))
   ]),
 
-  test("{ foo <= 1 ~ bar <= 2 }", (loc) => [
+  test("{ foo <= 1 bar <= 2 }", (loc) => [
     record([assign(symbol("foo", loc(0, 2,
                                      0, 5)),
                    integer(1, loc(0, 9,
                                   0, 10)),
                    loc(0, 2,
                        0, 10)),
-            bar(assign(symbol("bar", loc(0, 13,
-                                         0, 16)),
-                       integer(2, loc(0, 20,
-                                      0, 21)),
-                       loc(0, 13,
-                           0, 21)),
-                loc(0, 11,
-                    0, 21))],
+            assign(symbol("bar", loc(0, 11,
+                                     0, 14)),
+                   integer(2, loc(0, 18,
+                                  0, 19)),
+                   loc(0, 11,
+                       0, 19))],
            loc(0, 0,
-               0, 23))
+               0, 21))
   ]),
 
 
@@ -400,7 +398,7 @@ export default [
                0, 21))
   ]),
 
-  test("-> 1 &-> 2 ,@3", (loc) => [
+  test("-> 1 &-> 2 ~@3", (loc) => [
     lambda([integer(1, loc(0, 3,
                            0, 4))],
            quote(lambda([integer(2, loc(0, 9,
@@ -462,7 +460,7 @@ export default [
   ]),
 
 
-  test("&a.,b", (loc) => [
+  test("&a.~b", (loc) => [
     quote(dot(symbol("a", loc(0, 1,
                               0, 2)),
               unquote(symbol("b", loc(0, 4,
@@ -476,52 +474,52 @@ export default [
   ]),
 
 
-  test("(REWRITE-RULE\n  (IF ,test\n    ,then\n    ,else)\n  ~ &(MATCH ,test\n       *true\n       ~ ,then\n       *false\n       ~ ,else))", (loc) => [
+  test("(REWRITE-RULE\n  (IF ~test\n    ~then\n    ~else)\n  = &(MATCH ~test\n       *true\n       = ~then\n       *false\n       = ~else))", (loc) => [
     call([symbol("REWRITE-RULE", loc(0, 1,
                                      0, 13)),
-          call([symbol("IF", loc(1, 3,
-                                 1, 5)),
-                unquote(symbol("test", loc(1, 7,
-                                           1, 11)),
-                        loc(1, 6,
-                            1, 11)),
-                unquote(symbol("then", loc(2, 5,
-                                           2, 9)),
-                        loc(2, 4,
-                            2, 9)),
-                unquote(symbol("else", loc(3, 5,
-                                           3, 9)),
-                        loc(3, 4,
-                            3, 9))],
-               loc(1, 2,
-                   3, 10)),
-          bar(quote(call([symbol("MATCH", loc(4, 6,
+          bar(call([symbol("IF", loc(1, 3,
+                                     1, 5)),
+                    unquote(symbol("test", loc(1, 7,
+                                               1, 11)),
+                            loc(1, 6,
+                                1, 11)),
+                    unquote(symbol("then", loc(2, 5,
+                                               2, 9)),
+                            loc(2, 4,
+                                2, 9)),
+                    unquote(symbol("else", loc(3, 5,
+                                               3, 9)),
+                            loc(3, 4,
+                                3, 9))],
+                   loc(1, 2,
+                       3, 10)),
+              quote(call([symbol("MATCH", loc(4, 6,
                                               4, 11)),
                           unquote(symbol("test", loc(4, 13,
                                                      4, 17)),
                                   loc(4, 12,
                                       4, 17)),
-                          symbol("*true", loc(5, 7,
-                                              5, 12)),
-                          bar(unquote(symbol("then", loc(6, 10,
+                          bar(symbol("*true", loc(5, 7,
+                                                  5, 12)),
+                              unquote(symbol("then", loc(6, 10,
                                                          6, 14)),
                                       loc(6, 9,
                                           6, 14)),
-                              loc(6, 7,
+                              loc(5, 7,
                                   6, 14)),
-                          symbol("*false", loc(7, 7,
-                                               7, 13)),
-                          bar(unquote(symbol("else", loc(8, 10,
+                          bar(symbol("*false", loc(7, 7,
+                                                   7, 13)),
+                              unquote(symbol("else", loc(8, 10,
                                                          8, 14)),
                                       loc(8, 9,
                                           8, 14)),
-                              loc(8, 7,
+                              loc(7, 7,
                                   8, 14))],
                          loc(4, 5,
                              8, 15)),
                     loc(4, 4,
                         8, 15)),
-              loc(4, 2,
+              loc(1, 2,
                   8, 15))],
          loc(0, 0,
              8, 16))

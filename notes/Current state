@@ -9,7 +9,7 @@
   *indigo
   *violet)
 
-(TYPE RGB
+(TYPE Rgb
   (*rgba Integer Integer Integer))
 
 (TYPE (List a)
@@ -31,7 +31,7 @@
 (FUNCTION chain :: (REQUIRE ($transform a) ($flatten a)
                      (-> (a b) (-> b (a c)) (a c)))
   (chain a fn)
-  ~ (flatten (transform a fn)))
+  = (flatten (transform a fn)))
 
 (IMPORT (github { name <= "nulan/flatten"
                   file <= "src/flatten.nul"
@@ -61,14 +61,16 @@
   *some
   *none)
 
+(LOCAL-PROVIDE ($flatten Maybe)
+  flatten <= (-> ...)
+  (flatten ...))
+
 (IF test
   then
   else)
 
-(EXPORT-CONSTANT
+(EXPORT-DATA
   foo <= *foo)
-
-(IMPORT-BUILTINS)
 
 (IMPORT (nulan "unsafe/ffi")
   UNSAFE-FFI-IMPORT
@@ -83,11 +85,11 @@
 
 (FUNCTION foo<< :: (-> a Foo)
   (foo<< a)
-  ~ ...)
+  = ...)
 
 (FUNCTION <<foo :: (-> Foo a)
   (<<foo a)
-  ~ ...)
+  = ...)
 
 (CONSTANT foo :: (-> (-> Integer Integer Integer) Integer)
   (-> a (a 1 2)))
@@ -101,6 +103,15 @@
   b <= 2
   (+ a b))
 
+(LOCAL
+  a
+  <= (+ 1 2)
+
+  b
+  <= (+ 2 3)
+
+  (+ a b))
+
 (LOOP loop
   a <= 1
   b <= 2
@@ -108,34 +119,34 @@
 
 (FUNCTION foo :: (-> (-> Integer Integer Integer) Integer)
   (foo a)
-  ~ (a 1 2))
+  = (a 1 2))
 
 (FUNCTION foo :: (-> Text Text)
   (foo a)
-  ~ a)
+  = a)
 
 (FUNCTION bar :: (-> Integer Integer)
   (bar 1)
-  ~ 2
+  = 2
   (bar a)
-  ~ (+ (bar 1) a))
+  = (+ (bar 1) a))
 
 (REWRITE-RULE
-  (QUX ,@a)
-  ~ &(+ ,@a))
+  (QUX ~@a)
+  = &(+ ~@a))
 
 (MUTUALLY-RECURSIVE
   (FUNCTION even? :: (-> Integer Boolean)
     (even? 0)
-    ~ true
+    = true
     (even? a)
-    ~ (odd? (- a 1)))
+    = (odd? (- a 1)))
 
   (FUNCTION odd? :: (-> Integer Boolean)
     (odd? 0)
-    ~ false
+    = false
     (odd? a)
-    ~ (even? (- a 1))))
+    = (even? (- a 1))))
 
 (MUTUALLY-RECURSIVE
   (PROTOCOL ($foo a)
@@ -155,18 +166,18 @@
 
 (MUTUALLY-RECURSIVE
   (REWRITE-RULE
-    (FOO ,n <= ,v)
-    ~ &(BAR ,n ,v)
-    (FOO ,v)
-    ~ &(BAR ,v))
+    (FOO ~n <= ~v)
+    = &(BAR ~n ~v)
+    (FOO ~v)
+    = &(BAR ~v))
 
   (REWRITE-RULE
-    (BAR ,a ,@b)
-    ~ (MATCH a
-        &,n <= ,v
-        ~ &(QUX ,n ,v ,@b)
+    (BAR ~a ~@b)
+    = (MATCH a
+        &~n <= ~v
+        = &(QUX ~n ~v ~@b)
         v
-        ~ &(QUX 1 ,v ,@b))))
+        = &(QUX 1 ~v ~@b))))
 
 (foo -> a b (+ a b))
 (foo (-> a b (+ a b)))
@@ -178,16 +189,16 @@ FOO
 
 (MUTUALLY-RECURSIVE
   (REWRITE-RULE
-    (UNSTREAM (STREAM ,a))
-    ~ a
-    (UNSTREAM ,a)
-    ~ &(unstream ,a))
+    (UNSTREAM (STREAM ~a))
+    = a
+    (UNSTREAM ~a)
+    = &(unstream ~a))
 
   (REWRITE-RULE
-    (STREAM (UNSTREAM ,a))
-    ~ a
-    (STREAM ,a)
-    ~ &(stream ,a)))
+    (STREAM (UNSTREAM ~a))
+    = a
+    (STREAM ~a)
+    = &(stream ~a)))
 
 (CHAIN
   a <= a
@@ -213,13 +224,13 @@ FOO
 
 (MATCHES [ a b c ]
   [ 1 2 3 ]
-  ~ 1
+  = 1
   [ 1 2 a ]
-  ~ 2
+  = 2
   [ 1 a b ]
-  ~ 3
+  = 3
   [ a b c ]
-  ~ 4)
+  = 4)
 
 [ 1 2 3 ]
 
@@ -242,19 +253,19 @@ foo.bar
 
 (MATCH a
   _
-  ~ 1
+  = 1
   a
-  ~ 2
+  = 2
   1
-  ~ 3
+  = 3
   "foo"
-  ~ 4
+  = 4
   { a b c }
-  ~ 5
+  = 5
   { a <= b c <= d }
-  ~ { b <= a d <= c }
+  = { b <= a d <= c }
   (*foo 1)
-  ~ 6)
+  = 6)
 
 
 # Unsure
@@ -271,13 +282,13 @@ foo.bar
 
 (MATCH a
   (-> view a)
-  ~ 9)
+  = 9)
 
 (MATCH a
   (LOCAL
     a <= a
     (equal? a 1))
-  ~ 9)
+  = 9)
 
 # foo :: (POLYMORPH
 #          (-> Integer Integer)
@@ -285,17 +296,17 @@ foo.bar
 (POLYMORPHIC
   (FUNCTION foo :: (-> Integer Integer)
     (foo a)
-    ~ a)
+    = a)
 
   (FUNCTION foo :: (-> Text Text)
     (foo a)
-    ~ a))
+    = a))
 
 (FUNCTION bar :: (POLYMORPH
                    (-> Integer Integer)
                    (-> Text Text))
   (bar a)
-  ~ (foo a))
+  = (foo a))
 
 (UNSAFE-DEFAULT-PROVIDE ($transform Maybe)
   transform <= map)
@@ -308,20 +319,28 @@ foo.bar
 
 (UNSAFE-OPTIMIZATION-RULE
   (chain a b)
-  ~ (flatten (transform a b)))
+  = (flatten (transform a b)))
 
 (UNSAFE-OPTIMIZATION-RULE
   (reduce-left [] a -> b c (push b d))
-  ~ (reduce-left [] a -> b c (unsafe-push! b d)))
+  = (reduce-left [] a -> b c (unsafe-push! b d)))
 
 (UNSAFE-OPTIMIZATION-RULE
   (unstream (stream a))
-  ~ a)
+  = a)
 
 (UNSAFE-OPTIMIZATION-RULE
   (stream (unstream a))
-  ~ a)
+  = a)
 
 (UNSAFE-OPTIMIZATION-RULE
   (add a b)
-  ~ (ADD a b))
+  = (ADD a b))
+
+(IMPORT-ALL
+  %flatten <= (github { name <= "nulan/flatten"
+                        file <= "src/flatten.nul"
+                        version <= (major 2) }))
+
+%flatten.$flatten
+%flatten.flatten

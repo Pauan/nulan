@@ -365,7 +365,7 @@ const test_brackets = (start, end, is_space) => {
 
 export default [
   ...test_prefix("&"),
-  ...test_prefix(","),
+  ...test_prefix("~"),
   ...test_prefix("@"),
 
   ...test_infix("."),
@@ -487,12 +487,12 @@ export default [
                       0, 9))
   ]),
 
-  test(",foo ,bar", (loc) => [
-    symbol(",", loc(0, 0,
+  test("~foo ~bar", (loc) => [
+    symbol("~", loc(0, 0,
                     0, 1)),
     symbol("foo", loc(0, 1,
                       0, 4)),
-    symbol(",", loc(0, 5,
+    symbol("~", loc(0, 5,
                     0, 6)),
     symbol("bar", loc(0, 6,
                       0, 9))
@@ -655,24 +655,26 @@ export default [
     "  foo\"\n" +
     "  ^"),
 
-  test_crash("~ \"\nfoo\"",
+  test_crash("&&\"\nfoo\"",
     "there must be 3 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
     "  foo\"\n" +
     "  ^"),
 
-  test_crash("~ \"\n foo\"",
+  test_crash("&&\"\n foo\"",
     "there must be 3 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
     "   foo\"\n" +
     "  ^"),
 
-  test_crash("~ \"\n  foo\"",
+  test_crash("&&\"\n  foo\"",
     "there must be 3 or more spaces (U+0020)  (tokenize.test 2:1)\n" +
     "    foo\"\n" +
     "  ^-"),
 
-  test("~ \"\n   foo\"", (loc) => [
-    symbol("~", loc(0, 0,
+  test("&&\"\n   foo\"", (loc) => [
+    symbol("&", loc(0, 0,
                     0, 1)),
+    symbol("&", loc(0, 1,
+                    0, 2)),
     text("\nfoo", loc(0, 2,
                       1, 7))
   ]),
@@ -684,19 +686,21 @@ export default [
                       1, 9))
   ]),
 
-  test_crash("~ \"\n\n\n   foo\n  bar\"",
+  test_crash("&&\"\n\n\n   foo\n  bar\"",
     "there must be 3 or more spaces (U+0020)  (tokenize.test 5:1)\n" +
     "    bar\"\n" +
     "  ^-"),
 
-  test("~ \"\n\n\n   foo\n   bar\"", (loc) => [
-    symbol("~", loc(0, 0,
+  test("&&\"\n\n\n   foo\n   bar\"", (loc) => [
+    symbol("&", loc(0, 0,
                     0, 1)),
+    symbol("&", loc(0, 1,
+                    0, 2)),
     text("\n\n\nfoo\nbar", loc(0, 2,
                                4, 7))
   ]),
 
-  test_crash("~ \" foo\n       bar\n \n\n     qux\"",
+  test_crash("&&\" foo\n       bar\n \n\n     qux\"",
     "spaces (U+0020) are not allowed at the end of the line  (tokenize.test 3:1)\n" +
     "   \n" +
     "  ^"),
@@ -711,23 +715,29 @@ export default [
                          1, 5))
   ]),
 
-  test("~ \"foo\n   bar\"", (loc) => [
-    symbol("~", loc(0, 0,
+  test("&&\"foo\n   bar\"", (loc) => [
+    symbol("&", loc(0, 0,
                     0, 1)),
+    symbol("&", loc(0, 1,
+                    0, 2)),
     text("foo\nbar", loc(0, 2,
                          1, 7))
   ]),
 
-  test("~ \" foo\n     bar\"", (loc) => [
-    symbol("~", loc(0, 0,
+  test("&&\" foo\n     bar\"", (loc) => [
+    symbol("&", loc(0, 0,
                     0, 1)),
+    symbol("&", loc(0, 1,
+                    0, 2)),
     text(" foo\n  bar", loc(0, 2,
                             1, 9))
   ]),
 
-  test("~ \" foo\n     bar\n\n\n   qux\"", (loc) => [
-    symbol("~", loc(0, 0,
+  test("&&\" foo\n     bar\n\n\n   qux\"", (loc) => [
+    symbol("&", loc(0, 0,
                     0, 1)),
+    symbol("&", loc(0, 1,
+                    0, 2)),
     text(" foo\n  bar\n\n\nqux", loc(0, 2,
                                      4, 7))
   ]),
@@ -866,7 +876,7 @@ export default [
   ]),
 
 
-  test("1 1.5 1 ,5 (foo bar qux) u @q\nqux\n(nou)\n,foo\n,@foo", (loc) => [
+  test("1 1.5 1 ~5 (foo bar qux) u @q\nqux\n(nou)\n~foo\n~@foo", (loc) => [
     integer(1, loc(0, 0,
                    0, 1)),
     integer(1, loc(0, 2,
@@ -877,7 +887,7 @@ export default [
                    0, 5)),
     integer(1, loc(0, 6,
                    0, 7)),
-    symbol(",", loc(0, 8,
+    symbol("~", loc(0, 8,
                     0, 9)),
     integer(5, loc(0, 9,
                    0, 10)),
@@ -905,11 +915,11 @@ export default [
                       2, 4)),
     symbol(")", loc(2, 4,
                     2, 5)),
-    symbol(",", loc(3, 0,
+    symbol("~", loc(3, 0,
                     3, 1)),
     symbol("foo", loc(3, 1,
                       3, 4)),
-    symbol(",", loc(4, 0,
+    symbol("~", loc(4, 0,
                     4, 1)),
     symbol("@", loc(4, 1,
                     4, 2)),
