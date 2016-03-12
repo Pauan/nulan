@@ -29,3 +29,17 @@ export const sequential_null = (chain, reply, a) => {
 
   return loop(0);
 };
+
+
+const reduce_left_chain1 = (chain, reply, init, a, i, f) => {
+  if (i < a["length"]) {
+    return chain(f(init, a[i]), (init) =>
+      reduce_left_chain1(chain, reply, init, a, i + 1, f));
+
+  } else {
+    return reply(init);
+  }
+};
+
+export const reduce_left_chain = (chain, reply, init, a, f) =>
+  reduce_left_chain1(chain, reply, init, a, 0, f);

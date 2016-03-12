@@ -3,10 +3,12 @@ import { blocking } from "./blocking-task";
 
 
 export const size = (a) =>
-  a["length"];
+  // TODO is this a good idea ?
+  a["length"] | 0;
 
 
 export const copy = (a) => {
+  // TODO Integer overflow ?
   const length = a["length"];
   const output = new Array(length);
 
@@ -20,6 +22,7 @@ export const copy = (a) => {
 
 export const get_index = (index1, length) => {
   const index2 = (index1 < 0
+                   // TODO Integer functions ?
                    ? index1 + length
                    : index1);
 
@@ -27,17 +30,20 @@ export const get_index = (index1, length) => {
     return index2;
 
   } else {
-    crash(new Error("invalid index: " + index1));
+    return crash(new Error("invalid index: " + index1));
   }
 };
 
 
 export const nth = (a, index) =>
+  // TODO Integer overflow ?
   a[get_index(index, a["length"])];
 
 
 export const push = (a, b) => {
+  // TODO Integer overflow ?
   const length = a["length"];
+  // TODO Integer functions ?
   const output = new Array(length + 1);
 
   for (let i = 0; i < length; ++i) {
@@ -51,10 +57,13 @@ export const push = (a, b) => {
 
 
 export const insert = (a, index, b) => {
+  // TODO Integer overflow ?
   const length = a["length"];
 
+  // TODO Integer functions ?
   index = get_index(index, length + 1);
 
+  // TODO Integer functions ?
   const output = new Array(length + 1);
 
   for (let i = 0; i < index; ++i) {
@@ -64,7 +73,9 @@ export const insert = (a, index, b) => {
   output[index] = b;
 
   while (index < length) {
+    // TODO Integer functions ?
     output[index + 1] = a[index];
+    // TODO Integer functions ?
     ++index;
   }
 
@@ -73,6 +84,7 @@ export const insert = (a, index, b) => {
 
 
 export const update = (a, index, b) => {
+  // TODO Integer overflow ?
   index = get_index(index, a["length"]);
 
   // TODO test this
@@ -90,8 +102,10 @@ export const update = (a, index, b) => {
 
 
 export const remove = (a, index) => {
+  // TODO Integer overflow ?
   index = get_index(index, a["length"]);
 
+  // TODO Integer functions ?
   const length = a["length"] - 1;
 
   const output = new Array(length);
@@ -104,6 +118,7 @@ export const remove = (a, index) => {
   }
 
   while (i < length) {
+    // TODO Integer functions ?
     output[i] = a[i + 1];
     ++i;
   }
@@ -113,8 +128,10 @@ export const remove = (a, index) => {
 
 
 export const slice = (a, start1, end1) => {
+  // TODO Integer overflow ?
   const length = a["length"];
 
+  // TODO Integer functions ?
   const start2 = get_index(start1, length + 1);
   const end2   = get_index(end1, length + 1);
 
@@ -122,13 +139,15 @@ export const slice = (a, start1, end1) => {
     return a;
 
   } else if (start2 > end2) {
-    crash(new Error("start index " + start1 + " is greater than end index " + end1));
+    return crash(new Error("start index " + start1 + " is greater than end index " + end1));
 
   } else {
+    // TODO Integer functions ?
     const diff = end2 - start2;
     const out = new Array(diff);
 
     for (let i = 0; i < diff; ++i) {
+      // TODO Integer functions ?
       out[i] = a[i + start2];
     }
 
@@ -144,6 +163,7 @@ export const chunks = (a, size) => {
     crash(new Error("chunk size must be 1 or greater"));
   }
 
+  // TODO Integer overflow ?
   const length = a["length"];
 
   const out = [];
@@ -264,13 +284,13 @@ export const shuffle = (array) =>
 
 
 // TODO is this correct ?
-export const order = (order, a, b) => {
+export const order = ($order, a, b) => {
   const length1 = a["length"];
   const length2 = b["length"];
   const length = Math["min"](length1, length2);
 
   for (let i = 0; i < length; ++i) {
-    switch (order(a[i], b[i])) {
+    switch ($order(a[i], b[i])) {
     // *less
     case 0:
       return 0;
@@ -296,6 +316,7 @@ export const order = (order, a, b) => {
 
 
 // Insertion sort (https://en.wikipedia.org/wiki/Insertion_sort)
+// TODO use a better algorithm ?
 export const sort = (a, order) => {
   const array = copy(a);
   const length = array["length"];
@@ -337,4 +358,15 @@ export const sort = (a, order) => {
          : array),
     b: operations
   };
+};
+
+
+export const reduce_left = (init, a, f) => {
+  const length = a["length"];
+
+  for (let i = 0; i < length; ++i) {
+    init = f(init, a[i]);
+  }
+
+  return init;
 };

@@ -347,7 +347,7 @@ export const get_position = (a) =>
     const id = requestAnimationFrame(() => {
       const x = a["getBoundingClientRect"]();
 
-      success({
+      return success({
         a: x["left"],
         b: x["top"],
         c: x["width"],

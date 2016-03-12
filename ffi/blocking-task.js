@@ -29,7 +29,7 @@ export const log = (s) =>
   });
 
 
-const run = (task) => {
+export const run = (task) => {
   for (;;) {
     switch (task.$) {
     // *blocking

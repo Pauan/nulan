@@ -134,6 +134,7 @@ export const reply = (a) =>
 
 // TODO some code duplication with event.js
 // TODO test this
+// TODO use Date.now instead ?
 export const throttle = (observer, delay) => {
   if (delay < 1) {
     crash(new Error("delay must be 1 or greater"));

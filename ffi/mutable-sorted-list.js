@@ -10,6 +10,7 @@ export { changing_list_from, changing_from } from "./mutable-list";
 
 // TODO test this
 // TODO can this be made more efficient ?
+// TODO disallow duplicates ?
 const sorted_index = (list, sort, a) => {
   let start = 0;
   let end   = list["length"];
@@ -57,9 +58,8 @@ const sorted_index = (list, sort, a) => {
 const insert_sorted_index = (list, sort, a) => {
   const x = sorted_index(list, sort, a);
 
-  // TODO test this
   if (x.$ === 0) {
-    return x.a + 1;
+    crash(new Error("value already exists in sorted list"));
 
   } else {
     return x.a;
@@ -67,6 +67,7 @@ const insert_sorted_index = (list, sort, a) => {
 };
 
 
+// TODO rather than returning the last item, instead return the index of `a` ?
 const get_sorted_index = (list, sort, a) => {
   const x = sorted_index(list, sort, a);
 

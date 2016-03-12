@@ -38,6 +38,10 @@
         width: calc(78ch + 25px);
       }
 
+      #output {
+        padding-left: 0px;
+      }
+
       .syntax {
         color: #0D47A1; /* #E2E2E2 #e7915d #4d769f #3a5572 #5E6F82 #243547 #38516B #616467 #B1B1B1 #6F6F6F #006584 */
       }
@@ -74,6 +78,16 @@
         width: 3px;
         border-bottom-left-radius: 3px;
       }
+
+      .line-number {
+        display: inline-block;
+        width: 3.5em;
+        text-align: right;
+        padding-right: 10px;
+        margin-right: 5px;
+        background-color: #07090A;
+        color: #193561;
+      }
     </style>
   </head>
   <body>
@@ -95,136 +109,26 @@
 
 
       const syntax1 = (color) =>
-        (output, stack, position, text) => {
+        (output, position, text) => {
           output.push(wrap(color, text[position.index]));
           ++position.index;
-          ++position.column;
         };
-
-      const open = (color, is_record) =>
-        (output, stack, position, text) => {
-          stack.push({ column: position.column, is_record });
-          output.push(wrap(color, text[position.index]));
-          ++position.index;
-          ++position.column;
-        };
-
-      const close = (color) =>
-        (output, stack, position, text) => {
-          stack.pop();
-          output.push(wrap(color, text[position.index]));
-          ++position.index;
-          ++position.column;
-        };
-
-
-      // TODO is this correct ?
-      const find_endings = (index, text) => {
-        let endings = 0;
-
-        while (index < text.length) {
-          const c = text[index];
-
-          if (c === "\n") {
-            break;
-
-          } else if (c === "(" || c === "[" || c === "{") {
-            ++endings;
-            ++index;
-
-          } else if (c === ")" || c === "]" || c === "}") {
-            --endings;
-            ++index;
-
-          } else {
-            ++index;
-          }
-        }
-
-        return endings;
-      };
-
-      const whitespace = (output, stack, position, text) => {
-        const a = [];
-
-        const start = position.column;
-
-        while (position.index < text.length) {
-          const c = text[position.index];
-
-          if (c === " ") {
-            a.push(c);
-            ++position.index;
-            ++position.column;
-
-          } else {
-            break;
-          }
-        }
-
-        const next = text[position.index];
-
-        if (stack.length && start === 0) {
-          let max = 0;
-
-          // TODO is this correct ?
-          const endings = find_endings(position.index, text) + stack.length;
-
-          // TODO is the stack always in sorted order ?
-          for (let i = 0; i < stack.length; ++i) {
-            const x = stack[i].column;
-
-            if (next === "\n" || x < a.length) {
-              output.push(new Array(x - max + 1).join(" "));
-
-              // TODO is this correct ?
-              if (i >= endings) {
-                output.push(bar_end);
-              } else {
-                output.push(bar);
-              }
-
-              max = x;
-            }
-          }
-
-          // TODO is this correct ?
-          if (a.length > max) {
-            output.push(new Array(a.length - max + 1).join(" "));
-          }
-
-        } else {
-          output.push(a.join(""));
-        }
-      };
 
 
       const specials = {
-        "\n": (output, stack, position, text) => {
+        " ": (output, position, text) => {
           output.push(text[position.index]);
           ++position.index;
-          ++position.line;
-          position.column = 0;
-
-          whitespace(output, stack, position, text);
         },
 
-        " ": whitespace,
-
-        "#": (output, stack, position, text) => {
+        "#": (output, position, text) => {
           const a = [];
 
           while (position.index < text.length) {
             const c = text[position.index];
 
-            if (c === "\n") {
-              break;
-
-            } else {
-              a.push(c);
-              ++position.index;
-              ++position.column;
-            }
+            a.push(c);
+            ++position.index;
           }
 
           output.push(wrap("syntax", a.join("")));
@@ -232,18 +136,16 @@
 
         // TODO handle newlines
         // TODO handle escapes, etc.
-        "\"": (output, stack, position, text) => {
+        "\"": (output, position, text) => {
           const a = [text[position.index]];
 
           ++position.index;
-          ++position.column;
 
           while (position.index < text.length) {
             const c = text[position.index];
 
             a.push(c);
             ++position.index;
-            ++position.column;
 
             if (c === "\"") {
               break;
@@ -257,29 +159,23 @@
         "~": syntax1("syntax"),
         "@": syntax1("syntax"),
 
-        ".": (output, stack, position, text) => {
+        ".": (output, position, text) => {
           // TODO a tiny bit hacky
-          syntax1("syntax")(output, stack, position, text);
+          syntax1("syntax")(output, position, text);
           output.push(wrap("literal", parse_variable(position, text)));
         },
 
-        "(": open("syntax", false),
-        "[": open("syntax", false),
-        "{": open("syntax", true),
-        ")": close("syntax"),
-        "]": close("syntax"),
-        "}": close("syntax")
+        "(": syntax1("syntax"),
+        "[": syntax1("syntax"),
+        "{": syntax1("syntax"),
+        ")": syntax1("syntax"),
+        "]": syntax1("syntax"),
+        "}": syntax1("syntax")
       };
 
 
-      const variable = (stack, position, text, s) => {
-        if (s === "_") {
-          return wrap("syntax", s);
-
-        } else if (s === "->" || s === "<=" || s === "=") {
-          return wrap("syntax", s);
-
-        } else if (s === "::") {
+      const variable = (s) => {
+        if (s === "_" || s === "->" || s === "<=" || s === "=" || s === "::") {
           return wrap("syntax", s);
 
         } else if (s[0] === "*") {
@@ -298,51 +194,8 @@
           return wrap("type", s);
 
         } else {
-          // TODO hacky
-          // TODO is this correct ?
-          if (stack.length &&
-              stack[stack.length - 1].is_record &&
-              (find(position.index, text, "<=") ||
-               find(position.index, text, "::") ||
-               find_end(position.index, text))) {
-            return wrap("literal", s);
-          } else {
-            return escape(s);
-          }
+          return escape(s);
         }
-      };
-
-
-      // TODO hacky
-      const find = (index, text, s) => {
-        const a = [];
-
-        while (index < text.length) {
-          if (text[index] === " ") {
-            ++index;
-          } else {
-            break;
-          }
-        }
-
-        return parse_variable({ index, column: 0 }, text) === s;
-      };
-
-      // TODO hacky
-      const find_end = (index, text) => {
-        const a = [];
-
-        while (index < text.length) {
-          const c = text[index];
-
-          if (c === " " || c === "\n" || !specials[c]) {
-            ++index;
-          } else {
-            break;
-          }
-        }
-
-        return text[index] === "}";
       };
 
 
@@ -350,6 +203,7 @@
       const escape = (s) =>
         // TODO is this correct ?
         s.replace(/</g, "&lt;");
+
 
       const parse_variable = (position, text) => {
         const a = [];
@@ -363,7 +217,6 @@
           } else {
             a.push(c);
             ++position.index;
-            ++position.column;
           }
         }
 
@@ -371,24 +224,179 @@
       };
 
 
-      const markup = (text) => {
+      const add_bars = (indents) => {
+        let max = 0;
+
+        const length = indents.length;
+
         const output = [];
-        const stack = [];
 
-        const position = { column: 0, line: 0, index: 0 };
+        for (let i = 0; i < length; ++i) {
+          const x = indents[i];
 
-        while (position.index < text.length) {
-          const c = text[position.index];
+          output.push(new Array(x.indent - max - 2 + 1).join(" "));
+          output.push((x.last ? bar_end : bar));
+          output.push(new Array(2 + 1).join(" "));
 
-          if (specials[c]) {
-            specials[c](output, stack, position, text);
-
-          } else {
-            output.push(variable(stack, position, text, parse_variable(position, text)));
-          }
+          max = x.indent;
         }
 
         return output.join("");
+      };
+
+
+      const get_previous = (lines, index) => {
+        for (let i = index - 1; i >= 0; --i) {
+          const line = lines[i];
+
+          if (line.text !== "") {
+            return line;
+          }
+        }
+
+        return null;
+      };
+
+
+      const push_previous = (lines, index, indent) => {
+        for (let i = index - 1; i >= 0; --i) {
+          const line = lines[i];
+
+          if (line.text === "" || line.indent > indent) {
+            let seen = false;
+
+            for (let i = 0; i < line.indents.length; ++i) {
+              const x = line.indents[i];
+
+              if (x.indent === indent) {
+                seen = true;
+                break;
+              }
+            }
+
+            if (!seen) {
+              line.indents.unshift({ last: false, indent: indent });
+            }
+
+          } else {
+            break;
+          }
+        }
+      };
+
+
+      const markup = (text) => {
+        const lines = [];
+
+        text.split(/\n/).forEach((s, index) => {
+          let indent = 0;
+
+          while (indent < s.length) {
+            const c = s[indent];
+
+            if (c === " ") {
+              ++indent;
+            } else {
+              break;
+            }
+          }
+
+          const text = s.slice(indent);
+
+          const previous = get_previous(lines, index);
+
+          const indents = [];
+
+          if (previous !== null) {
+            for (let i = 0; i < previous.indents.length; ++i) {
+              const x = previous.indents[i];
+
+              if (x.indent < indent) {
+                indents.push({ last: false, indent: x.indent });
+
+              } else if (text !== "" && x.indent > indent) {
+                x.last = true;
+              }
+            }
+          }
+
+          // TODO is this correct ?
+          if (indent !== 0) {
+            push_previous(lines, index, indent);
+
+            indents.push({ last: false, indent: indent });
+          }
+
+          lines.push({
+            indent: indent,
+            indents: indents,
+            text: text
+          });
+        });
+
+        console.log(JSON.stringify(lines.map((x) => x.indents), null, 2));
+
+        const output = new Array(lines.length);
+
+        const indents = [];
+
+        for (let i = 0; i < lines.length; ++i) {
+          const line = lines[i];
+
+          const indent = line.indent;
+          const text = line.text;
+
+          const a = [];
+
+          const position = { index: 0 };
+
+          while (position.index < text.length) {
+            const c = text[position.index];
+
+            if (specials[c]) {
+              specials[c](a, position, text);
+
+            } else {
+              a.push(variable(parse_variable(position, text)));
+            }
+          }
+
+
+          /*const last = (indents.length === 0
+                         ? 0
+                         : indents[indents.length - 1].indent);
+
+          if (indent < last && text !== "") {
+            indents.pop();
+          }
+
+          if (indent > last) {
+            indents.push({ last: false, indent: indent });
+          }
+
+
+          const next_indent = get_indent(lines, i + 1);
+
+          for (let i = 0; i < indents.length; ++i) {
+            const x = indents[i];
+
+            if (x.last) {
+              // TODO hacky
+              indents.splice(i, 1);
+              --i;
+
+            } else if (x.indent > next_indent) {
+              x.last = true;
+            }
+          }*/
+
+
+          output[i] = "<span class='line-number'>" + (i + 1) + "</span>" +
+                      add_bars(line.indents) +
+                      a.join("");
+        }
+
+        return output.join("\n");
       };
 
 

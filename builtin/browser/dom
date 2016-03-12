@@ -123,13 +123,13 @@
 (FUNCTION on-mouse-hover-set! :: (-> (Mutable Boolean) Event)
   (on-mouse-hover-set! a)
   ~ (on-mouse-hover -> { hovering }
-      (set! a hovering)))
+      (task<< (set! a hovering))))
 
 # TODO inline this ?
 (FUNCTION on-mouse-hold-set! :: (-> (Mutable Boolean) Event)
   (on-mouse-hold-set! a)
   ~ (on-mouse-hold -> { holding }
-      (set! a holding)))
+      (task<< (set! a holding))))
 
 
 (FUNCTION visible :: (-> (Mutable Boolean) Attribute)

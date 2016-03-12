@@ -10,7 +10,7 @@
   *violet)
 
 (TYPE Rgb
-  (*rgba Integer Integer Integer))
+  (*rgba Integer Integer Integer Number))
 
 (TYPE (List a)
   *empty
@@ -128,6 +128,7 @@
 (FUNCTION bar :: (-> Integer Integer)
   (bar 1)
   = 2
+
   (bar a)
   = (+ (bar 1) a))
 
@@ -139,12 +140,14 @@
   (FUNCTION even? :: (-> Integer Boolean)
     (even? 0)
     = true
+
     (even? a)
     = (odd? (- a 1)))
 
   (FUNCTION odd? :: (-> Integer Boolean)
     (odd? 0)
     = false
+
     (odd? a)
     = (even? (- a 1))))
 
@@ -168,6 +171,7 @@
   (REWRITE-RULE
     (FOO ~n <= ~v)
     = &(BAR ~n ~v)
+
     (FOO ~v)
     = &(BAR ~v))
 
@@ -176,27 +180,25 @@
     = (MATCH a
         &~n <= ~v
         = &(QUX ~n ~v ~@b)
+
         v
         = &(QUX 1 ~v ~@b))))
 
 (foo -> a b (+ a b))
-(foo (-> a b (+ a b)))
-
-FOO
-(FOO)
-((FOO))
-(((FOO)))
+(foo (echo -> a b (+ a b)))
 
 (MUTUALLY-RECURSIVE
   (REWRITE-RULE
     (UNSTREAM (STREAM ~a))
     = a
+
     (UNSTREAM ~a)
     = &(unstream ~a))
 
   (REWRITE-RULE
     (STREAM (UNSTREAM ~a))
     = a
+
     (STREAM ~a)
     = &(stream ~a)))
 
@@ -225,10 +227,13 @@ FOO
 (MATCHES [ a b c ]
   [ 1 2 3 ]
   = 1
+
   [ 1 2 a ]
   = 2
+
   [ 1 a b ]
   = 3
+
   [ a b c ]
   = 4)
 
@@ -254,16 +259,22 @@ foo.bar
 (MATCH a
   _
   = 1
+
   a
   = 2
+
   1
   = 3
+
   "foo"
   = 4
+
   { a b c }
   = 5
+
   { a <= b c <= d }
   = { b <= a d <= c }
+
   (*foo 1)
   = 6)
 
@@ -282,6 +293,10 @@ foo.bar
 
 (MATCH a
   (-> view a)
+  = 9)
+
+(MATCH a
+  (-> a (equal? a 1))
   = 9)
 
 (MATCH a

@@ -1,24 +1,32 @@
-The Nulan `Number` type is represented as a JavaScript number:
+The Nulan ``Number`` type is represented as a `64-bit IEEE 754-2008 floating point number <https://en.wikipedia.org/wiki/IEEE_floating_point>`_.
 
-* Nulan::
+The maximum value is approximately ``179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368``
 
-    5.10
+The minimum value is approximately ``-179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368``
 
-* JavaScript::
+The smallest positive value (closest to ``0``) is approximately ``(divide 1 202402253307310618352495346718917307049556649764142118356901358027430339567995346891960383701437124495187077864316811911389808737385793476867013399940738509921517424276566361364466907742093216341239767678472745068562007483424692698618103355649159556340810056512358769552333414615230502532186327508646006263307707741093494784)``
 
-    5.10
+If you go too far above the maximum value, it will return ``infinity``
 
-Pattern matching is done using a JavaScript switch:
+If you go too far below the minimum value, it will return ``(negate infinity)``
+
+You should not write code which relies upon the fact that the ``Number`` type is 64-bit floating point. The representation could change at any time. If it changes, it will cause a minor bump to Nulan's version.
+
+----
+
+Pattern matching is done using a JavaScript ``switch``:
 
 * Nulan::
 
     (FUNCTION foo :: (-> Number Number)
-    | (foo 0.5)
-        0.5
-    | (foo 1.5)
-        1.5
-    | (foo a)
-        a)
+      (foo 0.5)
+      = 0.5
+
+      (foo 1.5)
+      = 1.5
+
+      (foo a)
+      = a)
 
 * JavaScript::
 
@@ -26,8 +34,10 @@ Pattern matching is done using a JavaScript switch:
       switch (a) {
       case 0.5:
         return 0.5;
+
       case 1.5:
         return 1.5;
+
       default:
         return a;
       }
