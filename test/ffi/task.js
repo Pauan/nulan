@@ -2,12 +2,11 @@ import { expect, expect_crash, assert_crash } from "../assert";
 import { crash } from "../../util/error";
 import { get_message } from "../../util/node";
 import { chain, reply, concurrent, concurrent_null,
-         wait, fastest, _yield, throw_error, ignore_kill, async_killable,
+         wait, fastest, throw_error, ignore_kill, async_killable,
          async_unkillable, never, kill_thread,
          make_thread_run, with_resource, catch_error } from "../../ffi/task";
 import * as $blocking from "../../ffi/blocking-task";
 import * as $mutable from "../../ffi/mutable";
-import { _null } from "../../ffi/types";
 
 
 const then = (a, b) =>
@@ -27,7 +26,7 @@ const killed = (a, value) =>
           kill_thread(make_thread_run(a));
         }), (_) => value);
 
-const ignore_yield = ignore_kill(_yield);
+const ignore_wait = ignore_kill(wait(1));
 
 // TODO handle 0
 const repeat = (x, i) => {
@@ -55,7 +54,7 @@ const queue = (f) =>
             f((value) =>
               sync(() => {
                 queue["push"](value);
-                return _null;
+                return null;
               }))), (result) => {
       if (result.$ === 0) {
         return reply({
@@ -86,7 +85,7 @@ const test_crash = (task, value) =>
 
 
 /*make_thread_run(fastest(
-  ignore_kill(forever(then(_yield, log("Hi")))),
+  ignore_kill(forever(then(wait(1), log("Hi")))),
   wait(1000)
 ));*/
 
@@ -112,14 +111,14 @@ export default [
   expect_crash("expected positive number but got -5", () =>
     wait(-5)),
 
-  expect_crash("cannot wait for 0 milliseconds (maybe use yield instead?)", () =>
+  expect_crash("cannot wait for 0 milliseconds", () =>
     wait(0)),
 
 
-  expect(_null,
+  expect(null,
     concurrent_null([])),
 
-  expect(_null,
+  expect(null,
     concurrent_null([
       reply("3"),
       reply("4")
@@ -312,19 +311,19 @@ export default [
 
   expect("1",
     fastest(
-      forever(ignore_kill(then(_yield, reply("2")))),
+      forever(ignore_kill(then(wait(1), reply("2")))),
       then(wait(100), reply("1"))
     )),
 
   expect("1",
     fastest(
-      forever(ignore_kill(then(ignore_kill(_yield), reply("2")))),
+      forever(ignore_kill(then(ignore_kill(wait(1)), reply("2")))),
       then(wait(100), reply("1"))
     )),
 
   expect("1",
     fastest(
-      then(then(_yield, _yield), reply("1")),
+      then(then(wait(1), wait(1)), reply("1")),
       then(wait(100), reply("2"))
     )),
 
@@ -350,23 +349,23 @@ export default [
 
   expect("1",
     fastest(
-      forever(_yield),
+      forever(wait(1)),
       then(wait(100), reply("1"))
     )),
 
   expect("1",
     fastest(
-      forever(ignore_yield),
+      forever(ignore_wait),
       then(wait(100), reply("1"))
     )),
 
   expect("1",
     fastest(
       fastest(
-        then(ignore_yield, reply("1")),
-        then(ignore_yield, reply("2"))
+        then(ignore_wait, reply("1")),
+        then(ignore_wait, reply("2"))
       ),
-      then(ignore_yield, reply("3"))
+      then(ignore_wait, reply("3"))
     )),
 
   expect("1",
@@ -493,10 +492,10 @@ export default [
     ))),
 
   expect(5,
-    fastest(_yield, reply(5))),
+    fastest(wait(1), reply(5))),
 
   expect(5,
-    fastest(reply(5), _yield)),
+    fastest(reply(5), wait(1))),
 
   expect(1,
     counter((increment) =>
@@ -527,9 +526,9 @@ export default [
   expect(1,
     counter((increment) =>
       then(fastest(
-        repeat(chain(ignore_yield, (_) => increment), 2),
-        _yield
-      ), _yield))),
+        repeat(chain(ignore_wait, (_) => increment), 2),
+        wait(1)
+      ), wait(1)))),
 
   expect("4",
     ignore_kill(fastest(
