@@ -59,6 +59,7 @@ export const kill_threads = (a) => {
   }
 };
 
+// TODO should this use try_catch ?
 export const run_in_thread = (thread, task, on_success, on_error) => {
   if (thread.a) {
     return crash(new Error("cannot run: thread is killed"));
@@ -79,6 +80,7 @@ export const make_thread_pool = (on_error) => {
 
     // on_error
     // TODO is this a good idea ?
+    // TODO does this need to use try_catch ?
     c: (value) => {
       // TODO is this a good idea ?
       kill_thread_pool(pool);
@@ -124,10 +126,9 @@ export const run_in_thread_pool = (pool, task) => {
 // TODO test this
 export const catch_error = (f) =>
   (thread, success, error) => {
-    const x = try_catch(f);
+    const x = try_catch(f, null);
 
     if (x.$ === 0) {
-      // TODO use try_catch ?
       return run_in_thread(thread, x.a,
         (value) => success({ $: 0, a: value }),
         (value) => success({ $: 1, a: value })
@@ -194,6 +195,7 @@ export const async_killable = (f) =>
       }
     });
 
+    // TODO use try_catch ?
     const kill = f(
       (value) => {
         if (done) {
@@ -262,11 +264,25 @@ export const throw_error = (value) =>
     error(value);
 
 
+// TODO test this
+const run_catch = (thread, f, value, success, error) => {
+  // TODO can this be made more efficient ?
+  const x = try_catch(f, value);
+
+  if (x.$ === 0) {
+    return run_in_thread(thread, x.a, success, error);
+
+  } else {
+    return error(x.a);
+  }
+};
+
+
 export const chain = (task, f) =>
   (thread, success, error) =>
     run_in_thread(thread, task,
       (value) =>
-        run_in_thread(thread, f(value), success, error),
+        run_catch(thread, f, value, success, error),
       error);
 
 
@@ -380,6 +396,7 @@ export const concurrent = (tasks) =>
 
 
 // TODO test this
+// TODO use try_catch ?
 export const transform2 = (task1, task2, f) =>
   (thread, success, error) => {
     const thread1 = make_thread();
@@ -482,7 +499,7 @@ Kill create + Error create   |             |                                -> C
 */
 // TODO is this correct ?
 // TODO test this
-// TODO catch synchronous errors ?
+// TODO use try_catch ?
 export const with_resource = (create, use, destroy) =>
   (thread, success, error) => {
     const thread_create = make_thread();
@@ -497,7 +514,7 @@ export const with_resource = (create, use, destroy) =>
       kill_thread(thread_use);
 
       if (resource.$ === 1) {
-        return run_in_thread(thread_create, destroy(resource.a), noop, crash);
+        return run_catch(thread_create, destroy, resource.a, noop, crash);
       }
     });
 
@@ -523,24 +540,25 @@ export const with_resource = (create, use, destroy) =>
     return run_in_thread(thread_create, create,
       (_resource) => {
         if (killed) {
-          return run_in_thread(thread_create, destroy(_resource), noop, crash);
+          return run_catch(thread_create, destroy, _resource, noop, crash);
 
         } else {
           resource = { $: 1, a: _resource };
 
-          return run_in_thread(thread_use, use(_resource),
+          return run_catch(thread_use, use, _resource,
             (value) => {
               resource = { $: 0 };
 
-              return run_in_thread(thread_create, destroy(_resource),
+              return run_catch(thread_create, destroy, _resource,
                 (_) =>
                   on_success(value),
                 on_error);
             },
+
             (value) => {
               resource = { $: 0 };
 
-              return run_in_thread(thread_create, destroy(_resource),
+              return run_catch(thread_create, destroy, _resource,
                 (_) =>
                   on_error(value),
                 on_error);

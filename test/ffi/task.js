@@ -148,6 +148,26 @@ export default [
       ]))),
 
 
+  expect_crash("cannot wait for 0 milliseconds", () =>
+    chain(reply(1), (_) =>
+      wait(0))),
+
+  expect_crash("cannot wait for 0 milliseconds", () =>
+    chain(wait(1), (_) =>
+      wait(0))),
+
+  expect_crash("Hi", () =>
+    reply(crash(new Error("Hi")))),
+
+  expect_crash("Hi", () =>
+    chain(reply(1), (_) =>
+      reply(crash(new Error("Hi"))))),
+
+  expect_crash("Hi", () =>
+    chain(wait(1), (_) =>
+      reply(crash(new Error("Hi"))))),
+
+
   expect([],
     concurrent([])),
 
@@ -542,6 +562,20 @@ export default [
       }), never),
       then(wait(100), reply("4"))
     ))),
+
+
+  // TODO more tests for this
+  expect({
+    queue: ["create"],
+    value: null,
+    error: "Hi2"
+  }, queue((push) =>
+       with_resource(then(push("create"),
+                          reply(1)),
+         (id) => then(push(["use", id]),
+                      reply(crash(new Error("Hi")))),
+         (id) => then(push(["destroy", id]),
+                      reply(crash(new Error("Hi2"))))))),
 
 
   // TODO Kill create | Error destroy -> Crash destroy

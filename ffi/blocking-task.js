@@ -17,9 +17,6 @@ export const transform = (a, b) =>
 export const flatten = (a) =>
   ({ $: 4, a });
 
-export const transform2 = (a, b, c) =>
-  ({ $: 5, a, b, c });
-
 
 export const log = (s) =>
   blocking(() => {
@@ -50,14 +47,10 @@ export const run = (task) => {
       return task.b(run(task.a));
 
     // *flatten
-    case 4:
+    default:
       // Tail recursive
       task = run(task.a);
       break;
-
-    // *transform2
-    default:
-      return task.c(run(task.a), run(task.b));
     }
   }
 };
@@ -65,7 +58,5 @@ export const run = (task) => {
 
 // TODO this can be made more efficient
 export const task_from = (task) =>
-  async_unkillable((success, error) => {
-    // TODO does this need to use try_catch ?
-    success(run(task));
-  });
+  async_unkillable((success, error) =>
+    success(run(task)));
