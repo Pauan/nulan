@@ -1,6 +1,5 @@
 import { crash } from "../util/error";
 import { blocking } from "./blocking-task";
-import { _null } from "./types";
 import { trigger } from "./mutable";
 import * as $list from "./list";
 
@@ -112,7 +111,7 @@ export const set = (mutable, list) =>
       });
     }
 
-    return _null;
+    return null;
   });
 
 
@@ -130,7 +129,7 @@ export const insert_sorted = (mutable, a) =>
       b: a
     });
 
-    return _null;
+    return null;
   });
 
 
@@ -147,7 +146,7 @@ export const remove_sorted = (mutable, a) =>
       a: index
     });
 
-    return _null;
+    return null;
   });
 
 
@@ -165,5 +164,5 @@ export const set_sort = (mutable, order) =>
       trigger(mutable.b, ops[i]);
     }
 
-    return _null;
+    return null;
   });

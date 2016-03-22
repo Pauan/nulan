@@ -1,4 +1,3 @@
-import { _null } from "./types";
 import { async_unkillable } from "./task";
 
 
@@ -25,7 +24,7 @@ export const transform2 = (a, b, c) =>
 export const log = (s) =>
   blocking(() => {
     console["log"](s);
-    return _null;
+    return null;
   });
 
 

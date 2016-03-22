@@ -1,6 +1,3 @@
-import { _null } from "./types";
-
-
 // TODO is this correct ?
 export const sequential = (chain, reply, a) => {
   const length = a["length"];
@@ -25,7 +22,7 @@ export const sequential_null = (chain, reply, a) => {
   const loop = (i) =>
     (i < length
       ? chain(a[i], (_) => loop(i + 1))
-      : reply(_null));
+      : reply(null));
 
   return loop(0);
 };

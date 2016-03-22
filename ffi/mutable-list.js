@@ -1,5 +1,4 @@
 import { blocking } from "./blocking-task";
-import { _null } from "./types";
 import * as $list from "./list";
 import * as $array from "../util/array";
 import { trigger } from "./mutable";
@@ -20,7 +19,7 @@ export const set = (mutable, a) =>
       });
     }
 
-    return _null;
+    return null;
   });
 
 
@@ -37,7 +36,7 @@ export const push = (mutable, a) =>
       b: a
     });
 
-    return _null;
+    return null;
   });
 
 
@@ -56,7 +55,7 @@ export const insert = (mutable, index1, a) =>
       b: a
     });
 
-    return _null;
+    return null;
   });
 
 
@@ -81,7 +80,7 @@ export const update = (mutable, index1, a) =>
       });
     }
 
-    return _null;
+    return null;
   });
 
 
@@ -99,7 +98,7 @@ export const remove = (mutable, index1) =>
       a: index2
     });
 
-    return _null;
+    return null;
   });
 
 

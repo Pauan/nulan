@@ -1,6 +1,5 @@
 import { async_killable, make_thread, kill_thread,
          run_in_thread, async_unkillable, with_resource } from "../task";
-import { _null } from "../types";
 import { make_stream } from "../stream";
 import { open, close, DEFAULT_MODE } from "./fs";
 import * as $fs from "fs";
@@ -62,7 +61,7 @@ export const read_from_stream = (input, push) =>
 
     const onEnd = () => {
       cleanup();
-      success(_null);
+      success(null);
     };
 
     const onError = (e) => {
@@ -124,7 +123,7 @@ export const write_to_stream = (input, output) =>
 
     const onFinish = () => {
       cleanup();
-      success(_null);
+      success(null);
     };
 
     const onComplete = () => {
@@ -149,7 +148,7 @@ export const write_to_stream = (input, output) =>
 
       const x = _success;
       _success = null;
-      x(_null);
+      x(null);
     };
 
     // TODO this doesn't work
@@ -163,7 +162,7 @@ export const write_to_stream = (input, output) =>
       async_killable((success, error) => {
         // Continue writing
         if (output["write"](value, "utf8")) {
-          success(_null);
+          success(null);
 
         // Wait for drain event
         // TODO verify that _success is null ?

@@ -1,5 +1,4 @@
 import { blocking } from "./blocking-task";
-import { _null } from "./types";
 import * as $array from "../util/array";
 
 
@@ -35,14 +34,14 @@ export const get = (mutable) =>
 export const set = (mutable, value) =>
   blocking(() => {
     _set(mutable, value);
-    return _null;
+    return null;
   });
 
 export const modify = (mutable, fn) =>
   blocking(() => {
     const value = mutable.a;
     _set(mutable, fn(value));
-    return _null;
+    return null;
   });
 
 
