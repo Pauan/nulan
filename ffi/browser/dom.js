@@ -1,6 +1,6 @@
 import { make_thread_pool, kill_thread_pool, run_in_thread_pool,
          async_killable } from "../task";
-import { crash } from "../../util/error";
+import { crash } from "../crash";
 
 
 const kill_all = (running) => {
@@ -201,16 +201,15 @@ export const frame = (b, c) =>
   ({ a: set_frame, b, c });
 
 
-const style_style = (running, style, attr) => {
-  return set_style(style, attr.b, attr.c);
-};
+const style_style = (running, style, attr) =>
+  set_style(style, attr.b, attr.c);
 
 export const style = (b, c) =>
   ({ a: style_style, b, c });
 
 
-const style_changing_style = (running, style, attr) => {
-  return each(running, attr.c, (maybe) => {
+const style_changing_style = (running, style, attr) =>
+  each(running, attr.c, (maybe) => {
     switch (maybe.$) {
     // *none
     case 0:
@@ -221,7 +220,6 @@ const style_changing_style = (running, style, attr) => {
       return set_style(style, attr.b, maybe.a);
     }
   });
-};
 
 export const changing_style = (b, c) =>
   ({ a: style_changing_style, b, c });
@@ -361,9 +359,8 @@ export const get_position = (a) =>
 
 
 // TODO duplicate attr check
-const attribute_attr = (running, x, attr) => {
-  return x["setAttribute"](attr.b, attr.c);
-};
+const attribute_attr = (running, x, attr) =>
+  x["setAttribute"](attr.b, attr.c);
 
 export const attr = (b, c) =>
   ({ a: attribute_attr, b, c });
@@ -387,8 +384,8 @@ export const classes = (b) =>
 
 
 // TODO duplicate class check
-const attribute_changing_class = (running, x, attr) => {
-  return each(running, attr.c, (a) => {
+const attribute_changing_class = (running, x, attr) =>
+  each(running, attr.c, (a) => {
     // *false
     if (a === 0) {
       return x["classList"]["remove"](attr.b);
@@ -398,24 +395,22 @@ const attribute_changing_class = (running, x, attr) => {
       return x["classList"]["add"](attr.b);
     }
   });
-};
 
 export const changing_class = (b, c) =>
   ({ a: attribute_changing_class, b, c });
 
 
 // TODO duplicate event check
-const attribute_events = (running, x, attr) => {
-  return set_attributes(running, x, attr.b);
-};
+const attribute_events = (running, x, attr) =>
+  set_attributes(running, x, attr.b);
 
 export const events = (b) =>
   ({ a: attribute_events, b });
 
 
 // TODO duplicate attr check
-const attribute_changing_attr = (running, x, attr) => {
-  return each(running, attr.c, (maybe) => {
+const attribute_changing_attr = (running, x, attr) =>
+  each(running, attr.c, (maybe) => {
     switch (maybe.$) {
     // *none
     case 0:
@@ -426,16 +421,14 @@ const attribute_changing_attr = (running, x, attr) => {
       return x["setAttribute"](attr.b, maybe.a);
     }
   });
-};
 
 export const changing_attr = (b, c) =>
   ({ a: attribute_changing_attr, b, c });
 
 
 // TODO duplicate style check
-const attribute_styles = (running, x, attr) => {
-  return set_attributes(running, x["style"], attr.b);
-};
+const attribute_styles = (running, x, attr) =>
+  set_attributes(running, x["style"], attr.b);
 
 export const styles = (b) =>
   ({ a: attribute_styles, b });
@@ -455,15 +448,17 @@ const set_attributes = (running, x, a) => {
 const set_children_list = (running, x, a) => {
   const length = a["length"];
 
-  // TODO is it faster or slower to use a document fragment ?
-  const fragment = document["createDocumentFragment"]();
+  if (length !== 0) {
+    // TODO is it faster or slower to use a document fragment ?
+    const fragment = document["createDocumentFragment"]();
 
-  for (let i = 0; i < length; ++i) {
-    const b = a[i];
-    fragment["appendChild"](b.a(running, b));
+    for (let i = 0; i < length; ++i) {
+      const b = a[i];
+      fragment["appendChild"](b.a(running, b));
+    }
+
+    return x["appendChild"](fragment);
   }
-
-  return x["appendChild"](fragment);
 };
 
 
