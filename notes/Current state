@@ -33,13 +33,21 @@
   (chain a fn)
   = (flatten (transform a fn)))
 
-(IMPORT (github { name <= "nulan/flatten"
-                  file <= "src/flatten.nul"
-                  version <= (major 2) })
+(LOAD-FILES
+  "nulan:imports/standard")
+
+(LOAD-FILES
+  "nulan:imports/node"
+  "nulan:imports/browser")
+
+(DEPENDENCY "flatten"
+  (github "nulan/flatten" (major 2 0 0)))
+
+(IMPORT "flatten/src/flatten.nul"
   $flatten
   flatten)
 
-(IMPORT (file "foo/bar")
+(IMPORT "foo/bar"
   a <= d
   b
   c
@@ -61,6 +69,9 @@
   *some
   *none)
 
+(LOAD-FILES
+  "./src/foo.nul")
+
 (LOCAL-PROVIDE ($flatten Maybe)
   flatten <= (-> ...)
   (flatten ...))
@@ -69,15 +80,15 @@
   then
   else)
 
-(EXPORT-DATA
+(EXPORT-WRAPPER
   foo <= *foo)
 
-(IMPORT (nulan "unsafe/ffi")
+(IMPORT "nulan:unsafe/ffi"
   UNSAFE-FFI-IMPORT
   javascript)
 
 (UNSAFE-FFI-IMPORT { target <= javascript
-                     file <= "foo/bar" }
+                     file <= "./foo/bar.js" }
   a :: (-> Integer Integer Integer)
   b :: Integer
   c :: Integer
@@ -329,7 +340,7 @@ foo.bar
 (UNSAFE-DEFAULT-PROVIDE ($transform Maybe)
   transform <= (-> a a))
 
-(IMPORT (nulan "unsafe")
+(IMPORT "nulan:unsafe"
   UNSAFE-OPTIMIZATION-RULE)
 
 (UNSAFE-OPTIMIZATION-RULE
