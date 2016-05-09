@@ -37,7 +37,7 @@
   = (flatten (transform a fn)))
 
 (LOAD-PACKAGE "flatten"
-  (github "nulan/flatten" (major 2 0 0)))
+  (github "nulan/flatten" (version 2 0)))
 
 (IMPORT "nulan:default/standard.nul")
 
@@ -52,38 +52,15 @@
   $flatten
   flatten)
 
-(EXPORT
-  foo
-  bar <= qux)
-
-(IMPORT-EXPORT "foo/bar.nul"
-  foo
-  bar <= qux)
-
 (PROVIDE ($transform Maybe)
   transform <= map)
 
 (PROVIDE ($transform Maybe)
-  (transform a b)
-  = (map a b))
-
-(EXPORT-PROVIDE ($transform Maybe)
-  transform <= map)
-
-(EXPORT-PROVIDE ($transform Maybe)
   (transform a b)
   = (map a b))
 
 (IMPORT "foo/bar.nul"
   a <= d
-  b
-  c
-  Maybe
-  *some
-  *none)
-
-(EXPORT
-  d <= a
   b
   c
   Maybe
@@ -102,9 +79,6 @@
 (IF test
   then
   else)
-
-(EXPORT-WRAPPER
-  foo <= *foo)
 
 (UNSAFE-FFI-IMPORT { target <= javascript
                      file <= "ffi/foo/bar.js" }
@@ -320,72 +294,3 @@ foo.bar
 
 (INLINE
   (-> foo bar))
-
-(MATCH a
-  (-> view a)
-  = 9)
-
-(MATCH a
-  (-> a (equal? a 1))
-  = 9)
-
-(MATCH a
-  (LOCAL
-    a <= a
-    (equal? a 1))
-  = 9)
-
-# foo :: (POLYMORPH
-#          (-> Integer Integer)
-#          (-> Text Text))
-(POLYMORPHIC
-  (FUNCTION foo :: (-> Integer Integer)
-    (foo a)
-    = a)
-
-  (FUNCTION foo :: (-> Text Text)
-    (foo a)
-    = a))
-
-(FUNCTION bar :: (POLYMORPH
-                   (-> Integer Integer)
-                   (-> Text Text))
-  (bar a)
-  = (foo a))
-
-(UNSAFE-DEFAULT-PROVIDE ($transform Maybe)
-  transform <= map)
-
-(UNSAFE-DEFAULT-PROVIDE ($transform Maybe)
-  transform <= (-> a a))
-
-(IMPORT "nulan:module/unsafe.nul"
-  UNSAFE-OPTIMIZATION-RULE)
-
-(UNSAFE-OPTIMIZATION-RULE
-  (chain a b)
-  = (flatten (transform a b)))
-
-(UNSAFE-OPTIMIZATION-RULE
-  (reduce-left [] a -> b c (push b d))
-  = (reduce-left [] a -> b c (unsafe-push! b d)))
-
-(UNSAFE-OPTIMIZATION-RULE
-  (unstream (stream a))
-  = a)
-
-(UNSAFE-OPTIMIZATION-RULE
-  (stream (unstream a))
-  = a)
-
-(UNSAFE-OPTIMIZATION-RULE
-  (add a b)
-  = (ADD a b))
-
-(IMPORT-ALL
-  %flatten <= (github { name <= "nulan/flatten"
-                        file <= "src/flatten.nul"
-                        version <= (major 2) }))
-
-%flatten.$flatten
-%flatten.flatten
