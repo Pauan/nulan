@@ -23,6 +23,9 @@
 (PROTOCOL ($transform a)
   transform :: (-> (a b) (-> b c) (a c)))
 
+(PROTOCOL ($transform a)
+  transform :: (-> (a b) (-> b c) (a c)))
+
 (CONSTANT chain :: (REQUIRE ($transform a) ($flatten a)
                      (-> (a b) (-> b (a c)) (a c)))
   (-> a fn
@@ -36,32 +39,40 @@
 (LOAD-PACKAGE "flatten"
   (github "nulan/flatten" (major 2 0 0)))
 
-(IMPORT-DEFAULT
-  "nulan:default/standard.nul")
+(IMPORT "nulan:default/standard.nul")
 
-(IMPORT-DEFAULT
-  "nulan:default/node.nul"
-  "nulan:default/browser.nul")
+(IMPORT "nulan:default/node.nul")
+(IMPORT "nulan:default/browser.nul")
 
-(IMPORT-DEFAULT
-  "default/foo.nul")
+(IMPORT "default/foo.nul")
 
-(IMPORT-DEFAULT
-  "package:flatten/default/foo.nul")
-
-(EXPORT-DEFAULT
-  foo
-  (PROVIDE ($bar Bar)
-    bar))
-
-(IMPORT-EXPORT-DEFAULT "foo/bar.nul"
-  foo
-  (PROVIDE ($bar Bar)
-    bar))
+(IMPORT "package:flatten/default/foo.nul")
 
 (IMPORT "package:flatten/module/flatten.nul"
   $flatten
   flatten)
+
+(EXPORT
+  foo
+  bar <= qux)
+
+(IMPORT-EXPORT "foo/bar.nul"
+  foo
+  bar <= qux)
+
+(PROVIDE ($transform Maybe)
+  transform <= map)
+
+(PROVIDE ($transform Maybe)
+  (transform a b)
+  = (map a b))
+
+(EXPORT-PROVIDE ($transform Maybe)
+  transform <= map)
+
+(EXPORT-PROVIDE ($transform Maybe)
+  (transform a b)
+  = (map a b))
 
 (IMPORT "foo/bar.nul"
   a <= d
@@ -69,13 +80,7 @@
   c
   Maybe
   *some
-  *none
-  (PROVIDE ($flatten Maybe)
-    flatten)
-  (PROVIDE ($transform Maybe)
-    transform <= map)
-  (PROVIDE ($reply Maybe)
-    reply))
+  *none)
 
 (EXPORT
   d <= a
@@ -87,6 +92,11 @@
 
 (LOCAL-PROVIDE ($flatten Maybe)
   flatten <= (-> ...)
+  (flatten ...))
+
+(LOCAL-PROVIDE ($flatten Maybe)
+  (flatten a b)
+  = ...
   (flatten ...))
 
 (IF test
