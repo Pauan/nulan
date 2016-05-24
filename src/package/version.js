@@ -38,3 +38,12 @@ export const order = (a, b) => {
 
 export const matches = (a, b) =>
   a.a === b.a && b.b >= a.b;
+
+export const is_higher = (a, b) => {
+  if (a.a === b.a) {
+    return b.b > a.b;
+
+  } else {
+    return b.a > a.a;
+  }
+};

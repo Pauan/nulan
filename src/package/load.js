@@ -6,16 +6,34 @@ import * as $version from "./version";
 import * as $git from "../../util/git";
 
 
-const get_tags = async (repo, version) => {
+const get_tags = async (repo) => {
   const tags = await $git.get_tags(repo);
 
   const parsed = tags["map"]((x) =>
     ({ tag: x, parsed: $version.parse(x) }));
 
-  const filtered = parsed["filter"]((x) =>
-    x.parsed !== null && $version.matches(version, x.parsed));
+  return parsed["filter"]((x) => x.parsed !== null);
+};
 
-  return filtered["sort"]((a, b) => $version.order(a.parsed, b.parsed));
+
+const get_highest_version = (tags) => {
+  const a = tags["sort"]((a, b) => $version.order(a.parsed, b.parsed));
+
+  return a[a["length"] - 1];
+};
+
+
+const get_highest_compatible_version = (tags, version) => {
+  const filtered = tags["filter"]((x) =>
+    $version.matches(version, x.parsed));
+
+  if (filtered["length"] === 0) {
+    // TODO line and column numbers
+    throw new Error("Could not find tag that matches " + $version.serialize(version));
+
+  } else {
+    return get_highest_version(filtered);
+  }
 };
 
 
@@ -34,7 +52,7 @@ const clone_repository = async (repo, a) => {
 
   const path = $path.join(".nulan", "dependencies", $path_util.encode($dependency.serialize(a)));
 
-  return await $git.clone_local(repo["path"](), path);
+  return await $git.clone_local(repo, path);
 };
 
 
@@ -43,23 +61,30 @@ export const load_package = async (a) => {
 
   const repo = await get_repository(a);
 
+  const tags = await get_tags(repo);
+
   const version = $dependency.version(a);
 
-  const tags = await get_tags(repo, version);
+  const highest = get_highest_version(tags);
 
-  if (tags["length"] === 0) {
-    // TODO line and column numbers
-    throw new Error("Could not find tag that matches " + $version.serialize(version));
+  const last = get_highest_compatible_version(tags, version);
 
-  } else {
-    const last = tags[tags["length"] - 1];
-
-    console.log(last);
-
-    const new_repo = await clone_repository(repo, $dependency.change_version(a, last.parsed));
-
-    await $git.checkout_tag(new_repo, last.tag);
+  if ($version.is_higher($dependency.version(a), highest.parsed)) {
+    // TODO line/column info
+    console["warn"]("Warning:\n  Package was specified as:\n    " +
+                      $dependency.serialize(a) + "\n\n  But the highest version is:\n    " +
+                      $dependency.serialize($dependency.change_version(a, highest.parsed)) + "\n");
   }
+
+  const new_dependency = $dependency.change_version(a, last.parsed);
+
+  console["info"]("Loading package " + $dependency.serialize(new_dependency) + "\n");
+
+  const new_repo = await clone_repository(repo, new_dependency);
+
+  await $git.checkout_tag(new_repo, last.tag);
+
+  return $git.get_path(new_repo);
 };
 
 
@@ -67,6 +92,8 @@ import { version } from "./version";
 
 console.log("STARTING");
 
-load_package($dependency.github("Pauan/Immutable", version(3, 0))).catch((e) => {
+load_package($dependency.github("Pauan/Immutable", version(6, 0))).catch((e) => {
   console.log(e);
+}).then((x) => {
+  console.log(x);
 });
