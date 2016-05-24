@@ -6,7 +6,9 @@
   "main": "build/nulan.js",
   "dependencies": {
     "babel-core": "^6.6.5",
-    "babel-preset-es2015-native-modules": "^6.5.0"
+    "babel-preset-es2015-native-modules": "^6.5.0",
+    "source-map": "^0.5.3",
+    "nodegit": "^0.13.0"
   },
   "devDependencies": {
     "rollup": "^0.24.0",

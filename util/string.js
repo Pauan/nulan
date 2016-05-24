@@ -12,3 +12,8 @@ export const repeat = (s, i) =>
 
 export const indent = (s, spaces) =>
   s["replace"](eols, eol + spaces);
+
+
+export const serialize = (a) =>
+  // TODO handle things like newlines
+  "\"" + a["replace"](/[\"\\]/g, "\\$&") + "\"";
