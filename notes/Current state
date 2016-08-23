@@ -34,10 +34,10 @@
 (FUNCTION chain :: (REQUIRE ($transform a) ($flatten a)
                      (-> (a b) (-> b (a c)) (a c)))
   (chain a fn)
-  = (flatten (transform a fn)))
+  : (flatten (transform a fn)))
 
 (LOAD-PACKAGE "flatten"
-  (github "nulan/flatten" (version 2 0)))
+  (github "nulan/flatten" "v2.0.0"))
 
 (IMPORT "nulan:default/standard.nul")
 
@@ -52,12 +52,28 @@
   $flatten
   flatten)
 
+(IMPORT "package:flatten/default/foo.nul"
+  (PROVIDE ($transform Maybe)))
+
+(LOCAL-IMPORT "package:flatten/default/foo.nul"
+  transform <= map
+  (transform ...))
+
+(LOCAL-IMPORT "package:flatten/default/foo.nul"
+  (PROVIDE ($transform Maybe))
+  (transform ...))
+
+(CONSTANT maybe-transform :: (-> ...)
+  (LOCAL-IMPORT "package:flatten/default/foo.nul"
+    (PROVIDE ($transform Maybe))
+    transform))
+
 (PROVIDE ($transform Maybe)
   transform <= map)
 
 (PROVIDE ($transform Maybe)
   (transform a b)
-  = (map a b))
+  : (map a b))
 
 (IMPORT "foo/bar.nul"
   a <= d
@@ -73,7 +89,7 @@
 
 (LOCAL-PROVIDE ($flatten Maybe)
   (flatten a b)
-  = ...
+  : ...
   (flatten ...))
 
 (IF test
@@ -89,11 +105,11 @@
 
 (FUNCTION foo<< :: (-> a Foo)
   (foo<< a)
-  = ...)
+  : ...)
 
 (FUNCTION <<foo :: (-> Foo a)
   (<<foo a)
-  = ...)
+  : ...)
 
 (CONSTANT foo :: (-> (-> Integer Integer Integer) Integer)
   (-> a (a 1 2)))
@@ -123,37 +139,37 @@
 
 (FUNCTION foo :: (-> (-> Integer Integer Integer) Integer)
   (foo a)
-  = (a 1 2))
+  : (a 1 2))
 
 (FUNCTION foo :: (-> Text Text)
   (foo a)
-  = a)
+  : a)
 
 (FUNCTION bar :: (-> Integer Integer)
   (bar 1)
-  = 2
+  : 2
 
   (bar a)
-  = (+ (bar 1) a))
+  : (+ (bar 1) a))
 
 (REWRITE-RULE
   (QUX ~@a)
-  = &(+ ~@a))
+  : &(+ ~@a))
 
 (MUTUALLY-RECURSIVE
   (FUNCTION even? :: (-> Integer Boolean)
     (even? 0)
-    = true
+    : true
 
     (even? a)
-    = (odd? (- a 1)))
+    : (odd? (- a 1)))
 
   (FUNCTION odd? :: (-> Integer Boolean)
     (odd? 0)
-    = false
+    : false
 
     (odd? a)
-    = (even? (- a 1))))
+    : (even? (- a 1))))
 
 (MUTUALLY-RECURSIVE
   (PROTOCOL ($foo a)
@@ -174,19 +190,19 @@
 (MUTUALLY-RECURSIVE
   (REWRITE-RULE
     (FOO ~n <= ~v)
-    = &(BAR ~n ~v)
+    : &(BAR ~n ~v)
 
     (FOO ~v)
-    = &(BAR ~v))
+    : &(BAR ~v))
 
   (REWRITE-RULE
     (BAR ~a ~@b)
-    = (MATCH a
+    : (MATCH a
         &~n <= ~v
-        = &(QUX ~n ~v ~@b)
+        : &(QUX ~n ~v ~@b)
 
         v
-        = &(QUX 1 ~v ~@b))))
+        : &(QUX 1 ~v ~@b))))
 
 (foo -> a b (+ a b))
 (foo (echo -> a b (+ a b)))
@@ -194,17 +210,17 @@
 (MUTUALLY-RECURSIVE
   (REWRITE-RULE
     (UNSTREAM (STREAM ~a))
-    = a
+    : a
 
     (UNSTREAM ~a)
-    = &(unstream ~a))
+    : &(unstream ~a))
 
   (REWRITE-RULE
     (STREAM (UNSTREAM ~a))
-    = a
+    : a
 
     (STREAM ~a)
-    = &(stream ~a)))
+    : &(stream ~a)))
 
 (CHAIN
   a <= a
@@ -230,16 +246,16 @@
 
 (MATCHES [ a b c ]
   [ 1 2 3 ]
-  = 1
+  : 1
 
   [ 1 2 a ]
-  = 2
+  : 2
 
   [ 1 a b ]
-  = 3
+  : 3
 
   [ a b c ]
-  = 4)
+  : 4)
 
 [ 1 2 3 ]
 
@@ -262,25 +278,25 @@ foo.bar
 
 (MATCH a
   _
-  = 1
+  : 1
 
   a
-  = 2
+  : 2
 
   1
-  = 3
+  : 3
 
   "foo"
-  = 4
+  : 4
 
   { a b c }
-  = 5
+  : 5
 
   { a <= b c <= d }
-  = { b <= a d <= c }
+  : { b <= a d <= c }
 
   (*foo 1)
-  = 6)
+  : 6)
 
 
 # Unsure
@@ -294,3 +310,8 @@ foo.bar
 
 (INLINE
   (-> foo bar))
+
+(IMPORT "package:flatten/module/flatten.nul"
+  (TYPE Foo
+    *bar
+    *qux))
