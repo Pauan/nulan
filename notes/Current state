@@ -12,6 +12,16 @@
 (TYPE Rgb
   (*rgba Integer Integer Integer Number))
 
+(TYPE Rbg
+  (*rgba { red :: Integer
+           blue :: Integer
+           green :: Integer
+           alpha :: Number }))
+
+(MATCH foo
+  (*rgba { red blue green alpha })
+  : ...)
+
 (TYPE (List a)
   *empty
   (*value a (List a)))
@@ -102,6 +112,69 @@
   b :: Integer
   c :: Integer
   d :: (Foo Integer))
+
+(PROTOCOL ($<< a b)
+  << :: (-> a b))
+
+(PROVIDE ($<< a Foo)
+  (<< a)
+  : ...)
+
+(PROVIDE ($<< Foo a)
+  (<< a)
+  : ...)
+
+(TYPE (Result a b)
+  (*success a)
+  (*failure b))
+
+(PROTOCOL ($result<< a b c)
+  result<< :: (-> a (Result b c)))
+
+(PROVIDE (REQUIRE ($<< a b)
+           ($result<< a b Never))
+  (result<< a)
+  : (*success (<< a)))
+
+(PROVIDE (REQUIRE ($result<< a b c)
+           ($<< a (Result b c)))
+  (<< a)
+  : (result<< a))
+
+(PROVIDE ($<< (Result a _) (Maybe a))
+  (<< (*success a))
+  : (*some a)
+
+  (<< (*failure _))
+  : *none)
+
+(PROVIDE ($<< (Maybe a) (Result a Null))
+  (<< (*some a))
+  : (*success a)
+
+  (<< *none)
+  : (*failure *null))
+
+(FUNCTION maybe<< :: (REQUIRE ($result<< a b _)
+                       (-> a (Maybe b)))
+  (maybe<< a)
+  : (<< (<< a)))
+
+(PROVIDE (REQUIRE ($result<< a b _)
+           ($<< a (Maybe b)))
+  (<< a)
+  : (<< (<< a)))
+
+(<< 5)
+
+(result<< 5)
+
+(maybe<< 5)
+
+(CHAIN
+  foo <= ...
+  bar <= ...
+  (<< 5))
 
 (FUNCTION foo<< :: (-> a Foo)
   (foo<< a)
@@ -231,7 +304,7 @@
   x <= (read-file "foo")
   (log x)
   (write-file "bar" x)
-  (reply null))
+  (<< null))
 
 (chain (read-file "foo") -> x
   (chain (log x) -> _ :: Null
@@ -263,16 +336,16 @@
   2
   3 ]
 
-{ a b }
+(*foo { a b })
 
-{ a <= 1 b <= 2 }
+(*foo { a <= 1 b <= 2 })
 
-{ a <= 1
-  b <= 2 }
+(*foo { a <= 1
+        b <= 2 })
 
-{ @a
-  b <= 2
-  c <= 3 }
+(*foo
+  { a <= 1
+    b <= 2 })
 
 foo.bar
 
@@ -289,11 +362,11 @@ foo.bar
   "foo"
   : 4
 
-  { a b c }
+  (*foo { a b c })
   : 5
 
-  { a <= b c <= d }
-  : { b <= a d <= c }
+  (*foo { a <= b c <= d })
+  : (*foo { b <= a d <= c })
 
   (*foo 1)
   : 6)
