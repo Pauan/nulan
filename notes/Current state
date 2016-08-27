@@ -18,9 +18,19 @@
            green :: Integer
            alpha :: Number }))
 
+(MATCHES [ foo ]
+  [ (*rgba { red blue green alpha }) ]
+  : (*rgba { red blue green alpha })
+
+  [ (*rgba { red blue green alpha }) ]
+  : b)
+
 (MATCH foo
   (*rgba { red blue green alpha })
-  : ...)
+  : (*rgba { red blue green alpha })
+
+  (*rgba { red blue green alpha })
+  : b)
 
 (TYPE (List a)
   *empty
@@ -29,6 +39,29 @@
 (TYPE Foo
   (REQUIRE ($foo a)
     (*foo a)))
+
+
+# The type and all tags are made public
+(PUBLIC
+  (TYPE Foo
+    *foo))
+
+# The type is made public (tags are private)
+(ABSTRACT-TYPE Foo
+  *foo)
+
+# The constant is made public
+(PUBLIC
+  (CONSTANT ...))
+
+# The protocol and all functions are made public
+(PUBLIC
+  (PROTOCOL ($foo a) ...))
+
+# The provide is made public
+(PUBLIC
+  (PROVIDE ($foo Foo) ...))
+
 
 (PROTOCOL ($transform a)
   transform :: (-> (a b) (-> b c) (a c)))
@@ -43,38 +76,38 @@
 
 (FUNCTION chain :: (REQUIRE ($transform a) ($flatten a)
                      (-> (a b) (-> b (a c)) (a c)))
-  (chain a fn)
+  [ a fn ]
   : (flatten (transform a fn)))
 
-(LOAD-PACKAGE "flatten"
+(DEPENDENCY "flatten"
   (github "nulan/flatten" "v2.0.0"))
 
-(IMPORT "nulan:default/standard.nul")
+(USE "package:nulan-standard/task.nul")
 
-(IMPORT "nulan:default/node.nul")
-(IMPORT "nulan:default/browser.nul")
+(USE "package:nulan-nodejs/node.nul")
+(USE "package:nulan-browser/browser.nul")
 
-(IMPORT "default/foo.nul")
+(USE "local:foo.nul")
 
-(IMPORT "package:flatten/default/foo.nul")
+(USE "package:flatten/foo.nul")
 
-(IMPORT "package:flatten/module/flatten.nul"
+(USE "package:flatten/module/flatten.nul"
   $flatten
   flatten)
 
-(IMPORT "package:flatten/default/foo.nul"
+(USE "package:flatten/foo.nul"
   (PROVIDE ($transform Maybe)))
 
-(LOCAL-IMPORT "package:flatten/default/foo.nul"
+(LOCAL-USE "package:flatten/foo.nul"
   transform <= map
   (transform ...))
 
-(LOCAL-IMPORT "package:flatten/default/foo.nul"
+(LOCAL-USE "package:flatten/foo.nul"
   (PROVIDE ($transform Maybe))
   (transform ...))
 
 (CONSTANT maybe-transform :: (-> ...)
-  (LOCAL-IMPORT "package:flatten/default/foo.nul"
+  (LOCAL-USE "package:flatten/foo.nul"
     (PROVIDE ($transform Maybe))
     transform))
 
@@ -85,7 +118,7 @@
   (transform a b)
   : (map a b))
 
-(IMPORT "foo/bar.nul"
+(USE "local:foo/bar.nul"
   a <= d
   b
   c
@@ -106,8 +139,8 @@
   then
   else)
 
-(UNSAFE-FFI-IMPORT { target <= javascript
-                     file <= "ffi/foo/bar.js" }
+(UNSAFE-FFI-USE { target <= javascript
+                  file <= "local:ffi/foo/bar.js" }
   a :: (-> Integer Integer Integer)
   b :: Integer
   c :: Integer
@@ -157,7 +190,7 @@
 
 (FUNCTION maybe<< :: (REQUIRE ($result<< a b _)
                        (-> a (Maybe b)))
-  (maybe<< a)
+  [ a ]
   : (<< (<< a)))
 
 (PROVIDE (REQUIRE ($result<< a b _)
@@ -177,11 +210,11 @@
   (<< 5))
 
 (FUNCTION foo<< :: (-> a Foo)
-  (foo<< a)
+  [ a ]
   : ...)
 
 (FUNCTION <<foo :: (-> Foo a)
-  (<<foo a)
+  [ a ]
   : ...)
 
 (CONSTANT foo :: (-> (-> Integer Integer Integer) Integer)
@@ -211,37 +244,65 @@
   (loop a b))
 
 (FUNCTION foo :: (-> (-> Integer Integer Integer) Integer)
-  (foo a)
+  [ a ]
   : (a 1 2))
 
 (FUNCTION foo :: (-> Text Text)
-  (foo a)
+  [ a ]
   : a)
 
 (FUNCTION bar :: (-> Integer Integer)
-  (bar 1)
+  [ 1 ]
   : 2
 
-  (bar a)
+  [ a ]
   : (+ (bar 1) a))
 
-(REWRITE-RULE
-  (QUX ~@a)
+
+(REWRITE-RULE QUX
+  [ ~@a ]
   : &(+ ~@a))
+
+
+(REWRITE-RULE ALIAS
+  [ ~n <= ~v ]
+  : &(REWRITE-RULE ~n
+       []
+       : &~~v))
+
+(ALIAS FOO <= (+ 5 10 20))
+
+
+(REWRITE-RULE CHAIN-MATCH
+  [ ~value ~@matches ]
+  : (LOCAL
+      a <= (UNIQUE-SYMBOL)
+      &(CHAIN
+         ~a <= ~value
+         (MATCHES [ ~a ]
+           ~@matches))))
+
+(CHAIN-MATCH foo
+  [ *none ]
+  : 1
+
+  [ (*some a) ]
+  : 2)
+
 
 (MUTUALLY-RECURSIVE
   (FUNCTION even? :: (-> Integer Boolean)
-    (even? 0)
+    [ 0 ]
     : true
 
-    (even? a)
+    [ a ]
     : (odd? (- a 1)))
 
   (FUNCTION odd? :: (-> Integer Boolean)
-    (odd? 0)
+    [ 0 ]
     : false
 
-    (odd? a)
+    [ a ]
     : (even? (- a 1))))
 
 (MUTUALLY-RECURSIVE
@@ -261,38 +322,40 @@
     (*bar Foo)))
 
 (MUTUALLY-RECURSIVE
-  (REWRITE-RULE
-    (FOO ~n <= ~v)
+  (REWRITE-RULE FOO
+    [ ~n <= ~v ]
     : &(BAR ~n ~v)
 
-    (FOO ~v)
+    [ ~v ]
     : &(BAR ~v))
 
-  (REWRITE-RULE
-    (BAR ~a ~@b)
-    : (MATCH a
-        &~n <= ~v
+  (REWRITE-RULE BAR
+    [ ~a ~@b ]
+    : (MATCHES [ a ]
+        [ &~n <= ~v ]
         : &(QUX ~n ~v ~@b)
 
-        v
+        [ v ]
         : &(QUX 1 ~v ~@b))))
 
 (foo -> a b (+ a b))
+(foo (-> a b (+ a b)))
 (foo (echo -> a b (+ a b)))
+(foo (ECHO -> a b (+ a b)))
 
 (MUTUALLY-RECURSIVE
-  (REWRITE-RULE
-    (UNSTREAM (STREAM ~a))
+  (REWRITE-RULE UNSTREAM
+    [ (STREAM ~a) ]
     : a
 
-    (UNSTREAM ~a)
+    [ ~a ]
     : &(unstream ~a))
 
-  (REWRITE-RULE
-    (STREAM (UNSTREAM ~a))
+  (REWRITE-RULE STREAM
+    [ (UNSTREAM ~a) ]
     : a
 
-    (STREAM ~a)
+    [ ~a ]
     : &(stream ~a)))
 
 (CHAIN
@@ -307,8 +370,8 @@
   (<< null))
 
 (chain (read-file "foo") -> x
-  (chain (log x) -> _ :: Null
-    (transform (write-file "bar" x) -> _ :: Null
+  (chain (log x) -> *null
+    (transform (write-file "bar" x) -> *null
       null)))
 
 (TRANSFORM
@@ -347,8 +410,6 @@
   { a <= 1
     b <= 2 })
 
-foo.bar
-
 (MATCH a
   _
   : 1
@@ -384,7 +445,7 @@ foo.bar
 (INLINE
   (-> foo bar))
 
-(IMPORT "package:flatten/module/flatten.nul"
+(USE "package:flatten/module/flatten.nul"
   (TYPE Foo
     *bar
     *qux))
