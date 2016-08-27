@@ -66,9 +66,6 @@
 (PROTOCOL ($transform a)
   transform :: (-> (a b) (-> b c) (a c)))
 
-(PROTOCOL ($transform a)
-  transform :: (-> (a b) (-> b c) (a c)))
-
 (CONSTANT chain :: (REQUIRE ($transform a) ($flatten a)
                      (-> (a b) (-> b (a c)) (a c)))
   (-> a fn
@@ -112,11 +109,13 @@
     transform))
 
 (PROVIDE ($transform Maybe)
-  transform <= map)
+  (CONSTANT transform :: (-> ...)
+    map))
 
 (PROVIDE ($transform Maybe)
-  (transform a b)
-  : (map a b))
+  (FUNCTION transform :: (-> ...)
+    [ a b ]
+    : (map a b)))
 
 (USE "local:foo/bar.nul"
   a <= d
@@ -127,12 +126,14 @@
   *none)
 
 (LOCAL-PROVIDE ($flatten Maybe)
-  flatten <= (-> ...)
+  (CONSTANT flatten :: (-> ...)
+    (-> ...))
   (flatten ...))
 
 (LOCAL-PROVIDE ($flatten Maybe)
-  (flatten a b)
-  : ...
+  (FUNCTION flatten :: (-> ...)
+    [ a b ]
+    : ...)
   (flatten ...))
 
 (IF test
@@ -150,12 +151,14 @@
   << :: (-> a b))
 
 (PROVIDE ($<< a Foo)
-  (<< a)
-  : ...)
+  (FUNCTION << :: (-> a Foo)
+    [ a ]
+    : ...))
 
 (PROVIDE ($<< Foo a)
-  (<< a)
-  : ...)
+  (FUNCTION << :: (-> Foo a)
+    [ a ]
+    : ...))
 
 (TYPE (Result a b)
   (*success a)
@@ -166,27 +169,31 @@
 
 (PROVIDE (REQUIRE ($<< a b)
            ($result<< a b Never))
-  (result<< a)
-  : (*success (<< a)))
+  (FUNCTION result<< :: (-> a (Result b Never))
+    [ a ]
+    : (*success (<< a))))
 
 (PROVIDE (REQUIRE ($result<< a b c)
            ($<< a (Result b c)))
-  (<< a)
-  : (result<< a))
+  (FUNCTION << :: (-> a (Result b c))
+    [ a ]
+    : (result<< a)))
 
 (PROVIDE ($<< (Result a _) (Maybe a))
-  (<< (*success a))
-  : (*some a)
+  (FUNCTION << :: (-> (Result a _) (Maybe a))
+    [ (*success a) ]
+    : (*some a)
 
-  (<< (*failure _))
-  : *none)
+    [ (*failure _) ]
+    : *none))
 
 (PROVIDE ($<< (Maybe a) (Result a Null))
-  (<< (*some a))
-  : (*success a)
+  (FUNCTION << :: (-> (Maybe a) (Result a Null))
+    [ (*some a) ]
+    : (*success a)
 
-  (<< *none)
-  : (*failure *null))
+    [ *none ]
+    : (*failure *null)))
 
 (FUNCTION maybe<< :: (REQUIRE ($result<< a b _)
                        (-> a (Maybe b)))
@@ -195,8 +202,9 @@
 
 (PROVIDE (REQUIRE ($result<< a b _)
            ($<< a (Maybe b)))
-  (<< a)
-  : (<< (<< a)))
+  (FUNCTION << :: (-> a (Maybe b))
+    [ a ]
+    : (<< (<< a))))
 
 (<< 5)
 
