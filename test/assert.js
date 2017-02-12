@@ -1,10 +1,10 @@
-import { crash } from "../util/error";
+import { crash } from "../builtin/js/crash";
 import { pretty, eol, get_message } from "../util/node";
 import { indent } from "../util/string";
-import { map, length } from "../util/array";
+import { transform, size } from "../builtin/js/list";
 import { fastest, chain, reply, throw_error,
-         wait, concurrent_null, catch_error, make_thread_run } from "../ffi/task";
-import { task_from, log } from "../ffi/blocking-task";
+         wait, concurrent_null, catch_error, unsafe_execute_main } from "../builtin/js/task";
+import { task_from, log } from "../builtin/js/blocking-task";
 
 
 const isObject = (x) =>
@@ -77,8 +77,13 @@ export const format_pretty = (message, value, expected) =>
 const token = {};
 
 export const test_group = (group_name, a) => {
-  const tasks = map(a, (f, index) => {
+  // TODO hacky
+  let index = 0;
+
+  const tasks = transform(a, (f) => {
     const name = group_name + " (test " + (index + 1) + ")";
+
+    ++index;
 
     return fastest(
       chain(f(name), (x) => {
@@ -95,7 +100,7 @@ export const test_group = (group_name, a) => {
   });
 
   return chain(concurrent_null(tasks), (_) =>
-           task_from(log(group_name + ": " + length(tasks) + " tests succeeded\n")));
+           task_from(log(group_name + ": " + size(tasks) + " tests succeeded\n")));
 };
 
 export const expect = (expected, task) =>
@@ -115,7 +120,7 @@ export const expect_crash = (expected, f) =>
             : throw_error(new Error(format_error(name, get_message(e.a), expected))))));
 
 export const run_tests = (a) => {
-  make_thread_run(chain(task_from(log("---- Starting unit tests\n")), (_) =>
+  unsafe_execute_main(chain(task_from(log("---- Starting unit tests\n")), (_) =>
                   chain(concurrent_null(a), (_) =>
                         task_from(log("---- All unit tests succeeded")))));
 };

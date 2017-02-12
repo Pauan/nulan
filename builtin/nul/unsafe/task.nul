@@ -1,0 +1,13 @@
+(TYPE (Task a))
+
+
+(UNSAFE-USE-FFI { target <= javascript
+                  file <= "local:ffi/task.js" }
+  async_killable :: Foreign
+  async_unkillable :: Foreign
+  unsafe_execute_main :: (-> (Task Null) Null))
+
+
+(PROVIDE unsafe-execute-task :: ($unsafe-execute-main (Task Null))
+  (CONSTANT unsafe-execute-main :: (-> (Task Null) Null)
+    unsafe_execute_main))

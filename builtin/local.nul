@@ -1,0 +1,10 @@
+(USE "nulan:rewrite-rule")
+(USE "nulan:syntax")
+
+
+(REWRITE-RULE LOCAL
+  [ ~name <= ~value ~body ]
+  : &((-> ~name ~body) ~value)
+
+  [ ~a ~@rest ]
+  : &(LOCAL ~a (LOCAL ~@rest)))

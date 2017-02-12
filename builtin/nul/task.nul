@@ -1,0 +1,20 @@
+(USE "nulan:type")
+(USE "nulan:syntax")
+(USE "nulan:unsafe")
+(USE "nulan:attributes")
+(USE "nulan:null")
+(USE "nulan:provide")
+(USE "nulan:constant")
+
+
+(TYPE (Task a))
+
+
+(ATTRIBUTES (TARGET JAVASCRIPT)
+  (UNSAFE-USE-FFI "local:ffi/task.js"
+    unsafe_execute_main :: (-> (Task Null) Null)))
+
+
+(PROVIDE ($unsafe-execute-main (Task Null))
+  (CONSTANT unsafe-execute-main :: (-> (Task Null) Null)
+    unsafe_execute_main))

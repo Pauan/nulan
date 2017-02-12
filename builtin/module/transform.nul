@@ -1,0 +1,45 @@
+(IMPORT "nulan:axioms"
+  PROTOCOL
+  REWRITE-RULE)
+
+(IMPORT "nulan:module/pair.nul"
+  pair)
+
+
+(PROTOCOL ($transform a)
+  transform :: (-> (a b) (-> b c) (a c)))
+
+(PROTOCOL ($transform2 a)
+  transform2 :: (-> (a b) (a c) (-> b c d) (a d)))
+
+
+(REWRITE-RULE
+  (TRANSFORM
+    ~a <= ~b
+    ~c)
+  = &(transform ~b -> ~a ~c)
+
+  (TRANSFORM
+    ~a <= ~b
+    ~c <= ~d
+    ~e)
+  = &(transform2 ~b ~d -> ~a ~c ~e)
+
+  (TRANSFORM
+    ~a <= ~b
+    ~c <= ~d
+    ~@e)
+  # TODO should this lean left, right, or balanced ?
+  = &(TRANSFORM
+       (*pair ~a ~c) <= (transform2 ~b ~d pair)
+       ~@e))
+
+
+(EXPORT
+  $transform
+  transform
+
+  $transform2
+  transform2
+
+  TRANSFORM)

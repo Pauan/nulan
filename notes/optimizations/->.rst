@@ -1,0 +1,80 @@
+Lambda inlining
+===============
+
+When does the optimization apply?
+---------------------------------
+
+1) The `->` is called immediately after being created::
+
+     ((-> a a) 1)
+
+
+What is optimized?
+------------------
+
+The body of the `->` must be inlined into the parent expression.
+
+Simple example:
+
+* Before::
+
+    (FUNCTION foo :: (-> Integer Integer)
+    | (foo a)
+        ((-> b (+ b 20)) a))
+
+* After::
+
+    (FUNCTION foo :: (-> Integer Integer)
+    | (foo a)
+        (+ a 20))
+
+The parameters which are passed to `->` must be evaluated only once.
+
+
+What are the benefits?
+----------------------
+
+* Avoids the cost of creating and calling a function.
+
+* Enables other optimizations (e.g. `WITH-LOOP` self tail call optimization)
+
+
+Implementation details
+----------------------
+
+Here is a more complex example::
+
+  (FUNCTION foo :: (-> Integer Integer)
+  | (foo a)
+      ((-> b c (+ b b c)) (+ a 20) 50))
+
+You might implement the optimization like this::
+
+  (FUNCTION foo :: (-> Integer Integer)
+  | (foo a)
+      (+ (+ a 20) (+ a 20) 50))
+
+But that is incorrect, because it evaluates `(+ a 20)` twice.
+
+Instead, the implementation must bind the expression `(+ a 20)` to a temporary
+variable.
+
+Nulan does not provide any way to do this, therefore the variable binding is
+an implementation detail.
+
+Here is the output of the Nulan -> JavaScript compiler::
+
+  const foo = (a) => {
+    const b = a + 20;
+    return b + b + 50;
+  };
+
+It uses `const` to create the temporary variable `b`
+
+----
+
+Rather than performing this optimization on Nulan source code, it may be
+easier to perform this optimization on the compiled code.
+
+e.g. compile Nulan `->` lambdas to JavaScript `=>` lambdas, and then optimize
+the JavaScript `=>` lambdas.

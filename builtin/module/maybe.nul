@@ -1,0 +1,13 @@
+(IMPORT "nulan:axioms"
+  TYPE)
+
+
+(TYPE (Maybe a)
+  *none
+  (*some a))
+
+
+(EXPORT
+  Maybe
+  *none
+  *some)

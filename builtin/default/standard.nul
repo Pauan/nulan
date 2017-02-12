@@ -1,0 +1,112 @@
+# IMPORT
+# EXPORT
+# IMPORT-DEFAULT
+# EXPORT-DEFAULT
+# IMPORT-EXPORT-DEFAULT
+# ->
+# <=
+# ::
+# .
+# =
+# &
+# ~
+# @
+# _
+
+(IMPORT-EXPORT-DEFAULT "nulan:axioms"
+  Task
+  List
+  Text
+  Integer
+  Number
+
+  Boolean
+  true
+  false
+  IF
+  AND
+  OR
+  NOT
+
+  Null
+  null
+
+  PROTOCOL
+  REQUIRE
+  PROVIDE
+  TYPE
+  FUNCTION
+  CONSTANT
+  MUTUALLY-RECURSIVE
+  REWRITE-RULE
+  LOCAL-PROVIDE
+  EXPORT-WRAPPER
+  LOOP
+  MATCHES
+  EXPORT
+  INLINE)
+
+(IMPORT-EXPORT-DEFAULT "nulan:module/match.nul"
+  MATCH)
+
+(IMPORT-EXPORT-DEFAULT "nulan:module/local.nul"
+  LOCAL)
+
+(IMPORT-EXPORT-DEFAULT "nulan:module/transform.nul"
+  $transform
+  transform
+
+  $transform2
+  transform2
+
+  TRANSFORM)
+
+(IMPORT-EXPORT-DEFAULT "nulan:module/chain.nul"
+  $chain
+  chain
+  CHAIN
+  sequential
+  sequential-null
+  reduce-left-chain)
+
+(IMPORT-EXPORT-DEFAULT "nulan:module/reply.nul"
+  $reply
+  reply)
+
+(IMPORT-EXPORT-DEFAULT "nulan:module/boolean.nul"
+  AND
+  OR
+  NOT)
+
+(IMPORT-EXPORT-DEFAULT "nulan:module/maybe.nul"
+  Maybe
+  *none
+  *some)
+
+(IMPORT-EXPORT-DEFAULT "nulan:module/task.nul"
+  $task<<
+  task<<
+
+  (PROVIDE ($chain Task)
+    chain)
+  (PROVIDE ($reply Task)
+    reply)
+  (PROVIDE ($transform Task)
+    transform)
+  (PROVIDE ($transform2 Task)
+    transform2))
+
+(IMPORT-EXPORT-DEFAULT "nulan:module/blocking-task.nul"
+  Blocking-Task
+  log
+
+  (PROVIDE ($task<< Blocking-Task)
+    task<<)
+  (PROVIDE ($reply Blocking-Task)
+    reply)
+  (PROVIDE ($chain Blocking-Task)
+    chain)
+  (PROVIDE ($transform Blocking-Task)
+    transform)
+  (PROVIDE ($flatten Blocking-Task)
+    flatten))

@@ -10,6 +10,10 @@ noop2();
 noop3();
 qux12();
 
+class Foo {}
+
+const MyFoo = class {};
+
 const yes = (foo, foo1, noop, noop3) => {
   return foo + foo1 + noop + noop3;
 };
@@ -25,3 +29,8 @@ export * from "./bar";
 export default 5;
 
 export const foo1 = 10;
+
+
+/*import { reply } from "nulan:task";
+
+export const main = reply(50);*/

@@ -1,0 +1,17 @@
+(IMPORT (nulan "core"))
+
+(IMPORT (nulan "unsafe"))
+
+(LOAD-FILES
+  "nul/null.nul")
+
+(PUBLIC
+  ATTRIBUTES
+  TARGET
+  TYPE
+  javascript)
+
+(PUBLIC
+  Null
+  null
+  unsafe-execute-task)

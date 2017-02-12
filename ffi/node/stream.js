@@ -1,8 +1,8 @@
-import { async_killable, make_thread, kill_thread,
+import { async_killable, make_thread, thread_kill,
          run_in_thread, async_unkillable, with_resource } from "../task";
 import { make_stream } from "../stream";
 import { open, close, DEFAULT_MODE } from "./fs";
-import * as $fs from "fs";
+import * as $fs from "node:fs";
 
 
 export const read_file = (path) =>
@@ -40,8 +40,6 @@ export const read_from_stream = (input, push) =>
   async_killable((success, error) => {
     let finished = false;
 
-    const thread = make_thread();
-
     const cleanup = () => {
       if (finished) {
         throw new Error("invalid cleanup");
@@ -51,7 +49,7 @@ export const read_from_stream = (input, push) =>
 
         // TODO is this correct ?
         input["destroy"]();
-        kill_thread(thread);
+        thread_kill(thread);
 
         input["removeListener"]("end", onEnd);
         input["removeListener"]("error", onError);
@@ -80,7 +78,7 @@ export const read_from_stream = (input, push) =>
       const chunk = input["read"]();
       if (chunk !== null) {
         // TODO is it possible for a "readable" event to trigger even if `chunk` is not `null` ?
-        run_in_thread(thread, push(chunk), onReadable, onError);
+        run_in_thread(thread, push(chunk));
       }
     };
 
@@ -89,6 +87,8 @@ export const read_from_stream = (input, push) =>
     input["on"]("end", onEnd);
     input["on"]("error", onError);
     input["on"]("readable", onReadable);
+
+    const thread = make_thread(onReadable, onError);
 
     onReadable();
 
@@ -99,8 +99,6 @@ export const read_from_stream = (input, push) =>
 export const write_to_stream = (input, output) =>
   async_killable((success, error) => {
     let cleaned = false;
-
-    const thread = make_thread();
 
     // TODO should this end the output ?
     const cleanup = () => {
@@ -113,7 +111,7 @@ export const write_to_stream = (input, output) =>
 
         // TODO is this correct ?
         output["destroy"]();
-        kill_thread(thread);
+        thread_kill(thread);
 
         output["removeListener"]("finish", onFinish);
         output["removeListener"]("error", onError);
@@ -158,6 +156,8 @@ export const write_to_stream = (input, output) =>
     output["on"]("error", onError);
     output["on"]("drain", onDrain);
 
+    const thread = make_thread(onComplete, onError);
+
     run_in_thread(thread, input((value) =>
       async_killable((success, error) => {
         // Continue writing
@@ -174,7 +174,7 @@ export const write_to_stream = (input, output) =>
         return () => {
           cleanup();
         };
-      })), onComplete, onError);
+      })));
 
     return cleanup;
   });

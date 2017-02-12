@@ -1,3 +1,5 @@
+# TODO http://www.westpoint.edu/eecs/SiteAssets/SitePages/Faculty%20Publication%20Documents/Okasaki/jfp95queue.pdf
+#      http://goto.ucsd.edu/~rjhala/liquid/haskell/blog/blog/2015/01/28/okasakis-lazy-queue.lhs/
 (TYPE (Queue a)
 | (*queue (Stack a) (Stack a)))
 

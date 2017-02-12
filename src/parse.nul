@@ -1,0 +1,12 @@
+(USE "local:tokenize.nul")
+
+
+(CONSTANT bar :: Nou
+  (*source
+    { filename <= "src/foo.nul"
+      start <= (*position { index <= 0
+                            line <= 0
+                            column <= 0 })
+      end <= (*position { index <= 0
+                          line <= 0
+                          column <= 0 }) }))

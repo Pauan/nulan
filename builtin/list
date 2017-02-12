@@ -62,16 +62,16 @@
       | (*value a b)
           (*step a b))))
 
-(FUNCTION <-iterator :: (INLINE (-> (Iterator a) (List a)))
-| (<-iterator (*iterator initial next))
-    (WITH-LOOP loop
-    | state <= initial
-    | list <= *empty
+(FUNCTION <<iterator :: (INLINE (-> (Iterator a) (List a)))
+  (<<iterator (*iterator initial next))
+    (LOOP loop
+      state <= initial
+      list <= *empty
       (MATCH (next state)
-      | *done
+        *done
           list
-      | (*state state)
+        (*state state)
           (loop state list)
-      | (*step value state)
+        (*step value state)
           (loop state
             (*value value list)))))

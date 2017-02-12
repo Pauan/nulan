@@ -1,3 +1,340 @@
+(TYPE (Stream input output return))
+
+
+(ALIAS (Stream-Transform a b) <= (Stream a b Null))
+
+
+(FUNCTION run :: (-> (Stream Never Never a) (Task a)))
+
+
+(++ (read-file "foo") (read-file "bar"))
+
+
+(CHAIN
+  (read-file "foo")
+  (read-file "bar"))
+
+
+(FUNCTION take :: (-> Integer (Stream a a Null))
+  [ 0 ]
+  : (<< *null)
+
+  [ amount ]
+  : (ASSERT (more? amount 0)
+      (CHAIN-MATCH await
+        | *none
+        : (<< *null)
+
+        | (*some a)
+        : (CHAIN
+            (yield a)
+            (take (- amount 1))))))
+
+
+(FUNCTION await-forever :: (-> (-> a (Stream a b Null)) (Stream a b Null))
+  [ f ]
+  : (CHAIN-MATCH await
+      | *none
+      : (<< *null)
+
+      | (*some b)
+      : (CHAIN
+          (f b)
+          (await-forever a))))
+
+
+(FUNCTION transform-maybe :: (-> (-> a (Maybe b)) (Stream a b Null))
+  [ f ]
+  : (await-forever -> a
+      (MATCH (f a)
+        | *none
+        : (<< *null)
+
+        | (*some a)
+        : (yield a))))
+
+
+
+(FUNCTION pipe :: (-> (Stream a b Null) (Stream b c d) (Stream a c d))
+  [ a b ]
+  : )
+
+
+(REWRITE-RULE >=>
+  [ ~a ~b ]
+  : &(pipe ~a ~b)
+
+  [ ~a ~@b ]
+  : &(>=> ~a (>=> ~@b)))
+
+
+  (>=> (Stream Never Text Null)
+      (Stream Text Never Null))
+
+  (>=>
+    (CHAIN
+      (read-file "foo")
+      (read-file "bar"))
+    (write-file "qux"))
+
+  (>=> (read-file "foo") (write-file "bar"))
+
+
+
+
+
+(ATTRIBUTES { public }
+  (TYPE (Step state value)
+    *done
+    (*state state)
+    (*value state value)))
+
+
+(ATTRIBUTES { public }
+  (TYPE (Stream a)
+    (*stream (-> (-> b (-> b
+                         (Task (Step b a)))
+                   (Task c))
+               (Task c)))))
+
+
+(ATTRIBUTES { public inline }
+  (FUNCTION with-stream :: (-> (Stream a) (-> b (-> b
+                                                  (Task (Step b a)))
+                                            (Task c))
+                             (Task c))
+    [ (*stream a) b ]
+    : (a b)))
+
+
+(ATTRIBUTES { public inline }
+  (FUNCTION make-stream :: (-> (-> (-> b (-> b
+                                           (Task (Step b a)))
+                                     (Task c))
+                                 (Task c))
+                             (Stream a))
+    [ a ]
+    : (*stream a)))
+
+
+(ATTRIBUTES { public }
+  (FUNCTION reduce-left :: (-> a (Stream b) (-> a b (Task a)) (Task a))
+    [ init a f ]
+    : (with-stream a -> state next
+        (LOOP loop
+          init <= init
+          state <= state
+          (CHAIN-MATCH (next state)
+            | *done
+            : (<< init)
+
+            | (*state state)
+            : (loop init state)
+
+            | (*value state value)
+            : (CHAIN
+                init <= (f init value)
+                (loop init state)))))))
+
+
+(ATTRIBUTES { public inline }
+  (FUNCTION each :: (-> (Stream a) (-> a (Task Null)) (Task Null))
+    [ a f ]
+    : (reduce-left *null a -> _ new
+        (f new))))
+
+
+(ATTRIBUTES { public }
+  (FUNCTION accumulate :: (-> a (Stream b) (-> a b (Task (Step a c))) (Stream c))
+    [ init a f ]
+    : (make-stream -> push
+        (with-stream a -> state next
+          (push (*pair init state) -> (*pair init state)
+            (CHAIN-MATCH (next state)
+              | *done
+              : (<< *done)
+
+              | (*state state)
+              : (<< (*state (*pair init state)))
+
+              | (*value state value)
+              : (CHAIN-MATCH (f init value)
+                  | *done
+                  : (<< *done)
+
+                  | (*state init)
+                  : (<< (*state (*pair init state)))
+
+                  | (*value init value)
+                  : (<< (*value (*pair init state) value)))))))))
+
+
+(ATTRIBUTES { inline }
+  (FUNCTION transform-stream :: (-> (Stream a) (-> (Step b a) (Task (Step b c))) (Stream c))
+    [ a f ]
+    : (make-stream -> push
+        (with-stream a -> state next
+          (push state -> state
+            (CHAIN
+              a <= (next state)
+              (f a)))))))
+
+
+(ATTRIBUTES { public }
+  (FUNCTION transform-maybe :: (-> (Stream a) (-> a (Maybe b)) (Stream b))
+    [ a f ]
+    : (transform-stream a -> a
+        (MATCH a
+          | (*value state value)
+          : (MATCH (f value)
+              | *none
+              : (<< (*state state))
+
+              | (*some value)
+              : (<< (*value state value)))
+
+          | a
+          : (<< a)))))
+
+
+(ATTRIBUTES { public }
+  (FUNCTION transform-until :: (-> (Stream a) (-> a (Maybe b)) (Stream b))
+    [ a f ]
+    : (transform-stream a -> a
+        (MATCH a
+          | (*value state value)
+          : (MATCH (f value)
+              | *none
+              # TODO stop pulling after it returns *none
+              : (<< *done)
+
+              | (*some value)
+              : (<< (*value state value)))
+
+          | a
+          : (<< a)))))
+
+
+(FUNCTION with-stream :: (-> (Stream a) (-> (Task (Maybe a)) (Task b)) (Task b))
+  [ a f ]
+  : (with-stream a -> state next
+      (LOOP loop
+        state <= state
+        |
+        : )))
+
+
+(ATTRIBUTES { public }
+  # TODO only initialize the second stream when the first stream has finished
+  (FUNCTION concat :: (-> (Stream a) (Stream a) (Stream a))
+    [ a b ]
+    : (make-stream -> push
+        (with-stream a -> state1 next1
+          (with-stream b -> state2 next2
+            (push (*left state1) -> state
+              (MATCH state
+                | (*left state)
+                : (CHAIN-MATCH (next1 state)
+                    | *done
+                    : (<< (*state (*right state2)))
+
+                    | (*state state)
+                    : (<< (*state (*left state)))
+
+                    | (*value state value)
+                    : (<< (*value (*left state) value)))
+
+                | (*right state)
+                : (CHAIN-MATCH (next2 state)
+                    | *done
+                    : (<< *done)
+
+                    | (*state state)
+                    : (<< (*state (*right state)))
+
+                    | (*value state value)
+                    : (<< (*value (*right state) value))))))))))
+
+
+(TYPE (Either-Pair a b)
+  (*left a)
+  (*right b)
+  (*both a b))
+
+
+(ATTRIBUTES { public }
+  (FUNCTION zip-either :: (-> (Stream a) (Stream b) (Stream (Either-Pair a b)))
+    [ a b ]
+    : (make-stream -> push
+        (with-stream a -> state1 next1
+          (with-stream b -> state2 next2
+            (push (*pair (*state state1) (*some state2)) -> state
+              (MATCH state
+                | (*pair *done *none)
+                : (<< *done)
+
+                | (*pair *done (*some state2))
+                : (CHAIN-MATCH (next2 state2)
+                    | *done
+                    : (<< (*state (*pair *done *none)))
+
+                    | (*state state2)
+                    : (<< (*state (*pair *done (*some state2))))
+
+                    | (*value state2 value2)
+                    : (<< (*value (*pair *done (*some state2)) (*right value2))))
+
+                | (*pair (*state state1) *none)
+                : (CHAIN-MATCH (next1 state1)
+                    | *done
+                    : (<< (*state (*pair *done *none)))
+
+                    | (*state state1)
+                    : (<< (*state (*pair (*state state1) *none)))
+
+                    | (*value state1 value1)
+                    : (<< (*value (*pair (*state state1) *none) (*left value1))))
+
+                | (*pair (*state state1) (*some state2))
+                : (CHAIN-MATCH (next1 state1)
+                    | *done
+                    : (<< (*state (*pair *done (*some state2))))
+
+                    | (*state state1)
+                    : (<< (*state (*pair (*state state1) (*some state2))))
+
+                    | (*value state1 value1)
+                    : (<< (*state (*pair (*value state1 value1) (*some state2)))))
+
+                | (*pair (*value state1 value1) *none)
+                : (<< (*value (*pair (*state state1) *none) (*left value1)))
+
+                | (*pair (*value state1 value1) (*some state2))
+                : (CHAIN-MATCH (next2 state2)
+                    | *done
+                    : (<< (*state (*pair (*value state1 value1) *none)))
+
+                    | (*state state2)
+                    : (<< (*state (*pair (*value state1 value1) (*some state2))))
+
+                    | (*value state2 value2)
+                    : (<< (*value (*pair (*state state1) (*some state2)) (*both value1 value2)))))))))))
+
+
+(ATTRIBUTES { public }
+  (FUNCTION zip :: (-> (Stream a) (Stream b) (Stream (Pair a b)))
+    [ a b ]
+    : (transform-until (zip-either a b) -> a
+        (MATCH a
+          | (*both a b)
+          : (*some (*pair a b))
+
+          | _
+          : *none))))
+
+
+
+
 (TYPE (Stream a)
 | (*stream (-> b (-> b a (Task b)) (Task b))))
 
@@ -149,8 +486,8 @@
           *done
             *done
 
-          *skip
-            *skip
+          *state
+            *state
 
           (*value value)
             (*value (f value)))))))

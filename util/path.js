@@ -24,3 +24,7 @@ export const encode = (a) =>
 // TODO does this correctly handle Unicode ?
 export const decode = (a) =>
   a["replace"](/\%[0-9a-fA-F]{2}/g, percentDecode);
+
+// TODO what about Unicode ?
+export const is_valid = (a) =>
+  a !== "." && a !== ".." && /^[^\u0000\/\\\:\*\?\u0022\<\>\|]+$/["test"](a);

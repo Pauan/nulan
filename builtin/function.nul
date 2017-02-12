@@ -1,0 +1,30 @@
+(USE "nulan:rewrite-rule")
+(USE "nulan:unique-symbol")
+(USE "nulan:constant")
+(USE "nulan:syntax")
+(USE "nulan:loop")
+(USE "nulan:matches-union")
+
+(USE "local:local.nul")
+(USE "local:transform.nul")
+
+
+(REWRITE-RULE FUNCTION-UNION
+  [ ~name :: ~type [ [ ~@args ] ~@rest ] : ~body ~@a ]
+  : (LOCAL
+      arguments <= (transform args -> _ (UNIQUE-SYMBOL))
+      &(CONSTANT ~name :: ~type
+         (-> ~@arguments
+           (LOOP ~name
+             ~@(transform arguments -> argument
+                 &~argument <= ~argument)
+             (MATCHES-UNION [ ~@arguments ]
+               [ [ ~@args ] ~@rest ] : ~body
+               ~@a))))))
+
+
+(REWRITE-RULE FUNCTION
+  [ ~a ~@args ]
+  : &(FUNCTION-UNION ~a
+       ~@(transform args -> &~a : ~b
+           &[ ~a ] : ~b)))

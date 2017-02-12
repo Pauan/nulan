@@ -1,0 +1,71 @@
+(IMPORT "nulan:axioms"
+  Boolean
+  true
+  false
+  AND
+  OR
+  NOT
+  FUNCTION
+  REWRITE-RULE)
+
+(IMPORT "nulan:module/transform.nul"
+  transform
+  transform2)
+
+(IMPORT "nulan:module/match.nul"
+  MATCH)
+
+
+(FUNCTION and :: (-> Boolean Boolean Boolean)
+  (and a b)
+  = (AND a b))
+
+(FUNCTION or :: (-> Boolean Boolean Boolean)
+  (or a b)
+  = (OR a b))
+
+(FUNCTION not :: (-> Boolean Boolean)
+  (not a)
+  = (NOT a))
+
+
+# TODO maybe replace with an equal? function ?
+(REWRITE-RULE
+  (MATCH? ~a ~b)
+  = &(MATCH ~a
+       ~b
+       = true
+
+       _
+       = false))
+
+(REWRITE-RULE
+  (TRANSFORM-AND ~a ~b)
+  = &(transform2 ~a ~b and)
+
+  (TRANSFORM-AND ~a ~b ~@c)
+  # TODO should this lean left or right ?
+  = &(TRANSFORM-AND (TRANSFORM-AND ~a ~b) ~@c))
+
+(REWRITE-RULE
+  (TRANSFORM-OR ~a ~b)
+  = &(transform2 ~a ~b or)
+
+  (TRANSFORM-OR ~a ~b ~@c)
+  # TODO should this lean left or right ?
+  = &(TRANSFORM-OR (TRANSFORM-OR ~a ~b) ~@c))
+
+# Added for consistency with TRANSFORM-AND and TRANSFORM-OR
+(REWRITE-RULE
+  (TRANSFORM-NOT ~a)
+  = &(transform ~a not))
+
+
+(EXPORT
+  not
+  and
+  or
+  MATCH?
+  TRANSFORM-AND
+  TRANSFORM-OR
+  TRANSFORM-NOT)

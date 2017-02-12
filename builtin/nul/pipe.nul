@@ -1,0 +1,26 @@
+(TYPE (Step a b)
+  (*step a b))
+
+(TYPE (Pipe a b)
+  *pipe :: (-> (-> a (Step b (Pipe a b))) (Pipe a b))
+  *pipe-id :: (Pipe a a))
+
+(FUNCTION lift :: (-> (-> a b) (Pipe a b))
+  [ f ]
+  : (*pipe -> a
+      (*step (f a) (lift f))))
+
+(FUNCTION concat :: (-> (Pipe a b) (Pipe b c) (Pipe a c))
+  [ *pipe-id a ]
+  : a
+
+  [ a *pipe-id ]
+  : a
+
+  [ (*pipe a) (*pipe b) ]
+  : (*pipe -> v
+      (MATCH (a v)
+        | (*step v1 s1)
+        : (MATCH (b v1)
+            | (*step v2 s2)
+            : (*step v2 (concat s1 s2))))))

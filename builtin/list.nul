@@ -1,0 +1,43 @@
+(USE "nulan:axioms")
+(USE "local:maybe.nul")
+(USE "local:transform.nul")
+(USE "local:reduce.nul")
+
+
+(TYPE (List a)
+  *empty
+  (*push (List a) a))
+
+
+(PROVIDE ($transform-maybe List)
+  (FUNCTION transform-maybe :: (-> (List a) (-> a (Maybe b)) (List b))
+    [ a f ]
+    : (reduce-left *empty a -> old new
+        (MATCH (f new)
+          | *none
+          : old
+
+          | (*some value)
+          : (*push old value)))))
+
+
+(PROVIDE ($reduce-right List)
+  (FUNCTION reduce-right :: (-> (List a) b (-> a b b) b)
+    [ *empty acc _ ]
+    : acc
+
+    [ (*push left value) acc f ]
+    : (reduce-right left (f value acc) f)))
+
+
+(PROVIDE ($reduce-left List)
+  (FUNCTION reduce-left :: (-> a (List b) (-> a b a) a)
+    [ acc *empty _ ]
+    : acc
+
+    [ acc (*push left value) f ]
+    : (f (reduce-left acc left f) value)))
+
+
+(PROVIDE ($push List)
+  (TAG->CONSTANT *push))

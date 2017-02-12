@@ -1,0 +1,78 @@
+(TYPE (State state value)
+  (*state (-> state (*pair state value))))
+
+
+(PROVIDE ($flatten (->TYPE b (State a b)))
+  (FUNCTION flatten :: (-> (State a (State a b)) (State a b))
+    [ (*state outer) ]
+    : (*state -> state
+        (MATCH (outer state)
+          | (*pair state (*state inner))
+          : (inner state)))))
+
+
+(transform foo [ a ] =>
+  (+ a 1))
+
+(transform foo => [ a ]
+  (+ a 1))
+
+(transform foo => a
+  (+ a 1))
+
+(transform foo -> a
+  (+ a 1))
+
+#(PROVIDE ($transform [ b ] -> (State a b))
+#(PROVIDE ($transform [ b ] => (State a b))
+#(PROVIDE ($transform (FORALL b (State a b)))
+#(PROVIDE ($transform (-> b (State a b)))
+#(PROVIDE ($transform (Function [a b] c))
+#(PROVIDE ($transform (=> b (State a b)))
+(PROVIDE ($transform (=> b (State a b)))
+  (FUNCTION transform :: (-> (State a b) (-> b c) (State a c))
+    [ (*state next) f ]
+    : (*state -> state
+        (MATCH (next state)
+          | (*pair state value)
+          : (*pair state (f value))))))
+
+
+(PROVIDE ($<< (=> b (State a b)))
+  (FUNCTION << :: (-> b (State a b))
+    [ a ]
+    : (*state -> state
+        (*pair state a))))
+
+
+(CONSTANT get-state :: (State a a)
+  (*state -> state
+    (*pair state state)))
+
+
+(FUNCTION replace-state! :: (-> a (State a Null))
+  [ a ]
+  : (*state -> _
+      (*pair a *null)))
+
+
+(FUNCTION modify-state! :: (-> (-> a a) (State a Null))
+  [ f ]
+  : (CHAIN
+      a <= get-state
+      (replace-state! (f a))))
+
+
+# TODO is this a good idea ?
+(FUNCTION unwrap-state :: (-> state (State state _) state)
+  [ state (*state next) ]
+  : (MATCH (next state)
+      | (*pair state _)
+      : state))
+
+
+(FUNCTION unwrap-value :: (-> state (State state value) value)
+  [ state (*state next) ]
+  : (MATCH (next state)
+      | (*pair _ value)
+      : value))

@@ -1,6 +1,6 @@
 import { async_unkillable, chain, reply } from "../task";
 import { callback } from "./util";
-import { randomBytes } from "crypto";
+import { randomBytes } from "node:crypto";
 
 
 export const NUMERIC      = "0123456789";

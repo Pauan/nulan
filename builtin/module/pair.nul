@@ -1,0 +1,15 @@
+(IMPORT "nulan:axioms"
+  TYPE
+  EXPORT-WRAPPER)
+
+
+(TYPE (Pair a b)
+  (*pair a b))
+
+
+(EXPORT-WRAPPER
+  pair <= *pair)
+
+(EXPORT
+  Pair
+  *pair)

@@ -1,0 +1,59 @@
+(FUNCTION compile-file :: (-> { watch :: Boolean
+                                input :: Path
+                                main :: Text
+                                output :: Path
+                                target :: Target
+                                source-map :: (Maybe Path) }
+                            (Task Null))
+  (compile-file a)
+  ~ (IF a.watch
+      (CHAIN
+        b <= (compile-watch
+               { input <= a.input
+                 main <= a.main
+                 target <= a.target })
+
+        (concurrent-null
+          [ (observe b.output -> output
+              (overwrite-file! a.output output))
+
+            (MATCH a.source-map
+              *none
+              ~ (reply null)
+
+              (*some path)
+              ~ (observe b.source-map -> source-map
+                  (overwrite-file! path source-map))) ]))
+
+      (CHAIN
+        b <= (compile
+               { input <= a.input
+                 main <= a.main
+                 target <= a.target })
+
+        (concurrent-null
+          [ (overwrite-file! a.output b.output)
+
+            (MATCH a.source-map
+              *none
+              ~ (reply null)
+
+              (*some path)
+              ~ (overwrite-file! path b.source-map)) ]))))
+
+
+(FUNCTION eval :: (-> { input :: Path
+                        main :: Text
+                        target :: Target }
+                    (Task Null))
+  (eval a)
+  ~ (CHAIN
+      b <= (compile
+             { input <= a.input
+               main <= a.main
+               target <= a.target })
+      (eval b.output)))
+
+
+(EXPORT
+  compile-file)

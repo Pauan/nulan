@@ -1,0 +1,38 @@
+(USE "package:nulan-standard")
+
+(USE "local:parse/position.nul")
+
+
+(TYPE Source
+  (*source { filename :: Text
+             start :: Position
+             end :: Position }))
+
+
+# TODO ensure that the filenames are the same ?
+(PROVIDE ($concat Source)
+  (FUNCTION concat :: (-> Source Source Source)
+    [ (*source { filename start }) (*source { end }) ]
+    : (*source { filename start end })))
+
+
+(PROVIDE ($text<< Source)
+  (FUNCTION text<< :: (-> Source Text)
+    [ (*source { filename
+                 (*position { line column }) <= start }) ]
+    : (++ "file " filename ", line " line ", column " column)))
+
+
+(TYPE (Source-Wrapper a)
+  (*source-wrapper a Source))
+
+
+(PROVIDE ($unwrap Source-Wrapper)
+  (FUNCTION unwrap :: (-> (Source-Wrapper a) a)
+    [ (*source-wrapper a _) ]
+    : a))
+
+
+(FUNCTION source :: (-> (Source-Wrapper _) Source)
+  [ (*source-wrapper _ source) ]
+  : source)

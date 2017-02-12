@@ -1,0 +1,13 @@
+(USE "package:nulan-standard")
+
+
+(TYPE Token
+  (*integer Text)
+  (*number Text)
+  (*text Text)
+  (*delimiter Text)
+  (*symbol Text)
+  (*symbol-tag Text)
+  (*symbol-protocol Text)
+  (*symbol-type Text)
+  (*symbol-rewrite-rule Text))

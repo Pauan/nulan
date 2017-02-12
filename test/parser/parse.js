@@ -1,12 +1,13 @@
 import { expect, expect_crash } from "../assert";
-import { reply } from "../../ffi/task";
+import { reply } from "../../builtin/ffi/task";
 import { tokenize } from "../../src/parser/tokenize";
 import { parse } from "../../src/parser/parse";
 import { lines, repeat } from "../../util/string";
 import { loc, text, symbol, integer,
          call, list, record, lambda,
          dot, bar, assign, type,
-         quote, unquote, splice, number } from "../../src/parser/type";
+         quote, unquote, splice, number,
+         wildcard } from "../../src/parser/type";
 
 
 const file = "parse.test";
@@ -88,7 +89,7 @@ const test_prefix = (name, make, space) => {
   ];
 };
 
-const test_infix = (name, make, right_associative, space) => {
+const test_infix = (name, make, { right_associative, space }) => {
   const name2 = (space
                   ? " " + name + " "
                   : name);
@@ -265,10 +266,10 @@ export default [
   ...test_prefix("~", unquote, false),
   ...test_prefix("@", splice, false),
 
-  ...test_infix("=", bar, true, true),
-  ...test_infix("<=", assign, true, true),
-  ...test_infix(".", dot, false, false),
-  ...test_infix("::", type, false, true),
+  ...test_infix(":", bar, { right_associative: true, space: true }),
+  ...test_infix("<=", assign, { right_associative: true, space: true }),
+  //...test_infix(".", dot, { right_associative: false, space: false }),
+  ...test_infix("::", type, { right_associative: true, space: true }),
 
 
   test("{ hi }", (loc) => [
@@ -428,21 +429,21 @@ export default [
     "   ^-"),
 
 
-  test("a.b", (loc) => [
+  /*test("a.b", (loc) => [
     dot(symbol("a", loc(0, 0,
                         0, 1)),
         symbol("b", loc(0, 2,
                         0, 3)),
         loc(0, 0,
             0, 3))
-  ]),
+  ]),*/
 
   test("0.1", (loc) => [
     number(0.1, loc(0, 0,
                     0, 3))
   ]),
 
-  test("a.b <= c.d", (loc) => [
+  /*test("a.b <= c.d", (loc) => [
     assign(dot(symbol("a", loc(0, 0,
                                0, 1)),
                symbol("b", loc(0, 2,
@@ -457,10 +458,10 @@ export default [
                    0, 10)),
            loc(0, 0,
                0, 10))
-  ]),
+  ]),*/
 
 
-  test("&a.~b", (loc) => [
+  /*test("&a.~b", (loc) => [
     quote(dot(symbol("a", loc(0, 1,
                               0, 2)),
               unquote(symbol("b", loc(0, 4,
@@ -471,10 +472,10 @@ export default [
                   0, 5)),
           loc(0, 0,
               0, 5))
-  ]),
+  ]),*/
 
 
-  test("(REWRITE-RULE\n  (IF ~test\n    ~then\n    ~else)\n  = &(MATCH ~test\n       *true\n       = ~then\n       *false\n       = ~else))", (loc) => [
+  test("(REWRITE-RULE\n  (IF ~test\n    ~then\n    ~else)\n  : &(MATCH ~test\n       *true\n       : ~then\n       *false\n       : ~else))", (loc) => [
     call([symbol("REWRITE-RULE", loc(0, 1,
                                      0, 13)),
           bar(call([symbol("IF", loc(1, 3,
@@ -523,5 +524,49 @@ export default [
                   8, 15))],
          loc(0, 0,
              8, 16))
+  ]),
+
+
+  test("&(CHAIN-RESULT _ :: Null <= ~a ~b)", (loc) => [
+    quote(call([symbol("CHAIN-RESULT", loc(0, 2,
+                                           0, 14)),
+                type(wildcard(loc(0, 15,
+                                  0, 16)),
+                     assign(symbol("Null", loc(0, 20,
+                                               0, 24)),
+                            unquote(symbol("a", loc(0, 29,
+                                                    0, 30)),
+                                    loc(0, 28,
+                                        0, 30)),
+                            loc(0, 20,
+                                0, 30)),
+                     loc(0, 15,
+                         0, 30)),
+                unquote(symbol("b", loc(0, 32,
+                                        0, 33)),
+                        loc(0, 31,
+                            0, 33))],
+               loc(0, 1,
+                   0, 34)),
+          loc(0, 0,
+              0, 34))
+  ]),
+
+
+  test("a : b :: c <= d", (loc) => [
+    bar(symbol("a", loc(0, 0,
+                        0, 1)),
+        type(symbol("b", loc(0, 4,
+                             0, 5)),
+             assign(symbol("c", loc(0, 9,
+                                    0, 10)),
+                    symbol("d", loc(0, 14,
+                                    0, 15)),
+                    loc(0, 9,
+                        0, 15)),
+             loc(0, 4,
+                 0, 15)),
+        loc(0, 0,
+            0, 15))
   ]),
 ];

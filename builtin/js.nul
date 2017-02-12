@@ -1,0 +1,177 @@
+(TYPE JS-Symbol
+  (*symbol-id Integer)
+  (*symbol-string Text))
+
+(TYPE JS-Key
+  (*string-key Text)
+  (*symbol-key JS-Symbol))
+
+
+(PROVIDE ($text<< JS-Key)
+  (FUNCTION text<< :: (-> JS-Key Text)
+    [ (*string-key x) ]
+    : (++ "string" x)
+
+    [ (*symbol-key (*symbol-id x)) ]
+    : (++ "symbol-id" (text<< x))
+
+    [ (*symbol-key (*symbol-string x)) ]
+    : (++ "symbol-string" x)))
+
+
+(TYPE JS-Property
+  (*property { get :: (Maybe JS)
+               set :: (Maybe JS)
+               value :: (Maybe JS)
+               writable :: Boolean
+               enumerable :: Boolean
+               configurable :: Boolean }))
+
+(TYPE JS
+  *null
+  *undefined
+  (*number Number)
+  (*string Text)
+  (*boolean Boolean)
+  (*symbol JS-Symbol)
+
+  (*object { keys :: (Mutable (Dictionary Text JS-Property))
+             prototype :: (Mutable JS) })
+
+  (*date { keys :: (Mutable (Dictionary Text JS-Property))
+           prototype :: (Mutable JS)
+           timestamp :: (Mutable Integer) })
+
+  (*array { keys :: (Mutable (Dictionary Text JS-Property))
+            prototype :: (Mutable JS)
+            length :: (Mutable Integer) })
+
+  (*function { keys :: (Mutable (Dictionary Text JS-Property))
+               prototype :: (Mutable JS)
+               callable :: (-> JS (Array JS) (Task JS)) }))
+
+
+(FUNCTION make-Window :: (-> JS (Task JS))
+  [ prototype ]
+  : (CHAIN
+      keys <= (*mutable (DICTIONARY))
+      prototype <= (*mutable prototype)
+      (*object { keys prototype })))
+
+
+(FUNCTION make-function :: (-> JS (-> JS (Array JS) (Task JS)) (Task JS))
+  [ prototype callable ]
+  : (CHAIN
+      keys <= (*mutable (DICTIONARY))
+      prototype <= (*mutable prototype)
+      (<< (*function { keys prototype callable }))))
+
+
+(FUNCTION make-add :: (-> JS (Task JS))
+  [ prototype ]
+  : (make-function prototype => args
+      (LOCAL
+        x <= (default (nth args 0) *undefined)
+        y <= (default (nth args 1) *undefined)
+        (MATCHES [ x y ]
+          [ (*number x) (*number y) ]
+          : (<< (*number (+ x y)))
+
+          [ (*string x) (*number y) ]
+          : (<< (*string (++ x (text<< y))))
+
+          [ (*number x) (*string y) ]
+          : (<< (*string (++ (text<< x) y)))
+
+          [ _ _ ]
+          : (<< ...)))))
+
+
+(FUNCTION get-js-value :: (-> (Mutable (Dictionary Text JS-Property)) Text (Task JS))
+  [ keys key ]
+  : (CHAIN
+      keys <= (get keys)
+      (CHAIN-MATCH (get-key keys key)
+        | *none
+        : (<< *undefined)
+
+        | (*some (*property { get value }))
+        : (MATCH get
+            | *none
+            : (MATCH value
+                | *none
+                : (<< *undefined)
+
+                | (*some value)
+                : (<< value))
+
+            | (*some fn)
+            : (apply fn [])))))
+
+
+(FUNCTION array<< :: (-> (Mutable (Dictionary Text JS-Property)) Integer
+                       (Task (Array JS)))
+  [ keys length ]
+  : (sequential
+      (transform (range 0 length) -> index
+        (get-js-value keys (text<< (*string-key (text<< index)))))))
+
+
+(FUNCTION apply :: (-> JS JS (Array JS) (Task JS))
+  [ (*function { callable }) this args ]
+  : (callable this args)
+
+  [ _ _ ]
+  : (error ...))
+
+
+(FUNCTION make-apply :: (-> JS (Task JS))
+  [ prototype ]
+  : (make-function prototype => args
+      (LOCAL
+        fn <= (default (nth args 0) *undefined)
+        this <= (default (nth args 1) *undefined)
+        (CHAIN-MATCH (default (nth args 2) *undefined)
+          | (*array { keys length })
+          : (CHAIN
+              args <= (array<< keys length)
+              (apply fn this args))
+
+          | _
+          : (error ...)))))
+
+
+(CONSTANT make-Function :: (Task JS)
+  (CHAIN
+    keys <= (*mutable (DICTIONARY))
+    prototype <= (*mutable *null)
+    (LOCAL
+      Function <= (*function
+                    { keys
+                      prototype
+                      callable <= ... })
+      (CHAIN
+        (set! prototype Function)
+        (<< Function)))))
+
+
+(FUNCTION-UNION set-key! :: (-> JS (Task Null))
+  [ [ (*object { keys }) key value ]
+    [ (*array { keys }) key value ]
+    [ (*function { keys }) key value ] ]
+  : (set! keys key value)
+
+  [ [ _ _ _ ] ]
+  : (error "not an object"))
+
+
+(CONSTANT main :: (Task Null)
+  (CHAIN
+    Object <= make-Object
+    Function <= make-Function
+    add <= (make-add Function)
+    Window <= (make-Window Object)
+    (set-key! Window (*string-key "Object") Object)
+    (set-key! Window (*string-key "Function") Function)
+    (set-key! Window (*string-key "+") add)
+    (set-key! Window (*string-key "window") Window)))

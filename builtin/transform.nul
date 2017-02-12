@@ -1,0 +1,6 @@
+(USE "nulan:protocol")
+(USE "nulan:syntax")
+
+
+(PROTOCOL ($transform a)
+  transform :: (-> (a b) (-> b c) (a c)))

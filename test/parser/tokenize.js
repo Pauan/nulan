@@ -1,6 +1,6 @@
 import { expect, expect_crash } from "../assert";
-import { reply } from "../../ffi/task";
-import { loc, text, symbol, integer } from "../../src/parser/type";
+import { reply } from "../../builtin/ffi/task";
+import { loc, text, symbol, integer, number } from "../../src/parser/type";
 import { tokenize } from "../../src/parser/tokenize";
 import { lines } from "../../util/string";
 
@@ -368,7 +368,7 @@ export default [
   ...test_prefix("~"),
   ...test_prefix("@"),
 
-  ...test_infix("."),
+  //...test_infix("."),
 
   ...test_brackets("(", ")", false),
   ...test_brackets("[", "]", true),
@@ -449,12 +449,8 @@ export default [
   ]),
 
   test("0.0", (loc) => [
-    integer(0, loc(0, 0,
-                   0, 1)),
-    symbol(".", loc(0, 1,
-                    0, 2)),
-    integer(0, loc(0, 2,
-                   0, 3))
+    number(0, loc(0, 0,
+                  0, 3))
   ]),
 
 
@@ -510,12 +506,8 @@ export default [
   ]),
 
   test("foo.bar", (loc) => [
-    symbol("foo", loc(0, 0,
-                      0, 3)),
-    symbol(".", loc(0, 3,
-                    0, 4)),
-    symbol("bar", loc(0, 4,
-                      0, 7))
+    symbol("foo.bar", loc(0, 0,
+                          0, 7))
   ]),
 
 
@@ -879,12 +871,8 @@ export default [
   test("1 1.5 1 ~5 (foo bar qux) u @q\nqux\n(nou)\n~foo\n~@foo", (loc) => [
     integer(1, loc(0, 0,
                    0, 1)),
-    integer(1, loc(0, 2,
-                   0, 3)),
-    symbol(".", loc(0, 3,
-                    0, 4)),
-    integer(5, loc(0, 4,
-                   0, 5)),
+    number(1.5, loc(0, 2,
+                    0, 5)),
     integer(1, loc(0, 6,
                    0, 7)),
     symbol("~", loc(0, 8,

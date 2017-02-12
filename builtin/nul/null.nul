@@ -1,0 +1,5 @@
+(TYPE Null)
+
+(ATTRIBUTES (TARGET javascript)
+  (UNSAFE-FFI-IMPORT "js/null.js"
+    null :: Null))

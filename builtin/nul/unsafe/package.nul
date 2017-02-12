@@ -1,0 +1,8 @@
+(IMPORT (local ".."))
+
+(LOAD-FILES
+  "task.nul")
+
+(PUBLIC
+  make-killable-task <= async_killable
+  make-unkillable-task <= async_unkillable)

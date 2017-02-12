@@ -1,0 +1,13 @@
+(USE "nulan:package")
+
+
+(DEPENDENCY "nulan-standard"
+  (github "nulan/nulan-standard" (version 1 0)))
+
+
+(DEPENDENCY "nulan-javascript-node"
+  (github "nulan/nulan-javascript-node" (version 1 0)))
+
+
+(ATTRIBUTES (TARGET JAVASCRIPT-NODE)
+  (COMPILE "build/main.js" <= "local:main.nul"))

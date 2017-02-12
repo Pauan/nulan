@@ -1,0 +1,36 @@
+(USE "nulan:rewrite-rule")
+(USE "nulan:syntax")
+(USE "nulan:matches-union")
+
+(USE "local:transform.nul")
+
+
+(REWRITE-RULE MATCHES
+  [ ~a ~@b ]
+  : &(MATCHES-UNION ~a
+       ~@(transform b -> &~b : ~c
+           &[ ~b ] : ~c)))
+
+
+#/(REWRITE-RULE MATCHES-UNION
+  [ ~a ~@b ]
+  : &(MATCHES ~a
+       ~@(flatten
+           (transform b -> &[ ~@b ] : ~c
+             (transform b -> b
+               &~b : ~c)))))/#
+
+
+(REWRITE-RULE MATCH-UNION
+  [ ~a ~@b ]
+  : &(MATCHES-UNION [ ~a ]
+       ~@(transform b -> &[ ~@b ] : ~c
+           &[ ~@(transform b -> b
+                  &[ ~b ]) ] : ~c)))
+
+
+(REWRITE-RULE MATCH
+  [ ~a ~@b ]
+  : &(MATCH-UNION ~a
+       ~@(transform b -> &| ~b : ~c
+           &[ ~b ] : ~c)))

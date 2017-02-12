@@ -1,0 +1,69 @@
+(REWRITE-RULE
+  (EXPORT-WRAPPERS ~@a)
+  = &(EXPORT
+       ~@(transform a -> a
+           (MATCH a
+             &(REQUIRE ~@_ (~a ~@_))
+             = a
+
+             &(REQUIRE ~@_ ~a)
+             = a
+
+             &(~a ~@_)
+             = a
+
+             a
+             = a))))
+
+
+(REWRITE-RULE
+  (EXPORT-TYPE (~a ~@b) ~@c)
+  = &(STATEMENTS
+       (TYPE (~a ~@b) ~@c)
+       (EXPORT ~a)
+       (EXPORT-WRAPPERS ~@c))
+
+  (EXPORT-TYPE ~a ~@b)
+  = &(STATEMENTS
+       (TYPE ~a ~@b)
+       (EXPORT ~a)
+       (EXPORT-WRAPPERS ~@b)))
+
+
+(REWRITE-RULE
+  (EXPORT-CONSTANT ~a :: ~b ~c)
+  = &(STATEMENTS
+       (CONSTANT ~a :: ~b ~c)
+       (EXPORT ~a)))
+
+
+(REWRITE-RULE
+  (EXPORT-FUNCTION ~a :: ~b ~@c)
+  = &(STATEMENTS
+       (FUNCTION ~a :: ~b ~@c)
+       (EXPORT ~a)))
+
+
+(REWRITE-RULE
+  (EXPORT-REWRITE-RULE (~a ~@b) = ~c ~@d)
+  = &(STATEMENTS
+       (REWRITE-RULE (~a ~@b) = ~c ~@d)
+       (EXPORT ~a)))
+
+
+(REWRITE-RULE
+  (EXPORT-PROTOCOL (~a ~@b) ~@c)
+  = &(STATEMENTS
+       (PROTOCOL (~a ~@b) ~@c)
+       (EXPORT ~a)
+       (EXPORT
+         ~@(transform c -> &~a :: ~_
+             a))))
+
+
+(EXPORT
+  EXPORT-TYPE
+  EXPORT-CONSTANT
+  EXPORT-FUNCTION
+  EXPORT-REWRITE-RULE
+  EXPORT-PROTOCOL)

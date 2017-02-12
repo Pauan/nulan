@@ -7,6 +7,9 @@
 
 (DEFINE-TYPE (Task a))
 
+(PROTOCOL ($task<< a)
+  task<< :: (-> (a b) (Task b)))
+
 (WITH-TARGET javascript
   (UNSAFE-FFI-LOAD "../ffi/task.js"
     | reply         :: (-> a (Task a))

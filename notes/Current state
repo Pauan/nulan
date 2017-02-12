@@ -1,5 +1,3 @@
-(TYPE (Foo a))
-
 (TYPE Color
   *red
   *orange
@@ -12,11 +10,11 @@
 (TYPE Rgb
   (*rgba Integer Integer Integer Number))
 
-(TYPE Rbg
-  (*rgba { red :: Integer
-           blue :: Integer
-           green :: Integer
-           alpha :: Number }))
+(RECORD Rbga
+  { red :: Integer
+    blue :: Integer
+    green :: Integer
+    alpha :: Number })
 
 (MATCHES [ foo ]
   [ (*rgba { red blue green alpha }) ]
@@ -26,10 +24,10 @@
   : b)
 
 (MATCH foo
-  (*rgba { red blue green alpha })
+  | (*rgba { red blue green alpha })
   : (*rgba { red blue green alpha })
 
-  (*rgba { red blue green alpha })
+  | (*rgba { red blue green alpha })
   : b)
 
 (TYPE (List a)
@@ -37,85 +35,203 @@
   (*value a (List a)))
 
 (TYPE Foo
-  (REQUIRE ($foo a)
-    (*foo a)))
+  (IMPLICIT a
+    (REQUIRE ($foo a)
+      (*foo a))))
 
 
-# The type and all tags are made public
-(PUBLIC
-  (TYPE Foo
-    *foo))
+(PROTOCOL ($flatten a)
+  flatten :: (IMPLICIT b
+               (-> (a (a b)) (a b))))
 
-# The type is made public (tags are private)
-(ABSTRACT-TYPE Foo
-  *foo)
 
-# The constant is made public
-(PUBLIC
-  (CONSTANT ...))
+(FUNCTION state-monad :: (IMPLICIT a
+                           (-> a Type))
+  [ value ]
+  : (IMPLICIT a
+      (State a value)))
 
-# The protocol and all functions are made public
-(PUBLIC
-  (PROTOCOL ($foo a) ...))
-
-# The provide is made public
-(PUBLIC
-  (PROVIDE ($foo Foo) ...))
+(PROVIDE ($flatten (IMPLICIT a
+                     (=> value (State a value))))
+  (FUNCTION flatten :: (IMPLICIT a value
+                         (-> (State (State a value)) (State a value)))
+    ...))
 
 
 (PROTOCOL ($transform a)
-  transform :: (-> (a b) (-> b c) (a c)))
+  transform :: (IMPLICIT b c
+                 (REQUIRE ($foo a)
+                   (-> (a b) (-> b c) (a c)))))
 
-(CONSTANT chain :: (REQUIRE ($transform a) ($flatten a)
-                     (-> (a b) (-> b (a c)) (a c)))
-  (-> a fn
+(CONSTANT chain :: (IMPLICIT a b c
+                     (REQUIRE ($transform a) ($flatten a)
+                       (-> (a b) (-> b (a c)) (a c))))
+  (=> a fn
     (flatten (transform a fn))))
 
-(FUNCTION chain :: (REQUIRE ($transform a) ($flatten a)
-                     (-> (a b) (-> b (a c)) (a c)))
+(FUNCTION chain :: (IMPLICIT a b c
+                     (REQUIRE ($transform a) ($flatten a)
+                       (-> (a b) (-> b (a c)) (a c))))
   [ a fn ]
   : (flatten (transform a fn)))
 
-(DEPENDENCY "flatten"
-  (github "nulan/flatten" "v2.0.0"))
+(IMPORT (github "nulan/flatten" "v2.0.0" "package.nul"))
 
-(USE "package:nulan-standard/task.nul")
+(IMPORT (github "nulan/nulan-standard" "v2.0.0" "unsafe/package.nul"))
 
-(USE "package:nulan-nodejs/node.nul")
-(USE "package:nulan-browser/browser.nul")
+(IMPORT (github "nulan/nulan-nodejs" "v2.0.0" "package.nul"))
+(IMPORT (github "nulan/nulan-browser" "v2.0.0" "package.nul"))
 
-(USE "local:foo.nul")
+(IMPORT (local "foo.nul"))
 
-(USE "package:flatten/foo.nul")
+(IMPORT (local "flatten/foo.nul"))
 
-(USE "package:flatten/module/flatten.nul"
+(IMPORT (local "flatten/module/flatten.nul")
   $flatten
   flatten)
 
-(USE "package:flatten/foo.nul"
-  (PROVIDE ($transform Maybe)))
+(IMPORT (local "flatten/foo.nul")
+  transform-maybe)
 
-(LOCAL-USE "package:flatten/foo.nul"
+(LOCAL-IMPORT (local "flatten/foo.nul")
+  (transform ...))
+
+(LOCAL-IMPORT (local "flatten/foo.nul")
   transform <= map
   (transform ...))
 
-(LOCAL-USE "package:flatten/foo.nul"
-  (PROVIDE ($transform Maybe))
+(LOCAL-IMPORT (local "flatten/foo.nul")
+  transform-maybe
   (transform ...))
 
 (CONSTANT maybe-transform :: (-> ...)
-  (LOCAL-USE "package:flatten/foo.nul"
-    (PROVIDE ($transform Maybe))
+  (LOCAL-IMPORT (local "flatten/foo.nul")
+    transform-maybe
     transform))
 
-(PROVIDE ($transform Maybe)
-  (CONSTANT transform :: (-> ...)
-    map))
+(PROVIDE transform-maybe :: ($transform Maybe)
+  map)
 
-(PROVIDE ($transform Maybe)
-  (FUNCTION transform :: (-> ...)
+(PROVIDE transform-maybe :: ($transform Maybe)
+  (LOCAL-FUNCTION (-> ...)
     [ a b ]
-    : (map a b)))
+    : ...))
+
+(PROVIDE-FUNCTION transform-maybe :: ($transform Maybe)
+  [ a b ]
+  : (map a b))
+
+
+(LOCAL-RECORD
+  (FUNCTION transform :: (-> (Maybe a) (-> a b) (Maybe b))
+    [ *none _ ]
+    : *none
+
+    [ (*some a) f ]
+    : (*some (f a))))
+
+(CONSTANT transform-maybe :: (Transform Maybe)
+  { transform <=
+    (-> a f
+      (MATCH a
+        | *none
+        : *none
+
+        | (*some a)
+        : (*some (f a)))) })
+
+
+(PROTOCOL (Transform a)
+  transform :: (-> (a b) (-> b c) (a c)))
+
+(FUNCTION foo :: (-> @(Transform a) a b c)
+  [ a b ]
+  : (transform a b c))
+
+
+(RECORD-TYPE (Transform a)
+  { transform :: (-> (a b) (-> b c) (a c)) })
+
+(IMPLICIT-RECORD transform-maybe :: (Transform Maybe)
+  (FUNCTION transform :: (-> (Maybe a) (-> a b) (Maybe b))
+    [ *none _ ]
+    : *none
+
+    [ (*some a) f ]
+    : (*some (f a))))
+
+(FUNCTION foo :: (-> @(Transform a) a b c)
+  [ @m a b ]
+  : (m.transform a b c))
+
+
+(PROTOCOL (Transform a)
+  (-> (a b) (-> b c) (a c)))
+
+(IMPLEMENT transform-maybe :: (Transform Maybe)
+  (FUNCTION transform :: (-> (Maybe a) (-> a b) (Maybe b))
+    [ *none _ ]
+    : *none
+
+    [ (*some a) f ]
+    : (*some (f a))))
+
+(IMPLEMENT-FUNCTION transform-maybe :: (Transform Maybe)
+  [ *none _ ]
+  : *none
+
+  [ (*some a) f ]
+  : (*some (f a)))
+
+(FUNCTION foo :: (-> @(Transform a) a b c)
+  [ @transform a b ]
+  : (transform a b c))
+
+
+(RECORD-TYPE (Transform a)
+  { transform :: (-> (a b) (-> b c) (a c)) })
+
+(CONSTANT-RECORD @transform-maybe :: (Transform Maybe)
+  (FUNCTION transform :: (-> (Maybe a) (-> a b) (Maybe b))
+    [ *none _ ]
+    : *none
+
+    [ (*some a) f ]
+    : (*some (f a))))
+
+(FUNCTION foo :: (-> @(Transform a) a b c)
+  [ @{ transform } a b ]
+  : (transform a b c))
+
+(FUNCTION foo :: (-> @(Transform a) a b c)
+  [ @m a b ]
+  : (m.transform a b c))
+
+(LOCAL
+  @m <= { transform <= ... }
+  (foo 1 2))
+
+
+(TYPE-ALIAS (Transform a b c)
+  (-> (a b) (-> b c) (a c)))
+
+(FUNCTION transform-maybe :: (-> (Maybe a) (-> a b) (Maybe b))
+  [ *none _ ]
+  : *none
+
+  [ (*some a) f ]
+  : (*some (f a)))
+
+(FUNCTION foo :: (-> @(Transform a b c) a b c)
+  [ @transform a b ]
+  : (transform a b c))
+
+
+(FUNCTION foo :: (REQUIRE ($transform a)
+                   (-> a b c))
+  [ a b ]
+  : (transform a b c))
+
 
 (USE "local:foo/bar.nul"
   a <= d
@@ -150,13 +266,15 @@
 (PROTOCOL ($<< a b)
   << :: (-> a b))
 
-(PROVIDE ($<< a Foo)
-  (FUNCTION << :: (-> a Foo)
+(PROVIDE $<<
+  (FUNCTION << :: (IMPLICIT a
+                    (-> a Foo))
     [ a ]
     : ...))
 
-(PROVIDE ($<< Foo a)
-  (FUNCTION << :: (-> Foo a)
+(PROVIDE $<<
+  (FUNCTION << :: (IMPLICIT a
+                    (-> Foo a))
     [ a ]
     : ...))
 
@@ -167,42 +285,48 @@
 (PROTOCOL ($result<< a b c)
   result<< :: (-> a (Result b c)))
 
-(PROVIDE (REQUIRE ($<< a b)
-           ($result<< a b Never))
-  (FUNCTION result<< :: (-> a (Result b Never))
+(PROVIDE $result<<
+  (FUNCTION result<< :: (IMPLICIT a b
+                          (REQUIRE ($<< a b)
+                            (-> a (Result b Never))))
     [ a ]
     : (*success (<< a))))
 
-(PROVIDE (REQUIRE ($result<< a b c)
-           ($<< a (Result b c)))
-  (FUNCTION << :: (-> a (Result b c))
+(PROVIDE $<<
+  (FUNCTION << :: (IMPLICIT
+                    (REQUIRE ($result<< a b c)
+                      (-> a (Result b c))))
     [ a ]
     : (result<< a)))
 
-(PROVIDE ($<< (Result a _) (Maybe a))
-  (FUNCTION << :: (-> (Result a _) (Maybe a))
+(PROVIDE $<<
+  (FUNCTION << :: (IMPLICIT a
+                    (-> (Result a _) (Maybe a)))
     [ (*success a) ]
     : (*some a)
 
     [ (*failure _) ]
     : *none))
 
-(PROVIDE ($<< (Maybe a) (Result a Null))
-  (FUNCTION << :: (-> (Maybe a) (Result a Null))
+(PROVIDE $<<
+  (FUNCTION << :: (IMPLICIT a
+                    (-> (Maybe a) (Result a Null)))
     [ (*some a) ]
     : (*success a)
 
     [ *none ]
     : (*failure *null)))
 
-(FUNCTION maybe<< :: (REQUIRE ($result<< a b _)
-                       (-> a (Maybe b)))
+(FUNCTION maybe<< :: (IMPLICIT a b
+                       (REQUIRE ($result<< a b _)
+                         (-> a (Maybe b))))
   [ a ]
   : (<< (<< a)))
 
-(PROVIDE (REQUIRE ($result<< a b _)
-           ($<< a (Maybe b)))
-  (FUNCTION << :: (-> a (Maybe b))
+(PROVIDE $<<
+  (FUNCTION << :: (IMPLICIT a b
+                    (REQUIRE ($result<< a b _)
+                      (-> a (Maybe b))))
     [ a ]
     : (<< (<< a))))
 
@@ -217,11 +341,13 @@
   bar <= ...
   (<< 5))
 
-(FUNCTION foo<< :: (-> a Foo)
+(FUNCTION foo<< :: (IMPLICIT a
+                     (-> a Foo))
   [ a ]
   : ...)
 
-(FUNCTION <<foo :: (-> Foo a)
+(FUNCTION <<foo :: (IMPLICIT a
+                     (-> Foo a))
   [ a ]
   : ...)
 
@@ -287,14 +413,14 @@
       a <= (UNIQUE-SYMBOL)
       &(CHAIN
          ~a <= ~value
-         (MATCHES [ ~a ]
+         (MATCH ~a
            ~@matches))))
 
 (CHAIN-MATCH foo
-  [ *none ]
+  | *none
   : 1
 
-  [ (*some a) ]
+  | (*some a)
   : 2)
 
 
@@ -339,11 +465,11 @@
 
   (REWRITE-RULE BAR
     [ ~a ~@b ]
-    : (MATCHES [ a ]
-        [ &~n <= ~v ]
+    : (MATCH a
+        | &~n <= ~v
         : &(QUX ~n ~v ~@b)
 
-        [ v ]
+        | v
         : &(QUX 1 ~v ~@b))))
 
 (foo -> a b (+ a b))
@@ -419,41 +545,84 @@
     b <= 2 })
 
 (MATCH a
-  _
+  | _
   : 1
 
-  a
+  | a
   : 2
 
-  1
+  | 1
   : 3
 
-  "foo"
+  | "foo"
   : 4
 
-  (*foo { a b c })
+  | (*foo { a b c })
   : 5
 
-  (*foo { a <= b c <= d })
+  | (*foo { a <= b c <= d })
   : (*foo { b <= a d <= c })
 
-  (*foo 1)
+  | (*foo 1)
   : 6)
+
+
+(ATTRIBUTES INLINE (TARGET JAVASCRIPT) (PHASE COMPILE)
+  ...)
+
+
+(ASSERT (equal? (foo 1) bar)
+  (+ 1 2))
+
+
+(ASSERTIONS
+  (equal? foo bar)
+
+  (test (foo (bar qux))))
+
+
+(PROTOCOL ($unsafe-execute-main a)
+  unsafe-execute-main :: (-> a Null))
 
 
 # Unsure
 
-(PRAGMA { phase <= run-time
-          target <= javascript }
-  foo)
+(ABSTRACT
+  (TYPE (Foo a)
+    *foo
+    (*bar a)))
 
-(METADATA impure inline-function synchronous
-  foo)
+(TAG->CONSTANT *foo)
 
-(INLINE
-  (-> foo bar))
+(PROVIDE { public }
+  (TAG->CONSTANT *foo))
 
-(USE "package:flatten/module/flatten.nul"
-  (TYPE Foo
-    *bar
-    *qux))
+(PUBLIC-TAG->CONSTANT
+  *foo)
+
+(USE-PREFIX "package:flatten/module/flatten.nul"
+  flatten-
+  flatten-foo
+  flatten-bar)
+
+
+(foo @bar ...) # equivalent to (foo (bar ...))
+
+(foo @bar @qux ...) # equivalent to (foo (bar (qux ...)))
+
+
+(TYPE Foo :: (-> $a $b Type)
+  (*foo $a))
+
+(TYPE Rgb :: Type
+  (*rgba Integer Integer Integer Number))
+
+(ASSERTIONS
+  (CHAIN
+    foo <= (read-file "foo")
+    (<< (equal? foo bar))))
+
+#/(ASSERTIONS
+  (flatten
+    (transform (read-file "foo") -> foo
+      (<< (equal? foo bar)))))/#

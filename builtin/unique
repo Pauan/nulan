@@ -1,0 +1,21 @@
+(TYPE Unique)
+
+
+(UNSAFE-FFI-IMPORT { target <= javascript
+                     file <= "../ffi/unique.js" }
+  unique :: (-> Text Unique))
+
+
+(REWRITE-RULE
+  (UNIQUE ~@a)
+    &(STATEMENTS
+       ~@(transform a -> &~name <= ~value
+           &(CONSTANT
+              ~name :: Unique
+              ~name <= (unique ~value)))))
+
+
+(EXPORT
+  Unique
+  unique
+  UNIQUE)

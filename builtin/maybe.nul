@@ -1,0 +1,12 @@
+(TYPE (Maybe a)
+  *none
+  (*some a))
+
+
+(FUNCTION equal-some? :: (REQUIRE ($equal? a)
+                           (-> (Maybe a) a Boolean))
+  [ *none _ ]
+  : *false
+
+  [ (*some a) b ]
+  : (equal? a b))

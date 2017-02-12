@@ -6,9 +6,10 @@
     <style>
       * {
         box-sizing: border-box;
+        margin: 0px;
       }
 
-      html {
+      html, body {
         height: 100%;
       }
 
@@ -18,28 +19,40 @@
         margin: 0px;
 
         display: flex;
-        flex-direction: horizontal;
+        flex-direction: row;
+        justify-content: center;
+      }
+
+      .outer {
+        line-height: 2ch; /* TODO is this correct ? */
+        height: 100%;
+      }
+
+      .inner {
+        border-left: 1px solid #0D47A1;
+        border-right: 1px solid #0D47A1;
+        overflow-x: auto;
+        padding-top: 2ch;
+        padding-bottom: 2ch;
+      }
+
+      #outer-input {
+        margin-left: 2ch;
+      }
+
+      #outer-output {
+        margin-left: -1px;
+        margin-right: 2ch;
       }
 
       #input {
-        border-right: 1px solid #0D47A1;
+        box-sizing: content-box;
+        padding-left: 2ch;
+        width: 78ch;
+        min-height: calc(100% - 4ch);
       }
 
       #output {
-
-      }
-
-      #input, #output {
-        margin: 0px;
-        position: relative;
-        line-height: 1.2em;
-        min-height: 50em;
-        padding: 25px;
-        width: calc(78ch + 25px);
-      }
-
-      #output {
-        padding-left: 0px;
       }
 
       .syntax {
@@ -47,7 +60,7 @@
       }
 
       .special {
-        color: #D32F2F; /* #b54a4a #D03B3B */
+        color: #ff5722; /* #b54a4a #D03B3B #D32F2F #a91537 */
       }
 
       .literal {
@@ -59,7 +72,7 @@
       }
 
       .type {
-        color: #FF8F00; /* #eac06c #e7ce5d #FFFA54 #FF9B5F */
+        color: #ff9800; /* #eac06c #e7ce5d #FFFA54 #FF9B5F */
       }
 
       .indent {
@@ -79,20 +92,32 @@
         border-bottom-left-radius: 3px;
       }
 
-      .line-number {
+      .line {
+        box-sizing: content-box;
         display: inline-block;
-        width: 3.5em;
+        width: 78ch;
+      }
+
+      .line-number {
+        box-sizing: content-box;
+        display: inline-block;
+        width: 3ch;
         text-align: right;
-        padding-right: 10px;
-        margin-right: 5px;
+        padding-left: 1ch;
+        padding-right: 1ch;
+        margin-right: 1ch;
         background-color: #07090A;
         color: #193561;
       }
     </style>
   </head>
   <body>
-    <pre id="input" contentEditable="true" spellcheck="false"></pre>
-    <pre id="output"></pre>
+    <div id="outer-input" class="outer">
+      <pre id="input" class="inner" contentEditable="true" spellcheck="false"></pre>
+    </div>
+    <div id="outer-output" class="outer">
+      <pre id="output" class="inner"></pre>
+    </div>
 
     <script>
       "use strict";
@@ -159,11 +184,11 @@
         "~": syntax1("syntax"),
         "@": syntax1("syntax"),
 
-        ".": (output, position, text) => {
+        /*".": (output, position, text) => {
           // TODO a tiny bit hacky
           syntax1("syntax")(output, position, text);
           output.push(wrap("literal", parse_variable(position, text)));
-        },
+        },*/
 
         "(": syntax1("syntax"),
         "[": syntax1("syntax"),
@@ -175,7 +200,7 @@
 
 
       const variable = (s) => {
-        if (s === "_" || s === "->" || s === "<=" || s === "=" || s === "::") {
+        if (s === "_" || s === "->" || s === "<=" || s === ":" || s === "|" || s === "::") {
           return wrap("syntax", s);
 
         } else if (s[0] === "*") {
@@ -185,6 +210,9 @@
           return wrap("protocol", s);
 
         } else if (/^[0-9]+$/.test(s)) {
+          return wrap("literal", s);
+
+        } else if (/^[0-9]+\.[0-9]+$/.test(s)) {
           return wrap("literal", s);
 
         } else if (/^[^a-z]+$/.test(s)) {
@@ -285,8 +313,33 @@
       };
 
 
-      const markup = (text) => {
-        const lines = [];
+      const parse = (text) => {
+        const a = [];
+
+        const position = { index: 0 };
+
+        while (position.index < text.length) {
+          const c = text[position.index];
+
+          if (specials[c]) {
+            specials[c](a, position, text);
+
+          } else {
+            a.push(variable(parse_variable(position, text)));
+          }
+        }
+
+        return a;
+      };
+
+
+      const markup = (text) =>
+        text.split(/\n/).map((line, i) =>
+          "<span class='line-number'>" + (i + 1) + "</span><span class='line'>" + parse(line).join("") + "</span>").join("\n");
+
+
+      const markup2 = (text) => {
+        /*const lines = [];
 
         text.split(/\n/).forEach((s, index) => {
           let indent = 0;
@@ -336,7 +389,7 @@
 
         console.log(JSON.stringify(lines.map((x) => x.indents), null, 2));
 
-        const output = new Array(lines.length);
+        const output = new Array(lines.length);*/
 
         const indents = [];
 
@@ -346,21 +399,8 @@
           const indent = line.indent;
           const text = line.text;
 
-          const a = [];
 
-          const position = { index: 0 };
-
-          while (position.index < text.length) {
-            const c = text[position.index];
-
-            if (specials[c]) {
-              specials[c](a, position, text);
-
-            } else {
-              a.push(variable(parse_variable(position, text)));
-            }
-          }
-
+          const a = parse(text);
 
           /*const last = (indents.length === 0
                          ? 0

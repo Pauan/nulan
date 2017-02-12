@@ -1,0 +1,8 @@
+(IMPORT-BUILTINS)
+
+(CONSTANT
+| main :: (Task Null)
+| main <= (log "Hello world!"))
+
+(EXPORT
+| main)

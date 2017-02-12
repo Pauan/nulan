@@ -1,0 +1,102 @@
+(CONSTANT integer :: (Parser Text Parse-Error)
+  (at-least-one (any-character "0123456789")))
+
+
+(CONSTANT floating-point :: (Parser Text Parse-Error)
+  (CHAIN
+    a <= integer
+    (CHAIN-MATCH (try-character ".")
+      | *none
+      : (<< a)
+
+      | (*some b)
+      : (CHAIN
+          c <= integer
+          (<< (++ a b c))))))
+
+
+(CONSTANT end-of-line :: (Parser Null Parse-Error)
+  (CHAIN-IF (try-character? "\r")
+    (CHAIN
+      (try-character "\n")
+      (<< *null))
+
+    (CHAIN
+      (character "\n")
+      (try-character "\r")
+      (<< *null))))
+
+      # # TODO this is incorrect
+      # (error (++ "expected any of [ \\r \\n \\r\\n \\n\\r ] but got " ))
+
+
+(FUNCTION parse-block-comment :: (-> Text Position (Parser Code Parse-Error))
+  [ filename start ]
+  : (CHAIN
+      new-start <= position
+      (CHAIN-IF (try-character? "#")
+        (CHAIN-IF (try-character? "/")
+          (CHAIN
+            # Allow for nested block comments
+            (parse-block-comment filename new-start)
+            (parse-block-comment filename start))
+
+          (parse-block-comment filename start))
+
+        (CHAIN-IF (try-character? "/")
+          (CHAIN-IF (try-character? "#")
+            (<< *comment)
+
+            (parse-block-comment filename start))
+
+          (CHAIN-IF try-any?
+            (parse-block-comment filename start)
+
+            (error (*parse-error "expected /# but reached the end of the file"
+                     (*source { filename start end <= new-start }))))))))
+
+
+(FUNCTION parse-comment :: (-> Text (Parser Code Parse-Error))
+  [ filename ]
+  : (CHAIN
+      start <= position
+      (character "#")
+      (CHAIN-IF (try-character? "/")
+        (parse-block-comment filename start)
+        (at-least-zero (not end-of-line)))
+      (<< *comment)))
+
+
+(FUNCTION parse-special :: (-> Text (Parser Code Parse-Error))
+  [ filename ]
+  : (any
+      [ (parse-comment filename) ]))
+
+(FUNCTION parse-symbol :: (-> Text (Parser Code Parse-Error))
+  [ filename ]
+  : (CHAIN
+      symbol <= (at-least-one (not (parse-special filename)))
+      )
+
+    (CHAIN
+      start <= position
+      number <= floating-point
+      end <= position
+      (MATCH (result<< number)
+        | (*success a)
+        : (<< (*number a (*source { filename start end)))
+
+        | (*failure a)
+        : (error (*parse-error "invalid number" start end)))))
+
+
+(CONSTANT parse-all :: (-> Text (Parser Code Parse-Error))
+  [ filename ]
+  : (any
+      [ (parse-special filename)
+        (parse-symbol filename) ]))
+
+
+(FUNCTION parse :: (-> Text Text (Result Code Parse-Error))
+  [ filename file ]
+  : (run-parser (parse-all filename) file))

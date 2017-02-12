@@ -1,0 +1,32 @@
+(USE "nulan:text")
+(USE "nulan:unsafe")
+(USE "nulan:protocol")
+(USE "nulan:provide")
+(USE "nulan:attributes")
+(USE "nulan:constant")
+(USE "nulan:syntax")
+
+(USE "local:function.nul")
+(USE "local:concat.nul")
+(USE "local:regexp.nul")
+
+
+(ATTRIBUTES (TARGET JAVASCRIPT)
+  (UNSAFE-USE-FFI "local:ffi/text.js"
+    concat :: (-> Text Text Text)))
+
+
+(PROVIDE ($concat Text)
+  (CONSTANT concat :: (-> Text Text Text)
+    concat))
+
+
+(PROTOCOL ($text<< a)
+  text<< :: (-> a Text))
+
+
+# TODO test this
+(FUNCTION indent :: (-> Text Text Text)
+  [ text spaces ]
+  # TODO make this more efficient
+  : (++ spaces (regexp-replace "\n" text spaces)))

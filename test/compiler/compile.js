@@ -1,5 +1,5 @@
 import { expect, expect_crash } from "../assert";
-import { reply } from "../../ffi/task";
+import { reply } from "../../builtin/ffi/task";
 import { tokenize } from "../../src/parser/tokenize";
 import { parse } from "../../src/parser/parse";
 import { compile } from "../../src/compiler/compile";

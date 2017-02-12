@@ -1,9 +1,0 @@
-(TYPE Null
-| *null)
-
-
-(EXPORT-CONSTANT
-| null <= *null)
-
-(EXPORT
-| Null)

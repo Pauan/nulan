@@ -1,0 +1,17 @@
+(USE "nulan:rewrite-rule")
+(USE "nulan:syntax")
+(USE "nulan:boolean")
+
+(USE "local:transform.nul")
+(USE "local:match.nul")
+
+
+(REWRITE-RULE EQUAL?
+  [ ~a ~@b ]
+  # TODO use MATCH-UNION ?
+  : &(MATCH ~a
+       ~@(transform b -> b
+           &| ~b : *true)
+
+       | _
+       : *false))

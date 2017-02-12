@@ -35,3 +35,16 @@ export const read_file = (path) =>
       }
     });
   });
+
+
+export const write_file = (path, value) =>
+  new Promise((success, error) => {
+    $fs.writeFile(path, value, { "encoding": "utf8" }, (e) => {
+      if (e) {
+        error(e);
+
+      } else {
+        success();
+      }
+    });
+  });

@@ -1,0 +1,29 @@
+(USE "nulan:text")
+(USE "nulan:integer")
+(USE "nulan:unsafe")
+(USE "nulan:provide")
+(USE "nulan:syntax")
+(USE "nulan:constant")
+(USE "nulan:attributes")
+
+(USE "local:concat.nul")
+(USE "local:text.nul")
+(USE "local:function.nul")
+
+
+(ATTRIBUTES (TARGET JAVASCRIPT)
+  (UNSAFE-USE-FFI "local:ffi/integer.js"
+    text_from_integer :: (-> Integer Text)))
+
+
+(PROVIDE ($text<< Integer)
+  (CONSTANT text<< :: (-> Integer Text)
+    text_from_integer))
+
+
+(FUNCTION plural :: (-> Integer Text Text)
+  [ 1 s ]
+  : (++ "1" s "s")
+
+  [ i s ]
+  : (++ (text<< i) s))

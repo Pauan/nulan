@@ -1,0 +1,56 @@
+(USE "nulan:syntax")
+(USE "nulan:type")
+(USE "nulan:provide")
+(USE "nulan:null")
+(USE "nulan:unique-symbol")
+
+(USE "local:wrap.nul")
+(USE "local:chain.nul")
+(USE "local:local.nul")
+(USE "local:transform.nul")
+(USE "local:flatten.nul")
+(USE "local:function.nul")
+
+
+(TYPE (Result success failure)
+  (*success success)
+  (*failure failure))
+
+
+(PROVIDE ($transform (TYPE-> a (Result a b)))
+  (FUNCTION transform :: (-> (Result a b) (-> a c) (Result c b))
+    [ (*success a) f ]
+    : (*success (f a))
+
+    [ a _ ]
+    : a))
+
+
+(PROVIDE ($flatten (TYPE-> a (Result a b)))
+  (FUNCTION flatten :: (-> (Result (Result a b) b) (Result a b))
+    [ (*success a) ]
+    : a
+
+    [ a ]
+    : a))
+
+
+# TODO test this
+(REWRITE-RULE CHAIN-RESULT
+  [ ~a <= ~b ~c ]
+  : (LOCAL
+      u <= (UNIQUE-SYMBOL)
+      &(CHAIN-MATCH ~b
+         | (*success ~a)
+         : ~c
+
+         | ~u
+         : (<< ~u)))
+
+  [ ~a ~b ]
+  : &(CHAIN-RESULT
+       *null <= ~a
+       ~b)
+
+  [ ~a ~@b ~c ]
+  : &(CHAIN-RESULT ~a (CHAIN-RESULT ~@b ~c)))

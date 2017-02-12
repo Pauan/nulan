@@ -1,0 +1,719 @@
+(USE "package:nulan-standard")
+
+(USE "local:parse/position.nul")
+(USE "local:parse/source.nul")
+(USE "local:parse/token.nul")
+(USE "local:parse/parse-error.nul")
+
+
+(TYPE Tokenize-Indent
+  (*indent { indent :: Integer
+             end :: Text }))
+
+(TYPE Tokenize-State
+  (*state { filename :: Text
+            input :: Text
+            indents :: (List Tokenize-Indent)
+            position :: Position }))
+
+
+(ALIAS (RESULT-TOKEN a) <= (Result a Parse-Error))
+
+(ALIAS (STATE-TOKEN a) <= (State Tokenize-State (RESULT-TOKEN a)))
+
+
+(CONSTANT get-input :: (State Tokenize-State Text)
+  (CHAIN-MATCH get-state
+    | (*state { input })
+    : input))
+
+
+(CONSTANT get-filename :: (State Tokenize-State Text)
+  (CHAIN-MATCH get-state
+    | (*state { filename })
+    : filename))
+
+
+(FUNCTION get-source :: (-> Position
+                          (State Tokenize-State Source))
+  [ start ]
+  : (CHAIN
+      end <= get-position
+      filename <= get-filename
+      (<< (*source { filename start end }))))
+
+
+(FUNCTION success :: (-> a (STATE-TOKEN a))
+  [ a ]
+  : (<< (<< a)))
+
+
+(FUNCTION error :: (-> Text Position (STATE-TOKEN Never))
+  [ message start ]
+  : (CHAIN
+      source <= (get-source start)
+      (<< (parse-error message source))))
+
+
+(CONSTANT peek-indent :: (State Tokenize-State (Maybe Tokenize-Indent))
+  (CHAIN-MATCH get-state
+    | (*state { indents })
+    : (MATCH indents
+        | *empty
+        : *none
+
+        | (*push _ a)
+        : (*some a))))
+
+
+(FUNCTION push-indent! :: (-> Tokenize-Indent (State Tokenize-State Null))
+  [ value ]
+  : (modify-state! -> (*state { filename input indents position })
+      (*state { filename
+                input
+                indents <= (push indents value)
+                position })))
+
+
+(CONSTANT pop-indent! :: (State Tokenize-State Null)
+  (modify-state! -> (*state { filename input indents position })
+    (*state { filename
+              input
+              # TODO is this correct ?
+              indents <= (default (pop a) *empty)
+              position })))
+
+
+(CONSTANT get-position :: (State Tokenize-State Position)
+  (CHAIN-MATCH get-state
+    | (*state { position })
+    : position))
+
+
+(FUNCTION modify-position! :: (-> (-> Position Position) (State Tokenize-State Null))
+  [ f ]
+  : (modify-state! -> (*state { filename input indents position })
+      (*state { filename
+                input
+                indents
+                position <= (f position) })))
+
+
+(CONSTANT peek-character :: (State Tokenize-State (Maybe Text))
+  (CHAIN-MATCH get-state
+    | (*state { input
+                (*position { index }) <= position })
+    : (nth input index)))
+
+
+# TODO inline ?
+(FUNCTION end-of-line? :: (-> Text Boolean)
+  [ a ]
+  # TODO Windows and Mac line endings
+  : (EQUAL? a "\n"))
+
+
+# TODO inline ?
+(FUNCTION end-of-line-or-file? :: (-> (Maybe Text) Boolean)
+  [ *none ]
+  : *true
+
+  [ (*some a) ]
+  : (end-of-line? a))
+
+
+(FUNCTION space? :: (-> Text Boolean)
+  [ a ]
+  : (EQUAL? a " "))
+
+
+(FUNCTION increment-character! :: (-> Text (State Tokenize-State Null))
+  [ char ]
+  : (IF (end-of-line? char)
+      (modify-position! increment-line)
+      (modify-position! increment-column)))
+
+
+(CONSTANT read-character! :: (State Tokenize-State (Maybe Text))
+  (CHAIN-MATCH peek-character
+    | *none
+    : (<< *none)
+
+    | (*some a)
+    : (CHAIN
+        (increment-character! a)
+        (<< (*some a)))))
+
+
+(FUNCTION increment-while! :: (-> (-> Text Boolean)
+                                (State Tokenize-State Null))
+  [ test? ]
+  : (CHAIN-MATCH peek-character
+      | *none
+      : (<< *null)
+
+      | (*some a)
+      : (IF (test? a)
+          (CHAIN
+            (increment-character! a)
+            (increment-while! test?))
+
+          (<< *null))))
+
+
+# TODO make this more efficient ?
+(FUNCTION read-while! :: (-> (-> Text Boolean)
+                           (State Tokenize-State (Maybe Text)))
+  [ test? ]
+  : (LOOP loop
+      output <= *none
+      (CHAIN-MATCH peek-character
+        | *none
+        : (<< output)
+
+        | (*some char)
+        : (IF (test? char)
+            (CHAIN
+              (increment-character! char)
+              (MATCH output
+                | *none
+                : (loop (*some char))
+
+                | (*some a)
+                : (loop (*some (++ a char)))))
+
+            (<< output)))))
+
+
+(FUNCTION consume-amount! :: (-> Integer (-> Text Boolean)
+                               (State Tokenize-State Integer))
+  [ amount test? ]
+  : (LOOP loop
+      count <= 0
+      (IF (equal? count amount)
+        (<< count)
+
+        (CHAIN-MATCH peek-character
+          | *none
+          : (<< count)
+
+          | (*some char)
+          : (IF (test? char)
+              (loop (+ count 1))
+
+              (<< count))))))
+
+
+# TODO code duplication
+(FUNCTION-UNION delimiter? :: (-> Text Boolean)
+  [ [ "\u[9]" ]
+    [ " " ]
+    # TODO Windows and Mac line endings
+    [ "\n" ]
+    [ "#" ]
+    [ "\"" ]
+    [ "(" ]
+    [ ")" ]
+    [ "[" ]
+    [ "]" ]
+    [ "{" ]
+    [ "}" ]
+    [ "&" ]
+    [ "~" ]
+    [ "@" ] ]
+  : *true
+
+  [ [ _ ] ]
+  : *false)
+
+
+(FUNCTION tokenize-tab :: (-> Text (STATE-TOKEN Never))
+  [ char ]
+  : (CHAIN
+      start <= get-position
+      (increment-while! -> a (equal? a char))
+      (error "tabs (U+0009) are not allowed" start)))
+
+
+(CONSTANT check-spaces :: (-> Position (STATE-TOKEN Null))
+  [ start ]
+  : (CHAIN
+      next <= peek-character
+      (IF (end-of-line-or-file? next)
+        (error "spaces (U+0020) are not allowed at the end of the line" start)
+
+        (success *null))))
+
+
+(CONSTANT read-spaces! :: (STATE-TOKEN Text)
+  (CHAIN
+    start <= get-position
+    (CHAIN-MATCH (read-while! space?)
+      | *none
+      : (success "")
+
+      | (*some spaces)
+      : (CHAIN-RESULT
+          (check-spaces start)
+          (success spaces)))))
+
+
+(FUNCTION consume-spaces-equal! :: (-> Integer (STATE-TOKEN Null))
+  [ amount ]
+  : (CHAIN
+      start <= get-position
+      (CHAIN-RESULT
+        spaces <= read-spaces!
+        (LOCAL
+          count <= (size spaces)
+          (IF (equal? count amount)
+            (success *null)
+
+            (error (++ "expected " (plural amount " space") " but got " (text<< count)) start))))))
+
+
+(FUNCTION consume-spaces-amount! :: (-> Integer (STATE-TOKEN Null))
+  [ amount ]
+  : (CHAIN
+      start <= get-position
+      count <= (consume-amount! amount space?)
+      (IF (equal? count amount)
+        (CHAIN-RESULT
+          (check-spaces start)
+          (success *null))
+
+        (error (++ "expected at least " (plural amount " space") " but got " (text<< count)) start))))
+
+
+(CONSTANT read-end-of-lines! :: (STATE-TOKEN Text)
+  (CHAIN
+    start <= get-position
+    (CHAIN-MATCH (read-while! end-of-line?)
+      | *none
+      # TODO is this correct ?
+      : (error "expected at least 1 newline but got 0" start)
+
+      | (*some lines)
+      : (success lines))))
+
+
+(FUNCTION tokenize-block-comment-error :: (-> Position (STATE-TOKEN Never))
+  [ start ]
+  : (error "missing ending /#" start))
+
+
+(FUNCTION tokenize-block-comment :: (-> Position (STATE-TOKEN Null))
+  [ start ]
+  : (CHAIN
+      # TODO make this more efficient ?
+      new-start <= get-position
+      (CHAIN-MATCH read-character!
+        | *none
+        : (tokenize-block-comment-error start)
+
+        | (*some "/")
+        : (CHAIN-MATCH read-character!
+            | *none
+            : (tokenize-block-comment-error start)
+
+            # We found the end of the block comment
+            | (*some "#")
+            : (success *null)
+
+            | (*some _)
+            : (tokenize-block-comment start))
+
+        | (*some "#")
+        : (CHAIN-MATCH read-character!
+            | *none
+            : (tokenize-block-comment-error start)
+
+            # Nested block comment
+            | (*some "/")
+            : (CHAIN-RESULT
+                (tokenize-block-comment new-start)
+                (tokenize-block-comment start))
+
+            | (*some _)
+            : (tokenize-block-comment start))
+
+        | (*some _)
+        : (tokenize-block-comment start))))
+
+
+(FUNCTION tokenize-comment :: (-> Text (STATE-TOKEN Null))
+  [ char ]
+  : (CHAIN
+      start <= get-position
+      (increment-char! char)
+      (CHAIN-MATCH peek-character
+        | *none
+        : (success *null)
+
+        | (*some "/")
+        : (CHAIN
+            (increment-char! "/")
+            (tokenize-block-comment start))
+
+        | (*some _)
+        : (CHAIN
+            # TODO what about end of file ?
+            (increment-while! -> a (NOT (end-of-line? a)))
+            (success *null)))))
+
+
+(FUNCTION-UNION pretty-newline :: (-> (Maybe Text) Text)
+  [ [ *none ]
+    # TODO Windows and Mac line endings
+    [ (*some "\n") ] ]
+  : ""
+
+  [ [ (*some a) ] ]
+  : a)
+
+
+(FUNCTION hex? :: (-> Text Boolean)
+  [ a ]
+  : (EQUAL? a
+      "0" "1" "2" "3" "4" "5" "6" "7" "8" "9"
+      "A" "B" "C" "D" "E" "F"))
+
+
+(FUNCTION text<<hex :: (-> Text (Maybe Text))
+  [ hex ]
+  : (CHAIN
+      a <= (integer<<text hex 16)
+      b <= (code-point<< a)
+      (<< (text<< b))))
+
+
+(FUNCTION tokenize-string-escape-unicode :: (-> Position (STATE-TOKEN Text))
+  [ start ]
+  : (CHAIN
+      (increment-character! "u")
+      (CHAIN-MATCH read-character!
+        | (*some "[")
+        : (LOOP loop
+            hexes <= *empty
+            (CHAIN
+              start <= get-position
+              (CHAIN-MATCH (read-while! hex?)
+                | *none
+                : (CHAIN
+                    next <= peek-character
+                    (error (++ "expected one of [0 1 2 3 4 5 6 7 8 9 A B C D E F] but got " (pretty-newline next)) start))
+
+                | (*some hex)
+                : (CHAIN
+                    start <= get-position
+                    (CHAIN-MATCH read-character!
+                      | (*some "]")
+                      # TODO better name than `join` ?
+                      : (join hexes "")
+
+                      | (*some " ")
+                      : (MATCH (text<<hex hex)
+                          | *none
+                          : (error (++ "invalid hexadecimal " hex) start)
+
+                          | (*some hex)
+                          : (loop (push hexes hex)))
+
+                      | a
+                      : (error (++ "expected space or ] but got " (pretty-newline a)) start))))))
+
+        | a
+        : (error (++ "expected \\u[ but got \\u" (pretty-newline a)) start))))
+
+
+(CONSTANT tokenize-string-escape :: (STATE-TOKEN Text)
+  (CHAIN
+    start <= get-position
+    (increment-character! "\\")
+    (CHAIN-MATCH read-character!
+      | (*some "\\")
+      : (success "\\")
+
+      | (*some "\"")
+      : (success "\"")
+
+      | (*some "s")
+      : (success " ")
+
+      | (*some "n")
+      : (success "\n")
+
+      | (*some "u")
+      : (tokenize-string-escape-unicode start)
+
+      | a
+      : (error (++ "expected one of [\\\\ \\\" \\s \\n \\u] but got \\" (pretty-newline a)) start))))
+
+
+(FUNCTION tokenize-string :: (-> Text (STATE-TOKEN (Source-Wrapper Token)))
+  [ char ]
+  : (CHAIN
+      start <= get-position
+      (increment-character! char)
+      (MATCH start
+        | (*position { column })
+        : (LOOP loop
+            text <= ""
+            (CHAIN-MATCH peek-character
+              | *none
+              : (error (++ "missing ending " char) start)
+
+              | (*some "\\")
+              : (CHAIN-RESULT
+                  a <= (tokenize-string-escape start)
+                  (loop (++ text a)))
+
+              | (*some a)
+              : (IF (equal? a char)
+                  (CHAIN
+                    (increment-character! a)
+                    source <= (get-source start)
+                    (success (*source-wrapper (*text text) source)))
+
+                  (IF (end-of-line? a)
+                    (CHAIN-RESULT
+                      lines <= read-end-of-lines!
+                      (consume-spaces-amount! (+ column 1))
+                      (loop (++ text lines)))
+
+                    (IF (space? a)
+                      (CHAIN-RESULT
+                        spaces <= read-spaces!
+                        (loop (++ text spaces)))
+
+                      (loop (++ text a))))))))))
+
+
+# TODO make this more efficient ?
+# TODO make this easier to understand
+(FUNCTION tokenize-symbol1 :: (-> Text Position (STATE-TOKEN (Source-Wrapper Token)))
+  [ symbol start ]
+  : (MATCH-REGEXP symbol
+      | (REGEXP "^[0-9]+$")
+      : (CHAIN
+          source <= (get-source start)
+          (success (*source-wrapper (*integer symbol) source)))
+
+      # TODO better error checking
+      | (REGEXP "^[0-9]+\\.[0-9]+$")
+      : (CHAIN
+          source <= (get-source start)
+          (success (*source-wrapper (*number symbol) source)))
+
+
+      | (REGEXP "^\\$[^A-Z\\$\\*\\.]+$")
+      : (CHAIN
+          source <= (get-source start)
+          (success (*source-wrapper (*symbol-protocol symbol) source)))
+
+      | (REGEXP "^\\$$")
+      : (error "protocol cannot be empty" start)
+
+      | (REGEXP "^\\$")
+      : (error "protocol cannot contain uppercase letters, *, $, or ." start)
+
+
+      | (REGEXP "^\\*[^A-Z\\$\\*\\.]+$")
+      : (CHAIN
+          source <= (get-source start)
+          (success (*source-wrapper (*symbol-tag symbol) source)))
+
+      | (REGEXP "^\\*$")
+      : (error "tag cannot be empty" start)
+
+      | (REGEXP "^\\*")
+      : (error "tag cannot contain uppercase letters, *, $, or ." start)
+
+
+      # This must be below the integer, number, protocol, and tag
+      | (REGEXP "^[^a-z\\$\\*\\.]+$")
+      : (CHAIN
+          source <= (get-source start)
+          (success (*source-wrapper (*symbol-rewrite-rule symbol) source)))
+
+      | (REGEXP "^[^a-z]+$")
+      : (error "rewrite rule cannot contain *, $, or ." start)
+
+
+      # This must be below the rewrite-rule
+      | (REGEXP "^[A-Z][^\\$\\*\\.]+$")
+      : (CHAIN
+          source <= (get-source start)
+          (success (*source-wrapper (*symbol-type symbol) source)))
+
+      | (REGEXP "^[A-Z]")
+      : (error "type cannot contain *, $, or ." start)
+
+
+      # This must be below everything else
+      | (REGEXP "^[^A-Z\\$\\*\\.]+$")
+      : (CHAIN
+          source <= (get-source start)
+          (success (*source-wrapper (*symbol symbol) source)))
+
+      | (REGEXP "^$")
+      : (error "variable cannot be empty" start)
+
+      | _
+      : (error "variable cannot contain uppercase letters, *, $, or ." start)))
+
+
+(CONSTANT tokenize-symbol :: (STATE-TOKEN (Source-Wrapper Token))
+  (CHAIN
+    start <= get-position
+    symbol <= (read-while! -> a (NOT (delimiter? a)))
+    (MATCH symbol
+      | *none
+      : (error "empty symbol" start)
+
+      | (*some symbol)
+      : (tokenize-symbol1 symbol start))))
+
+
+(FUNCTION tokenize-delimiter :: (-> Text (STATE-TOKEN (Source-Wrapper Token)))
+  [ char ]
+  : (CHAIN
+      start <= get-position
+      (increment-character! char)
+      source <= (get-source start)
+      (success (*source-wrapper (*delimiter char) source))))
+
+
+(FUNCTION tokenize-start-bracket :: (-> Text Text (STATE-TOKEN (Source-Wrapper Token)))
+  [ char end ]
+  : (CHAIN-MATCH get-position
+      | (*position { column })
+      : (CHAIN
+          (push-indent!
+            (*indent { indent <= (+ column 2)
+                       end <= end }))
+          (tokenize-delimiter char))))
+
+
+(FUNCTION tokenize-end-bracket :: (-> Text Text (STATE-TOKEN (Source-Wrapper Token)))
+  [ char start ]
+  : (CHAIN-RESULT
+      token <= (tokenize-delimiter char)
+      (CHAIN-MATCH peek-indent
+        | *none
+        : (<< (parse-error (++ "missing starting " start)
+                (source token)))
+
+        | (*some (*indent { indent end }))
+        : (IF (equal? end char)
+            (CHAIN
+              pop-indent!
+              (success token))
+
+            (<< (parse-error (++ "expected " end " but got " char)
+                  (source token)))))))
+
+
+(CONSTANT consume-indent :: (STATE-TOKEN Null)
+  (CHAIN-MATCH peek-indent
+    | *none
+    : (consume-spaces-equal! 0)
+
+    | (*some (*indent { indent }))
+    : (consume-spaces-equal! indent)))
+
+
+(FUNCTION tokenize1 :: (-> (List (Source-Wrapper Token))
+                         (STATE-TOKEN (List (Source-Wrapper Token))))
+  [ output ]
+  : (CHAIN-MATCH peek-character
+      | *none
+      : (success output)
+
+      | (*some char)
+      : (MATCH-UNION char
+          [ "\u[9]" ]
+          : (CHAIN-RESULT
+              (tokenize-tab char)
+              (tokenize1 output))
+
+          [ " " ]
+          : (CHAIN-RESULT
+              (consume-spaces-equal! 1)
+              (tokenize1 output))
+
+          # TODO Windows and Mac line endings
+          [ "\n" ]
+          : (CHAIN
+              (increment-character! char)
+              (CHAIN-RESULT
+                consume-indent
+                (tokenize1 output)))
+
+          [ "#" ]
+          : (CHAIN-RESULT
+              (tokenize-comment char)
+              (tokenize1 output))
+
+          [ "\"" ]
+          : (CHAIN-RESULT
+              a <= (tokenize-string char)
+              (tokenize1 (push output a)))
+
+          [ "(" ]
+          : (CHAIN-RESULT
+              a <= (tokenize-start-bracket char ")")
+              (tokenize1 (push output a)))
+
+          [ "[" ]
+          : (CHAIN-RESULT
+              a <= (tokenize-start-bracket char "]")
+              (tokenize1 (push output a)))
+
+          [ "{" ]
+          : (CHAIN-RESULT
+              a <= (tokenize-start-bracket char "}")
+              (tokenize1 (push output a)))
+
+          [ ")" ]
+          : (CHAIN-RESULT
+              a <= (tokenize-end-bracket char "(")
+              (tokenize1 (push output a)))
+
+          [ "]" ]
+          : (CHAIN-RESULT
+              a <= (tokenize-end-bracket char "[")
+              (tokenize1 (push output a)))
+
+          [ "}" ]
+          : (CHAIN-RESULT
+              a <= (tokenize-end-bracket char "{")
+              (tokenize1 (push output a)))
+
+          [ "&"
+            "~"
+            "@" ]
+          : (CHAIN-RESULT
+              a <= (tokenize-delimiter char)
+              (tokenize1 (push output a)))
+
+          [ _ ]
+          : (CHAIN-RESULT
+              a <= tokenize-symbol
+              (tokenize1 (push output a))))))
+
+
+(FUNCTION tokenize :: (-> Text Text (RESULT-TOKEN (List (Source-Wrapper Token))))
+  [ filename input ]
+  : (unwrap-value
+      (*state
+        { filename
+          input
+          indents <= *empty
+          position <= (*position { index <= 0
+                                   line <= 0
+                                   column <= 0 }) })
+      (CHAIN-RESULT
+        # TODO is this correct ?
+        consume-indent
+        (tokenize1 *empty))))

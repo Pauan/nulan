@@ -1,0 +1,17 @@
+(IMPORT "nulan:axioms"
+  REWRITE-RULE
+  MATCHES)
+
+(IMPORT "nulan:module/list.nul"
+  transform)
+
+
+(REWRITE-RULE
+  (MATCH ~a ~@b)
+  = &(MATCHES [~a]
+       ~@(transform b -> &~pattern = ~value
+           &[~pattern] = ~value)))
+
+
+(EXPORT
+  MATCH)

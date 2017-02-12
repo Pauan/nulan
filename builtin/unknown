@@ -1,0 +1,22 @@
+(TYPE Unknown
+| (*unknown a))
+
+
+(FUNCTION unknown<| :: (INLINE (-> a Unknown))
+| (unknown<| a)
+    (*unknown a))
+
+(FUNCTION unsafe-<|unknown :: (INLINE (-> Unknown a))
+| (unsafe-<|unknown (*unknown a))
+    a)
+
+
+(FUNCTION unsafe-convert :: (INLINE (-> a b))
+  (unsafe-convert a)
+    (unsafe-<<unknown (unknown<< a)))
+
+
+(EXPORT
+| Unknown
+| unknown<|
+| unsafe-<|unknown)

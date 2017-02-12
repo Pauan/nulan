@@ -1,0 +1,27 @@
+(USE "nulan:protocol")
+(USE "nulan:rewrite-rule")
+(USE "nulan:syntax")
+
+(USE "local:function.nul")
+(USE "local:reduce.nul")
+(USE "local:push.nul")
+
+
+(PROTOCOL ($concat a)
+  concat :: (-> a a a))
+
+
+# TODO is this a good idea ?
+(PROVIDE (REQUIRE ($reduce-left a) ($push a)
+           ($concat (a b)))
+  (FUNCTION concat :: (-> (a b) (a b) (a b))
+    [ a b ]
+    : (reduce-left a b push)))
+
+
+(REWRITE-RULE ++
+  [ ~a ~b ]
+  : &(concat ~a ~b)
+
+  [ ~a ~b ~@c ]
+  : &(++ (++ ~a ~b) ~@c))

@@ -1,0 +1,33 @@
+(IMPORT "nulan:axioms"
+  TYPE
+  UNSAFE-FFI-IMPORT
+  javascript
+  Text
+  Integer
+  EXPORT)
+
+(IMPORT "nulan:module/task.nul"
+  Task)
+
+
+(TYPE (Blocking-Task a))
+
+
+(UNSAFE-FFI-IMPORT { target <= javascript
+                     file <= "../ffi/blocking-task.js" }
+  reply :: (-> a (Blocking-Task a))
+  chain :: (-> (Blocking-Task a) (-> a (Blocking-Task b)) (Blocking-Task b))
+  transform :: (-> (Blocking-Task a) (-> a b) (Blocking-Task b))
+  flatten :: (-> (Blocking-Task (Blocking-Task a)) (Blocking-Task a))
+  task_from :: (-> (Blocking-Task a) (Task a))
+  log :: (-> Text (Blocking-Task a))
+  random_integer :: (-> Integer Integer (Blocking-Task Integer)))
+
+
+(EXPORT
+  reply
+  chain
+  transform
+  flatten
+  task<< <= task_from
+  random-integer <= random_integer)
