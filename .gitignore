@@ -1,2 +1,7 @@
-/build
-/node_modules
+/bower_components/
+/node_modules/
+/.pulp-cache/
+/output/
+/.psc*
+/.psa*
+/nulan

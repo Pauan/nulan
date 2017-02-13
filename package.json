@@ -9,21 +9,16 @@
   "bin": {
     "nulan": "./nulan"
   },
-  "dependencies": {
-    "babel-core": "^6.13.2",
-    "source-map": "^0.5.6",
-    "nodegit": "^0.14.1",
-    "babel-polyfill": "^6.13.0",
-    "esotope": "^1.4.5"
-  },
   "devDependencies": {
-    "rollup": "^0.34.10",
-    "rollup-plugin-babel": "^2.6.1",
-    "babel-preset-es2015": "^6.13.2",
-    "babel-plugin-external-helpers": "^6.8.0",
-    "babel-plugin-transform-async-to-generator": "^6.8.0"
+    "bower": "^1.8.0",
+    "pulp": "^10.0.0",
+    "purescript": "0.10.5",
+    "rollup": "^0.41.4",
+    "rollup-plugin-purs": "^1.0.24"
   },
   "scripts": {
-    "prepublish": "rollup --config build.nulan.js"
+    "prepublish": "bower install",
+    "run": "pulp run",
+    "build": "pulp build && rollup --config build.nulan.js"
   }
 }
