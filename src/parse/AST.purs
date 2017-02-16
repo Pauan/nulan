@@ -39,10 +39,13 @@ instance showAST' :: Show AST' where
   show (Text a) = show a
   show (Symbol a) = a
 
+  -- TODO better spacing when it only has a body
   show (Lambda a b) = "(-> " <> intercalate " " (map show a) <> " " <> show b <> ")"
 
   show (Parens a) = "(" <> intercalate " " (map show a) <> ")"
+  -- TODO better spacing when it is empty
   show (Array a) = "[ " <> intercalate " " (map show a) <> " ]"
+  -- TODO better spacing when it is empty
   show (Record a) = "{ " <> intercalate " " (map show a) <> " }"
 
   show (Quote a) = "&" <> show a

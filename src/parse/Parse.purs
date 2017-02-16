@@ -129,6 +129,24 @@ parseInfix priority associativity make middle name =
         throwError $ MissingLeftExpression name middle
 
 
+parseWildcard :: Source' -> TokenInfo
+parseWildcard middle =
+  { priority: top
+  , parse: \token priority output ->
+      parse' priority $ snoc output $ Source Wildcard middle }
+
+
+parseLambda :: Priority -> (Array AST -> AST -> AST') -> Source' -> String -> TokenInfo
+parseLambda priority make middle name =
+  parseTransform priority Right \left _ right ->
+    case unsnoc right of
+      Just (Tuple r right) ->
+        pure $ snoc left $ Source (make (Array.fromFoldable right) r) (middle <> source r)
+
+      Nothing ->
+        throwError $ LambdaMissingBody name middle
+
+
 parseNormal :: TokenInfo
 parseNormal =
   { priority: top
@@ -150,6 +168,8 @@ parseSpecial (Source (TokenSymbol ".") source) = parseInfix 10 Left Dot source "
 parseSpecial (Source (TokenSymbol ":") source) = parseInfix 10 Right Match source ":"
 parseSpecial (Source (TokenSymbol "::") source) = parseInfix 10 Right Type source "::"
 parseSpecial (Source (TokenSymbol "<=") source) = parseInfix 10 Right Assign source "<="
+parseSpecial (Source (TokenSymbol "->") source) = parseLambda 10 Lambda source "->"
+parseSpecial (Source (TokenSymbol "_") source) = parseWildcard source
 parseSpecial _ = parseNormal
 
 

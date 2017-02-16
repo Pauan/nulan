@@ -11,6 +11,7 @@ data ParseError
   | MissingEndParen String Source'
   | MissingLeftExpression String Source'
   | MissingRightExpression String Source'
+  | LambdaMissingBody String Source'
 
 
 printError :: String -> Source' -> String
@@ -24,3 +25,4 @@ instance showParseError :: Show ParseError where
   show (MissingEndParen end source)           = printError ("missing ending " <> end) source
   show (MissingLeftExpression middle source)  = printError ("missing expression on the left side of " <> middle) source
   show (MissingRightExpression middle source) = printError ("missing expression on the right side of " <> middle) source
+  show (LambdaMissingBody name source)        = printError ("missing expression on the right side of " <> name) source
