@@ -1,31 +1,57 @@
 module Nulan.AST where
 
 import Prelude
+import Data.Foldable (intercalate)
 import Nulan.Source (Source)
 
 
 data AST'
-  = Integer String
+  = Wildcard
+
+  | Integer String
   | Number String
   | Text String
   | Symbol String
+
+  | Lambda (Array AST) AST
+
   | Parens (Array AST)
   | Array (Array AST)
   | Record (Array AST)
+
+  | Quote AST
+  | Unquote AST
+  | Splice AST
+
+  | Dot AST AST
+  | Match AST AST
   | Assign AST AST
   | Type AST AST
 
 derive instance eqAST' :: Eq AST'
 
+-- TODO remove unnecessary parens from the output
 instance showAST' :: Show AST' where
-  show (Integer a) = "(Integer " <> a <> ")"
-  show (Number a) = "(Number " <> a <> ")"
-  show (Text a) = "(Text " <> show a <> ")"
-  show (Symbol a) = "(Symbol " <> show a <> ")"
-  show (Parens a) = "(Parens " <> show a <> ")"
-  show (Array a) = "(Array " <> show a <> ")"
-  show (Record a) = "(Record " <> show a <> ")"
-  show (Assign a b) = "(Assign " <> show a <> " " <> show b <> ")"
-  show (Type a b) = "(Type " <> show a <> " " <> show b <> ")"
+  show Wildcard = "_"
+
+  show (Integer a) = a
+  show (Number a) = a
+  show (Text a) = show a
+  show (Symbol a) = a
+
+  show (Lambda a b) = "(-> " <> intercalate " " (map show a) <> " " <> show b <> ")"
+
+  show (Parens a) = "(" <> intercalate " " (map show a) <> ")"
+  show (Array a) = "[ " <> intercalate " " (map show a) <> " ]"
+  show (Record a) = "{ " <> intercalate " " (map show a) <> " }"
+
+  show (Quote a) = "&" <> show a
+  show (Unquote a) = "~" <> show a
+  show (Splice a) = "@" <> show a
+
+  show (Dot a b) = "(" <> show a <> "." <> show b <> ")"
+  show (Match a b) = "(" <> show a <> " : " <> show b <> ")"
+  show (Assign a b) = "(" <> show a <> " <= " <> show b <> ")"
+  show (Type a b) = "(" <> show a <> " :: " <> show b <> ")"
 
 type AST = Source AST'

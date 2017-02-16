@@ -26,8 +26,14 @@ instance semigroupSource' :: Semigroup Source' where
 data Source a =
   Source a Source'
 
+instance functorSource :: Functor Source where
+  map f (Source a b) = Source (f a) b
+
 instance showSource :: Show a => Show (Source a) where
   show (Source a _) = show a
 
 instance eqSource :: Eq a => Eq (Source a) where
   eq (Source a _) (Source b _) = eq a b
+
+source :: forall a. Source a -> Source'
+source (Source _ a) = a

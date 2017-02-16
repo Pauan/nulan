@@ -2,19 +2,24 @@ module Nulan.Parse where
 
 import Prelude
 import Data.Maybe (Maybe(..))
-import Data.Either (Either(..))
+import Data.Either (Either)
 import Data.Tuple (Tuple(..))
 import Data.Array as Array
 
-import Nulan.Queue (Queue, uncons, snoc, empty, fromString)
+import Nulan.Queue (Queue, uncons, snoc, unsnoc, empty, fromString, singleton)
 import Nulan.ParseError (ParseError(..))
 import Nulan.AST (AST, AST'(..))
 import Nulan.Position (Position(..))
-import Nulan.Source (Source(..), Source')
+import Nulan.Source (Source(..), Source', source)
 import Nulan.Tokenize (Token, Token'(..))
 import Nulan.State (State, runState, getState, putState, throwError)
 
 import Debug.Trace
+
+
+data Associativity
+  = Left
+  | Right
 
 
 type Priority = Int
@@ -40,10 +45,10 @@ setCurrent :: Queue Token -> Parser Unit
 setCurrent input = putState { input }
 
 
-tokenToAST :: Token -> AST
-tokenToAST (Source (TokenInteger a) b) = Source (Integer a) b
-tokenToAST (Source (TokenText a) b)    = Source (Text a) b
-tokenToAST (Source (TokenSymbol a) b)  = Source (Symbol a) b
+tokenToAST :: Token' -> AST'
+tokenToAST (TokenInteger a) = Integer a
+tokenToAST (TokenText a)    = Text a
+tokenToAST (TokenSymbol a)  = Symbol a
 
 
 parseParen' :: (Array AST -> AST') -> Source' -> String -> Queue AST -> Parser AST
@@ -85,11 +90,50 @@ errorMissing source left =
       throwError $ MissingStartParen left source }
 
 
+parseTransform :: Priority -> Associativity -> (Queue AST -> Token -> Queue AST -> Parser (Queue AST)) -> TokenInfo
+parseTransform priority associativity parse =
+  { priority: priority
+  , parse: \token continue output -> do
+      let priority' = case associativity of
+                        Left -> priority
+                        Right -> priority - 1
+      right <- parse' priority' empty
+      a <- parse output token right
+      parse' continue a }
+
+
+parsePrefix :: Priority -> (AST -> AST') -> Source' -> String -> TokenInfo
+parsePrefix priority make middle name =
+  parseTransform priority Right \left _ right ->
+    case uncons right of
+      Just (Tuple r right) ->
+        pure $ snoc left (Source (make r) (middle <> source r)) <> right
+
+      Nothing ->
+        throwError $ MissingRightExpression name middle
+
+
+parseInfix :: Priority -> Associativity -> (AST -> AST -> AST') -> Source' -> String -> TokenInfo
+parseInfix priority associativity make middle name =
+  parseTransform priority associativity \left _ right ->
+    case unsnoc left of
+      Just (Tuple l left) ->
+        case uncons right of
+          Just (Tuple r right) ->
+            pure $ snoc left (Source (make l r) (source l <> source r)) <> right
+
+          Nothing ->
+            throwError $ MissingRightExpression name middle
+
+      Nothing ->
+        throwError $ MissingLeftExpression name middle
+
+
 parseNormal :: TokenInfo
 parseNormal =
   { priority: top
   , parse: \token priority output ->
-      parse' priority $ snoc output $ tokenToAST token }
+      parse' priority $ snoc output $ map tokenToAST token }
 
 
 parseSpecial :: Token -> TokenInfo
@@ -97,6 +141,15 @@ parseSpecial (Source (TokenSymbol "(") source) = parseParen Parens source ")"
 parseSpecial (Source (TokenSymbol ")") source) = errorMissing source "("
 parseSpecial (Source (TokenSymbol "[") source) = parseParen Array source "]"
 parseSpecial (Source (TokenSymbol "]") source) = errorMissing source "["
+parseSpecial (Source (TokenSymbol "{") source) = parseParen Record source "}"
+parseSpecial (Source (TokenSymbol "}") source) = errorMissing source "{"
+parseSpecial (Source (TokenSymbol "&") source) = parsePrefix 10 Quote source "&"
+parseSpecial (Source (TokenSymbol "~") source) = parsePrefix 20 Unquote source "~"
+parseSpecial (Source (TokenSymbol "@") source) = parsePrefix 20 Splice source "@"
+parseSpecial (Source (TokenSymbol ".") source) = parseInfix 10 Left Dot source "."
+parseSpecial (Source (TokenSymbol ":") source) = parseInfix 10 Right Match source ":"
+parseSpecial (Source (TokenSymbol "::") source) = parseInfix 10 Right Type source "::"
+parseSpecial (Source (TokenSymbol "<=") source) = parseInfix 10 Right Assign source "<="
 parseSpecial _ = parseNormal
 
 

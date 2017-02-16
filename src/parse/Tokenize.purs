@@ -21,9 +21,9 @@ data Token'
   | TokenSymbol String
 
 instance showToken :: Show Token' where
-  show (TokenInteger s) = "(TokenInteger " <> show s <> ")"
-  show (TokenText s) = "(TokenText " <> show s <> ")"
-  show (TokenSymbol s) = "(TokenSymbol " <> show s <> ")"
+  show (TokenInteger s) = s
+  show (TokenText s) = show s
+  show (TokenSymbol s) = s
 
 type Token = Source Token'
 
