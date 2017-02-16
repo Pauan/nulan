@@ -1,6 +1,22 @@
 module Nulan.ParseError where
 
-import Nulan.Source (Source)
+import Prelude
+import Nulan.Source (Source')
 
 
-data ParseError = ParseError String Source
+data ParseError
+  = TabsNotAllowed Source'
+  | MissingEndComment Source'
+  | MissingStartParen String Source'
+  | MissingEndParen String Source'
+
+
+printError :: String -> Source' -> String
+printError message source = "Error: " <> message <> "  " <> show source
+
+
+instance showParseError :: Show ParseError where
+  show (TabsNotAllowed source)          = printError "tabs are not allowed" source
+  show (MissingEndComment source)       = printError "missing ending /#" source
+  show (MissingStartParen start source) = printError ("missing starting " <> start) source
+  show (MissingEndParen end source)     = printError ("missing ending " <> end) source

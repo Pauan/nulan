@@ -1,95 +1,131 @@
 module Nulan.Parse where
 
 import Prelude
-import Nulan.CharStream (CharStream, fromString, peek, next)
-import Data.String (fromCharArray, toCharArray)
 import Data.Maybe (Maybe(..))
-import Control.Alt ((<|>))
-import Data.Either (Either)
-import Data.Array (many, some)
-import Text.Parsing.Parser (Parser, ParseError, runParser)
-import Text.Parsing.Parser.Expr (buildExprParser, Assoc(..), Operator(..))
-import Text.Parsing.Parser.Combinators (optionMaybe, skipMany, between)
-import Text.Parsing.Parser.String (char, eof, oneOf, string)
-import Nulan.AST (AST(..))
+import Data.Either (Either(..))
+import Data.Tuple (Tuple(..))
+import Data.Array as Array
+
+import Nulan.Queue (Queue, uncons, snoc, empty, fromString)
+import Nulan.ParseError (ParseError(..))
+import Nulan.AST (AST, AST'(..))
+import Nulan.Position (Position(..))
+import Nulan.Source (Source(..), Source')
+import Nulan.Tokenize (Token, Token'(..))
+import Nulan.State (State, runState, getState, putState, throwError)
+
 import Debug.Trace
 
 
-data Token
-  = TokenInteger String Source
-  | TokenNumber String Source
-  | TokenText String Source
-  | TokenSymbol String Source
+type Priority = Int
+
+type TokenInfo =
+  { priority :: Priority
+  , parse :: Token -> Priority -> Queue AST -> Parser (Queue AST) }
 
 
+type ParserState =
+  { input :: Queue Token }
 
-tokenize1 :: Char -> Maybe Token
-
-
-digit :: Parser String Char
-digit = oneOf $ toCharArray "0123456789"
-
-identifier :: Parser String Char
-identifier = oneOf $ toCharArray "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ?!*$<=-"
+type Parser = State ParseError ParserState
 
 
-parseParens :: Unit -> Parser String AST
-parseParens _ = do
-  a <- between (char '(') (char ')') parse'
-  pure $ Parens a
+getCurrent :: Parser (Maybe (Tuple Token (Queue Token)))
+getCurrent = do
+  { input } <- getState
+  pure $ uncons input
 
 
-parseArray :: Unit -> Parser String AST
-parseArray _ = do
-  a <- between (char '[') (char ']') parse'
-  pure $ Array a
+setCurrent :: Queue Token -> Parser Unit
+setCurrent input = putState { input }
 
 
-parseRecord :: Unit -> Parser String AST
-parseRecord _ = do
-  a <- between (char '{') (char '}') parse'
-  pure $ Record a
+tokenToAST :: Token -> AST
+tokenToAST (Source (TokenInteger a) b) = Source (Integer a) b
+tokenToAST (Source (TokenText a) b)    = Source (Text a) b
+tokenToAST (Source (TokenSymbol a) b)  = Source (Symbol a) b
 
 
-parseWhitespace :: Parser String Char
-parseWhitespace = char ' ' <|> char '\n'
+parseParen' :: (Array AST -> AST') -> Source' -> String -> Queue AST -> Parser AST
+parseParen' make start right output = do
+  current <- getCurrent
+  case current of
+    Just (Tuple token rest) -> do
+      case token of
+        Source (TokenSymbol s) end ->
+          if s == right
+          then do
+            setCurrent rest
+            pure $ Source (make $ Array.fromFoldable output) (start <> end)
 
+          else do
+            output <- parse'' bottom output token rest
+            parseParen' make start right output
 
-parseNums :: Parser String AST
-parseNums = do
-  a <- some digit
-  b <- optionMaybe (char '.')
-  case b of
-    Just b -> do
-      c <- some digit
-      pure $ Number $ fromCharArray (a <> [b] <> c)
+        _ -> do
+          output <- parse'' bottom output token rest
+          parseParen' make start right output
+
     Nothing ->
-      pure $ Integer $ fromCharArray a
+      throwError $ MissingEndParen right start
 
 
-parseIdentifier :: Parser String AST
-parseIdentifier = do
-  a <- some identifier
-  pure $ Symbol $ fromCharArray a
+parseParen :: (Array AST -> AST') -> Source' -> String -> TokenInfo
+parseParen make start right =
+  { priority: top
+  , parse: \_ priority output -> do
+      a <- parseParen' make start right empty
+      parse' priority (snoc output a) }
 
 
-parse' :: Parser String (Array AST)
-parse' = many do
-  skipMany parseWhitespace
-  buildExprParser
-    [ [ Infix (string "<=" $> \a b -> Assign (spy a) (spy b)) AssocRight ]
-    , [ Infix (string "::" $> Type) AssocLeft ]
-    ]
-    (parseParens unit <|>
-     parseArray unit <|>
-     parseRecord unit <|>
-     parseNums <|>
-     parseIdentifier)
+errorMissing :: forall a. Source' -> String -> TokenInfo
+errorMissing source left =
+  { priority: bottom
+  , parse: \_ _ _ ->
+      throwError $ MissingStartParen left source }
 
 
-parse :: String -> String -> Either ParseError (Array AST)
-parse code filename = runParser code do
-  a <- parse'
-  -- TODO is this the idiomatic way to accomplish this ?
-  eof
-  pure a
+parseNormal :: TokenInfo
+parseNormal =
+  { priority: top
+  , parse: \token priority output ->
+      parse' priority $ snoc output $ tokenToAST token }
+
+
+parseSpecial :: Token -> TokenInfo
+parseSpecial (Source (TokenSymbol "(") source) = parseParen Parens source ")"
+parseSpecial (Source (TokenSymbol ")") source) = errorMissing source "("
+parseSpecial (Source (TokenSymbol "[") source) = parseParen Array source "]"
+parseSpecial (Source (TokenSymbol "]") source) = errorMissing source "["
+parseSpecial _ = parseNormal
+
+
+parse'' :: Priority -> Queue AST -> Token -> Queue Token -> Parser (Queue AST)
+parse'' priority output token rest =
+  let a = parseSpecial token
+  in
+    if priority < a.priority
+    then do
+      setCurrent rest
+      a.parse token priority output
+    else
+      pure output
+
+
+parse' :: Priority -> Queue AST -> Parser (Queue AST)
+parse' priority output = do
+  current <- getCurrent
+  case current of
+    Just (Tuple token rest) ->
+      parse'' priority output token rest
+
+    Nothing ->
+      pure output
+
+
+parse :: Either ParseError (Queue Token) -> Either ParseError (Queue AST)
+parse input = do
+  input <- input
+  runState
+    (parse' bottom empty)
+    { input: input }
