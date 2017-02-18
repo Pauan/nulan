@@ -4,6 +4,7 @@ import Prelude
 import Data.String (fromCharArray, toCharArray, singleton, charAt)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Either (Either(..))
+import Data.Array as Array
 
 import Nulan.Queue (Queue, uncons, snoc, empty, fromString)
 import Nulan.ParseError (ParseError(..))
@@ -20,10 +21,12 @@ data Token'
   | TokenText String
   | TokenSymbol String
 
-instance showToken :: Show Token' where
-  show (TokenInteger s) = s
-  show (TokenText s) = show s
-  show (TokenSymbol s) = s
+derive instance eqToken' :: Eq Token'
+
+instance showToken' :: Show Token' where
+  show (TokenInteger s) = "(TokenInteger " <> show s <> ")"
+  show (TokenText s) = "(TokenText " <> show s <> ")"
+  show (TokenSymbol s) = "(TokenSymbol " <> show s <> ")"
 
 type Token = Source Token'
 
@@ -147,7 +150,7 @@ tokenizeComment output = do
     Just char -> do
       readChar char
       -- TODO Windows/Mac line endings ?
-      _ <- consumeMany (_ /= '\n') (singleton char)
+      consumeMany (_ /= '\n') const unit
       pure output
 
     Nothing ->
@@ -173,32 +176,48 @@ tokenizeSpecial '~'  = Just (push1 '~')
 tokenizeSpecial _    = Nothing
 
 
-consumeMany :: (Char -> Boolean) -> String -> Tokenizer String
-consumeMany test str = do
+consumeMany :: forall a. (Char -> Boolean) -> (a -> Char -> a) -> a -> Tokenizer a
+consumeMany test push a = do
   char <- peekChar
   case char of
     Just char ->
       if test char
       then do
         readChar char
-        consumeMany test (str <> singleton char)
+        consumeMany test push (push a char)
       else
-        pure str
+        pure a
     Nothing ->
-      pure str
+      pure a
 
 
 isIdentifier :: Char -> Boolean
 isIdentifier char = isNothing (tokenizeSpecial char)
 
 
+isNumber :: Char -> Boolean
+isNumber '0' = true
+isNumber '1' = true
+isNumber '2' = true
+isNumber '3' = true
+isNumber '4' = true
+isNumber '5' = true
+isNumber '6' = true
+isNumber '7' = true
+isNumber '8' = true
+isNumber '9' = true
+isNumber _ = false
+
+
 tokenizeIdentifier :: Char -> Queue Token -> Tokenizer (Queue Token)
 tokenizeIdentifier char output = do
   start <- getPosition
   readChar char
-  str <- consumeMany isIdentifier (singleton char)
+  str <- consumeMany isIdentifier Array.snoc (Array.singleton char)
   source <- getSource start
-  pure $ snoc output $ Source (TokenSymbol str) source
+  if Array.all isNumber str
+    then pure $ snoc output $ Source (TokenInteger $ fromCharArray str) source
+    else pure $ snoc output $ Source (TokenSymbol $ fromCharArray str) source
 
 
 tokenize' :: Queue Token -> Tokenizer (Queue Token)

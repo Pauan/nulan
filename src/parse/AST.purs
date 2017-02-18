@@ -30,31 +30,55 @@ data AST'
 
 derive instance eqAST' :: Eq AST'
 
+{-pretty Wildcard = "_"
+
+pretty (Integer a) = a
+pretty (Number a) = a
+pretty (Text a) = show a
+pretty (Symbol a) = a
+
+-- TODO better spacing when it only has a body
+pretty (Lambda a b) = "(-> " <> intercalate " " (map pretty a) <> " " <> pretty b <> ")"
+
+pretty (Parens a) = "(" <> intercalate " " (map pretty a) <> ")"
+-- TODO better spacing when it is empty
+pretty (Array a) = "[ " <> intercalate " " (map pretty a) <> " ]"
+-- TODO better spacing when it is empty
+pretty (Record a) = "{ " <> intercalate " " (map pretty a) <> " }"
+
+pretty (Quote a) = "&" <> pretty a
+pretty (Unquote a) = "~" <> pretty a
+pretty (Splice a) = "@" <> pretty a
+
+pretty (Dot a b) = "(" <> pretty a <> "." <> pretty b <> ")"
+pretty (Match a b) = "(" <> pretty a <> " : " <> pretty b <> ")"
+pretty (Assign a b) = "(" <> pretty a <> " <= " <> pretty b <> ")"
+pretty (Type a b) = "(" <> pretty a <> " :: " <> pretty b <> ")"-}
+
 -- TODO remove unnecessary parens from the output
 instance showAST' :: Show AST' where
-  show Wildcard = "_"
+  show Wildcard = "Wildcard"
 
-  show (Integer a) = a
-  show (Number a) = a
-  show (Text a) = show a
-  show (Symbol a) = a
+  show (Integer a) = "(Integer " <> show a <> ")"
+  show (Number a) = "(Number " <> show a <> ")"
+  show (Text a) = "(Text " <> show a <> ")"
+  show (Symbol a) = "(Symbol " <> show a <> ")"
 
-  -- TODO better spacing when it only has a body
-  show (Lambda a b) = "(-> " <> intercalate " " (map show a) <> " " <> show b <> ")"
+  show (Lambda a b) = "(Lambda " <> show a <> " " <> show b <> ")"
 
-  show (Parens a) = "(" <> intercalate " " (map show a) <> ")"
+  show (Parens a) = "(Parens" <> show a <> ")"
   -- TODO better spacing when it is empty
-  show (Array a) = "[ " <> intercalate " " (map show a) <> " ]"
+  show (Array a) = "(Array " <> show a <> " ]"
   -- TODO better spacing when it is empty
-  show (Record a) = "{ " <> intercalate " " (map show a) <> " }"
+  show (Record a) = "(Record " <> show a <> " }"
 
-  show (Quote a) = "&" <> show a
-  show (Unquote a) = "~" <> show a
-  show (Splice a) = "@" <> show a
+  show (Quote a) = "(Quote " <> show a <> ")"
+  show (Unquote a) = "(Unquote " <> show a <> ")"
+  show (Splice a) = "(Splice " <> show a <> ")"
 
-  show (Dot a b) = "(" <> show a <> "." <> show b <> ")"
-  show (Match a b) = "(" <> show a <> " : " <> show b <> ")"
-  show (Assign a b) = "(" <> show a <> " <= " <> show b <> ")"
-  show (Type a b) = "(" <> show a <> " :: " <> show b <> ")"
+  show (Dot a b) = "(Dot " <> show a <> " " <> show b <> ")"
+  show (Match a b) = "(Match " <> show a <> " " <> show b <> ")"
+  show (Assign a b) = "(Assign " <> show a <> " " <> show b <> ")"
+  show (Type a b) = "(Type " <> show a <> " " <> show b <> ")"
 
 type AST = Source AST'

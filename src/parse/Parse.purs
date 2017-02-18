@@ -10,7 +10,7 @@ import Nulan.Queue (Queue, uncons, snoc, unsnoc, empty, fromString, singleton)
 import Nulan.ParseError (ParseError(..))
 import Nulan.AST (AST, AST'(..))
 import Nulan.Position (Position(..))
-import Nulan.Source (Source(..), Source', source)
+import Nulan.Source (Source(..), Source', getSource)
 import Nulan.Tokenize (Token, Token'(..))
 import Nulan.State (State, runState, getState, putState, throwError)
 
@@ -107,7 +107,7 @@ parsePrefix priority make middle name =
   parseTransform priority Right \left _ right ->
     case uncons right of
       Just (Tuple r right) ->
-        pure $ snoc left (Source (make r) (middle <> source r)) <> right
+        pure $ snoc left (Source (make r) (middle <> getSource r)) <> right
 
       Nothing ->
         throwError $ MissingRightExpression name middle
@@ -120,7 +120,7 @@ parseInfix priority associativity make middle name =
       Just (Tuple l left) ->
         case uncons right of
           Just (Tuple r right) ->
-            pure $ snoc left (Source (make l r) (source l <> source r)) <> right
+            pure $ snoc left (Source (make l r) (getSource l <> getSource r)) <> right
 
           Nothing ->
             throwError $ MissingRightExpression name middle
@@ -141,7 +141,7 @@ parseLambda priority make middle name =
   parseTransform priority Right \left _ right ->
     case unsnoc right of
       Just (Tuple r right) ->
-        pure $ snoc left $ Source (make (Array.fromFoldable right) r) (middle <> source r)
+        pure $ snoc left $ Source (make (Array.fromFoldable right) r) (middle <> getSource r)
 
       Nothing ->
         throwError $ LambdaMissingBody name middle

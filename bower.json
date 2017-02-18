@@ -12,7 +12,8 @@
     "purescript-debug": "^2.0.0",
     "purescript-strings": "^2.1.0",
     "purescript-arrays": "^3.2.0",
-    "purescript-parsing": "^3.2.0"
+    "purescript-parsing": "^3.2.0",
+    "purescript-test-unit": "^10.1.0"
   },
   "devDependencies": {
     "purescript-psci-support": "^2.0.0"

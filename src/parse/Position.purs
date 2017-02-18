@@ -10,6 +10,14 @@ newtype Position =
 
 derive instance eqPosition :: Eq Position
 
+instance showPosition :: Show Position where
+  show (Position { index, line, column }) =
+    "(Position { index: " <> show index <> ", line: " <> show line <> ", column: " <> show column <> " })"
+
+
+position :: Int -> Int -> Int -> Position
+position index line column = Position { index, line, column }
+
 
 incrementLine :: Position -> Position
 incrementLine (Position { index, line }) =

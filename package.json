@@ -19,6 +19,7 @@
   "scripts": {
     "prepublish": "bower install",
     "run": "pulp run",
+    "test": "pulp test",
     "build": "pulp build && rollup --config build.nulan.js"
   }
 }
