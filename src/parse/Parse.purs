@@ -154,22 +154,34 @@ parseNormal =
       parse' priority $ snoc output $ map tokenToAST token }
 
 
+makeDot :: AST -> AST -> AST'
+makeDot (Source (Integer a) _) (Source (Integer b) _) = Number (a <> "." <> b)
+makeDot a b = Dot a b
+
+
 parseSpecial :: Token -> TokenInfo
 parseSpecial (Source (TokenSymbol "(") source) = parseParen Parens source ")"
 parseSpecial (Source (TokenSymbol ")") source) = errorMissing source "("
+
 parseSpecial (Source (TokenSymbol "[") source) = parseParen Array source "]"
 parseSpecial (Source (TokenSymbol "]") source) = errorMissing source "["
+
 parseSpecial (Source (TokenSymbol "{") source) = parseParen Record source "}"
 parseSpecial (Source (TokenSymbol "}") source) = errorMissing source "{"
-parseSpecial (Source (TokenSymbol "&") source) = parsePrefix 10 Quote source "&"
+
+parseSpecial (Source (TokenSymbol "|") source) = parsePrefix 30 Bar source "|"
 parseSpecial (Source (TokenSymbol "~") source) = parsePrefix 20 Unquote source "~"
 parseSpecial (Source (TokenSymbol "@") source) = parsePrefix 20 Splice source "@"
-parseSpecial (Source (TokenSymbol ".") source) = parseInfix 10 Left Dot source "."
+parseSpecial (Source (TokenSymbol "&") source) = parsePrefix 10 Quote source "&"
+
+parseSpecial (Source (TokenSymbol ".") source) = parseInfix 10 Left makeDot source "."
 parseSpecial (Source (TokenSymbol ":") source) = parseInfix 10 Right Match source ":"
 parseSpecial (Source (TokenSymbol "::") source) = parseInfix 10 Right Type source "::"
 parseSpecial (Source (TokenSymbol "<=") source) = parseInfix 10 Right Assign source "<="
+
 parseSpecial (Source (TokenSymbol "->") source) = parseLambda 10 Lambda source "->"
 parseSpecial (Source (TokenSymbol "_") source) = parseWildcard source
+
 parseSpecial _ = parseNormal
 
 

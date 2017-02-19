@@ -2,6 +2,7 @@ module Nulan.Source where
 
 import Prelude
 import Nulan.Position (Position(..))
+import Nulan.Pretty (class Pretty, pretty)
 
 
 newtype Source' =
@@ -33,6 +34,10 @@ instance functorSource :: Functor Source where
 
 instance showSource :: Show a => Show (Source a) where
   show (Source a b) = "(Source " <> show a <> " " <> show b <> ")"
+
+instance prettySource :: Pretty a => Pretty (Source a) where
+  pretty (Source a _) = pretty a
+
 
 getValue :: forall a. Source a -> a
 getValue (Source a _) = a
