@@ -233,10 +233,14 @@ tokenize' output = do
       pure output
 
 
-tokenize :: String -> String -> Either ParseError (Queue Token)
+tokenize :: String -> String -> Either ParseError (Source (Queue Token))
 tokenize code filename =
   runState
-    (tokenize' empty)
+    do
+      start <- getPosition
+      output <- tokenize' empty
+      source <- getSource start
+      pure $ Source output source
     { input: code
     , filename: filename
     , position: Position { index: 0, line: 0, column: 0 } }

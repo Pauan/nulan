@@ -14,7 +14,7 @@ derive instance eqSource' :: Eq Source'
 
 instance showSource' :: Show Source' where
   show (Source' { filename, start, end }) =
-    "(Source' { filename: " <> show filename <> ", start: " <> show start <> ", end: " <> show end <> " })"
+    "{ filename: " <> show filename <> ", start: " <> show start <> ", end: " <> show end <> " }"
 
 
 instance semigroupSource' :: Semigroup Source' where

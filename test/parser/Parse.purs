@@ -9,36 +9,48 @@ import Nulan.AST (AST, AST'(..))
 import Nulan.Parse (parse)
 import Nulan.Tokenize (tokenize)
 import Nulan.Position (Position, position)
-import Nulan.Source (Source, source)
+import Nulan.Source (Source(..), source)
 import Nulan.Pretty (pretty)
 
 source' :: forall a. a -> Position -> Position -> Source a
 source' a start end = source a "test.nul" start end
 
-testParse :: forall a. String -> Array AST -> TestSuite a
+testParse :: forall a. String -> Source (Array AST) -> TestSuite a
 testParse input a =
   test input
     case parse (tokenize input "test.nul") of
       Left b -> failure (show b)
-      Right b -> equal a (Array.fromFoldable b)
+      Right b -> equal a (map Array.fromFoldable b)
 
 testPretty :: forall a. String -> Array String -> TestSuite a
 testPretty input a =
   test input
     case parse (tokenize input "test.nul") of
       Left b -> failure (show b)
-      Right b -> equal a (map pretty (Array.fromFoldable b))
+      Right (Source b _) -> equal a (map pretty (Array.fromFoldable b))
 
 tests :: forall a. TestSuite a
 tests = suite "Parse" do
-  testParse "( foo bar )"
+  testParse "( foo bar )" $ source'
     [ source' (Parens [ source' (Symbol "foo") (position 2 0 2) (position 5 0 5)
                       , source' (Symbol "bar") (position 6 0 6) (position 9 0 9) ])
               (position 0 0 0)
               (position 11 0 11) ]
+    (position 0 0 0)
+    (position 11 0 11)
 
 
-  testParse " [10.0]  &((20.0) 30) (-> 1 2 3 4) { _ }\nfoobar <= test"
+  testParse "(-> a b c)" $ source'
+    [ source' (Lambda [ source' (Symbol "a") (position 4 0 4) (position 5 0 5)
+                      , source' (Symbol "b") (position 6 0 6) (position 7 0 7) ]
+                (source' (Symbol "c") (position 8 0 8) (position 9 0 9)))
+              (position 0 0 0)
+              (position 10 0 10) ]
+    (position 0 0 0)
+    (position 10 0 10)
+
+
+  testParse " [10.0]  &((20.0) 30) (-> 1 2 3 4) { _ }\nfoobar <= test" $ source'
     [ source' (Array [ source' (Number "10.0") (position 2 0 2) (position 6 0 6) ])
               (position 1 0 1)
               (position 7 0 7)
@@ -52,12 +64,10 @@ tests = suite "Parse" do
               (position 9 0 9)
               (position 21 0 21)
 
-    , source' (Parens [ source' (Lambda [ source' (Integer "1") (position 26 0 26) (position 27 0 27)
-                                        , source' (Integer "2") (position 28 0 28) (position 29 0 29)
-                                        , source' (Integer "3") (position 30 0 30) (position 31 0 31) ]
-                                  (source' (Integer "4") (position 32 0 32) (position 33 0 33)))
-                                (position 23 0 23)
-                                (position 33 0 33) ])
+    , source' (Lambda [ source' (Integer "1") (position 26 0 26) (position 27 0 27)
+                      , source' (Integer "2") (position 28 0 28) (position 29 0 29)
+                      , source' (Integer "3") (position 30 0 30) (position 31 0 31) ]
+                (source' (Integer "4") (position 32 0 32) (position 33 0 33)))
               (position 22 0 22)
               (position 34 0 34)
 
@@ -69,6 +79,8 @@ tests = suite "Parse" do
                       (source' (Symbol "test") (position 51 1 10) (position 55 1 14)))
               (position 41 1 0)
               (position 55 1 14) ]
+    (position 0 0 0)
+    (position 55 1 14)
 
 
   testPretty "(-> 1 2 3 (-> 4 5 6 [ 1 2 3 ] { 4 5 6 } | [ 1 &~2 ]))"

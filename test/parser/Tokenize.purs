@@ -12,22 +12,24 @@ import Nulan.Source (Source, source)
 source' :: forall a. a -> Position -> Position -> Source a
 source' a start end = source a "test.nul" start end
 
-testTokenize :: forall a. String -> Array Token -> TestSuite a
+testTokenize :: forall a. String -> Source (Array Token) -> TestSuite a
 testTokenize input a =
   test input
     case tokenize input "test.nul" of
       Left b -> failure (show b)
-      Right b -> equal a (Array.fromFoldable b)
+      Right b -> equal a (map Array.fromFoldable b)
 
 tests :: forall a. TestSuite a
 tests = suite "Tokenize" do
-  testTokenize "( foo bar )"
+  testTokenize "( foo bar )" $ source'
     [ source' (TokenSymbol "(") (position 0 0 0) (position 1 0 1)
     , source' (TokenSymbol "foo") (position 2 0 2) (position 5 0 5)
     , source' (TokenSymbol "bar") (position 6 0 6) (position 9 0 9)
     , source' (TokenSymbol ")") (position 10 0 10) (position 11 0 11) ]
+    (position 0 0 0)
+    (position 11 0 11)
 
-  testTokenize " [10.0]  &((20.0) 30) (-> 1 2 3 4) { _ }\nfoobar <= test"
+  testTokenize " [10.0]  &((20.0) 30) (-> 1 2 3 4) { _ }\nfoobar <= test" $ source'
     [ source' (TokenSymbol "[") (position 1 0 1) (position 2 0 2)
     , source' (TokenInteger "10") (position 2 0 2) (position 4 0 4)
     , source' (TokenSymbol ".") (position 4 0 4) (position 5 0 5)
@@ -55,3 +57,5 @@ tests = suite "Tokenize" do
     , source' (TokenSymbol "foobar") (position 41 1 0) (position 47 1 6)
     , source' (TokenSymbol "<=") (position 48 1 7) (position 50 1 9)
     , source' (TokenSymbol "test") (position 51 1 10) (position 55 1 14) ]
+    (position 0 0 0)
+    (position 55 1 14)

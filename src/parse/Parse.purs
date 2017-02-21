@@ -159,8 +159,13 @@ makeDot (Source (Integer a) _) (Source (Integer b) _) = Number (a <> "." <> b)
 makeDot a b = Dot a b
 
 
+makeParen :: Array AST -> AST'
+makeParen [(Source (Lambda a b) _)] = Lambda a b
+makeParen a = Parens a
+
+
 parseSpecial :: Token -> TokenInfo
-parseSpecial (Source (TokenSymbol "(") source) = parseParen Parens source ")"
+parseSpecial (Source (TokenSymbol "(") source) = parseParen makeParen source ")"
 parseSpecial (Source (TokenSymbol ")") source) = errorMissing source "("
 
 parseSpecial (Source (TokenSymbol "[") source) = parseParen Array source "]"
@@ -208,9 +213,10 @@ parse' priority output = do
       pure output
 
 
-parse :: Either ParseError (Queue Token) -> Either ParseError (Queue AST)
+parse :: Either ParseError (Source (Queue Token)) -> Either ParseError (Source (Queue AST))
 parse input = do
-  input <- input
-  runState
+  (Source input source) <- input
+  output <- runState
     (parse' bottom empty)
     { input: input }
+  pure $ Source output source
