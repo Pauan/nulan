@@ -248,13 +248,15 @@ defineNewVariable info@(Gensym { id, source }) = do
                  , seen: scope.seen }
 
 
-newtype RecordPair =
-  RecordPair { key :: String, value :: Expression }
+newtype RecordPair' =
+  RecordPair' { key :: Source String, value :: Expression }
 
-derive instance eqRecordPair :: Eq RecordPair
+type RecordPair = Source RecordPair'
 
-instance showRecordPair :: Show RecordPair where
-  show (RecordPair a) = "RecordPair { key: " <> a.key <> ", value: " <> show a.value <> " }"
+derive instance eqRecordPair' :: Eq RecordPair'
+
+instance showRecordPair' :: Show RecordPair' where
+  show (RecordPair' a) = "RecordPair' { key: " <> show a.key <> ", value: " <> show a.value <> " }"
 
 
 data Expression'
@@ -267,7 +269,7 @@ data Expression'
   | FunctionCall Expression (Array Expression)
 
   | Record (Array RecordPair)
-  | RecordGet Expression String
+  | RecordGet Expression (Source String)
 
   | IsEqual Expression Expression
 
@@ -313,6 +315,9 @@ instance showStatement' :: Show Statement' where
 compileExpression :: AST.AST -> Compiler Expression
 compileExpression (Source (AST.Symbol var) source) =
   compileSymbol var source
+
+compileExpression (Source (AST.Variable id) source) =
+  pure $ Source (Variable id) source
 
 -- TODO handle Uint32
 compileExpression (Source (AST.Integer a) source) =
