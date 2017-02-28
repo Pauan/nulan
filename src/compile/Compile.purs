@@ -8,6 +8,7 @@ import Data.Array as Array
 import Data.Int (fromString)
 import Data.Map as Map
 
+import Nulan.Number as Number
 import Nulan.ParseError (ParseError(..))
 import Nulan.AST as AST
 import Nulan.Source (Source(..), Source'(..))
@@ -17,13 +18,29 @@ import Nulan.Stack as Stack
 import Nulan.State (State, runState, getState, putState, modifyState, throwError)
 
 
-newtype VariableInfo = VariableInfo
-  { id :: AST.VariableId
-  , name :: String
-  , source :: Source'
-  , macro :: Maybe (AST.AST -> Compiler AST.AST)
-  , statement :: Maybe (AST.AST -> Compiler Statement)
-  , expression :: Maybe (AST.AST -> Compiler Expression) }
+data VariableInfo
+  = Explicit
+      { id :: AST.VariableId
+      , name :: String
+      , source :: Source'
+      , macro :: Maybe (AST.AST -> Compiler AST.AST) }
+  | Gensym
+      { id :: AST.VariableId
+      , source :: Source'
+      , macro :: Maybe (AST.AST -> Compiler AST.AST) }
+  | Builtin
+      { id :: AST.VariableId
+      , name :: String
+      , source :: Source'
+      , statement :: Maybe (AST.AST -> Compiler Statement)
+      , expression :: Maybe (AST.AST -> Compiler Expression) }
+
+
+getVariableId :: VariableInfo -> AST.VariableId
+getVariableId (Explicit { id }) = id
+getVariableId (Builtin { id }) = id
+getVariableId (Gensym { id }) = id
+
 
 newtype Scope = Scope
   { vars :: Map.Map AST.VariableId VariableInfo
@@ -96,36 +113,37 @@ withNewScope run = do
   pure $ output
 
 
-lookupScope :: forall a. Stack.Stack Scope -> (Scope -> Maybe a) -> Maybe a
-lookupScope scopes fn = do
+lookupScope' :: forall a. Stack.Stack Scope -> (Scope -> Maybe a) -> Maybe a
+lookupScope' scopes fn = do
   scope <- Stack.peek scopes
   case fn scope of
     Just a -> Just a
-    Nothing -> lookupScope (Stack.pop scopes) fn
+    Nothing -> lookupScope' (Stack.pop scopes) fn
+
+
+lookupScope :: forall a. (Scope -> Maybe a) -> Compiler (Maybe a)
+lookupScope fn = do
+  { scopes } <- getState
+  pure $ lookupScope' scopes fn
 
 
 lookupSymbol' :: String -> Compiler (Maybe VariableInfo)
-lookupSymbol' name = do
-  { scopes } <- getState
-  pure $ lookupScope scopes \(Scope scope) -> do
-    id <- Map.lookup name scope.defined
-    -- TODO throw an error if this fails ?
-    Map.lookup id scope.vars
+lookupSymbol' name = lookupScope \(Scope scope) -> do
+  id <- Map.lookup name scope.defined
+  -- TODO throw an error if this fails ?
+  Map.lookup id scope.vars
 
 
 lookupVariable' :: AST.VariableId -> Compiler (Maybe VariableInfo)
-lookupVariable' id = do
-  { scopes } <- getState
-  pure $ lookupScope scopes \(Scope scope) ->
-    Map.lookup id scope.vars
+lookupVariable' id = lookupScope \(Scope scope) -> Map.lookup id scope.vars
 
 
 compileSymbol :: String -> Source' -> Compiler Expression
 compileSymbol name source = do
   var <- lookupSymbol' name
   case var of
-    Just (VariableInfo { id }) ->
-      pure $ Source (Variable id) source
+    Just var ->
+      pure $ Source (Variable $ getVariableId var) source
 
     Nothing ->
       throwError $ VariableUndefined name source
@@ -135,6 +153,29 @@ lookupSymbol :: AST.AST' -> Compiler (Maybe VariableInfo)
 lookupSymbol (AST.Symbol name) = lookupSymbol' name
 lookupSymbol (AST.Variable id) = lookupVariable' id
 lookupSymbol _ = pure $ Nothing
+
+
+lookupVariableId :: AST.AST' -> Source' -> Compiler (Maybe AST.VariableId)
+lookupVariableId (AST.Symbol name) source = do
+  id <- lookupScope \(Scope scope) -> Map.lookup name scope.defined
+  case id of
+    Just id -> pure $ Just id
+    Nothing -> throwError $ VariableUndefined name source
+
+lookupVariableId (AST.Variable id) _ = pure $ Just id
+lookupVariableId _ _ = pure Nothing
+
+
+assertVariableId :: AST.AST -> AST.VariableId -> Compiler Unit
+assertVariableId (Source a source) expected = do
+  id <- lookupVariableId a source
+  case id of
+    Just id ->
+      if id == expected
+      then pure unit
+      else throwError $ ExpectedVariableId expected id source
+    Nothing ->
+      throwError $ ExpectedSymbol a source
 
 
 newVariableId :: Compiler AST.VariableId
@@ -147,33 +188,64 @@ newVariableId = do
   pure varCounter
 
 
-defineNewVariable :: VariableInfo -> Compiler Unit
-defineNewVariable info@(VariableInfo { id, name, source }) = do
+getCurrentScope :: Compiler Scope
+getCurrentScope = do
   { scopes } <- getState
 
   case Stack.peek scopes of
-    Just (Scope scope) ->
-      if Map.member name scope.defined
-      then throwError $ VariableDefined name source
-
-      else if Map.member name scope.seen
-      then throwError $ VariableSeen name source
-
-      else if Map.member id scope.vars
-      then throwError $ InternalError source
-
-      else
-        modifyState \{ varCounter, scopes, statements } ->
-          { varCounter
-          -- TODO a tiny bit hacky
-          , scopes: Stack.push (Stack.pop scopes)
-              (Scope { vars: Map.insert id info scope.vars
-                     , defined: Map.insert name id scope.defined
-                     , seen: scope.seen })
-          , statements }
+    Just scope ->
+      pure scope
 
     Nothing ->
-      throwError $ InternalError source
+      throwError InternalError
+
+
+setCurrentScope :: Scope -> Compiler Unit
+setCurrentScope scope =
+  modifyState \{ varCounter, scopes, statements } ->
+    { varCounter
+    -- TODO a tiny bit hacky
+    , scopes: Stack.push (Stack.pop scopes) scope
+    , statements }
+
+
+defineNewVariable' :: AST.VariableId -> String -> Source' -> VariableInfo -> Compiler Unit
+defineNewVariable' id name source info = do
+  Scope scope <- getCurrentScope
+
+  if Map.member name scope.defined
+    then throwError $ VariableDefined name source
+
+    else if Map.member name scope.seen
+    then throwError $ VariableSeen name source
+
+    else if Map.member id scope.vars
+    then throwError InternalError
+
+    else
+      setCurrentScope $
+        Scope { vars: Map.insert id info scope.vars
+              , defined: Map.insert name id scope.defined
+              , seen: scope.seen }
+
+
+defineNewVariable :: VariableInfo -> Compiler Unit
+defineNewVariable info@(Explicit { id, name, source }) =
+  defineNewVariable' id name source info
+
+defineNewVariable info@(Builtin { id, name, source }) =
+  defineNewVariable' id name source info
+
+defineNewVariable info@(Gensym { id, source }) = do
+  Scope scope <- getCurrentScope
+
+  if Map.member id scope.vars
+    -- TODO better error
+    then throwError InternalError
+    else setCurrentScope $
+           Scope { vars: Map.insert id info scope.vars
+                 , defined: scope.defined
+                 , seen: scope.seen }
 
 
 newtype RecordPair =
@@ -182,7 +254,7 @@ newtype RecordPair =
 derive instance eqRecordPair :: Eq RecordPair
 
 instance showRecordPair :: Show RecordPair where
-  show (RecordPair a) = "{ key: " <> a.key <> ", value: " <> show a.value <> " }"
+  show (RecordPair a) = "RecordPair { key: " <> a.key <> ", value: " <> show a.value <> " }"
 
 
 data Expression'
@@ -193,8 +265,6 @@ data Expression'
 
   | Function (Array (Source AST.VariableId)) Statement
   | FunctionCall Expression (Array Expression)
-
-  | Array (Array Expression)
 
   | Record (Array RecordPair)
   | RecordGet Expression String
@@ -213,7 +283,6 @@ instance showExpression' :: Show Expression' where
   show (String a) = "(String " <> show a <> ")"
   show (Function args body) = "(Function " <> show args <> " " <> show body <> ")"
   show (FunctionCall expr args) = "(FunctionCall " <> show expr <> " " <> show args <> ")"
-  show (Array a) = "(Array " <> show a <> ")"
   show (Record a) = "(Record " <> show a <> ")"
   show (RecordGet a b) = "(RecordGet " <> show a <> " " <> show b <> ")"
   show (IsEqual a b) = "(IsEqual " <> show a <> " " <> show b <> ")"
@@ -245,6 +314,7 @@ compileExpression :: AST.AST -> Compiler Expression
 compileExpression (Source (AST.Symbol var) source) =
   compileSymbol var source
 
+-- TODO handle Uint32
 compileExpression (Source (AST.Integer a) source) =
   case fromString a of
     Just a ->
@@ -252,6 +322,17 @@ compileExpression (Source (AST.Integer a) source) =
 
     Nothing ->
       throwError $ InvalidInt32 a source
+
+compileExpression (Source (AST.Number a) source) =
+  case Number.fromString a of
+    Just a ->
+      pure $ Source (Float64 a) source
+
+    Nothing ->
+      throwError $ InvalidFloat64 a source
+
+compileExpression (Source (AST.Text a) source) =
+  pure $ Source (String a) source
 
 compileExpression (Source (AST.Lambda args body) source) =
   withNewScope do
@@ -271,6 +352,15 @@ compileExpression (Source (AST.Parens a) source) =
     Nothing ->
       throwError $ EmptyParens (AST.Parens a) source
 
+compileExpression (Source (AST.Bar _) source) =
+  throwError $ InvalidBar source
+
+compileExpression (Source (AST.Array _) source) =
+  throwError $ InvalidArray source
+
+compileExpression (Source AST.Wildcard source) =
+  throwError $ InvalidWildcard source
+
 compileExpression (Source expr source) =
   throwError $ ExpectedExpression expr source
 
@@ -278,20 +368,18 @@ compileExpression (Source expr source) =
 makeEmptyVariable :: String -> Source' -> Compiler VariableInfo
 makeEmptyVariable name source = do
   id <- newVariableId
-  pure $ VariableInfo
+  pure $ Explicit
     { id
     , name
     , source
-    , macro: Nothing
-    , statement: Nothing
-    , expression: Nothing }
+    , macro: Nothing }
 
 
 compileNewVariable :: AST.AST -> Compiler (Source AST.VariableId)
 compileNewVariable (Source (AST.Symbol var) source) = do
-  info@(VariableInfo { id }) <- makeEmptyVariable var source
+  info <- makeEmptyVariable var source
   defineNewVariable info
-  pure $ Source id source
+  pure $ Source (getVariableId info) source
 
 compileNewVariable (Source a source) =
   throwError $ ExpectedSymbol a source
@@ -304,40 +392,55 @@ builtinSource = Source'
   , end: position 0 0 0 }
 
 
-defineBuiltinStatement :: String -> (AST.AST -> Compiler Statement) -> Compiler AST.VariableId
-defineBuiltinStatement name fn = do
-  id <- newVariableId
-  defineNewVariable $ VariableInfo
+defineBuiltinStatement' :: String -> AST.VariableId -> (AST.AST -> Compiler Statement) -> Compiler Unit
+defineBuiltinStatement' name id fn =
+  defineNewVariable $ Builtin
     { id
     , name
     , source: builtinSource
-    , macro: Nothing
     , expression: Nothing
     , statement: Just fn }
-  pure id
+
+
+defineBuiltinStatement :: String -> (AST.AST -> Compiler Statement) -> Compiler Unit
+defineBuiltinStatement name fn = do
+  id <- newVariableId
+  defineBuiltinStatement' name id fn
 
 
 defineBuiltins :: Compiler Unit
 defineBuiltins = do
-  constantId <- defineBuiltinStatement "CONSTANT" \(Source ast source) -> do
+  constantId <- newVariableId
+  defineBuiltinStatement' "CONSTANT" constantId \(Source ast source) -> do
     case ast of
       AST.Parens [_, (Source (AST.Type var _) _), body] -> do
         body <- compileExpression body
-        withNewScope do
-          var <- compileNewVariable var
-          pure $ Source (Constant var body) source
+        var <- compileNewVariable var
+        pure $ Source (Constant var body) source
 
       _ ->
         throwError $ PatternMatchFailed source
 
 
   -- TODO what about nested RECURSIVE ?
-  _ <- defineBuiltinStatement "RECURSIVE" \(Source ast source) -> do
+  defineBuiltinStatement "RECURSIVE" \(Source ast source) -> do
     case ast of
       AST.Parens a ->
         case Array.tail a of
           Just rest -> do
-            output <- traverse compileStatement rest
+            bodies <- traverse (\(Source ast source) ->
+              case ast of
+                AST.Parens [head, (Source (AST.Type var _) _), body@(Source (AST.Lambda _ _) _)] -> do
+                  assertVariableId head constantId
+                  var <- compileNewVariable var
+                  pure $ do
+                    body <- compileExpression body
+                    pure $ Source (Constant var body) source
+
+                _ ->
+                  -- TODO better error
+                  throwError $ PatternMatchFailed source) rest
+            output <- traverse id bodies
             -- TODO is this correct ?
             pure $ Source (Recursive output) source
 
@@ -346,6 +449,7 @@ defineBuiltins = do
 
       _ ->
         throwError $ PatternMatchFailed source
+
 
   pure unit
 
@@ -356,21 +460,14 @@ compileStatement (Source (AST.Parens a) source) =
     Just (Source first _) -> do
       var <- lookupSymbol first
       case var of
-        Just (VariableInfo var) ->
-          case var.macro of
-            Just macro -> do
-              output <- macro $ Source (AST.Parens a) source
-              compileStatement output
+        Just (Explicit { macro: Just macro }) -> do
+          output <- macro $ Source (AST.Parens a) source
+          compileStatement output
 
-            Nothing ->
-              case var.statement of
-                Just statement ->
-                  statement $ Source (AST.Parens a) source
+        Just (Builtin { statement: Just statement }) ->
+          statement $ Source (AST.Parens a) source
 
-                Nothing ->
-                  throwError $ ExpectedStatement (AST.Parens a) source
-
-        Nothing ->
+        _ ->
           throwError $ ExpectedStatement (AST.Parens a) source
 
     Nothing ->

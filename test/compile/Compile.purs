@@ -55,13 +55,52 @@ tests = suite "Compile" do
                                                   (position 50 0 50)
                                                   (position 55 0 55)))
                                        (position 46 0 46)
-                                       (position 57 0 57)))
-                            (position 0 0 0)
-                            (position 58 0 58) ])
+                                       (position 56 0 56)))
+                            (position 11 0 11)
+                            (position 57 0 57) ])
                 (position 0 0 0)
                 (position 58 0 58) ])
     (position 0 0 0)
     (position 58 0 58)
+
+
+  testCompile "(RECURSIVE (CONSTANT foo :: (FORALL a (-> a)) (-> (bar))) (CONSTANT bar :: (FORALL a (-> a)) (-> (foo))))" $ source'
+    (Statements
+      [ source' (Recursive
+                  [ source' (Constant
+                              (source' (variableId 0) (position 21 0 21) (position 24 0 24))
+                              (source' (Function []
+                                         (source' (FunctionReturn
+                                                    (source' (FunctionCall (source' (variable 1)
+                                                                                    (position 51 0 51)
+                                                                                    (position 54 0 54)) [])
+                                                             (position 50 0 50)
+                                                             (position 55 0 55)))
+                                                  (position 50 0 50)
+                                                  (position 55 0 55)))
+                                       (position 46 0 46)
+                                       (position 56 0 56)))
+                            (position 11 0 11)
+                            (position 57 0 57)
+                  , source' (Constant
+                              (source' (variableId 1) (position 68 0 68) (position 71 0 71))
+                              (source' (Function []
+                                         (source' (FunctionReturn
+                                                    (source' (FunctionCall (source' (variable 0)
+                                                                                    (position 98 0 98)
+                                                                                    (position 101 0 101)) [])
+                                                             (position 97 0 97)
+                                                             (position 102 0 102)))
+                                                  (position 97 0 97)
+                                                  (position 102 0 102)))
+                                       (position 93 0 93)
+                                       (position 103 0 103)))
+                            (position 58 0 58)
+                            (position 104 0 104) ])
+                (position 0 0 0)
+                (position 105 0 105) ])
+    (position 0 0 0)
+    (position 105 0 105)
 
 {-
   testParse " [10.0]  &((20.0) 30) (-> 1 2 3 4) { _ }\nfoobar <= test"
