@@ -24,3 +24,19 @@ export function pretty(a: string): string {
 export function prettyCharacter(a: string): string {
   return a.replace(/\n\r|\r\n|\n|\r/g, "<NEWLINE>");
 }
+
+
+export function plural(a: number, b: string): string {
+  if (a === 1) {
+    return a + b;
+
+  } else {
+    return a + b + "s";
+  }
+}
+
+
+// TODO make this more efficient ?
+export function repeat(a: string, amount: number): string {
+  return new Array(amount + 1).join(a);
+}

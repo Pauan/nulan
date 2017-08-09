@@ -1,4 +1,4 @@
-import { order, pretty, prettyCharacter } from "./string";
+import { order, pretty, prettyCharacter, plural, repeat } from "./string";
 
 
 test("order", () => {
@@ -26,4 +26,24 @@ test("prettyCharacter", () => {
   expect(prettyCharacter("\r")).toBe("<NEWLINE>");
   expect(prettyCharacter("\r\n")).toBe("<NEWLINE>");
   expect(prettyCharacter("\n\r")).toBe("<NEWLINE>");
+});
+
+
+test("plural", () => {
+  expect(plural(-1, "foo")).toBe("-1foos");
+  expect(plural(0, "foo")).toBe("0foos");
+  expect(plural(1, "foo")).toBe("1foo");
+  expect(plural(2, "foo")).toBe("2foos");
+});
+
+
+test("repeat", () => {
+  expect(repeat("1", -3)).toBe("");
+  expect(repeat("1", -2)).toBe("");
+  expect(repeat("1", -1)).toBe("");
+  expect(repeat("1", 0)).toBe("");
+  expect(repeat("1", 1)).toBe("1");
+  expect(repeat("1", 2)).toBe("11");
+  expect(repeat("1", 3)).toBe("111");
+  expect(repeat("123", 3)).toBe("123123123");
 });

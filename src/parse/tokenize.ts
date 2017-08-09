@@ -1,6 +1,7 @@
 import { NulanError } from "../util/error";
 import { Loc, Position } from "../util/loc";
 import * as $string from "../util/string";
+import { Token } from "./ast";
 
 
 function errorBlockComment(state: TokenState, pos: Position, start: string): NulanError {
@@ -15,7 +16,20 @@ function errorStringMissing(state: TokenState, pos: Position, delimiter: string)
 
 function errorStringIndentation(state: TokenState, pos: Position, expected: number, actual: number): NulanError {
   return new NulanError(loc(state, pos, position(state)),
-    "At least " + expected + " spaces are required, but there are " + actual);
+    (expected === 1
+      ? "At least 1 space is required, but there "
+      : "At least " + expected + " spaces are required, but there ") +
+    (actual === 1
+      ? "is 1"
+      : "are " + actual));
+}
+
+function errorExtraSpaces(state: TokenState, pos: Position, actual: number): NulanError {
+  return new NulanError(loc(state, pos, position(state)),
+    "Spaces are not allowed at the end of the line, but there " +
+    (actual === 1
+      ? "is 1"
+      : "are " + actual));
 }
 
 function errorStringUnknown(state: TokenState, pos: Position, char: string): NulanError {
@@ -28,11 +42,9 @@ function errorStringUnknown(state: TokenState, pos: Position, char: string): Nul
       .join(" "));
 }
 
-
-export type Token
-  = { type: "integer", value: string, loc: Loc }
-  | { type: "string", value: string, loc: Loc }
-  | { type: "symbol", value: string, loc: Loc };
+function errorTab(state: TokenState, pos: Position): NulanError {
+  return new NulanError(loc(state, pos, position(state)), "Invalid tab (U+0009)");
+}
 
 
 type Specials = {
@@ -113,18 +125,34 @@ function incrementCharacter(state: TokenState, char: string): void {
   }
 }
 
-function incrementSpaces(state: TokenState, amount: number): void {
-  const pos = position(state);
+function consumeSpaces(state: TokenState): { spaces: number, next: string | null } {
+  let i = 0;
 
-  for (let i = 0; i < amount; ++i) {
+  for (;;) {
     const char = peek(state);
 
     if (char === " ") {
       incrementColumn(state);
+      ++i;
 
     } else {
-      throw errorStringIndentation(state, pos, amount, i);
+      return {
+        spaces: i,
+        next: char
+      };
     }
+  }
+}
+
+function consumeSpacesError(state: TokenState) {
+  const pos = position(state);
+
+  incrementColumn(state);
+
+  const x = consumeSpaces(state);
+
+  if (x.next == null || x.next === "\n" || x.next === "\r") {
+    throw errorExtraSpaces(state, pos, x.spaces + 1);
   }
 }
 
@@ -134,8 +162,7 @@ function tokenizeIdentifier(state: TokenState, output: Array<Token>, char: strin
 
   const start = position(state);
 
-  // TODO this should be incrementColumn if newlines are in special
-  incrementCharacter(state, char);
+  incrementColumn(state);
 
   for (;;) {
     const char = peek(state);
@@ -148,8 +175,7 @@ function tokenizeIdentifier(state: TokenState, output: Array<Token>, char: strin
       break;
 
     } else {
-      // TODO this should be incrementColumn if newlines are in special
-      incrementCharacter(state, char);
+      incrementColumn(state);
       chars.push(char);
     }
   }
@@ -207,6 +233,10 @@ function specialLineComment(state: TokenState, char: string | null): void {
       break;
 
     } else {
+      if (char === " ") {
+        consumeSpacesError(state);
+      }
+
       incrementColumn(state);
       char = peek(state);
     }
@@ -234,6 +264,9 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
         incrementColumn(state);
         break;
 
+      } else if (char === " ") {
+        consumeSpacesError(state);
+
       } else {
         incrementCharacter(state, char);
       }
@@ -251,9 +284,15 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
       } else if (char === "/") {
         specialBlockComment(state, newPos, start);
 
+      } else if (char === " ") {
+        consumeSpacesError(state);
+
       } else {
         incrementCharacter(state, char);
       }
+
+    } else if (char === " ") {
+      consumeSpacesError(state);
 
     } else {
       incrementCharacter(state, char);
@@ -280,8 +319,16 @@ function specialNewline(state: TokenState, output: Array<Token>, char: string): 
   incrementCharacter(state, char);
 }
 
-function specialSpace(state: TokenState, output: Array<Token>, char: string): void {
+function specialTab(state: TokenState, output: Array<Token>, char: string): void {
+  const start = position(state);
+
   incrementColumn(state);
+
+  throw errorTab(state, start);
+}
+
+function specialSpace(state: TokenState, output: Array<Token>, char: string): void {
+  consumeSpacesError(state);
 }
 
 function specialCharacter(state: TokenState, output: Array<Token>, char: string): void {
@@ -322,6 +369,29 @@ function specialStringEscape(state: TokenState, pos: Position, chars: Array<stri
   }
 }
 
+function incrementStringSpaces(state: TokenState, start: Position, delimiter: string, chars: Array<string>): void {
+  const amount = start.column + 1;
+
+  const pos = position(state);
+
+  const x = consumeSpaces(state);
+
+  if (x.next == null) {
+    throw errorStringMissing(state, start, delimiter);
+
+  } else if (x.next === "\n" || x.next === "\r") {
+    if (x.spaces !== 0) {
+      throw errorExtraSpaces(state, pos, x.spaces);
+    }
+
+  } else if (x.spaces < amount) {
+    throw errorStringIndentation(state, pos, amount, x.spaces);
+
+  } else if (x.spaces > amount) {
+    chars.push($string.repeat(" ", x.spaces - amount));
+  }
+}
+
 function specialString(state: TokenState, output: Array<Token>, delimiter: string): void {
   const chars = [];
 
@@ -354,7 +424,7 @@ function specialString(state: TokenState, output: Array<Token>, delimiter: strin
 
       incrementCharacter(state, char);
 
-      incrementSpaces(state, start.column + 1);
+      incrementStringSpaces(state, start, delimiter, chars);
 
     } else {
       chars.push(char);
@@ -373,7 +443,7 @@ function specialStringEscapeChar(output: string) {
 
 function specialStringEscapeNewline(state: TokenState, pos: Position, chars: Array<string>, delimiter: string, start: Position, char: string): void {
   incrementCharacter(state, char);
-  incrementSpaces(state, pos.column + 1);
+  incrementStringSpaces(state, pos, delimiter, chars);
 }
 
 const specialStringEscapes: Escapes = Object.create(null);
@@ -388,6 +458,7 @@ specialStringEscapes["\r"] = specialStringEscapeNewline;
 
 const specials: Specials = Object.create(null);
 specials[" "] = specialSpace;
+specials["\t"] = specialTab;
 specials["#"] = specialComment;
 specials["\r"] = specialNewline;
 specials["\n"] = specialNewline;
