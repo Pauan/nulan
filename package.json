@@ -9,20 +9,33 @@
   "bin": {
     "nulan": "./nulan"
   },
+  "dependencies": {},
   "devDependencies": {
-    "bower": "^1.8.0",
-    "pulp": "^10.0.0",
-    "purescript": "0.10.5",
-    "rollup": "^0.41.4",
-    "rollup-plugin-purs": "^1.0.24"
+    "@types/chalk": "^0.4.31",
+    "@types/jest": "^20.0.6",
+    "chalk": "^2.1.0",
+    "jest": "^20.0.4",
+    "ts-jest": "^20.0.10",
+    "ts-loader": "^2.3.2",
+    "typescript": "^2.4.2",
+    "webpack": "^3.5.2"
   },
   "scripts": {
-    "prepublish": "bower install",
-    "run": "pulp run",
-    "test": "pulp test",
-    "build": "pulp build && rollup --config build.nulan.js"
+    "build": "webpack",
+    "test": "jest"
   },
-  "dependencies": {
-    "source-map": "^0.5.6"
+  "jest": {
+    "collectCoverage": true,
+    "mapCoverage": true,
+    "transform": {
+      ".(ts|tsx)": "<rootDir>/node_modules/ts-jest/preprocessor.js"
+    },
+    "testRegex": "(/__tests__/.*|\\.(test|spec))\\.(ts|tsx|js)$",
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "json"
+    ]
   }
 }
