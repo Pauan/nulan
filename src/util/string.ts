@@ -36,7 +36,12 @@ export function plural(a: number, b: string): string {
 }
 
 
-// TODO make this more efficient ?
 export function repeat(a: string, amount: number): string {
-  return new Array(amount + 1).join(a);
+  if (amount <= 0) {
+    return "";
+
+  } else {
+    // TODO make this more efficient ?
+    return new Array(amount + 1).join(a);
+  }
 }
