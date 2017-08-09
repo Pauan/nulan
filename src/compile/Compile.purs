@@ -456,6 +456,25 @@ defineBuiltins = do
         throwError $ PatternMatchFailed source
 
 
+  defineBuiltinStatement "MATCHES" \(Source ast source) -> do
+    case ast of
+      AST.Parens a ->
+        case Array.tail a of
+          Just rest ->
+            case Array.uncons rest of
+              Just { head: Source (AST.Array a) _, tail } ->
+
+
+              Nothing ->
+                throwError $ PatternMatchFailed source
+
+          Nothing ->
+            throwError $ PatternMatchFailed source
+
+      _ ->
+        throwError $ PatternMatchFailed source
+
+
   pure unit
 
 

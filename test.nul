@@ -1,0 +1,1 @@
+(RECURSIVE (CONSTANT foo :: (FORALL a (-> a)) (-> (bar))) (CONSTANT bar :: (FORALL a (-> a)) (-> (foo))))

@@ -13,7 +13,7 @@ import Nulan.Source (Source, source)
 import Nulan.Pretty (pretty)
 
 variableId :: Int -> Int
-variableId a = a + 2
+variableId a = a + 3
 
 variable :: Int -> Expression'
 variable a = Variable $ variableId a
