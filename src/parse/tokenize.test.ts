@@ -127,12 +127,12 @@ test("string", () => {
 	]);
 
 
-	expect(() => tokenize("\"foo\\u", f)).toThrow("Missing ending \"");
-	expect(() => tokenize("\"foo\\u[", f)).toThrow("Missing ending \"");
-	expect(() => tokenize("\"foo\\u[0", f)).toThrow("Missing ending \"");
+	expect(() => tokenize("\"foo\\u", f)).toThrow("Missing starting [");
+	expect(() => tokenize("\"foo\\u[", f)).toThrow("Missing ending ]");
+	expect(() => tokenize("\"foo\\u[0", f)).toThrow("Missing ending ]");
 	expect(() => tokenize("\"foo\\u[0]", f)).toThrow("Missing ending \"");
-	expect(() => tokenize("\"foo\\u[0 ", f)).toThrow("Missing ending \"");
-	expect(() => tokenize("\"foo\\u[0 0", f)).toThrow("Missing ending \"");
+	expect(() => tokenize("\"foo\\u[0 ", f)).toThrow("Missing ending ]");
+	expect(() => tokenize("\"foo\\u[0 0", f)).toThrow("Missing ending ]");
 	expect(() => tokenize("\"foo\\u[0 0]", f)).toThrow("Missing ending \"");
 
 	expect(() => tokenize("\"foo\\u\"", f)).toThrow("Invalid \", it must be [");

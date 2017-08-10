@@ -4,9 +4,9 @@ import * as $string from "../util/string";
 import { Token } from "./ast";
 
 
-function errorMissingEnding(state: TokenState, pos: Position, ending: string): NulanError {
+function errorMissing(state: TokenState, pos: Position, message: string): NulanError {
   return new NulanError(loc(state, pos, position(state)),
-    "Missing ending " + ending);
+    "Missing " + message);
 }
 
 function errorStringIndentation(state: TokenState, pos: Position, expected: number, actual: number): NulanError {
@@ -263,7 +263,7 @@ function incrementBlockCharacter(state: TokenState, pos: Position, start: string
     const x = consumeSpaces(state);
 
     if (x.next == null) {
-      throw errorMissingEnding(state, pos, "/" + start);
+      throw errorMissing(state, pos, "ending /" + start);
 
     } else if (x.next === "\n" || x.next === "\r") {
       throw errorExtraSpaces(state, pos, x.spaces + 1);
@@ -281,7 +281,7 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
     const char = peek(state);
 
     if (char == null) {
-      throw errorMissingEnding(state, pos, "/" + start);
+      throw errorMissing(state, pos, "ending /" + start);
 
     } else if (char === "/") {
       incrementColumn(state);
@@ -289,7 +289,7 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
       const char = peek(state);
 
       if (char == null) {
-        throw errorMissingEnding(state, pos, "/" + start);
+        throw errorMissing(state, pos, "ending /" + start);
 
       } else if (char === start) {
         incrementColumn(state);
@@ -307,7 +307,7 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
       const char = peek(state);
 
       if (char == null) {
-        throw errorMissingEnding(state, pos, "/" + start);
+        throw errorMissing(state, pos, "ending /" + start);
 
       } else if (char === "/") {
         specialBlockComment(state, newPos, start);
@@ -364,7 +364,7 @@ function specialStringEscape(state: TokenState, pos: Position, chars: Array<stri
   const char = peek(state);
 
   if (char == null) {
-    throw errorMissingEnding(state, pos, delimiter);
+    throw errorMissing(state, pos, "ending " + delimiter);
 
   } else {
     const escape = specialStringEscapes[char];
@@ -389,7 +389,7 @@ function incrementStringSpaces(state: TokenState, start: Position, delimiter: st
   const x = consumeSpaces(state);
 
   if (x.next == null) {
-    throw errorMissingEnding(state, start, delimiter);
+    throw errorMissing(state, start, "ending " + delimiter);
 
   } else if (x.next === "\n" || x.next === "\r") {
     if (x.spaces === 0) {
@@ -432,7 +432,7 @@ function specialString(state: TokenState, output: Array<Token>, delimiter: strin
     const char = peek(state);
 
     if (char == null) {
-      throw errorMissingEnding(state, start, delimiter);
+      throw errorMissing(state, start, "ending " + delimiter);
 
     } else if (char === delimiter) {
       incrementColumn(state);
@@ -489,7 +489,7 @@ function specialStringEscapeUnicode(state: TokenState, pos: Position, chars: Arr
   const next = peek(state);
 
   if (next == null) {
-    throw errorMissingEnding(state, start, delimiter);
+    throw errorMissing(state, start, "starting [");
 
   } else if (next === "[") {
     incrementColumn(state);
@@ -506,7 +506,7 @@ function specialStringEscapeUnicode(state: TokenState, pos: Position, chars: Arr
         const next = peek(state);
 
         if (next == null) {
-          throw errorMissingEnding(state, start, delimiter);
+          throw errorMissing(state, start, "ending ]");
 
         // TODO more efficient check ?
         } else if (/^[0-9A-F]$/.test(next)) {
@@ -518,7 +518,7 @@ function specialStringEscapeUnicode(state: TokenState, pos: Position, chars: Arr
             const next = peek(state);
 
             if (next == null) {
-              throw errorMissingEnding(state, start, delimiter);
+              throw errorMissing(state, start, "ending ]");
 
             } else if (next === " ") {
               const pos = position(state);
