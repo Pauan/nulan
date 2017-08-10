@@ -86,21 +86,21 @@ test("string", () => {
 	expect(() => tokenize(" \"foo\n", f)).toThrow("Missing ending \"");
 	expect(() => tokenize(" \"foo\n ", f)).toThrow("Missing ending \"");
 
-	expect(() => tokenize(" \"foo\n\"", f)).toThrow("At least 2 spaces are required, but there are 0");
-	expect(() => tokenize(" \"foo\n \"", f)).toThrow("At least 2 spaces are required, but there is 1");
+	expect(() => tokenize(" \"foo\n\"", f)).toThrow("There must be at least 2 spaces, but there are 0");
+	expect(() => tokenize(" \"foo\n \"", f)).toThrow("There must be at least 2 spaces, but there is 1");
 
 	expect(() => tokenize(" \"foo\n  bar   \n  \"", f)).toThrow("Spaces are not allowed at the end of the line, but there are 3");
 	expect(() => tokenize(" \"foo\n      \n\"", f)).toThrow("Spaces are not allowed at the end of the line, but there are 6");
 	expect(() => tokenize("\"foo\n \n bar\"", f)).toThrow("Spaces are not allowed at the end of the line, but there is 1");
 	expect(() => tokenize("\"foo\n   \n bar\"", f)).toThrow("Spaces are not allowed at the end of the line, but there are 3");
 
-	expect(() => tokenize("\"foo\nbar", f)).toThrow("At least 1 space is required, but there are 0");
-	expect(() => tokenize(" \"foo\nbar", f)).toThrow("At least 2 spaces are required, but there are 0");
-	expect(() => tokenize(" \"foo\n bar", f)).toThrow("At least 2 spaces are required, but there is 1");
-	expect(() => tokenize("  \"foo\n  bar", f)).toThrow("At least 3 spaces are required, but there are 2");
-	expect(() => tokenize("  \"foo\r  bar", f)).toThrow("At least 3 spaces are required, but there are 2");
-	expect(() => tokenize("  \"foo\n\r  bar", f)).toThrow("At least 3 spaces are required, but there are 2");
-	expect(() => tokenize("  \"foo\r\n  bar", f)).toThrow("At least 3 spaces are required, but there are 2");
+	expect(() => tokenize("\"foo\nbar", f)).toThrow("There must be at least 1 space, but there are 0");
+	expect(() => tokenize(" \"foo\nbar", f)).toThrow("There must be at least 2 spaces, but there are 0");
+	expect(() => tokenize(" \"foo\n bar", f)).toThrow("There must be at least 2 spaces, but there is 1");
+	expect(() => tokenize("  \"foo\n  bar", f)).toThrow("There must be at least 3 spaces, but there are 2");
+	expect(() => tokenize("  \"foo\r  bar", f)).toThrow("There must be at least 3 spaces, but there are 2");
+	expect(() => tokenize("  \"foo\n\r  bar", f)).toThrow("There must be at least 3 spaces, but there are 2");
+	expect(() => tokenize("  \"foo\r\n  bar", f)).toThrow("There must be at least 3 spaces, but there are 2");
 
 	expect(tokenize(" \"foo\n  \"", f)).toEqual([
 		string("foo\n", l(f, p(1, 0, 1), p(9, 1, 3)))
@@ -127,8 +127,43 @@ test("string", () => {
 	]);
 
 
+	expect(() => tokenize("\"foo\\u", f)).toThrow("Missing ending \"");
+	expect(() => tokenize("\"foo\\u[", f)).toThrow("Missing ending \"");
+	expect(() => tokenize("\"foo\\u[0", f)).toThrow("Missing ending \"");
+	expect(() => tokenize("\"foo\\u[0]", f)).toThrow("Missing ending \"");
+	expect(() => tokenize("\"foo\\u[0 ", f)).toThrow("Missing ending \"");
+	expect(() => tokenize("\"foo\\u[0 0", f)).toThrow("Missing ending \"");
+	expect(() => tokenize("\"foo\\u[0 0]", f)).toThrow("Missing ending \"");
+
+	expect(() => tokenize("\"foo\\u\"", f)).toThrow("Invalid \", it must be [");
+	expect(() => tokenize("\"foo\\u[A\"", f)).toThrow("Invalid \", it must be one of the following: <SPACE> ] 0 1 2 3 4 5 6 7 8 9 A B C D E F");
+	expect(() => tokenize("\"foo\\u[A\n]", f)).toThrow("Invalid <NEWLINE>, it must be one of the following: <SPACE> ] 0 1 2 3 4 5 6 7 8 9 A B C D E F");
+	expect(() => tokenize("\"foo\\u[\n]", f)).toThrow("Invalid <NEWLINE>, it must be one of the following: 0 1 2 3 4 5 6 7 8 9 A B C D E F");
+	expect(() => tokenize("\"foo\\u[a]", f)).toThrow("Invalid a, it must be one of the following: 0 1 2 3 4 5 6 7 8 9 A B C D E F");
+
+	expect(() => tokenize("\"foo\\u[ A]", f)).toThrow("There cannot be a space after [");
+	expect(() => tokenize("\"foo\\u[A ]", f)).toThrow("There cannot be a space before ]");
+	expect(() => tokenize("\"foo\\u[A  A]", f)).toThrow("There must be exactly 1 space, but there are 2");
+	expect(() => tokenize("\"foo\\u[A     A]", f)).toThrow("There must be exactly 1 space, but there are 5");
+
 	expect(tokenize("\"foo\\u[0]\"", f)).toEqual([
 		string("foo\u0000", l(f, p(0, 0, 0), p(10, 0, 10)))
+	]);
+
+	expect(tokenize("\"foo\\u[0 0 0 0]\"", f)).toEqual([
+		string("foo\u0000\u0000\u0000\u0000", l(f, p(0, 0, 0), p(16, 0, 16)))
+	]);
+
+	expect(tokenize("\"foo\\u[0 9 5E 23 41]\"", f)).toEqual([
+		string("foo\u0000\t^#A", l(f, p(0, 0, 0), p(21, 0, 21)))
+	]);
+
+	expect(tokenize("\"foo\\u[0000000]\"", f)).toEqual([
+		string("foo\u0000", l(f, p(0, 0, 0), p(16, 0, 16)))
+	]);
+
+	expect(tokenize("\"foo\\u[10FFFF]\"", f)).toEqual([
+		string("foo\udbff\udfff", l(f, p(0, 0, 0), p(15, 0, 15)))
 	]);
 });
 

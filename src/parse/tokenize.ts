@@ -4,21 +4,16 @@ import * as $string from "../util/string";
 import { Token } from "./ast";
 
 
-function errorBlockComment(state: TokenState, pos: Position, start: string): NulanError {
+function errorMissingEnding(state: TokenState, pos: Position, ending: string): NulanError {
   return new NulanError(loc(state, pos, position(state)),
-    "Missing ending /" + start);
-}
-
-function errorStringMissing(state: TokenState, pos: Position, delimiter: string): NulanError {
-  return new NulanError(loc(state, pos, position(state)),
-    "Missing ending " + delimiter);
+    "Missing ending " + ending);
 }
 
 function errorStringIndentation(state: TokenState, pos: Position, expected: number, actual: number): NulanError {
   return new NulanError(loc(state, pos, position(state)),
     (expected === 1
-      ? "At least 1 space is required, but there "
-      : "At least " + expected + " spaces are required, but there ") +
+      ? "There must be at least 1 space, but there "
+      : "There must be at least " + expected + " spaces, but there ") +
     (actual === 1
       ? "is 1"
       : "are " + actual));
@@ -32,14 +27,25 @@ function errorExtraSpaces(state: TokenState, pos: Position, actual: number): Nul
       : "are " + actual));
 }
 
-function errorStringUnknown(state: TokenState, pos: Position, char: string): NulanError {
+function errorInvalidExactSpaces(state: TokenState, pos: Position, expected: number, actual: number): NulanError {
   return new NulanError(loc(state, pos, position(state)),
-    "Invalid \\" + $string.prettyCharacter(char) + ", it must be one of the following: " +
-    Object.keys(specialStringEscapes)
-      .filter((x) => (x !== "\r")) // TODO a tiny bit hacky
-      .sort($string.order)
-      .map((x) => "\\" + $string.prettyCharacter(x))
-      .join(" "));
+    "There must be exactly " + $string.plural(expected, " space") + ", but there are " + actual);
+}
+
+function errorInvalidSpace(state: TokenState, pos: Position, message: string): NulanError {
+  return new NulanError(loc(state, pos, position(state)), "There cannot be a space " + message);
+}
+
+function errorInvalidMany(state: TokenState, pos: Position, expected: Array<string>, actual: string): NulanError {
+  return new NulanError(loc(state, pos, position(state)),
+    "Invalid " + $string.prettyCharacter(actual) + ", it must be one of the following: " +
+    expected.map($string.prettyCharacter).join(" "));
+}
+
+function errorInvalid(state: TokenState, pos: Position, expected: string, actual: string): NulanError {
+  return new NulanError(loc(state, pos, position(state)),
+    "Invalid " + $string.prettyCharacter(actual) + ", it must be " +
+    $string.prettyCharacter(expected));
 }
 
 function errorTab(state: TokenState, pos: Position): NulanError {
@@ -257,7 +263,7 @@ function incrementBlockCharacter(state: TokenState, pos: Position, start: string
     const x = consumeSpaces(state);
 
     if (x.next == null) {
-      throw errorBlockComment(state, pos, start);
+      throw errorMissingEnding(state, pos, "/" + start);
 
     } else if (x.next === "\n" || x.next === "\r") {
       throw errorExtraSpaces(state, pos, x.spaces + 1);
@@ -275,7 +281,7 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
     const char = peek(state);
 
     if (char == null) {
-      throw errorBlockComment(state, pos, start);
+      throw errorMissingEnding(state, pos, "/" + start);
 
     } else if (char === "/") {
       incrementColumn(state);
@@ -283,7 +289,7 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
       const char = peek(state);
 
       if (char == null) {
-        throw errorBlockComment(state, pos, start);
+        throw errorMissingEnding(state, pos, "/" + start);
 
       } else if (char === start) {
         incrementColumn(state);
@@ -301,7 +307,7 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
       const char = peek(state);
 
       if (char == null) {
-        throw errorBlockComment(state, pos, start);
+        throw errorMissingEnding(state, pos, "/" + start);
 
       } else if (char === "/") {
         specialBlockComment(state, newPos, start);
@@ -358,14 +364,20 @@ function specialStringEscape(state: TokenState, pos: Position, chars: Array<stri
   const char = peek(state);
 
   if (char == null) {
-    throw errorStringMissing(state, pos, delimiter);
+    throw errorMissingEnding(state, pos, delimiter);
 
   } else {
     const escape = specialStringEscapes[char];
 
     if (escape == null) {
       incrementCharacter(state, char);
-      throw errorStringUnknown(state, start, char);
+
+      const escapes = Object.keys(specialStringEscapes)
+        .filter((x) => (x !== "\r")) // TODO a tiny bit hacky
+        .sort($string.order)
+        .map((x) => "\\" + x);
+
+      throw errorInvalidMany(state, start, escapes, "\\" + char);
 
     } else {
       escape(state, pos, chars, delimiter, start, char);
@@ -377,7 +389,7 @@ function incrementStringSpaces(state: TokenState, start: Position, delimiter: st
   const x = consumeSpaces(state);
 
   if (x.next == null) {
-    throw errorStringMissing(state, start, delimiter);
+    throw errorMissingEnding(state, start, delimiter);
 
   } else if (x.next === "\n" || x.next === "\r") {
     if (x.spaces === 0) {
@@ -420,7 +432,7 @@ function specialString(state: TokenState, output: Array<Token>, delimiter: strin
     const char = peek(state);
 
     if (char == null) {
-      throw errorStringMissing(state, start, delimiter);
+      throw errorMissingEnding(state, start, delimiter);
 
     } else if (char === delimiter) {
       incrementColumn(state);
@@ -472,6 +484,89 @@ function specialStringEscapeNewline(state: TokenState, pos: Position, chars: Arr
 }
 
 function specialStringEscapeUnicode(state: TokenState, pos: Position, chars: Array<string>, delimiter: string, start: Position, char: string): void {
+  incrementColumn(state);
+
+  const next = peek(state);
+
+  if (next == null) {
+    throw errorMissingEnding(state, start, delimiter);
+
+  } else if (next === "[") {
+    incrementColumn(state);
+
+    if (peek(state) === " ") {
+      const pos = position(state);
+      incrementColumn(state);
+      throw errorInvalidSpace(state, pos, "after [");
+
+    } else {
+      for (;;) {
+        const hexes = [];
+
+        const next = peek(state);
+
+        if (next == null) {
+          throw errorMissingEnding(state, start, delimiter);
+
+        // TODO more efficient check ?
+        } else if (/^[0-9A-F]$/.test(next)) {
+          incrementColumn(state);
+
+          hexes.push(next);
+
+          for (;;) {
+            const next = peek(state);
+
+            if (next == null) {
+              throw errorMissingEnding(state, start, delimiter);
+
+            } else if (next === " ") {
+              const pos = position(state);
+              const x = consumeSpaces(state);
+
+              if (x.spaces > 1) {
+                throw errorInvalidExactSpaces(state, pos, 1, x.spaces);
+
+              } else if (x.next === "]") {
+                throw errorInvalidSpace(state, pos, "before ]");
+
+              } else {
+                chars.push($string.parseHex(hexes.join("")));
+                hexes.length = 0;
+              }
+              break;
+
+            } else if (next === "]") {
+              incrementColumn(state);
+              chars.push($string.parseHex(hexes.join("")));
+              return;
+
+            // TODO more efficient check ?
+            } else if (/^[0-9A-F]$/.test(next)) {
+              incrementColumn(state);
+
+              hexes.push(next);
+
+            } else {
+              const pos = position(state);
+              incrementCharacter(state, next);
+              throw errorInvalidMany(state, pos, " ]0123456789ABCDEF".split(""), next);
+            }
+          }
+
+        } else {
+          const pos = position(state);
+          incrementCharacter(state, next);
+          throw errorInvalidMany(state, pos, "0123456789ABCDEF".split(""), next);
+        }
+      }
+    }
+
+  } else {
+    const pos = position(state);
+    incrementCharacter(state, next);
+    throw errorInvalid(state, pos, "[", next);
+  }
 }
 
 const specialStringEscapes: Escapes = Object.create(null);

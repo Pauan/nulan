@@ -21,8 +21,9 @@ export function pretty(a: string): string {
 
 
 // TODO better pretty-printing
+// TODO make this more efficient
 export function prettyCharacter(a: string): string {
-  return a.replace(/\n\r|\r\n|\n|\r/g, "<NEWLINE>");
+  return a.replace(/\n\r|\r\n|\n|\r/g, "<NEWLINE>").replace(/ /g, "<SPACE>");
 }
 
 
@@ -44,4 +45,9 @@ export function repeat(a: string, amount: number): string {
     // TODO make this more efficient ?
     return new Array(amount + 1).join(a);
   }
+}
+
+
+export function parseHex(hex: string): string {
+  return String.fromCodePoint(parseInt(hex, 16));
 }
