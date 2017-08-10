@@ -146,6 +146,9 @@ test("string", () => {
 	expect(() => tokenize("\"foo\\u[A  A]", f)).toThrow("There must be exactly 1 space, but there are 2");
 	expect(() => tokenize("\"foo\\u[A     A]", f)).toThrow("There must be exactly 1 space, but there are 5");
 
+	// TODO better error message ?
+	expect(() => tokenize("\"foo\\u[FFFFFF]", f)).toThrow("Invalid code point 16777215");
+
 	expect(tokenize("\"foo\\u[0]\"", f)).toEqual([
 		string("foo\u0000", l(f, p(0, 0, 0), p(10, 0, 10)))
 	]);

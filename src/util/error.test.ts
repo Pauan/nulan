@@ -13,7 +13,7 @@ test("NulanError", () => {
 test("warning", () => {
   var old = global.console;
 
-  global.console = {
+  global.console = <any>{
     warn: jest.fn()
   };
 
