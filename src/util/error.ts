@@ -4,6 +4,26 @@ import * as $node from "./node";
 import * as $loc from "./loc";
 
 
+export function assertExists<A>(v: A | undefined | null): v is A {
+  if (v == null) {
+    throw new Error("Value " + v + " is null or undefined");
+
+  } else {
+    return true;
+  }
+}
+
+
+export function assert(test: boolean): test is true {
+  if (test) {
+    return true;
+
+  } else {
+    throw new Error("Assertion failed");
+  }
+}
+
+
 export class NulanError {
   public loc: $loc.Loc;
   public message: string;

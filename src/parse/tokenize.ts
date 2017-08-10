@@ -2,12 +2,8 @@ import { NulanError } from "../util/error";
 import { Loc, Position } from "../util/loc";
 import * as $string from "../util/string";
 import { Token } from "./ast";
+import { errorMissing } from "./error";
 
-
-function errorMissing(state: TokenState, pos: Position, message: string): NulanError {
-  return new NulanError(loc(state, pos, position(state)),
-    "Missing " + message);
-}
 
 function errorStringIndentation(state: TokenState, pos: Position, expected: number, actual: number): NulanError {
   return new NulanError(loc(state, pos, position(state)),
@@ -25,6 +21,10 @@ function errorExtraSpaces(state: TokenState, pos: Position, actual: number): Nul
     (actual === 1
       ? "is 1"
       : "are " + actual));
+}
+
+function errorTagEmpty(state: TokenState, pos: Position): NulanError {
+  return new NulanError(loc(state, pos, position(state)), "Tag cannot be empty");
 }
 
 function errorInvalidExactSpaces(state: TokenState, pos: Position, expected: number, actual: number): NulanError {
@@ -171,13 +171,7 @@ function consumeSpacesError(state: TokenState) {
 }
 
 
-function tokenizeIdentifier(state: TokenState, output: Array<Token>, char: string): void {
-  const chars = [char];
-
-  const start = position(state);
-
-  incrementColumn(state);
-
+function consumeIdentifier(state: TokenState, chars: Array<string>): void {
   for (;;) {
     const char = peek(state);
 
@@ -193,6 +187,17 @@ function tokenizeIdentifier(state: TokenState, output: Array<Token>, char: strin
       chars.push(char);
     }
   }
+}
+
+
+function tokenizeIdentifier(state: TokenState, char: string): Token {
+  const chars = [char];
+
+  const start = position(state);
+
+  incrementColumn(state);
+
+  consumeIdentifier(state, chars);
 
   const end = position(state);
 
@@ -200,18 +205,18 @@ function tokenizeIdentifier(state: TokenState, output: Array<Token>, char: strin
 
   // TODO more efficient check
   if (/^[0-9]+$/.test(str)) {
-    output.push({
+    return {
       type: "integer",
       value: str,
       loc: loc(state, start, end)
-    });
+    };
 
   } else {
-    output.push({
+    return {
       type: "symbol",
       value: str,
       loc: loc(state, start, end)
-    });
+    };
   }
 }
 
@@ -227,12 +232,38 @@ function tokenize1(state: TokenState, output: Array<Token>): void {
       const special = specials[char];
 
       if (special == null) {
-        tokenizeIdentifier(state, output, char);
+        output.push(tokenizeIdentifier(state, char));
 
       } else {
         special(state, output, char);
       }
     }
+  }
+}
+
+
+function specialTag(state: TokenState, output: Array<Token>, char: string): void {
+  const start = position(state);
+
+  incrementColumn(state);
+
+  const chars: Array<string> = [];
+
+  consumeIdentifier(state, chars);
+
+  if (chars.length === 0) {
+    throw errorTagEmpty(state, start);
+
+  } else {
+    const end = position(state);
+
+    const str = chars.join("");
+
+    output.push({
+      type: "tag",
+      value: str,
+      loc: loc(state, start, end)
+    });
   }
 }
 
@@ -263,7 +294,7 @@ function incrementBlockCharacter(state: TokenState, pos: Position, start: string
     const x = consumeSpaces(state);
 
     if (x.next == null) {
-      throw errorMissing(state, pos, "ending /" + start);
+      throw errorMissing(loc(state, pos, position(state)), "ending /" + start);
 
     } else if (x.next === "\n" || x.next === "\r") {
       throw errorExtraSpaces(state, pos, x.spaces + 1);
@@ -281,7 +312,7 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
     const char = peek(state);
 
     if (char == null) {
-      throw errorMissing(state, pos, "ending /" + start);
+      throw errorMissing(loc(state, pos, position(state)), "ending /" + start);
 
     } else if (char === "/") {
       incrementColumn(state);
@@ -289,7 +320,7 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
       const char = peek(state);
 
       if (char == null) {
-        throw errorMissing(state, pos, "ending /" + start);
+        throw errorMissing(loc(state, pos, position(state)), "ending /" + start);
 
       } else if (char === start) {
         incrementColumn(state);
@@ -307,7 +338,7 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
       const char = peek(state);
 
       if (char == null) {
-        throw errorMissing(state, pos, "ending /" + start);
+        throw errorMissing(loc(state, pos, position(state)), "ending /" + start);
 
       } else if (char === "/") {
         specialBlockComment(state, newPos, start);
@@ -364,7 +395,7 @@ function specialStringEscape(state: TokenState, pos: Position, chars: Array<stri
   const char = peek(state);
 
   if (char == null) {
-    throw errorMissing(state, pos, "ending " + delimiter);
+    throw errorMissing(loc(state, pos, position(state)), "ending " + delimiter);
 
   } else {
     const escape = specialStringEscapes[char];
@@ -389,7 +420,7 @@ function incrementStringSpaces(state: TokenState, start: Position, delimiter: st
   const x = consumeSpaces(state);
 
   if (x.next == null) {
-    throw errorMissing(state, start, "ending " + delimiter);
+    throw errorMissing(loc(state, start, position(state)), "ending " + delimiter);
 
   } else if (x.next === "\n" || x.next === "\r") {
     if (x.spaces === 0) {
@@ -432,7 +463,7 @@ function specialString(state: TokenState, output: Array<Token>, delimiter: strin
     const char = peek(state);
 
     if (char == null) {
-      throw errorMissing(state, start, "ending " + delimiter);
+      throw errorMissing(loc(state, start, position(state)), "ending " + delimiter);
 
     } else if (char === delimiter) {
       incrementColumn(state);
@@ -489,7 +520,7 @@ function specialStringEscapeUnicode(state: TokenState, pos: Position, chars: Arr
   const next = peek(state);
 
   if (next == null) {
-    throw errorMissing(state, start, "starting [");
+    throw errorMissing(loc(state, start, position(state)), "starting [");
 
   } else if (next === "[") {
     incrementColumn(state);
@@ -506,7 +537,7 @@ function specialStringEscapeUnicode(state: TokenState, pos: Position, chars: Arr
         const next = peek(state);
 
         if (next == null) {
-          throw errorMissing(state, start, "ending ]");
+          throw errorMissing(loc(state, start, position(state)), "ending ]");
 
         // TODO more efficient check ?
         } else if (/^[0-9A-F]$/.test(next)) {
@@ -518,7 +549,7 @@ function specialStringEscapeUnicode(state: TokenState, pos: Position, chars: Arr
             const next = peek(state);
 
             if (next == null) {
-              throw errorMissing(state, start, "ending ]");
+              throw errorMissing(loc(state, start, position(state)), "ending ]");
 
             } else if (next === " ") {
               const pos = position(state);
@@ -587,13 +618,14 @@ specials["\r"] = specialIncrement;
 specials["\n"] = specialIncrement;
 specials["#"] = specialComment;
 specials["\""] = specialString;
-specials["."] = specialCharacter;
+specials["*"] = specialTag;
 specials["("] = specialCharacter;
 specials[")"] = specialCharacter;
 specials["["] = specialCharacter;
 specials["]"] = specialCharacter;
 specials["{"] = specialCharacter;
 specials["}"] = specialCharacter;
+specials["."] = specialCharacter;
 specials["@"] = specialCharacter;
 specials["&"] = specialCharacter;
 specials["~"] = specialCharacter;
