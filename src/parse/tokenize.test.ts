@@ -60,6 +60,22 @@ test("string", () => {
 		string("foo\"\\\t\n\rbar", l(f, p(0, 0, 0), p(18, 0, 18)))
 	]);
 
+	expect(tokenize("  \"foo\\\n   bar\"", f)).toEqual([
+		string("foobar", l(f, p(2, 0, 2), p(15, 1, 7)))
+	]);
+
+	expect(tokenize("  \"foo\\\r   bar\"", f)).toEqual([
+		string("foobar", l(f, p(2, 0, 2), p(15, 1, 7)))
+	]);
+
+	expect(tokenize("  \"foo\\\n\r   bar\"", f)).toEqual([
+		string("foobar", l(f, p(2, 0, 2), p(16, 1, 7)))
+	]);
+
+	expect(tokenize("  \"foo\\\r\n   bar\"", f)).toEqual([
+		string("foobar", l(f, p(2, 0, 2), p(16, 1, 7)))
+	]);
+
 	expect(() => tokenize("\"foo\\\t\"", f)).toThrow("Invalid tab (U+0009)");
 
 	expect(() => tokenize("\"foo\\", f)).toThrow("Missing ending \"");
@@ -109,6 +125,11 @@ test("string", () => {
 	expect(tokenize("  \"foo\n\n\n\n      bar\"", f)).toEqual([
 		string("foo\n\n\n\n   bar", l(f, p(2, 0, 2), p(20, 4, 10)))
 	]);
+
+
+	expect(tokenize("\"foo\\u[0]\"", f)).toEqual([
+		string("foo\u0000", l(f, p(0, 0, 0), p(10, 0, 10)))
+	]);
 });
 
 
@@ -144,6 +165,10 @@ test("newline", () => {
 
 
 test("line comment", () => {
+	expect(tokenize("foo#", f)).toEqual([
+		symbol("foo", l(f, p(0, 0, 0), p(3, 0, 3)))
+	]);
+
 	expect(tokenize("foo\nbar#qux\ncorge", f)).toEqual([
 		symbol("foo", l(f, p(0, 0, 0), p(3, 0, 3))),
 		symbol("bar", l(f, p(4, 1, 0), p(7, 1, 3))),
@@ -173,12 +198,25 @@ test("line comment", () => {
 		symbol("bar", l(f, p(10, 1, 0), p(13, 1, 3)))
 	]);
 
+	expect(() => tokenize("#foo\t", f)).toThrow("Invalid tab (U+0009)");
+
 	expect(() => tokenize("#foo     ", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
 	expect(() => tokenize("#foo     \n", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
 });
 
 
 test("block comment", () => {
+	expect(tokenize("foo#/bar/qux/#qux", f)).toEqual([
+		symbol("foo", l(f, p(0, 0, 0), p(3, 0, 3))),
+		symbol("qux", l(f, p(14, 0, 14), p(17, 0, 17)))
+	]);
+
+	expect(tokenize("foo#/bar qux/#qux", f)).toEqual([
+		symbol("foo", l(f, p(0, 0, 0), p(3, 0, 3))),
+		symbol("qux", l(f, p(14, 0, 14), p(17, 0, 17)))
+	]);
+
+
 	expect(tokenize("foo#/bar/#qux", f)).toEqual([
 		symbol("foo", l(f, p(0, 0, 0), p(3, 0, 3))),
 		symbol("qux", l(f, p(10, 0, 10), p(13, 0, 13)))
@@ -217,12 +255,19 @@ test("block comment", () => {
 	]);
 
 
+	expect(() => tokenize("#/foo\t/#", f)).toThrow("Invalid tab (U+0009)");
+
 	expect(() => tokenize("#/foo     ", f)).toThrow("Missing ending /#");
+	expect(() => tokenize("#/foo#", f)).toThrow("Missing ending /#");
+	expect(() => tokenize("#/foo/", f)).toThrow("Missing ending /#");
+
 	expect(() => tokenize("#/foo/# ", f)).toThrow("Spaces are not allowed at the end of the line, but there is 1");
 	expect(() => tokenize("#/foo/# \n", f)).toThrow("Spaces are not allowed at the end of the line, but there is 1");
-
 	expect(() => tokenize("#/foo \n/#", f)).toThrow("Spaces are not allowed at the end of the line, but there is 1");
 	expect(() => tokenize("#/foo     \n/#", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
+	expect(() => tokenize("#/foo     \r/#", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
+	expect(() => tokenize("#/foo     \n\r/#", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
+	expect(() => tokenize("#/foo     \r\n/#", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
 	expect(() => tokenize("#/foo#     \n/#", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
 	expect(() => tokenize("#/foo/     \n/#", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
 });

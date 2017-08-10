@@ -247,6 +247,27 @@ function specialLineComment(state: TokenState, char: string | null): void {
   }
 }
 
+function incrementBlockCharacter(state: TokenState, pos: Position, start: string, char: string): void {
+  // TODO code duplication with consumeSpacesError
+  if (char === " ") {
+    const pos = position(state);
+
+    incrementColumn(state);
+
+    const x = consumeSpaces(state);
+
+    if (x.next == null) {
+      throw errorBlockComment(state, pos, start);
+
+    } else if (x.next === "\n" || x.next === "\r") {
+      throw errorExtraSpaces(state, pos, x.spaces + 1);
+    }
+
+  } else {
+    incrementCharacter(state, char);
+  }
+}
+
 function specialBlockComment(state: TokenState, pos: Position, start: string): void {
   incrementColumn(state);
 
@@ -269,7 +290,7 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
         break;
 
       } else {
-        incrementCharacter(state, char);
+        incrementBlockCharacter(state, pos, start, char);
       }
 
     } else if (char === start) {
@@ -286,11 +307,11 @@ function specialBlockComment(state: TokenState, pos: Position, start: string): v
         specialBlockComment(state, newPos, start);
 
       } else {
-        incrementCharacter(state, char);
+        incrementBlockCharacter(state, pos, start, char);
       }
 
     } else {
-      incrementCharacter(state, char);
+      incrementBlockCharacter(state, pos, start, char);
     }
   }
 }
@@ -427,9 +448,8 @@ function specialString(state: TokenState, output: Array<Token>, delimiter: strin
 
       const spaces = incrementStringSpaces(state, start, delimiter, pos);
 
-      if (spaces != null) {
-        chars.push($string.repeat(" ", spaces));
-      }
+      // TODO hacky cast needed to avoid a code coverage warning
+      chars.push($string.repeat(" ", spaces as number));
 
     } else {
       chars.push(char);
