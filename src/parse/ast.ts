@@ -27,18 +27,6 @@ export type AST
   | { type: "type", left: AST, right: AST, loc: Loc };
 
 
-export function shouldUnwrap(a: AST): boolean {
-  return a.type === "lambda" ||
-         a.type === "bar" ||
-         a.type === "quote" ||
-         a.type === "unquote" ||
-         a.type === "splice" ||
-         a.type === "match" ||
-         a.type === "assign" ||
-         a.type === "type";
-}
-
-
 export function pretty(a: AST): string {
   switch (a.type) {
   case "variable":

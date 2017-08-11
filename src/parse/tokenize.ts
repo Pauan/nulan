@@ -629,6 +629,7 @@ specials["."] = specialCharacter;
 specials["@"] = specialCharacter;
 specials["&"] = specialCharacter;
 specials["~"] = specialCharacter;
+specials["|"] = specialCharacter;
 
 
 export function tokenize(input: string, filename: string): Array<Token> {

@@ -17,19 +17,20 @@ test("symbol", () => {
 		symbol("bar", l(f, p(4, 0, 4), p(7, 0, 7)))
 	]);
 
-	expect(tokenize("foo.bar()[]{}@&~", f)).toEqual([
+	expect(tokenize("foo.bar|()[]{}@&~", f)).toEqual([
 		symbol("foo", l(f, p(0, 0, 0), p(3, 0, 3))),
 		symbol(".", l(f, p(3, 0, 3), p(4, 0, 4))),
 		symbol("bar", l(f, p(4, 0, 4), p(7, 0, 7))),
-		symbol("(", l(f, p(7, 0, 7), p(8, 0, 8))),
-		symbol(")", l(f, p(8, 0, 8), p(9, 0, 9))),
-		symbol("[", l(f, p(9, 0, 9), p(10, 0, 10))),
-		symbol("]", l(f, p(10, 0, 10), p(11, 0, 11))),
-		symbol("{", l(f, p(11, 0, 11), p(12, 0, 12))),
-		symbol("}", l(f, p(12, 0, 12), p(13, 0, 13))),
-		symbol("@", l(f, p(13, 0, 13), p(14, 0, 14))),
-		symbol("&", l(f, p(14, 0, 14), p(15, 0, 15))),
-		symbol("~", l(f, p(15, 0, 15), p(16, 0, 16))),
+		symbol("|", l(f, p(7, 0, 7), p(8, 0, 8))),
+		symbol("(", l(f, p(8, 0, 8), p(9, 0, 9))),
+		symbol(")", l(f, p(9, 0, 9), p(10, 0, 10))),
+		symbol("[", l(f, p(10, 0, 10), p(11, 0, 11))),
+		symbol("]", l(f, p(11, 0, 11), p(12, 0, 12))),
+		symbol("{", l(f, p(12, 0, 12), p(13, 0, 13))),
+		symbol("}", l(f, p(13, 0, 13), p(14, 0, 14))),
+		symbol("@", l(f, p(14, 0, 14), p(15, 0, 15))),
+		symbol("&", l(f, p(15, 0, 15), p(16, 0, 16))),
+		symbol("~", l(f, p(16, 0, 16), p(17, 0, 17))),
 	]);
 
 	expect(tokenize("foo!?-barABC0123_$^<<=", f)).toEqual([

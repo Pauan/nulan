@@ -186,7 +186,7 @@ specials["["] = parseStartBracket("]", $ast.array);
 specials["{"] = parseStartBracket("}", $ast.record);
 
 specials["("] = parseStartBracket(")", (args: Array<$ast.AST>, loc: Loc) => {
-  if (args.length === 1 && $ast.shouldUnwrap(args[0])) {
+  if (args.length === 1) {
     // TODO don't use mutation ?
     args[0].loc = loc;
     return args[0];
