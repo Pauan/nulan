@@ -31,9 +31,9 @@ export function pretty(a: AST): string {
   switch (a.type) {
   case "variable":
     if (a.name == null) {
-      return "#<var " + a.id + ">";
+      return "#(var " + a.id + ")";
     } else {
-      return "#<var " + a.id + " " + a.name + ">";
+      return "#(var " + a.id + " " + a.name + ")";
     }
   case "integer":
   case "symbol":
@@ -48,11 +48,23 @@ export function pretty(a: AST): string {
   case "lambda":
     return "(-> " + a.args.concat([a.body]).map(pretty).join(" ") + ")";
   case "call":
-    return "( " + a.args.map(pretty).join(" ") + " )";
+    if (a.args.length === 0) {
+      return "()";
+    } else {
+      return "( " + a.args.map(pretty).join(" ") + " )";
+    }
   case "array":
-    return "[ " + a.args.map(pretty).join(" ") + " ]";
+    if (a.args.length === 0) {
+      return "[]";
+    } else {
+      return "[ " + a.args.map(pretty).join(" ") + " ]";
+    }
   case "record":
-    return "{ " + a.args.map(pretty).join(" ") + " }";
+    if (a.args.length === 0) {
+      return "{}";
+    } else {
+      return "{ " + a.args.map(pretty).join(" ") + " }";
+    }
   case "bar":
     return "(| " + pretty(a.value) + ")";
   case "quote":
@@ -72,6 +84,10 @@ export function pretty(a: AST): string {
   }
 }
 
+
+export function variable(id: number, name: string | null, loc: Loc): AST {
+  return { type: "variable", id, name, loc };
+}
 
 export function wildcard(loc: Loc): AST {
   return { type: "wildcard", loc };

@@ -1,6 +1,21 @@
-import { NulanError, warning } from "./error";
+import { NulanError, warning, assertExists, assert } from "./error";
 import { loc, position } from "./loc";
 import { EOL } from "./node";
+
+
+test("assertExists", () => {
+  expect(assertExists(1)).toBe(true);
+  expect(assertExists("1")).toBe(true);
+
+  expect(() => assertExists(null)).toThrow("Value cannot be null or undefined");
+  expect(() => assertExists(undefined)).toThrow("Value cannot be null or undefined");
+});
+
+
+test("assert", () => {
+  expect(assert(true)).toBe(undefined);
+  expect(() => assert(false)).toThrow("Assertion failed");
+});
 
 
 test("NulanError", () => {

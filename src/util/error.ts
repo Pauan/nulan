@@ -6,7 +6,7 @@ import * as $loc from "./loc";
 
 export function assertExists<A>(v: A | undefined | null): v is A {
   if (v == null) {
-    throw new Error("Value " + v + " is null or undefined");
+    throw new Error("Value cannot be null or undefined");
 
   } else {
     return true;
@@ -14,11 +14,8 @@ export function assertExists<A>(v: A | undefined | null): v is A {
 }
 
 
-export function assert(test: boolean): test is true {
-  if (test) {
-    return true;
-
-  } else {
+export function assert(test: boolean): void {
+  if (!test) {
     throw new Error("Assertion failed");
   }
 }

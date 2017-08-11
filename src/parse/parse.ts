@@ -33,7 +33,7 @@ function next(state: ParserState): void {
 }
 
 
-function parse1(state: ParserState, priority: Priority, output: Array<$ast.AST>): Array<$ast.AST> {
+function parse1(state: ParserState, priority: Priority | null, output: Array<$ast.AST>): Array<$ast.AST> {
   for (;;) {
     const token = peek(state);
 
@@ -47,7 +47,7 @@ function parse1(state: ParserState, priority: Priority, output: Array<$ast.AST>)
         next(state);
         output.push(token);
 
-      } else if (priority < special.priority) {
+      } else if (priority == null || priority < special.priority) {
         next(state);
         output = special.parse(state, token, output);
 
@@ -66,7 +66,7 @@ export function parse(tokens: Array<$ast.Token>): Array<$ast.AST> {
   return parse1({
     index: 0,
     input: tokens
-  }, -Infinity, []);
+  }, null, []);
 }
 
 
@@ -202,12 +202,10 @@ specials["}"] = parseEndBracket("{");
 
 specials["_"] = parseSingle($ast.wildcard);
 
-specials["~"] = parsePrefix(3, $ast.unquote);
-specials["@"] = parsePrefix(3, $ast.splice);
+specials[":"] = parseInfix(1, "right", $ast.match);
+
 specials["|"] = parsePrefix(2, $ast.bar);
 specials["&"] = parsePrefix(2, $ast.quote);
-
-specials[":"] = parseInfix(1, "right", $ast.match);
 specials["<="] = parseInfix(2, "right", $ast.assign);
 specials["::"] = parseInfix(2, "right", $ast.type);
 
@@ -221,3 +219,6 @@ specials["."] = parseInfix(2, "left", (left, right, loc) => {
     return $ast.dot(left, right, loc);
   }
 });
+
+specials["~"] = parsePrefix(3, $ast.unquote);
+specials["@"] = parsePrefix(3, $ast.splice);

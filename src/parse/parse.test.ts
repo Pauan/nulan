@@ -1,6 +1,6 @@
 import { tokenize } from "./tokenize";
 import { NulanError } from "../util/error";
-import { loc as l, position as p } from "../util/loc";
+import { loc as l, position as p, Loc } from "../util/loc";
 import { AST, symbol, integer, float, string, tag, call, lambda, array,
          record, wildcard, bar, quote, unquote, splice, type, assign, match,
          dot, pretty } from "./ast";
@@ -12,6 +12,76 @@ const f = "test.nul";
 function parse(s: string, filename: string): Array<AST> {
   return $parse.parse(tokenize(s, filename));
 }
+
+
+function testBrackets(start: string, end: string, make: (args: Array<AST>, loc: Loc) => AST): void {
+  expect(parse(start + "a b" + end, f)).toEqual([
+    make([
+      symbol("a", l(f, p(1, 0, 1), p(2, 0, 2))),
+      symbol("b", l(f, p(3, 0, 3), p(4, 0, 4))),
+    ], l(f, p(0, 0, 0), p(5, 0, 5)))
+  ]);
+
+  expect(() => parse(start, f)).toThrow("Missing ending " + end);
+  expect(() => parse(end, f)).toThrow("Missing starting " + start);
+
+  expect(() => parse(start + "a", f)).toThrow("Missing ending " + end);
+  expect(() => parse("a" + end, f)).toThrow("Missing starting " + start);
+}
+
+
+function testPrefix(s: string, make: (ast: AST, loc: Loc) => AST): void {
+  expect(parse(s + "1", f)).toEqual([
+    make(integer("1", l(f, p(1, 0, 1), p(2, 0, 2))),
+         l(f, p(0, 0, 0), p(2, 0, 2)))
+  ]);
+
+  expect(() => parse(s, f)).toThrow("There must be an expression on the right of " + s);
+}
+
+
+function testInfix(s: string, make: (left: AST, right: AST, loc: Loc) => AST): void {
+  expect(parse("a " + s + " b", f)).toEqual([
+    make(
+      symbol("a", l(f, p(0, 0, 0), p(1, 0, 1))),
+      symbol("b", l(f, p(1 + s.length + 2, 0, 1 + s.length + 2), p(2 + s.length + 2, 0, 2 + s.length + 2))),
+      l(f, p(0, 0, 0), p(2 + s.length + 2, 0, 2 + s.length + 2))
+     )
+  ]);
+
+  expect(() => parse(s, f)).toThrow("There must be an expression on the left of " + s);
+  expect(() => parse("a " + s, f)).toThrow("There must be an expression on the right of " + s);
+  expect(() => parse(s + " b", f)).toThrow("There must be an expression on the left of " + s);
+}
+
+
+test("brackets", () => {
+  testBrackets("(", ")", call);
+  testBrackets("[", "]", array);
+  testBrackets("{", "}", record);
+});
+
+
+test("prefix", () => {
+  testPrefix("|", bar);
+  testPrefix("&", quote);
+  testPrefix("~", unquote);
+  testPrefix("@", splice);
+});
+
+
+test("infix", () => {
+  testInfix(":", match);
+  testInfix("<=", assign);
+  testInfix("::", type);
+  testInfix(".", dot);
+});
+
+
+test("lambda", () => {
+  expect(() => parse("->", f)).toThrow("There must be an expression on the right of ->");
+  expect(() => parse("(->)", f)).toThrow("There must be an expression on the right of ->");
+});
 
 
 test("parse", () => {
