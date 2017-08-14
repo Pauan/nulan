@@ -1,3 +1,4 @@
+import { expectError } from "../util/test";
 import { tokenize } from "./tokenize";
 import { NulanError } from "../util/error";
 import { loc as l, position as p } from "../util/loc";
@@ -5,6 +6,92 @@ import { symbol, integer, string, tag } from "./ast";
 
 
 const f = "test.nul";
+
+
+function testInfixWhitespace(s: string): void {
+	expect(tokenize("a" + s + "b", f)).toEqual([
+		symbol("a", l(f, p(0, 0, 0), p(1, 0, 1))),
+		symbol(s, l(f, p(1, 0, 1), p(2, 0, 2))),
+		symbol("b", l(f, p(2, 0, 2), p(3, 0, 3)))
+	]);
+
+	expectError(() => tokenize("a" + s, f),
+		l(f, p(2, 0, 2), p(2, 0, 2)),
+		"There cannot be whitespace to the right of .");
+
+	expectError(() => tokenize("a" + s + " b", f),
+		l(f, p(2, 0, 2), p(3, 0, 3)),
+		"There cannot be whitespace to the right of .");
+
+	expectError(() => tokenize("a" + s + "\n", f),
+		l(f, p(2, 0, 2), p(3, 1, 0)),
+		"There cannot be whitespace to the right of .");
+
+	expectError(() => tokenize("a" + s + "\r", f),
+		l(f, p(2, 0, 2), p(3, 1, 0)),
+		"There cannot be whitespace to the right of .");
+
+	expectError(() => tokenize("a" + s + "\n\r", f),
+		l(f, p(2, 0, 2), p(4, 1, 0)),
+		"There cannot be whitespace to the right of .");
+
+	expectError(() => tokenize("a" + s + "\r\n", f),
+		l(f, p(2, 0, 2), p(4, 1, 0)),
+		"There cannot be whitespace to the right of .");
+
+	expectError(() => tokenize("a" + s + "\t", f),
+		l(f, p(2, 0, 2), p(3, 0, 3)),
+		"Invalid tab (U+0009)");
+
+	expectError(() => tokenize("a" + s + "#", f),
+		l(f, p(2, 0, 2), p(3, 0, 3)),
+		"There cannot be whitespace to the right of .");
+
+	expectError(() => tokenize(s + "b", f),
+		l(f, p(0, 0, 0), p(0, 0, 0)),
+		"There cannot be whitespace to the left of .");
+
+	expectError(() => tokenize(" " + s + "b", f),
+		l(f, p(0, 0, 0), p(1, 0, 1)),
+		"There cannot be whitespace to the left of .");
+
+	expectError(() => tokenize("\n" + s + "b", f),
+		l(f, p(0, 0, 0), p(1, 1, 0)),
+		"There cannot be whitespace to the left of .");
+
+	expectError(() => tokenize("\r" + s + "b", f),
+		l(f, p(0, 0, 0), p(1, 1, 0)),
+		"There cannot be whitespace to the left of .");
+
+	expectError(() => tokenize("\n\r" + s + "b", f),
+		l(f, p(0, 0, 0), p(2, 1, 0)),
+		"There cannot be whitespace to the left of .");
+
+	expectError(() => tokenize("\r\n" + s + "b", f),
+		l(f, p(0, 0, 0), p(2, 1, 0)),
+		"There cannot be whitespace to the left of .");
+
+	expectError(() => tokenize("111\n\r" + s + "b", f),
+		l(f, p(3, 0, 3), p(5, 1, 0)),
+		"There cannot be whitespace to the left of .");
+
+	expectError(() => tokenize("111\r\n" + s + "b", f),
+		l(f, p(3, 0, 3), p(5, 1, 0)),
+		"There cannot be whitespace to the left of .");
+
+	expectError(() => tokenize("\t" + s + "b", f),
+		l(f, p(0, 0, 0), p(1, 0, 1)),
+		"Invalid tab (U+0009)");
+
+	expectError(() => tokenize("#//#" + s + "b", f),
+		l(f, p(3, 0, 3), p(4, 0, 4)),
+		"There cannot be whitespace to the left of .");
+}
+
+
+test("infix", () => {
+	testInfixWhitespace(".");
+});
 
 
 test("symbol", () => {
@@ -61,10 +148,21 @@ test("tag", () => {
 		symbol(")", l(f, p(26, 0, 26), p(27, 0, 27)))
 	]);
 
-	expect(() => tokenize("*", f)).toThrow("Tag cannot be empty");
-	expect(() => tokenize("**foo", f)).toThrow("Tag cannot be empty");
-	expect(() => tokenize("* foo", f)).toThrow("Tag cannot be empty");
-	expect(() => tokenize("*(", f)).toThrow("Tag cannot be empty");
+	expectError(() => tokenize("*", f),
+		l(f, p(0, 0, 0), p(1, 0, 1)),
+		"Tag cannot be empty");
+
+	expectError(() => tokenize("**foo", f),
+		l(f, p(0, 0, 0), p(1, 0, 1)),
+		"Tag cannot be empty");
+
+	expectError(() => tokenize("* foo", f),
+		l(f, p(0, 0, 0), p(1, 0, 1)),
+		"Tag cannot be empty");
+
+	expectError(() => tokenize("*(", f),
+		l(f, p(0, 0, 0), p(1, 0, 1)),
+		"Tag cannot be empty");
 });
 
 
@@ -110,31 +208,85 @@ test("string", () => {
 		string("foobar", l(f, p(2, 0, 2), p(16, 1, 7)))
 	]);
 
-	expect(() => tokenize("\"foo\\\t\"", f)).toThrow("Invalid tab (U+0009)");
+	expectError(() => tokenize("\"foo\\\t\"", f),
+		l(f, p(5, 0, 5), p(6, 0, 6)),
+		"Invalid tab (U+0009)");
 
-	expect(() => tokenize("\"foo\\", f)).toThrow("Missing ending \"");
-	expect(() => tokenize("\"foo\\1\"", f)).toThrow("Invalid \\1, it must be one of the following: \\<NEWLINE> \\\" \\\\ \\n \\r \\t \\u");
+	expectError(() => tokenize("\"foo\\", f),
+		l(f, p(0, 0, 0), p(5, 0, 5)),
+		"Missing ending \"");
 
-	expect(() => tokenize(" \"foo", f)).toThrow("Missing ending \"");
-	expect(() => tokenize(" \"foo     ", f)).toThrow("Missing ending \"");
-	expect(() => tokenize(" \"foo\n", f)).toThrow("Missing ending \"");
-	expect(() => tokenize(" \"foo\n ", f)).toThrow("Missing ending \"");
+	expectError(() => tokenize("\"foo\\1\"", f),
+		l(f, p(4, 0, 4), p(6, 0, 6)),
+		"Invalid \\1, it must be one of the following: \\<NEWLINE> \\\" \\\\ \\n \\r \\t \\u");
 
-	expect(() => tokenize(" \"foo\n\"", f)).toThrow("There must be at least 2 spaces, but there are 0");
-	expect(() => tokenize(" \"foo\n \"", f)).toThrow("There must be at least 2 spaces, but there is 1");
+	expectError(() => tokenize(" \"foo", f),
+		l(f, p(1, 0, 1), p(5, 0, 5)),
+		"Missing ending \"");
 
-	expect(() => tokenize(" \"foo\n  bar   \n  \"", f)).toThrow("Spaces are not allowed at the end of the line, but there are 3");
-	expect(() => tokenize(" \"foo\n      \n\"", f)).toThrow("Spaces are not allowed at the end of the line, but there are 6");
-	expect(() => tokenize("\"foo\n \n bar\"", f)).toThrow("Spaces are not allowed at the end of the line, but there is 1");
-	expect(() => tokenize("\"foo\n   \n bar\"", f)).toThrow("Spaces are not allowed at the end of the line, but there are 3");
+	expectError(() => tokenize(" \"foo     ", f),
+		l(f, p(1, 0, 1), p(10, 0, 10)),
+		"Missing ending \"");
 
-	expect(() => tokenize("\"foo\nbar", f)).toThrow("There must be at least 1 space, but there are 0");
-	expect(() => tokenize(" \"foo\nbar", f)).toThrow("There must be at least 2 spaces, but there are 0");
-	expect(() => tokenize(" \"foo\n bar", f)).toThrow("There must be at least 2 spaces, but there is 1");
-	expect(() => tokenize("  \"foo\n  bar", f)).toThrow("There must be at least 3 spaces, but there are 2");
-	expect(() => tokenize("  \"foo\r  bar", f)).toThrow("There must be at least 3 spaces, but there are 2");
-	expect(() => tokenize("  \"foo\n\r  bar", f)).toThrow("There must be at least 3 spaces, but there are 2");
-	expect(() => tokenize("  \"foo\r\n  bar", f)).toThrow("There must be at least 3 spaces, but there are 2");
+	expectError(() => tokenize(" \"foo\n", f),
+		l(f, p(1, 0, 1), p(6, 1, 0)),
+		"Missing ending \"");
+
+	expectError(() => tokenize(" \"foo\n ", f),
+		l(f, p(1, 0, 1), p(7, 1, 1)),
+		"Missing ending \"");
+
+	expectError(() => tokenize(" \"foo\n\"", f),
+		l(f, p(6, 1, 0), p(6, 1, 0)),
+		"There must be at least 2 spaces, but there are 0");
+
+	expectError(() => tokenize(" \"foo\n \"", f),
+		l(f, p(6, 1, 0), p(7, 1, 1)),
+		"There must be at least 2 spaces, but there is 1");
+
+	expectError(() => tokenize(" \"foo\n  bar   \n  \"", f),
+		l(f, p(11, 1, 5), p(14, 1, 8)),
+		"Spaces are not allowed at the end of the line, but there are 3");
+
+	expectError(() => tokenize(" \"foo\n      \n\"", f),
+		l(f, p(6, 1, 0), p(12, 1, 6)),
+		"Spaces are not allowed at the end of the line, but there are 6");
+
+	expectError(() => tokenize("\"foo\n \n bar\"", f),
+		l(f, p(5, 1, 0), p(6, 1, 1)),
+		"Spaces are not allowed at the end of the line, but there is 1");
+
+	expectError(() => tokenize("\"foo\n   \n bar\"", f),
+		l(f, p(5, 1, 0), p(8, 1, 3)),
+		"Spaces are not allowed at the end of the line, but there are 3");
+
+	expectError(() => tokenize("\"foo\nbar", f),
+		l(f, p(5, 1, 0), p(5, 1, 0)),
+		"There must be at least 1 space, but there are 0");
+
+	expectError(() => tokenize(" \"foo\nbar", f),
+		l(f, p(6, 1, 0), p(6, 1, 0)),
+		"There must be at least 2 spaces, but there are 0");
+
+	expectError(() => tokenize(" \"foo\n bar", f),
+		l(f, p(6, 1, 0), p(7, 1, 1)),
+		"There must be at least 2 spaces, but there is 1");
+
+	expectError(() => tokenize("  \"foo\n  bar", f),
+		l(f, p(7, 1, 0), p(9, 1, 2)),
+		"There must be at least 3 spaces, but there are 2");
+
+	expectError(() => tokenize("  \"foo\r  bar", f),
+		l(f, p(7, 1, 0), p(9, 1, 2)),
+		"There must be at least 3 spaces, but there are 2");
+
+	expectError(() => tokenize("  \"foo\n\r  bar", f),
+		l(f, p(8, 1, 0), p(10, 1, 2)),
+		"There must be at least 3 spaces, but there are 2");
+
+	expectError(() => tokenize("  \"foo\r\n  bar", f),
+		l(f, p(8, 1, 0), p(10, 1, 2)),
+		"There must be at least 3 spaces, but there are 2");
 
 	expect(tokenize(" \"foo\n  \"", f)).toEqual([
 		string("foo\n", l(f, p(1, 0, 1), p(9, 1, 3)))
@@ -161,27 +313,74 @@ test("string", () => {
 	]);
 
 
-	expect(() => tokenize("\"foo\\u", f)).toThrow("Missing starting [");
-	expect(() => tokenize("\"foo\\u[", f)).toThrow("Missing ending ]");
-	expect(() => tokenize("\"foo\\u[0", f)).toThrow("Missing ending ]");
-	expect(() => tokenize("\"foo\\u[0]", f)).toThrow("Missing ending \"");
-	expect(() => tokenize("\"foo\\u[0 ", f)).toThrow("Missing ending ]");
-	expect(() => tokenize("\"foo\\u[0 0", f)).toThrow("Missing ending ]");
-	expect(() => tokenize("\"foo\\u[0 0]", f)).toThrow("Missing ending \"");
+	expectError(() => tokenize("\"foo\\u", f),
+		l(f, p(4, 0, 4), p(6, 0, 6)),
+		"Missing starting [");
 
-	expect(() => tokenize("\"foo\\u\"", f)).toThrow("Invalid \", it must be [");
-	expect(() => tokenize("\"foo\\u[A\"", f)).toThrow("Invalid \", it must be one of the following: <SPACE> ] 0 1 2 3 4 5 6 7 8 9 A B C D E F");
-	expect(() => tokenize("\"foo\\u[A\n]", f)).toThrow("Invalid <NEWLINE>, it must be one of the following: <SPACE> ] 0 1 2 3 4 5 6 7 8 9 A B C D E F");
-	expect(() => tokenize("\"foo\\u[\n]", f)).toThrow("Invalid <NEWLINE>, it must be one of the following: 0 1 2 3 4 5 6 7 8 9 A B C D E F");
-	expect(() => tokenize("\"foo\\u[a]", f)).toThrow("Invalid a, it must be one of the following: 0 1 2 3 4 5 6 7 8 9 A B C D E F");
+	expectError(() => tokenize("\"foo\\u[", f),
+		l(f, p(4, 0, 4), p(7, 0, 7)),
+		"Missing ending ]");
 
-	expect(() => tokenize("\"foo\\u[ A]", f)).toThrow("There cannot be a space after [");
-	expect(() => tokenize("\"foo\\u[A ]", f)).toThrow("There cannot be a space before ]");
-	expect(() => tokenize("\"foo\\u[A  A]", f)).toThrow("There must be exactly 1 space, but there are 2");
-	expect(() => tokenize("\"foo\\u[A     A]", f)).toThrow("There must be exactly 1 space, but there are 5");
+	expectError(() => tokenize("\"foo\\u[0", f),
+		l(f, p(4, 0, 4), p(8, 0, 8)),
+		"Missing ending ]");
 
-	// TODO better error message ?
-	expect(() => tokenize("\"foo\\u[FFFFFF]", f)).toThrow("Invalid code point 16777215");
+	expectError(() => tokenize("\"foo\\u[0]", f),
+		l(f, p(0, 0, 0), p(9, 0, 9)),
+		"Missing ending \"");
+
+	expectError(() => tokenize("\"foo\\u[0 ", f),
+		l(f, p(4, 0, 4), p(9, 0, 9)),
+		"Missing ending ]");
+
+	expectError(() => tokenize("\"foo\\u[0 0", f),
+		l(f, p(4, 0, 4), p(10, 0, 10)),
+		"Missing ending ]");
+
+	expectError(() => tokenize("\"foo\\u[0 0]", f),
+		l(f, p(0, 0, 0), p(11, 0, 11)),
+		"Missing ending \"");
+
+	expectError(() => tokenize("\"foo\\u\"", f),
+		l(f, p(6, 0, 6), p(7, 0, 7)),
+		"Invalid \", it must be [");
+
+	expectError(() => tokenize("\"foo\\u[A\"", f),
+		l(f, p(8, 0, 8), p(9, 0, 9)),
+		"Invalid \", it must be one of the following: <SPACE> ] 0 1 2 3 4 5 6 7 8 9 A B C D E F");
+
+	expectError(() => tokenize("\"foo\\u[A\n]", f),
+		l(f, p(8, 0, 8), p(9, 1, 0)),
+		"Invalid <NEWLINE>, it must be one of the following: <SPACE> ] 0 1 2 3 4 5 6 7 8 9 A B C D E F");
+
+	expectError(() => tokenize("\"foo\\u[\n]", f),
+		l(f, p(7, 0, 7), p(8, 1, 0)),
+		"Invalid <NEWLINE>, it must be one of the following: 0 1 2 3 4 5 6 7 8 9 A B C D E F");
+
+	expectError(() => tokenize("\"foo\\u[a]", f),
+		l(f, p(7, 0, 7), p(8, 0, 8)),
+		"Invalid a, it must be one of the following: 0 1 2 3 4 5 6 7 8 9 A B C D E F");
+
+	expectError(() => tokenize("\"foo\\u[ A]", f),
+		l(f, p(7, 0, 7), p(8, 0, 8)),
+		"There cannot be a space after [");
+
+	expectError(() => tokenize("\"foo\\u[A ]", f),
+		l(f, p(8, 0, 8), p(9, 0, 9)),
+		"There cannot be a space before ]");
+
+	expectError(() => tokenize("\"foo\\u[A  A]", f),
+		l(f, p(8, 0, 8), p(10, 0, 10)),
+		"There must be exactly 1 space, but there are 2");
+
+	expectError(() => tokenize("\"foo\\u[A     A]", f),
+		l(f, p(8, 0, 8), p(13, 0, 13)),
+		"There must be exactly 1 space, but there are 5");
+
+	expectError(() => tokenize("\"foo\\u[FFFFFF]", f),
+		l(f, p(7, 0, 7), p(13, 0, 13)),
+		"Invalid code point FFFFFF");
+
 
 	expect(tokenize("\"foo\\u[0]\"", f)).toEqual([
 		string("foo\u0000", l(f, p(0, 0, 0), p(10, 0, 10)))
@@ -201,6 +400,10 @@ test("string", () => {
 
 	expect(tokenize("\"foo\\u[10FFFF]\"", f)).toEqual([
 		string("foo\udbff\udfff", l(f, p(0, 0, 0), p(15, 0, 15)))
+	]);
+
+	expect(tokenize("\"foo\\u[10FFFF]1AF\"", f)).toEqual([
+		string("foo\udbff\udfff1AF", l(f, p(0, 0, 0), p(18, 0, 18)))
 	]);
 });
 
@@ -226,13 +429,29 @@ test("newline", () => {
 		symbol("bar", l(f, p(5, 1, 0), p(8, 1, 3)))
 	]);
 
-	expect(() => tokenize("foo\n  \n", f)).toThrow("Spaces are not allowed at the end of the line, but there are 2");
-	expect(() => tokenize("foo\r  \r", f)).toThrow("Spaces are not allowed at the end of the line, but there are 2");
-	expect(() => tokenize("foo\n\r  \n\r", f)).toThrow("Spaces are not allowed at the end of the line, but there are 2");
-	expect(() => tokenize("foo\r\n  \r\n", f)).toThrow("Spaces are not allowed at the end of the line, but there are 2");
+	expectError(() => tokenize("foo\n  \n", f),
+		l(f, p(4, 1, 0), p(6, 1, 2)),
+		"Spaces are not allowed at the end of the line, but there are 2");
 
-	expect(() => tokenize("foo\n  ", f)).toThrow("Spaces are not allowed at the end of the line, but there are 2");
-	expect(() => tokenize("foo\n  \nbar", f)).toThrow("Spaces are not allowed at the end of the line, but there are 2");
+	expectError(() => tokenize("foo\r  \r", f),
+		l(f, p(4, 1, 0), p(6, 1, 2)),
+		"Spaces are not allowed at the end of the line, but there are 2");
+
+	expectError(() => tokenize("foo\n\r  \n\r", f),
+		l(f, p(5, 1, 0), p(7, 1, 2)),
+		"Spaces are not allowed at the end of the line, but there are 2");
+
+	expectError(() => tokenize("foo\r\n  \r\n", f),
+		l(f, p(5, 1, 0), p(7, 1, 2)),
+		"Spaces are not allowed at the end of the line, but there are 2");
+
+	expectError(() => tokenize("foo\n  ", f),
+		l(f, p(4, 1, 0), p(6, 1, 2)),
+		"Spaces are not allowed at the end of the line, but there are 2");
+
+	expectError(() => tokenize("foo\n  \nbar", f),
+		l(f, p(4, 1, 0), p(6, 1, 2)),
+		"Spaces are not allowed at the end of the line, but there are 2");
 });
 
 
@@ -270,10 +489,17 @@ test("line comment", () => {
 		symbol("bar", l(f, p(10, 1, 0), p(13, 1, 3)))
 	]);
 
-	expect(() => tokenize("#foo\t", f)).toThrow("Invalid tab (U+0009)");
+	expectError(() => tokenize("#foo\t", f),
+		l(f, p(4, 0, 4), p(5, 0, 5)),
+		"Invalid tab (U+0009)");
 
-	expect(() => tokenize("#foo     ", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
-	expect(() => tokenize("#foo     \n", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
+	expectError(() => tokenize("#foo     ", f),
+		l(f, p(4, 0, 4), p(9, 0, 9)),
+		"Spaces are not allowed at the end of the line, but there are 5");
+
+	expectError(() => tokenize("#foo     \n", f),
+		l(f, p(4, 0, 4), p(9, 0, 9)),
+		"Spaces are not allowed at the end of the line, but there are 5");
 });
 
 
@@ -294,7 +520,9 @@ test("block comment", () => {
 		symbol("qux", l(f, p(10, 0, 10), p(13, 0, 13)))
 	]);
 
-	expect(() => tokenize("foo#/barqux", f)).toThrow("Missing ending /#");
+	expectError(() => tokenize("foo#/barqux", f),
+		l(f, p(3, 0, 3), p(11, 0, 11)),
+		"Missing ending /#");
 
 
 	expect(tokenize("foo#/1#/2/#3/#bar", f)).toEqual([
@@ -302,8 +530,17 @@ test("block comment", () => {
 		symbol("bar", l(f, p(14, 0, 14), p(17, 0, 17)))
 	]);
 
-	expect(() => tokenize("foo#/1#/2/#3bar", f)).toThrow("Missing ending /#");
-	expect(() => tokenize("foo#/1#/23/#bar", f)).toThrow("Missing ending /#");
+	expectError(() => tokenize("foo#/1#/2/#3bar", f),
+		l(f, p(3, 0, 3), p(15, 0, 15)),
+		"Missing ending /#");
+
+	expectError(() => tokenize("foo#/1#/23bar", f),
+		l(f, p(6, 0, 6), p(13, 0, 13)),
+		"Missing ending /#");
+
+	expectError(() => tokenize("foo#/1#/23/#bar", f),
+		l(f, p(3, 0, 3), p(15, 0, 15)),
+		"Missing ending /#");
 
 
 	expect(tokenize("foo\n#/\n1\n#/\n2\n/#3\n/#\nbar", f)).toEqual([
@@ -327,19 +564,55 @@ test("block comment", () => {
 	]);
 
 
-	expect(() => tokenize("#/foo\t/#", f)).toThrow("Invalid tab (U+0009)");
+	expectError(() => tokenize("#/foo\t/#", f),
+		l(f, p(5, 0, 5), p(6, 0, 6)),
+		"Invalid tab (U+0009)");
 
-	expect(() => tokenize("#/foo     ", f)).toThrow("Missing ending /#");
-	expect(() => tokenize("#/foo#", f)).toThrow("Missing ending /#");
-	expect(() => tokenize("#/foo/", f)).toThrow("Missing ending /#");
+	expectError(() => tokenize("#/foo     ", f),
+		l(f, p(0, 0, 0), p(10, 0, 10)),
+		"Missing ending /#");
 
-	expect(() => tokenize("#/foo/# ", f)).toThrow("Spaces are not allowed at the end of the line, but there is 1");
-	expect(() => tokenize("#/foo/# \n", f)).toThrow("Spaces are not allowed at the end of the line, but there is 1");
-	expect(() => tokenize("#/foo \n/#", f)).toThrow("Spaces are not allowed at the end of the line, but there is 1");
-	expect(() => tokenize("#/foo     \n/#", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
-	expect(() => tokenize("#/foo     \r/#", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
-	expect(() => tokenize("#/foo     \n\r/#", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
-	expect(() => tokenize("#/foo     \r\n/#", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
-	expect(() => tokenize("#/foo#     \n/#", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
-	expect(() => tokenize("#/foo/     \n/#", f)).toThrow("Spaces are not allowed at the end of the line, but there are 5");
+	expectError(() => tokenize("#/foo#", f),
+		l(f, p(0, 0, 0), p(6, 0, 6)),
+		"Missing ending /#");
+
+	expectError(() => tokenize("#/foo/", f),
+		l(f, p(0, 0, 0), p(6, 0, 6)),
+		"Missing ending /#");
+
+	expectError(() => tokenize("#/foo/# ", f),
+		l(f, p(7, 0, 7), p(8, 0, 8)),
+		"Spaces are not allowed at the end of the line, but there is 1");
+
+	expectError(() => tokenize("#/foo/# \n", f),
+		l(f, p(7, 0, 7), p(8, 0, 8)),
+		"Spaces are not allowed at the end of the line, but there is 1");
+
+	expectError(() => tokenize("#/foo \n/#", f),
+		l(f, p(5, 0, 5), p(6, 0, 6)),
+		"Spaces are not allowed at the end of the line, but there is 1");
+
+	expectError(() => tokenize("#/foo     \n/#", f),
+		l(f, p(5, 0, 5), p(10, 0, 10)),
+		"Spaces are not allowed at the end of the line, but there are 5");
+
+	expectError(() => tokenize("#/foo     \r/#", f),
+		l(f, p(5, 0, 5), p(10, 0, 10)),
+		"Spaces are not allowed at the end of the line, but there are 5");
+
+	expectError(() => tokenize("#/foo     \n\r/#", f),
+		l(f, p(5, 0, 5), p(10, 0, 10)),
+		"Spaces are not allowed at the end of the line, but there are 5");
+
+	expectError(() => tokenize("#/foo     \r\n/#", f),
+		l(f, p(5, 0, 5), p(10, 0, 10)),
+		"Spaces are not allowed at the end of the line, but there are 5");
+
+	expectError(() => tokenize("#/foo#     \n/#", f),
+		l(f, p(6, 0, 6), p(11, 0, 11)),
+		"Spaces are not allowed at the end of the line, but there are 5");
+
+	expectError(() => tokenize("#/foo/     \n/#", f),
+		l(f, p(6, 0, 6), p(11, 0, 11)),
+		"Spaces are not allowed at the end of the line, but there are 5");
 });

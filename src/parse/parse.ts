@@ -16,7 +16,8 @@ type TokenInfo = {
 
 type ParserState = {
   index: number,
-  input: Array<$ast.Token>
+  input: Array<$ast.Token>,
+  brackets: Array<string>
 };
 
 function peek(state: ParserState): $ast.Token | null {
@@ -65,7 +66,8 @@ function parse1(state: ParserState, priority: Priority | null, output: Array<$as
 export function parse(tokens: Array<$ast.Token>): Array<$ast.AST> {
   return parse1({
     index: 0,
-    input: tokens
+    input: tokens,
+    brackets: []
   }, null, []);
 }
 
@@ -89,8 +91,7 @@ function parseStartBracket(end: string, make: (args: Array<$ast.AST>, loc: Loc) 
           return output;
 
         } else {
-          // TODO is this the correct priority ?
-          args = parse1(state, -Infinity, args);
+          args = parse1(state, null, args);
         }
       }
     }
@@ -110,6 +111,7 @@ function parseEndBracket(start: string): TokenInfo {
 
 function parseSingle(fn: (loc: Loc) => $ast.AST): TokenInfo {
   return {
+    // TODO is this the correct priority ?
     priority: Infinity,
     parse: (state: ParserState, token: $ast.Token, output: Array<$ast.AST>): Array<$ast.AST> => {
       output.push(fn(token.loc));

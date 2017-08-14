@@ -1,4 +1,4 @@
-import { NulanError } from "../util/error";
+import { NulanError, assertExists, assert } from "../util/error";
 import { Loc, Position } from "../util/loc";
 import * as $string from "../util/string";
 import { Token } from "./ast";
@@ -52,6 +52,15 @@ function errorTab(state: TokenState, pos: Position): NulanError {
   return new NulanError(loc(state, pos, position(state)), "Invalid tab (U+0009)");
 }
 
+function errorWhitespace(state: TokenState, pos: Position, message: string, char: string): NulanError {
+  return new NulanError(loc(state, pos, position(state)),
+    "There cannot be whitespace " + message + " " + $string.prettyCharacter(char));
+}
+
+function errorInvalidCodePoint(state: TokenState, pos: Position, hex: string): NulanError {
+  return new NulanError(loc(state, pos, position(state)), "Invalid code point " + hex);
+}
+
 
 type Specials = {
   [key: string]: (state: TokenState, output: Array<Token>, char: string) => void
@@ -66,8 +75,14 @@ type TokenState = {
   filename: string,
   index: number,
   line: number,
-  column: number
+  column: number,
+  oldColumn: number
 };
+
+
+function isWhitespace(char: string | null): boolean {
+  return char === null || char === " " || char === "\n" || char === "\r" || char === "#";
+}
 
 
 function peek(state: TokenState): string | null {
@@ -75,6 +90,19 @@ function peek(state: TokenState): string | null {
   const index = state.index;
 
   if (index < input.length) {
+    return input[index];
+
+  } else {
+    return null;
+  }
+}
+
+
+function peekPrevious(state: TokenState): string | null {
+  const input = state.input;
+  const index = state.index - 1;
+
+  if (index >= 0 && index < input.length) {
     return input[index];
 
   } else {
@@ -103,6 +131,7 @@ function loc(state: TokenState, start: Position, end: Position): Loc {
 function incrementLine(state: TokenState): void {
   ++state.index;
   ++state.line;
+  state.oldColumn = state.column;
   state.column = 0;
 }
 
@@ -136,6 +165,32 @@ function incrementCharacter(state: TokenState, char: string): void {
 
   } else {
     incrementColumn(state);
+  }
+}
+
+// TODO what about space and tab ?
+function decrementCharacter(state: TokenState, char: string): void {
+  if (char === "\n") {
+    --state.index;
+    --state.line;
+    state.column = state.oldColumn;
+
+    if (peekPrevious(state) === "\r") {
+      --state.index;
+    }
+
+  } else if (char === "\r") {
+    --state.index;
+    --state.line;
+    state.column = state.oldColumn;
+
+    if (peekPrevious(state) === "\n") {
+      --state.index;
+    }
+
+  } else {
+    --state.index;
+    --state.column;
   }
 }
 
@@ -287,7 +342,7 @@ function specialLineComment(state: TokenState, char: string | null): void {
 function incrementBlockCharacter(state: TokenState, pos: Position, start: string, char: string): void {
   // TODO code duplication with consumeSpacesError
   if (char === " ") {
-    const pos = position(state);
+    const sPos = position(state);
 
     incrementColumn(state);
 
@@ -297,7 +352,7 @@ function incrementBlockCharacter(state: TokenState, pos: Position, start: string
       throw errorMissing(loc(state, pos, position(state)), "ending /" + start);
 
     } else if (x.next === "\n" || x.next === "\r") {
-      throw errorExtraSpaces(state, pos, x.spaces + 1);
+      throw errorExtraSpaces(state, sPos, x.spaces + 1);
     }
 
   } else {
@@ -378,6 +433,47 @@ function specialCharacter(state: TokenState, output: Array<Token>, char: string)
   incrementColumn(state);
 
   const end = position(state);
+
+  output.push({
+    type: "symbol",
+    value: char,
+    loc: loc(state, start, end)
+  });
+}
+
+function specialInfix(state: TokenState, output: Array<Token>, char: string): void {
+  const prev = peekPrevious(state);
+
+  if (isWhitespace(prev)) {
+    if (prev != null) {
+      decrementCharacter(state, prev);
+    }
+
+    const pos = position(state);
+
+    if (prev != null) {
+      const next = assertExists(peek(state));
+
+      incrementCharacter(state, next);
+    }
+
+    throw errorWhitespace(state, pos, "to the left of", char);
+  }
+
+  const start = position(state);
+
+  incrementColumn(state);
+
+  const end = position(state);
+
+  const next = peek(state);
+
+  if (isWhitespace(next)) {
+    if (next != null) {
+      incrementCharacter(state, next);
+    }
+    throw errorWhitespace(state, end, "to the right of", char);
+  }
 
   output.push({
     type: "symbol",
@@ -514,6 +610,44 @@ function specialStringEscapeNewline(state: TokenState, pos: Position, chars: Arr
   pushStringSpaces(state, pos, delimiter, chars);
 }
 
+
+function parseHex(state: TokenState, pos: Position, s: string): string {
+  try {
+    return $string.parseHex(s);
+
+  // TODO better check for the errors ?
+  } catch (e) {
+    assert(e instanceof RangeError);
+
+    throw errorInvalidCodePoint(state, pos, s);
+  }
+}
+
+function consumeHex(state: TokenState, start: Position): string {
+  const chars = [];
+
+  for (;;) {
+    const char = peek(state);
+
+    if (char == null) {
+      throw errorMissing(loc(state, start, position(state)), "ending ]");
+
+    // TODO more efficient check ?
+    } else if (/^[0-9A-F]$/.test(char)) {
+      incrementColumn(state);
+      chars.push(char);
+
+    } else if (chars.length === 0) {
+      const pos = position(state);
+      incrementCharacter(state, char);
+      throw errorInvalidMany(state, pos, "0123456789ABCDEF".split(""), char);
+
+    } else {
+      return chars.join("");
+    }
+  }
+}
+
 function specialStringEscapeUnicode(state: TokenState, pos: Position, chars: Array<string>, delimiter: string, start: Position, char: string): void {
   incrementColumn(state);
 
@@ -532,63 +666,33 @@ function specialStringEscapeUnicode(state: TokenState, pos: Position, chars: Arr
 
     } else {
       for (;;) {
-        const hexes = [];
+        const pos = position(state);
 
-        const next = peek(state);
+        const hex = consumeHex(state, start);
 
-        if (next == null) {
-          throw errorMissing(loc(state, start, position(state)), "ending ]");
+        chars.push(parseHex(state, pos, hex));
 
-        // TODO more efficient check ?
-        } else if (/^[0-9A-F]$/.test(next)) {
-          incrementColumn(state);
+        const char = assertExists(peek(state));
 
-          hexes.push(next);
+        if (char === " ") {
+          const pos = position(state);
+          const x = consumeSpaces(state);
 
-          for (;;) {
-            const next = peek(state);
+          if (x.spaces !== 1) {
+            throw errorInvalidExactSpaces(state, pos, 1, x.spaces);
 
-            if (next == null) {
-              throw errorMissing(loc(state, start, position(state)), "ending ]");
-
-            } else if (next === " ") {
-              const pos = position(state);
-              const x = consumeSpaces(state);
-
-              if (x.spaces > 1) {
-                throw errorInvalidExactSpaces(state, pos, 1, x.spaces);
-
-              } else if (x.next === "]") {
-                throw errorInvalidSpace(state, pos, "before ]");
-
-              } else {
-                chars.push($string.parseHex(hexes.join("")));
-                hexes.length = 0;
-              }
-              break;
-
-            } else if (next === "]") {
-              incrementColumn(state);
-              chars.push($string.parseHex(hexes.join("")));
-              return;
-
-            // TODO more efficient check ?
-            } else if (/^[0-9A-F]$/.test(next)) {
-              incrementColumn(state);
-
-              hexes.push(next);
-
-            } else {
-              const pos = position(state);
-              incrementCharacter(state, next);
-              throw errorInvalidMany(state, pos, " ]0123456789ABCDEF".split(""), next);
-            }
+          } else if (x.next === "]") {
+            throw errorInvalidSpace(state, pos, "before ]");
           }
+
+        } else if (char === "]") {
+          incrementColumn(state);
+          break;
 
         } else {
           const pos = position(state);
-          incrementCharacter(state, next);
-          throw errorInvalidMany(state, pos, "0123456789ABCDEF".split(""), next);
+          incrementCharacter(state, char);
+          throw errorInvalidMany(state, pos, " ]0123456789ABCDEF".split(""), char);
         }
       }
     }
@@ -625,7 +729,7 @@ specials["["] = specialCharacter;
 specials["]"] = specialCharacter;
 specials["{"] = specialCharacter;
 specials["}"] = specialCharacter;
-specials["."] = specialCharacter;
+specials["."] = specialInfix;
 specials["@"] = specialCharacter;
 specials["&"] = specialCharacter;
 specials["~"] = specialCharacter;
@@ -640,7 +744,8 @@ export function tokenize(input: string, filename: string): Array<Token> {
     filename: filename,
     index: 0,
     line: 0,
-    column: 0
+    column: 0,
+    oldColumn: 0
   }, output);
 
   return output;

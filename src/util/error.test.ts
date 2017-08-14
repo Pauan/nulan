@@ -4,8 +4,8 @@ import { EOL } from "./node";
 
 
 test("assertExists", () => {
-  expect(assertExists(1)).toBe(true);
-  expect(assertExists("1")).toBe(true);
+  expect(assertExists(1)).toBe(1);
+  expect(assertExists("1")).toBe("1");
 
   expect(() => assertExists(null)).toThrow("Value cannot be null or undefined");
   expect(() => assertExists(undefined)).toThrow("Value cannot be null or undefined");

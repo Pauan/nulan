@@ -4,12 +4,12 @@ import * as $node from "./node";
 import * as $loc from "./loc";
 
 
-export function assertExists<A>(v: A | undefined | null): v is A {
+export function assertExists<A>(v: A | undefined | null): A {
   if (v == null) {
     throw new Error("Value cannot be null or undefined");
 
   } else {
-    return true;
+    return v;
   }
 }
 
@@ -21,6 +21,8 @@ export function assert(test: boolean): void {
 }
 
 
+// TODO extend from Error
+// TODO add name property
 export class NulanError {
   public loc: $loc.Loc;
   public message: string;
