@@ -16,27 +16,27 @@ function testInfixWhitespace(s: string): void {
 	]);
 
 	expectError(() => tokenize("a" + s, f),
-		l(f, p(2, 0, 2), p(2, 0, 2)),
+		l(f, p(1, 0, 1), p(2, 0, 2)),
 		"There cannot be whitespace to the right of .");
 
 	expectError(() => tokenize("a" + s + " b", f),
-		l(f, p(2, 0, 2), p(3, 0, 3)),
+		l(f, p(1, 0, 1), p(2, 0, 2)),
 		"There cannot be whitespace to the right of .");
 
 	expectError(() => tokenize("a" + s + "\n", f),
-		l(f, p(2, 0, 2), p(3, 1, 0)),
+		l(f, p(1, 0, 1), p(2, 0, 2)),
 		"There cannot be whitespace to the right of .");
 
 	expectError(() => tokenize("a" + s + "\r", f),
-		l(f, p(2, 0, 2), p(3, 1, 0)),
+		l(f, p(1, 0, 1), p(2, 0, 2)),
 		"There cannot be whitespace to the right of .");
 
 	expectError(() => tokenize("a" + s + "\n\r", f),
-		l(f, p(2, 0, 2), p(4, 1, 0)),
+		l(f, p(1, 0, 1), p(2, 0, 2)),
 		"There cannot be whitespace to the right of .");
 
 	expectError(() => tokenize("a" + s + "\r\n", f),
-		l(f, p(2, 0, 2), p(4, 1, 0)),
+		l(f, p(1, 0, 1), p(2, 0, 2)),
 		"There cannot be whitespace to the right of .");
 
 	expectError(() => tokenize("a" + s + "\t", f),
@@ -44,39 +44,39 @@ function testInfixWhitespace(s: string): void {
 		"Invalid tab (U+0009)");
 
 	expectError(() => tokenize("a" + s + "#", f),
-		l(f, p(2, 0, 2), p(3, 0, 3)),
+		l(f, p(1, 0, 1), p(2, 0, 2)),
 		"There cannot be whitespace to the right of .");
 
 	expectError(() => tokenize(s + "b", f),
-		l(f, p(0, 0, 0), p(0, 0, 0)),
-		"There cannot be whitespace to the left of .");
-
-	expectError(() => tokenize(" " + s + "b", f),
 		l(f, p(0, 0, 0), p(1, 0, 1)),
 		"There cannot be whitespace to the left of .");
 
+	expectError(() => tokenize(" " + s + "b", f),
+		l(f, p(1, 0, 1), p(2, 0, 2)),
+		"There cannot be whitespace to the left of .");
+
 	expectError(() => tokenize("\n" + s + "b", f),
-		l(f, p(0, 0, 0), p(1, 1, 0)),
+		l(f, p(1, 1, 0), p(2, 1, 1)),
 		"There cannot be whitespace to the left of .");
 
 	expectError(() => tokenize("\r" + s + "b", f),
-		l(f, p(0, 0, 0), p(1, 1, 0)),
+		l(f, p(1, 1, 0), p(2, 1, 1)),
 		"There cannot be whitespace to the left of .");
 
 	expectError(() => tokenize("\n\r" + s + "b", f),
-		l(f, p(0, 0, 0), p(2, 1, 0)),
+		l(f, p(2, 1, 0), p(3, 1, 1)),
 		"There cannot be whitespace to the left of .");
 
 	expectError(() => tokenize("\r\n" + s + "b", f),
-		l(f, p(0, 0, 0), p(2, 1, 0)),
+		l(f, p(2, 1, 0), p(3, 1, 1)),
 		"There cannot be whitespace to the left of .");
 
 	expectError(() => tokenize("111\n\r" + s + "b", f),
-		l(f, p(3, 0, 3), p(5, 1, 0)),
+		l(f, p(5, 1, 0), p(6, 1, 1)),
 		"There cannot be whitespace to the left of .");
 
 	expectError(() => tokenize("111\r\n" + s + "b", f),
-		l(f, p(3, 0, 3), p(5, 1, 0)),
+		l(f, p(5, 1, 0), p(6, 1, 1)),
 		"There cannot be whitespace to the left of .");
 
 	expectError(() => tokenize("\t" + s + "b", f),
@@ -84,7 +84,7 @@ function testInfixWhitespace(s: string): void {
 		"Invalid tab (U+0009)");
 
 	expectError(() => tokenize("#//#" + s + "b", f),
-		l(f, p(3, 0, 3), p(4, 0, 4)),
+		l(f, p(4, 0, 4), p(5, 0, 5)),
 		"There cannot be whitespace to the left of .");
 }
 

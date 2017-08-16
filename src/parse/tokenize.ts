@@ -442,38 +442,23 @@ function specialCharacter(state: TokenState, output: Array<Token>, char: string)
 }
 
 function specialInfix(state: TokenState, output: Array<Token>, char: string): void {
-  const prev = peekPrevious(state);
-
-  if (isWhitespace(prev)) {
-    if (prev != null) {
-      decrementCharacter(state, prev);
-    }
-
-    const pos = position(state);
-
-    if (prev != null) {
-      const next = assertExists(peek(state));
-
-      incrementCharacter(state, next);
-    }
-
-    throw errorWhitespace(state, pos, "to the left of", char);
-  }
-
   const start = position(state);
+
+  const prev = peekPrevious(state);
 
   incrementColumn(state);
 
-  const end = position(state);
+  if (isWhitespace(prev)) {
+    throw errorWhitespace(state, start, "to the left of", char);
+  }
 
   const next = peek(state);
 
   if (isWhitespace(next)) {
-    if (next != null) {
-      incrementCharacter(state, next);
-    }
-    throw errorWhitespace(state, end, "to the right of", char);
+    throw errorWhitespace(state, start, "to the right of", char);
   }
+
+  const end = position(state);
 
   output.push({
     type: "symbol",

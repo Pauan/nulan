@@ -13,11 +13,10 @@ export type AST
   | { type: "float", value: string, loc: Loc }
   | { type: "wildcard", loc: Loc }
   | { type: "variable", id: number, name: string | null, loc: Loc }
-  | { type: "lambda", args: Array<AST>, body: AST, loc: Loc }
   | { type: "call", args: Array<AST>, loc: Loc }
   | { type: "array", args: Array<AST>, loc: Loc }
   | { type: "record", args: Array<AST>, loc: Loc }
-  | { type: "bar", value: AST, loc: Loc }
+  | { type: "bar", args: Array<AST>, loc: Loc }
   | { type: "quote", value: AST, loc: Loc }
   | { type: "unquote", value: AST, loc: Loc }
   | { type: "splice", value: AST, loc: Loc }
@@ -45,8 +44,6 @@ export function pretty(a: AST): string {
     return "*" + a.value;
   case "wildcard":
     return "_";
-  case "lambda":
-    return "(-> " + a.args.concat([a.body]).map(pretty).join(" ") + ")";
   case "call":
     if (a.args.length === 0) {
       return "()";
@@ -66,7 +63,7 @@ export function pretty(a: AST): string {
       return "{ " + a.args.map(pretty).join(" ") + " }";
     }
   case "bar":
-    return "(| " + pretty(a.value) + ")";
+    return "(| " + a.args.map(pretty).join(" ") + ")";
   case "quote":
     return "(& " + pretty(a.value) + ")";
   case "unquote":
@@ -125,8 +122,8 @@ export function record(args: Array<AST>, loc: Loc): AST {
   return { type: "record", args, loc };
 }
 
-export function bar(value: AST, loc: Loc): AST {
-  return { type: "bar", value, loc };
+export function bar(args: Array<AST>, loc: Loc): AST {
+  return { type: "bar", args, loc };
 }
 
 export function quote(value: AST, loc: Loc): AST {
@@ -155,8 +152,4 @@ export function type(left: AST, right: AST, loc: Loc): AST {
 
 export function dot(left: AST, right: AST, loc: Loc): AST {
   return { type: "dot", left, right, loc };
-}
-
-export function lambda(args: Array<AST>, body: AST, loc: Loc): AST {
-  return { type: "lambda", args, body, loc };
 }

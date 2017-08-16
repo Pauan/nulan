@@ -21,13 +21,14 @@ export function assert(test: boolean): void {
 }
 
 
-// TODO extend from Error
-// TODO add name property
-export class NulanError {
+export class NulanError extends Error {
+  public name: string = "NulanError";
   public loc: $loc.Loc;
   public message: string;
 
   constructor(loc: $loc.Loc, message: string) {
+    // TODO is this correct ?
+    super(message);
     this.loc = loc;
     this.message = message;
   }

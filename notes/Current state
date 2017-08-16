@@ -10,18 +10,11 @@
 (TYPE Rgb
   (*rgba Integer Integer Integer Number))
 
-(RECORD Rbga
+(RECORD-TYPE Rbga
   { red :: Integer
     blue :: Integer
     green :: Integer
     alpha :: Number })
-
-(MATCHES [ foo ]
-  [ (*rgba { red blue green alpha }) ]
-  : (*rgba { red blue green alpha })
-
-  [ (*rgba { red blue green alpha }) ]
-  : b)
 
 (MATCH foo
   | (*rgba { red blue green alpha })
@@ -35,45 +28,42 @@
   (*value a (List a)))
 
 (TYPE Foo
-  (IMPLICIT a
-    (REQUIRE ($foo a)
-      (*foo a))))
+  (FORALL a
+    (*foo %(Bar a) a)))
 
 
-(PROTOCOL ($flatten a)
-  flatten :: (IMPLICIT b
-               (-> (a (a b)) (a b))))
+(PROTOCOL (Flatten a)
+  flatten :: (-> (a (a b)) (a b)))
 
 
-(FUNCTION state-monad :: (IMPLICIT a
-                           (-> a Type))
-  [ value ]
-  : (IMPLICIT a
+(LET state-monad :: (-> a Type)
+  | value
+  : (FORALL a
       (State a value)))
 
-(PROVIDE ($flatten (IMPLICIT a
-                     (=> value (State a value))))
-  (FUNCTION flatten :: (IMPLICIT a value
-                         (-> (State (State a value)) (State a value)))
-    ...))
+(FORALL a
+  (LET-RECORD %flatten-state :: (Flatten (=> value (State a value)))
+    (LET flatten :: (-> (State (State a value)) (State a value))
+      ...)))
 
 
-(PROTOCOL ($transform a)
-  transform :: (IMPLICIT b c
-                 (REQUIRE ($foo a)
-                   (-> (a b) (-> b c) (a c)))))
+(PROTOCOL (Transform a)
+  transform :: (-> %(Foo a) (a b) (-> b c) (a c)))
 
-(CONSTANT chain :: (IMPLICIT a b c
-                     (REQUIRE ($transform a) ($flatten a)
-                       (-> (a b) (-> b (a c)) (a c))))
-  (=> a fn
-    (flatten (transform a fn))))
 
-(FUNCTION chain :: (IMPLICIT a b c
-                     (REQUIRE ($transform a) ($flatten a)
-                       (-> (a b) (-> b (a c)) (a c))))
-  [ a fn ]
+(LET step :: (IMPLICIT a b c
+               (REQUIRE ($transform a) ($flatten a)
+                 (-> (a b) (-> b (a c)) (a c))))
+  | a fn
   : (flatten (transform a fn)))
+
+(MEMOIZE-GLOBAL
+  (FORALL a
+    (LET %eq-array :: (-> %(Eq a) (Eq (Array a)))
+      | %{ eq }
+      : { (LET eq :: (-> (Array a) (Array a) Bool)
+            | a b
+            : ...) })))
 
 (IMPORT (github "nulan/flatten" "v2.0.0" "package.nul"))
 
@@ -104,132 +94,128 @@
   transform-maybe
   (transform ...))
 
-(CONSTANT maybe-transform :: (-> ...)
+(LET maybe-transform :: (-> ...)
   (LOCAL-IMPORT (local "flatten/foo.nul")
     transform-maybe
     transform))
 
-(PROVIDE transform-maybe :: ($transform Maybe)
-  map)
+(LET %transform-maybe :: (Transform Maybe)
+  { transform <= map })
 
-(PROVIDE transform-maybe :: ($transform Maybe)
-  (LOCAL-FUNCTION (-> ...)
-    [ a b ]
-    : ...))
+(LET %transform-maybe :: (Transform Maybe)
+  { transform <=
+      (GROUP
+        | a b
+        : ...) })
 
-(PROVIDE-FUNCTION transform-maybe :: ($transform Maybe)
-  [ a b ]
-  : (map a b))
+(LET-RECORD %transform-maybe :: (Transform Maybe)
+  (LET transform :: (-> (Maybe a) (-> a b) (Maybe b))
+    | a b
+    : (map a b)))
 
 
-(LOCAL-RECORD
-  (FUNCTION transform :: (-> (Maybe a) (-> a b) (Maybe b))
-    [ *none _ ]
+{ (LET transform :: (-> (Maybe a) (-> a b) (Maybe b))
+    | *none _
     : *none
 
-    [ (*some a) f ]
-    : (*some (f a))))
+    | (*some a) f
+    : (*some (f a))) }
 
-(CONSTANT transform-maybe :: (Transform Maybe)
+
+(LET transform-maybe :: (Transform Maybe)
   { transform <=
-    (-> a f
-      (MATCH a
-        | *none
-        : *none
+      (GROUP
+        | a f
+        : (MATCH a
+            | *none
+            : *none
 
-        | (*some a)
-        : (*some (f a)))) })
+            | (*some a)
+            : (*some (f a)))) })
 
 
 (PROTOCOL (Transform a)
   transform :: (-> (a b) (-> b c) (a c)))
 
-(FUNCTION foo :: (-> @(Transform a) a b c)
-  [ a b ]
+(LET foo :: (-> %(Transform a) a b c)
+  | %{ transform } a b
   : (transform a b c))
+
+(LET foo :: (-> %(Transform a) a b c)
+  | %m a b
+  : (m.transform a b c))
 
 
 (RECORD-TYPE (Transform a)
   { transform :: (-> (a b) (-> b c) (a c)) })
 
-(IMPLICIT-RECORD transform-maybe :: (Transform Maybe)
-  (FUNCTION transform :: (-> (Maybe a) (-> a b) (Maybe b))
-    [ *none _ ]
+(LET-RECORD %transform-maybe :: (Transform Maybe)
+  (LET transform :: (-> (Maybe a) (-> a b) (Maybe b))
+    | *none _
     : *none
 
-    [ (*some a) f ]
+    | (*some a) f
     : (*some (f a))))
 
-(FUNCTION foo :: (-> @(Transform a) a b c)
-  [ @m a b ]
+(LET foo :: (-> %(Transform a) a b c)
+  | %m a b
   : (m.transform a b c))
 
 
 (PROTOCOL (Transform a)
-  (-> (a b) (-> b c) (a c)))
+  transform :: (-> (a b) (-> b c) (a c)))
 
-(IMPLEMENT transform-maybe :: (Transform Maybe)
-  (FUNCTION transform :: (-> (Maybe a) (-> a b) (Maybe b))
-    [ *none _ ]
+(LET-RECORD %transform-maybe :: (Transform Maybe)
+  (LET transform :: (-> (Maybe a) (-> a b) (Maybe b))
+    | *none _
     : *none
 
-    [ (*some a) f ]
+    | (*some a) f
     : (*some (f a))))
-
-(IMPLEMENT-FUNCTION transform-maybe :: (Transform Maybe)
-  [ *none _ ]
-  : *none
-
-  [ (*some a) f ]
-  : (*some (f a)))
-
-(FUNCTION foo :: (-> @(Transform a) a b c)
-  [ @transform a b ]
-  : (transform a b c))
 
 
 (RECORD-TYPE (Transform a)
   { transform :: (-> (a b) (-> b c) (a c)) })
 
-(CONSTANT-RECORD @transform-maybe :: (Transform Maybe)
-  (FUNCTION transform :: (-> (Maybe a) (-> a b) (Maybe b))
-    [ *none _ ]
+(LET-RECORD %transform-maybe :: (Transform Maybe)
+  (LET transform :: (-> (Maybe a) (-> a b) (Maybe b))
+    | *none _
     : *none
 
-    [ (*some a) f ]
+    | (*some a) f
     : (*some (f a))))
 
-(FUNCTION foo :: (-> @(Transform a) a b c)
-  [ @{ transform } a b ]
+(LET foo :: (-> %(Transform a) a b c)
+  | %{ transform } a b
   : (transform a b c))
 
-(FUNCTION foo :: (-> @(Transform a) a b c)
-  [ @m a b ]
+(LET foo :: (-> %(Transform a) a b c)
+  | %m a b
   : (m.transform a b c))
 
 (LOCAL
-  @m <= { transform <= ... }
+  %m <= { transform <= ... }
   (foo 1 2))
 
 
 (TYPE-ALIAS (Transform a b c)
   (-> (a b) (-> b c) (a c)))
 
-(FUNCTION transform-maybe :: (-> (Maybe a) (-> a b) (Maybe b))
-  [ *none _ ]
+(LET transform-maybe :: (-> (Maybe a) (-> a b) (Maybe b))
+  | *none _
   : *none
 
-  [ (*some a) f ]
+  | (*some a) f
   : (*some (f a)))
 
-(FUNCTION foo :: (-> @(Transform a b c) a b c)
-  [ @transform a b ]
+(LET foo :: (-> %(Transform a b c) a b c)
+  | %transform a b
   : (transform a b c))
 
 
-(FUNCTION foo :: (REQUIRE ($transform a)
-                   (-> a b c))
-  [ a b ]
+(LET foo :: (REQUIRE ($transform a)
+              (-> a b c))
+  | a b
   : (transform a b c))
 
 
@@ -242,13 +228,13 @@
   *none)
 
 (LOCAL-PROVIDE ($flatten Maybe)
-  (CONSTANT flatten :: (-> ...)
+  (LET flatten :: (-> ...)
     (-> ...))
   (flatten ...))
 
 (LOCAL-PROVIDE ($flatten Maybe)
-  (FUNCTION flatten :: (-> ...)
-    [ a b ]
+  (LET flatten :: (-> ...)
+    | a b
     : ...)
   (flatten ...))
 
@@ -267,15 +253,15 @@
   << :: (-> a b))
 
 (PROVIDE $<<
-  (FUNCTION << :: (IMPLICIT a
-                    (-> a Foo))
-    [ a ]
+  (LET << :: (IMPLICIT a
+               (-> a Foo))
+    | a
     : ...))
 
 (PROVIDE $<<
-  (FUNCTION << :: (IMPLICIT a
-                    (-> Foo a))
-    [ a ]
+  (LET << :: (IMPLICIT a
+               (-> Foo a))
+    | a
     : ...))
 
 (TYPE (Result a b)
@@ -286,48 +272,48 @@
   result<< :: (-> a (Result b c)))
 
 (PROVIDE $result<<
-  (FUNCTION result<< :: (IMPLICIT a b
-                          (REQUIRE ($<< a b)
-                            (-> a (Result b Never))))
-    [ a ]
+  (LET result<< :: (IMPLICIT a b
+                     (REQUIRE ($<< a b)
+                       (-> a (Result b Never))))
+    | a
     : (*success (<< a))))
 
 (PROVIDE $<<
-  (FUNCTION << :: (IMPLICIT
-                    (REQUIRE ($result<< a b c)
-                      (-> a (Result b c))))
-    [ a ]
+  (LET << :: (IMPLICIT
+               (REQUIRE ($result<< a b c)
+                 (-> a (Result b c))))
+    | a
     : (result<< a)))
 
 (PROVIDE $<<
-  (FUNCTION << :: (IMPLICIT a
-                    (-> (Result a _) (Maybe a)))
-    [ (*success a) ]
+  (LET << :: (IMPLICIT a
+               (-> (Result a _) (Maybe a)))
+    | (*success a)
     : (*some a)
 
-    [ (*failure _) ]
+    | (*failure _)
     : *none))
 
 (PROVIDE $<<
-  (FUNCTION << :: (IMPLICIT a
-                    (-> (Maybe a) (Result a Null)))
-    [ (*some a) ]
+  (LET << :: (IMPLICIT a
+               (-> (Maybe a) (Result a Null)))
+    | (*some a)
     : (*success a)
 
-    [ *none ]
+    | *none
     : (*failure *null)))
 
-(FUNCTION maybe<< :: (IMPLICIT a b
-                       (REQUIRE ($result<< a b _)
-                         (-> a (Maybe b))))
-  [ a ]
+(LET maybe<< :: (IMPLICIT a b
+                  (REQUIRE ($result<< a b _)
+                    (-> a (Maybe b))))
+  | a
   : (<< (<< a)))
 
 (PROVIDE $<<
-  (FUNCTION << :: (IMPLICIT a b
-                    (REQUIRE ($result<< a b _)
-                      (-> a (Maybe b))))
-    [ a ]
+  (LET << :: (IMPLICIT a b
+               (REQUIRE ($result<< a b _)
+                 (-> a (Maybe b))))
+    | a
     : (<< (<< a))))
 
 (<< 5)
@@ -336,22 +322,22 @@
 
 (maybe<< 5)
 
-(CHAIN
+(STEPS
   foo <= ...
   bar <= ...
   (<< 5))
 
-(FUNCTION foo<< :: (IMPLICIT a
-                     (-> a Foo))
-  [ a ]
+(LET foo<< :: (IMPLICIT a
+                (-> a Foo))
+  | a
   : ...)
 
-(FUNCTION <<foo :: (IMPLICIT a
-                     (-> Foo a))
-  [ a ]
+(LET <<foo :: (IMPLICIT a
+                (-> Foo a))
+  | a
   : ...)
 
-(CONSTANT foo :: (-> (-> Integer Integer Integer) Integer)
+(LET foo :: (-> (-> Integer Integer Integer) Integer)
   (-> a (a 1 2)))
 
 (LOCAL
@@ -372,51 +358,77 @@
 
   (+ a b))
 
+
+(REWRITE-RULE LOOP
+  | ~name ~@args ~body
+  : &(LOCAL
+       (RECURSIVE
+         (LET ~name
+           | ~@(transform args
+                 | ~n <= ~_
+                 : n)
+           : ~body))
+       (~name ~@(transform args
+                  | ~_ <= ~v
+                  : v))))
+
 (LOOP loop
   a <= 1
   b <= 2
-  (loop a b))
+  (IF (< a 10)
+    (loop (+ a 1) (+ b 1))
+    (+ a b)))
 
-(FUNCTION foo :: (-> (-> Integer Integer Integer) Integer)
-  [ a ]
+(LOCAL
+  (RECURSIVE
+    (LET loop
+      | a b
+      : (IF (< a 10)
+          (loop (+ a 1) (+ b 1))
+          (+ a b))))
+  (loop 1 2))
+
+
+(LET foo :: (-> (-> Integer Integer Integer) Integer)
+  | a
   : (a 1 2))
 
-(FUNCTION foo :: (-> Text Text)
-  [ a ]
+(LET foo :: (-> Text Text)
+  | a
   : a)
 
-(FUNCTION bar :: (-> Integer Integer)
-  [ 1 ]
+(LET bar :: (-> Integer Integer)
+  | 1
   : 2
 
-  [ a ]
+  | a
   : (+ (bar 1) a))
 
 
 (REWRITE-RULE QUX
-  [ ~@a ]
+  | ~@a
   : &(+ ~@a))
 
 
 (REWRITE-RULE ALIAS
-  [ ~n <= ~v ]
+  | ~n <= ~v
   : &(REWRITE-RULE ~n
-       []
+       |
        : &~~v))
 
 (ALIAS FOO <= (+ 5 10 20))
 
 
-(REWRITE-RULE CHAIN-MATCH
-  [ ~value ~@matches ]
+(REWRITE-RULE STEP-MATCH
+  | ~value ~@matches
   : (LOCAL
       a <= (UNIQUE-SYMBOL)
-      &(CHAIN
+      &(STEPS
          ~a <= ~value
          (MATCH ~a
            ~@matches))))
 
-(CHAIN-MATCH foo
+(STEP-MATCH foo
   | *none
   : 1
 
@@ -424,47 +436,45 @@
   : 2)
 
 
-(MUTUALLY-RECURSIVE
-  (FUNCTION even? :: (-> Integer Boolean)
-    [ 0 ]
+(RECURSIVE
+  (LET even? :: (-> Integer Boolean)
+    | 0
     : true
 
-    [ a ]
+    | a
     : (odd? (- a 1)))
 
-  (FUNCTION odd? :: (-> Integer Boolean)
-    [ 0 ]
+  (LET odd? :: (-> Integer Boolean)
+    | 0
     : false
 
-    [ a ]
+    | a
     : (even? (- a 1))))
 
-(MUTUALLY-RECURSIVE
-  (PROTOCOL ($foo a)
-    foo :: (REQUIRE ($bar a)
-             (-> a a)))
+(RECURSIVE
+  (PROTOCOL (Foo a)
+    foo :: (-> %(Bar a) a a))
 
-  (PROTOCOL ($bar a)
-    bar :: (REQUIRE ($foo a)
-             (-> a a))))
+  (PROTOCOL (Bar a)
+    bar :: (-> (%Foo a) a a)))
 
-(MUTUALLY-RECURSIVE
+(RECURSIVE
   (TYPE Foo
     (*foo Bar))
 
   (TYPE Bar
     (*bar Foo)))
 
-(MUTUALLY-RECURSIVE
+(RECURSIVE
   (REWRITE-RULE FOO
-    [ ~n <= ~v ]
+    | ~n <= ~v
     : &(BAR ~n ~v)
 
-    [ ~v ]
+    | ~v
     : &(BAR ~v))
 
   (REWRITE-RULE BAR
-    [ ~a ~@b ]
+    | ~a ~@b
     : (MATCH a
         | &~n <= ~v
         : &(QUX ~n ~v ~@b)
@@ -477,34 +487,34 @@
 (foo (echo -> a b (+ a b)))
 (foo (ECHO -> a b (+ a b)))
 
-(MUTUALLY-RECURSIVE
+(RECURSIVE
   (REWRITE-RULE UNSTREAM
-    [ (STREAM ~a) ]
+    | (STREAM ~a)
     : a
 
-    [ ~a ]
+    | ~a
     : &(unstream ~a))
 
   (REWRITE-RULE STREAM
-    [ (UNSTREAM ~a) ]
+    | (UNSTREAM ~a)
     : a
 
-    [ ~a ]
+    | ~a
     : &(stream ~a)))
 
-(CHAIN
+(STEPS
   a <= a
   b <= b
   c)
 
-(CHAIN
+(STEPS
   x <= (read-file "foo")
   (log x)
   (write-file "bar" x)
   (<< null))
 
-(chain (read-file "foo") -> x
-  (chain (log x) -> *null
+(step (read-file "foo") -> x
+  (step (log x) -> *null
     (transform (write-file "bar" x) -> *null
       null)))
 
@@ -514,17 +524,17 @@
   c <= 3
   (+ a b c))
 
-(MATCHES [ a b c ]
-  [ 1 2 3 ]
+(MATCH a b c
+  | 1 2 3
   : 1
 
-  [ 1 2 a ]
+  | 1 2 a
   : 2
 
-  [ 1 a b ]
+  | 1 a b
   : 3
 
-  [ a b c ]
+  | a b c
   : 4)
 
 [ 1 2 3 ]
@@ -592,12 +602,12 @@
     *foo
     (*bar a)))
 
-(TAG->CONSTANT *foo)
+(TAG->LET *foo)
 
 (PROVIDE { public }
-  (TAG->CONSTANT *foo))
+  (TAG->LET *foo))
 
-(PUBLIC-TAG->CONSTANT
+(PUBLIC-TAG->LET
   *foo)
 
 (USE-PREFIX "package:flatten/module/flatten.nul"
@@ -618,7 +628,7 @@
   (*rgba Integer Integer Integer Number))
 
 (ASSERTIONS
-  (CHAIN
+  (STEPS
     foo <= (read-file "foo")
     (<< (equal? foo bar))))
 
