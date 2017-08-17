@@ -16,12 +16,12 @@ export type AST
   | { type: "call", args: Array<AST>, loc: Loc }
   | { type: "array", args: Array<AST>, loc: Loc }
   | { type: "record", args: Array<AST>, loc: Loc }
-  | { type: "bar", args: Array<AST>, loc: Loc }
+  | { type: "implicit", value: AST, loc: Loc }
   | { type: "quote", value: AST, loc: Loc }
   | { type: "unquote", value: AST, loc: Loc }
   | { type: "splice", value: AST, loc: Loc }
   | { type: "dot", left: AST, right: AST, loc: Loc }
-  | { type: "match", left: AST, right: AST, loc: Loc }
+  | { type: "match", args: Array<AST>, body: AST, loc: Loc }
   | { type: "assign", left: AST, right: AST, loc: Loc }
   | { type: "type", left: AST, right: AST, loc: Loc };
 
@@ -62,18 +62,22 @@ export function pretty(a: AST): string {
     } else {
       return "{ " + a.args.map(pretty).join(" ") + " }";
     }
-  case "bar":
-    return "(| " + a.args.map(pretty).join(" ") + ")";
   case "quote":
     return "(& " + pretty(a.value) + ")";
   case "unquote":
     return "(~ " + pretty(a.value) + ")";
   case "splice":
     return "(@ " + pretty(a.value) + ")";
+  case "implicit":
+    return "(% " + pretty(a.value) + ")";
   case "dot":
     return "(" + pretty(a.left) + " . " + pretty(a.right) + ")";
   case "match":
-    return "(" + pretty(a.left) + " : " + pretty(a.right) + ")";
+    if (a.args.length === 0) {
+      return "(| : " + pretty(a.body) + ")";
+    } else {
+      return "(| " + a.args.map(pretty).join(" ") + " : " + pretty(a.body) + ")";
+    }
   case "assign":
     return "(" + pretty(a.left) + " <= " + pretty(a.right) + ")";
   case "type":
@@ -122,10 +126,6 @@ export function record(args: Array<AST>, loc: Loc): AST {
   return { type: "record", args, loc };
 }
 
-export function bar(args: Array<AST>, loc: Loc): AST {
-  return { type: "bar", args, loc };
-}
-
 export function quote(value: AST, loc: Loc): AST {
   return { type: "quote", value, loc };
 }
@@ -138,8 +138,12 @@ export function splice(value: AST, loc: Loc): AST {
   return { type: "splice", value, loc };
 }
 
-export function match(left: AST, right: AST, loc: Loc): AST {
-  return { type: "match", left, right, loc };
+export function implicit(value: AST, loc: Loc): AST {
+  return { type: "implicit", value, loc };
+}
+
+export function match(args: Array<AST>, body: AST, loc: Loc): AST {
+  return { type: "match", args, body, loc };
 }
 
 export function assign(left: AST, right: AST, loc: Loc): AST {

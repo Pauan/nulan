@@ -4,7 +4,7 @@ import * as $parse from "./parse";
 import { tokenize } from "./tokenize";
 import { NulanError } from "../util/error";
 import { AST, symbol, integer, float, string, tag, call, array, record,
-         wildcard, bar, quote, unquote, splice, type, assign, match,
+         wildcard, quote, unquote, splice, type, assign, match, implicit,
          dot, pretty } from "./ast";
 
 
@@ -142,15 +142,16 @@ test("prefix", () => {
   testPrefix("&", quote);
   testPrefix("~", unquote);
   testPrefix("@", splice);
+  testPrefix("%", implicit);
 });
 
 
 test("infix", () => {
-  $parse.specials["L+"] = $parse.parseInfix(2, "left", assign);
-  $parse.specials["L/"] = $parse.parseInfix(1, "left", type);
+  $parse.specials["L+"] = $parse.infix(2, "left", assign);
+  $parse.specials["L/"] = $parse.infix(1, "left", type);
 
-  $parse.specials["R+"] = $parse.parseInfix(2, "right", assign);
-  $parse.specials["R/"] = $parse.parseInfix(1, "right", type);
+  $parse.specials["R+"] = $parse.infix(2, "right", assign);
+  $parse.specials["R/"] = $parse.infix(1, "right", type);
 
   // (((1 L+ ((2 L/ 3) L/ 4)) L+ 5) L+ 6)
   expectParse("1 L+ 2 L/ 3 L/ 4 L+ 5 L+ 6", (l, p) => [
@@ -202,7 +203,6 @@ test("infix", () => {
     )
   ]);
 
-  testInfix(":", " ", match, "must be an expression on");
   testInfix("<=", " ", assign, "must be an expression on");
   testInfix("::", " ", type, "must be an expression on");
   testInfix(".", "", dot, "cannot be whitespace to");
@@ -210,20 +210,21 @@ test("infix", () => {
 
 
 test("|", () => {
-  expectParse("|", (l, p) => [
-    bar([], l(p(0, 0, 0), p(1, 0, 1)))
-  ]);
+  expectError("|",
+    (l, p) => l(p(0, 0, 0), p(1, 0, 1)),
+    "Missing ending :");
+
 
   // ((| foo) : ((| bar) : qux))
   expectParse("| foo : | bar : qux", (l, p) => [
     match(
-      bar([
+      [
         symbol("foo", l(p(2, 0, 2), p(5, 0, 5)))
-      ], l(p(0, 0, 0), p(5, 0, 5))),
+      ],
       match(
-        bar([
+        [
           symbol("bar", l(p(10, 0, 10), p(13, 0, 13)))
-        ], l(p(8, 0, 8), p(13, 0, 13))),
+        ],
         symbol("qux", l(p(16, 0, 16), p(19, 0, 19))),
         l(p(8, 0, 8), p(19, 0, 19))
       ),
@@ -256,10 +257,7 @@ test("&", () => {
       )
     ], l(p(0, 0, 0), p(10, 0, 10)))
   ]);
-});
 
-
-test("^", () => {
   expectParse("&foo <= bar qux", (l, p) => [
     quote(
       assign(
@@ -272,6 +270,26 @@ test("^", () => {
 
     symbol("qux", l(p(12, 0, 12), p(15, 0, 15)))
   ]);
+});
+
+
+test("^", () => {
+  expectError("^a",
+    (l, p) => l(p(0, 0, 0), p(1, 0, 1)),
+    "There must be a ( after ^");
+
+  expectError("^~a",
+    (l, p) => l(p(0, 0, 0), p(1, 0, 1)),
+    "There must be a ( after ^");
+
+  expectError("^a <= b",
+    (l, p) => l(p(0, 0, 0), p(1, 0, 1)),
+    "There must be a ( after ^");
+
+  expectError("^(a b)",
+    (l, p) => l(p(0, 0, 0), p(6, 0, 6)),
+    "There must be exactly one expression inside ^()");
+
 
   expectParse("^(&foo) <= bar qux", (l, p) => [
     assign(
@@ -307,10 +325,10 @@ test("parse", () => {
       symbol("MATCH", l(p(1, 0, 1), p(6, 0, 6))),
       symbol("foo", l(p(7, 0, 7), p(10, 0, 10))),
       match(
-        bar([
+        [
           quote(symbol("bar", l(p(14, 0, 14), p(17, 0, 17))),
                 l(p(13, 0, 13), p(17, 0, 17)))
-        ], l(p(11, 0, 11), p(17, 0, 17))),
+        ],
         assign(
           symbol("qux", l(p(20, 0, 20), p(23, 0, 23))),
           symbol("corge", l(p(27, 0, 27), p(32, 0, 32))),
@@ -321,30 +339,11 @@ test("parse", () => {
     ], l(p(0, 0, 0), p(33, 0, 33))),
   ]);
 
-  expectParse("(MATCH foo [ &bar ] : qux <= corge)", (l, p) => [
-    call([
-      symbol("MATCH", l(p(1, 0, 1), p(6, 0, 6))),
-      symbol("foo", l(p(7, 0, 7), p(10, 0, 10))),
-      match(
-        array([
-          quote(symbol("bar", l(p(14, 0, 14), p(17, 0, 17))),
-                l(p(13, 0, 13), p(17, 0, 17)))
-        ], l(p(11, 0, 11), p(19, 0, 19))),
-        assign(
-          symbol("qux", l(p(22, 0, 22), p(25, 0, 25))),
-          symbol("corge", l(p(29, 0, 29), p(34, 0, 34))),
-          l(p(22, 0, 22), p(34, 0, 34))
-        ),
-        l(p(11, 0, 11), p(34, 0, 34))
-      )
-    ], l(p(0, 0, 0), p(35, 0, 35))),
-  ]);
-
 
   // ((| a (& ((~a) <= (~b)))) : c)
   expectParse("| a &~b <= ~c : d", (l, p) => [
     match(
-      bar([
+      [
         symbol("a", l(p(2, 0, 2), p(3, 0, 3))),
         quote(
           assign(
@@ -360,22 +359,92 @@ test("parse", () => {
           ),
           l(p(4, 0, 4), p(13, 0, 13))
         )
-      ], l(p(0, 0, 0), p(13, 0, 13))),
+      ],
       symbol("d", l(p(16, 0, 16), p(17, 0, 17))),
       l(p(0, 0, 0), p(17, 0, 17))
     )
   ]);
 
 
+  expectParse("&| 1 : 2 <= 3 4", (l, p) => [
+    quote(
+      match(
+        [
+          integer("1", l(p(3, 0, 3), p(4, 0, 4))),
+        ],
+        assign(
+          integer("2", l(p(7, 0, 7), p(8, 0, 8))),
+          integer("3", l(p(12, 0, 12), p(13, 0, 13))),
+          l(p(7, 0, 7), p(13, 0, 13))
+        ),
+        l(p(1, 0, 1), p(13, 0, 13))
+      ),
+      l(p(0, 0, 0), p(13, 0, 13))
+    ),
+    integer("4", l(p(14, 0, 14), p(15, 0, 15)))
+  ]);
+
+
+  expectParse("&| 1 2 3 4 : 5", (l, p) => [
+    quote(
+      match(
+        [
+          integer("1", l(p(3, 0, 3), p(4, 0, 4))),
+          integer("2", l(p(5, 0, 5), p(6, 0, 6))),
+          integer("3", l(p(7, 0, 7), p(8, 0, 8))),
+          integer("4", l(p(9, 0, 9), p(10, 0, 10))),
+        ],
+        integer("5", l(p(13, 0, 13), p(14, 0, 14))),
+        l(p(1, 0, 1), p(14, 0, 14))
+      ),
+      l(p(0, 0, 0), p(14, 0, 14))
+    )
+  ]);
+
+
   // ((| 1 (~ (@1)) (& 1)) : (2 <= (1 :: 1.2)))
-  /*expectParse("| 1 ~ @1 & 1 : 2 <= 1 :: 1.2", (l, p) =>
-);*/
+  expectParse("| 1 ~ @2 & 3 : 4 <= 5 :: 1.2", (l, p) => [
+    match(
+      [
+        integer("1", l(p(2, 0, 2), p(3, 0, 3))),
+        unquote(
+          splice(
+            integer("2", l(p(7, 0, 7), p(8, 0, 8))),
+            l(p(6, 0, 6), p(8, 0, 8))
+          ),
+          l(p(4, 0, 4), p(8, 0, 8))
+        ),
+
+        quote(
+          integer("3", l(p(11, 0, 11), p(12, 0, 12))),
+          l(p(9, 0, 9), p(12, 0, 12))
+        )
+      ],
+      assign(
+        integer("4", l(p(15, 0, 15), p(16, 0, 16))),
+        type(
+          integer("5", l(p(20, 0, 20), p(21, 0, 21))),
+          float("1.2", l(p(25, 0, 25), p(28, 0, 28))),
+          l(p(20, 0, 20), p(28, 0, 28))
+        ),
+        l(p(15, 0, 15), p(28, 0, 28))
+      ),
+      l(p(0, 0, 0), p(28, 0, 28))
+    )
+  ]);
+
+
+  expectParse("foo _ bar", (l, p) => [
+    symbol("foo", l(p(0, 0, 0), p(3, 0, 3))),
+    wildcard(l(p(4, 0, 4), p(5, 0, 5))),
+    symbol("bar", l(p(6, 0, 6), p(9, 0, 9)))
+  ]);
 
 
   expectParse("(| : 1)", (l, p) => [
     call([
       match(
-        bar([], l(p(1, 0, 1), p(2, 0, 2))),
+        [],
         integer("1", l(p(5, 0, 5), p(6, 0, 6))),
         l(p(1, 0, 1), p(6, 0, 6))
       ),
@@ -386,10 +455,10 @@ test("parse", () => {
   expectParse("(| foo bar : &1)", (l, p) => [
     call([
       match(
-        bar([
+        [
           symbol("foo", l(p(3, 0, 3), p(6, 0, 6))),
           symbol("bar", l(p(7, 0, 7), p(10, 0, 10)))
-        ], l(p(1, 0, 1), p(10, 0, 10))),
+        ],
         quote(integer("1", l(p(14, 0, 14), p(15, 0, 15))),
               l(p(13, 0, 13), p(15, 0, 15))),
         l(p(1, 0, 1), p(15, 0, 15))

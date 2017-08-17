@@ -27,14 +27,14 @@ test("pretty", () => {
   expect($ast.pretty($ast.record([$ast.symbol("foo", l)], l))).toBe("{ foo }");
   expect($ast.pretty($ast.record([$ast.symbol("foo", l), $ast.symbol("bar", l)], l))).toBe("{ foo bar }");
 
-  expect($ast.pretty($ast.bar([$ast.symbol("foo", l)], l))).toBe("(| foo)");
-  expect($ast.pretty($ast.bar([$ast.symbol("foo", l), $ast.symbol("bar", l)], l))).toBe("(| foo bar)");
+  expect($ast.pretty($ast.match([], $ast.symbol("foo", l), l))).toBe("(| : foo)");
+  expect($ast.pretty($ast.match([$ast.symbol("foo", l)], $ast.symbol("bar", l), l))).toBe("(| foo : bar)");
   expect($ast.pretty($ast.quote($ast.symbol("foo", l), l))).toBe("(& foo)");
   expect($ast.pretty($ast.unquote($ast.symbol("foo", l), l))).toBe("(~ foo)");
   expect($ast.pretty($ast.splice($ast.symbol("foo", l), l))).toBe("(@ foo)");
+  expect($ast.pretty($ast.implicit($ast.symbol("foo", l), l))).toBe("(% foo)");
 
   expect($ast.pretty($ast.dot($ast.symbol("foo", l), $ast.symbol("bar", l), l))).toBe("(foo . bar)");
-  expect($ast.pretty($ast.match($ast.symbol("foo", l), $ast.symbol("bar", l), l))).toBe("(foo : bar)");
   expect($ast.pretty($ast.assign($ast.symbol("foo", l), $ast.symbol("bar", l), l))).toBe("(foo <= bar)");
   expect($ast.pretty($ast.type($ast.symbol("foo", l), $ast.symbol("bar", l), l))).toBe("(foo :: bar)");
 });

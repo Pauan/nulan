@@ -168,31 +168,6 @@ function incrementCharacter(state: TokenState, char: string): void {
   }
 }
 
-// TODO what about space and tab ?
-function decrementCharacter(state: TokenState, char: string): void {
-  if (char === "\n") {
-    --state.index;
-    --state.line;
-    state.column = state.oldColumn;
-
-    if (peekPrevious(state) === "\r") {
-      --state.index;
-    }
-
-  } else if (char === "\r") {
-    --state.index;
-    --state.line;
-    state.column = state.oldColumn;
-
-    if (peekPrevious(state) === "\n") {
-      --state.index;
-    }
-
-  } else {
-    --state.index;
-    --state.column;
-  }
-}
 
 function consumeSpaces(state: TokenState): { spaces: number, next: string | null } {
   let i = 0;
@@ -709,17 +684,19 @@ specials["\n"] = specialIncrement;
 specials["#"] = specialComment;
 specials["\""] = specialString;
 specials["*"] = specialTag;
+specials["."] = specialInfix;
 specials["("] = specialCharacter;
 specials[")"] = specialCharacter;
 specials["["] = specialCharacter;
 specials["]"] = specialCharacter;
 specials["{"] = specialCharacter;
 specials["}"] = specialCharacter;
-specials["."] = specialInfix;
 specials["@"] = specialCharacter;
 specials["&"] = specialCharacter;
 specials["~"] = specialCharacter;
 specials["|"] = specialCharacter;
+specials["^"] = specialCharacter;
+specials["%"] = specialCharacter;
 
 
 export function tokenize(input: string, filename: string): Array<Token> {

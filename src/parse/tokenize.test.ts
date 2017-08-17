@@ -120,8 +120,8 @@ test("symbol", () => {
 		symbol("~", l(f, p(16, 0, 16), p(17, 0, 17))),
 	]);
 
-	expect(tokenize("foo!?-barABC0123_$^<<=", f)).toEqual([
-		symbol("foo!?-barABC0123_$^<<=", l(f, p(0, 0, 0), p(22, 0, 22)))
+	expect(tokenize("foo!?-barABC0123_$<<=", f)).toEqual([
+		symbol("foo!?-barABC0123_$<<=", l(f, p(0, 0, 0), p(21, 0, 21)))
 	]);
 });
 
@@ -131,21 +131,21 @@ test("tag", () => {
 		tag("foo", l(f, p(0, 0, 0), p(4, 0, 4)))
 	]);
 
-	expect(tokenize("*foo!?-barABC0123_$^<<=", f)).toEqual([
-		tag("foo!?-barABC0123_$^<<=", l(f, p(0, 0, 0), p(23, 0, 23)))
+	expect(tokenize("*foo!?-barABC0123_$<<=", f)).toEqual([
+		tag("foo!?-barABC0123_$<<=", l(f, p(0, 0, 0), p(22, 0, 22)))
 	]);
 
-	expect(tokenize("*foo!?-bar*ABC0123_$^<<=", f)).toEqual([
+	expect(tokenize("*foo!?-bar*ABC0123_$<<=", f)).toEqual([
 		tag("foo!?-bar", l(f, p(0, 0, 0), p(10, 0, 10))),
-		tag("ABC0123_$^<<=", l(f, p(10, 0, 10), p(24, 0, 24)))
+		tag("ABC0123_$<<=", l(f, p(10, 0, 10), p(23, 0, 23)))
 	]);
 
-	expect(tokenize("uh*foo!?-bar(ABC0123_$^<<=)", f)).toEqual([
+	expect(tokenize("uh*foo!?-bar(ABC0123_$<<=)", f)).toEqual([
 		symbol("uh", l(f, p(0, 0, 0), p(2, 0, 2))),
 		tag("foo!?-bar", l(f, p(2, 0, 2), p(12, 0, 12))),
 		symbol("(", l(f, p(12, 0, 12), p(13, 0, 13))),
-		symbol("ABC0123_$^<<=", l(f, p(13, 0, 13), p(26, 0, 26))),
-		symbol(")", l(f, p(26, 0, 26), p(27, 0, 27)))
+		symbol("ABC0123_$<<=", l(f, p(13, 0, 13), p(25, 0, 25))),
+		symbol(")", l(f, p(25, 0, 25), p(26, 0, 26)))
 	]);
 
 	expectError(() => tokenize("*", f),
