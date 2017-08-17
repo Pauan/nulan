@@ -1,10 +1,12 @@
 import { tokenize } from "../parse/tokenize";
+import { parse } from "../parse/parse";
+import { compile } from "../compile/compile";
 import { NulanError, warning } from "../util/error";
 
 declare var process: any;
 
 try {
-  console.log(tokenize("\"foobar \\1\"\nfoobar qux corge#/hiya/#testing 10 50.5000.test\n#testing\ntesting", "TE\\ST\".NUL"));
+  console.log(compile(parse(tokenize("(+ foo bar qux) (MATCH foo | qux : 1)", "TE\\ST\".NUL"))));
 
 } catch (e) {
   if (e instanceof NulanError) {
