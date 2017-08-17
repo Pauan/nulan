@@ -146,6 +146,62 @@ test("prefix", () => {
 
 
 test("infix", () => {
+  $parse.specials["L+"] = $parse.parseInfix(2, "left", assign);
+  $parse.specials["L/"] = $parse.parseInfix(1, "left", type);
+
+  $parse.specials["R+"] = $parse.parseInfix(2, "right", assign);
+  $parse.specials["R/"] = $parse.parseInfix(1, "right", type);
+
+  // (((1 L+ ((2 L/ 3) L/ 4)) L+ 5) L+ 6)
+  expectParse("1 L+ 2 L/ 3 L/ 4 L+ 5 L+ 6", (l, p) => [
+    assign(
+      assign(
+        assign(
+          integer("1", l(p(0, 0, 0), p(1, 0, 1))),
+          type(
+            type(
+              integer("2", l(p(5, 0, 5), p(6, 0, 6))),
+              integer("3", l(p(10, 0, 10), p(11, 0, 11))),
+              l(p(5, 0, 5), p(11, 0, 11))
+            ),
+            integer("4", l(p(15, 0, 15), p(16, 0, 16))),
+            l(p(5, 0, 5), p(16, 0, 16))
+          ),
+          l(p(0, 0, 0), p(16, 0, 16))
+        ),
+        integer("5", l(p(20, 0, 20), p(21, 0, 21))),
+        l(p(0, 0, 0), p(21, 0, 21))
+      ),
+      integer("6", l(p(25, 0, 25), p(26, 0, 26))),
+      l(p(0, 0, 0), p(26, 0, 26))
+    )
+  ]);
+
+  // (1 R+ ((2 R/ (3 R/ 4)) R+ (5 R+ 6)))
+  expectParse("1 R+ 2 R/ 3 R/ 4 R+ 5 R+ 6", (l, p) => [
+    assign(
+      integer("1", l(p(0, 0, 0), p(1, 0, 1))),
+      assign(
+        type(
+          integer("2", l(p(5, 0, 5), p(6, 0, 6))),
+          type(
+            integer("3", l(p(10, 0, 10), p(11, 0, 11))),
+            integer("4", l(p(15, 0, 15), p(16, 0, 16))),
+            l(p(10, 0, 10), p(16, 0, 16))
+          ),
+          l(p(5, 0, 5), p(16, 0, 16))
+        ),
+        assign(
+          integer("5", l(p(20, 0, 20), p(21, 0, 21))),
+          integer("6", l(p(25, 0, 25), p(26, 0, 26))),
+          l(p(20, 0, 20), p(26, 0, 26))
+        ),
+        l(p(5, 0, 5), p(26, 0, 26))
+      ),
+      l(p(0, 0, 0), p(26, 0, 26))
+    )
+  ]);
+
   testInfix(":", " ", match, "must be an expression on");
   testInfix("<=", " ", assign, "must be an expression on");
   testInfix("::", " ", type, "must be an expression on");

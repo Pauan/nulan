@@ -19,8 +19,19 @@ test("assert", () => {
 
 
 test("NulanError", () => {
-  expect(new NulanError(loc("foo.nul", position(0, 1, 2), position(3, 4, 5)), "test\ntest\ntest").toString()).toBe(
+  const e = new NulanError(loc("foo.nul", position(0, 1, 2), position(3, 4, 5)), "test\ntest\ntest");
+
+  expect(e.constructor).toBe(NulanError);
+  expect(e.name).toBe("NulanError");
+  expect(e.message).toBe("test\ntest\ntest");
+  expect(e.loc).toEqual(loc("foo.nul", position(0, 1, 2), position(3, 4, 5)));
+
+  expect(e.pretty()).toBe(
     "\u001b[1m\u001b[31m\u001b[2mError in file \u001b[32m\"foo.nul\"\u001b[31m at position \u001b[32m2:3\u001b[31m to \u001b[32m5:6\u001b[31m:\u001b[1m\u001b[39m\u001b[22m\n\u001b[1m  test\u001b[22m\n\u001b[1m  test\u001b[22m\n\u001b[1m  test\u001b[22m".replace(/\n/g, EOL)
+  );
+
+  expect(e.toString()).toBe(
+    "NulanError: test\ntest\ntest"
   );
 });
 

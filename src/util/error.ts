@@ -24,16 +24,17 @@ export function assert(test: boolean): void {
 export class NulanError extends Error {
   public name: string = "NulanError";
   public loc: $loc.Loc;
-  public message: string;
 
   constructor(loc: $loc.Loc, message: string) {
-    // TODO is this correct ?
     super(message);
+
+    // TODO very hacky, remove later
+    Object.setPrototypeOf(this, NulanError.prototype);
+
     this.loc = loc;
-    this.message = message;
   }
 
-  toString() {
+  pretty() {
     return $chalk.bold(
       $chalk.red.dim("Error in " + $loc.pretty(this.loc) + ":") +
       $node.EOL + "  " + this.message.replace(/\n/g, $node.EOL + "  ")

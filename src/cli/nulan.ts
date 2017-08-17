@@ -8,8 +8,7 @@ try {
 
 } catch (e) {
   if (e instanceof NulanError) {
-    //warning(e.loc, e.message);
-    console.error("" + e);
+    console.error(e.pretty());
     process.exit(1);
   }
 }

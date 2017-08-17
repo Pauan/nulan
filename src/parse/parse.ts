@@ -10,8 +10,7 @@ type Priority = number;
 
 type TokenInfo = {
   priority: Priority,
-  prefix: (state: ParserState, token: $ast.Token) => $ast.AST,
-  infix?: (state: ParserState, left: $ast.AST, token: $ast.Token) => $ast.AST
+  parse: (state: ParserState, output: Array<$ast.AST>, token: $ast.Token) => void
 };
 
 type ParserState = {
@@ -37,20 +36,6 @@ function next(state: ParserState): void {
 }
 
 
-function unexpected(state: ParserState, left: $ast.AST, token: $ast.Token): $ast.AST {
-  throw new NulanError(token.loc, "Cannot have an expression on the left of " + token.value);
-}
-
-
-const defaultParser: TokenInfo = {
-  priority: 0,
-  prefix: (state: ParserState, token: $ast.Token): $ast.AST => {
-    return token;
-  },
-  infix: unexpected
-};
-
-
 function lookup(token: $ast.Token): TokenInfo {
   if (token.type === "symbol") {
     const special = specials[token.value];
@@ -64,61 +49,54 @@ function lookup(token: $ast.Token): TokenInfo {
 }
 
 
-function parse1(state: ParserState, priority: Priority, token: $ast.Token): $ast.AST {
-  let info = lookup(token);
-
-  let ast: $ast.AST = info.prefix(state, token);
-
+function parse1(state: ParserState, output: Array<$ast.AST>, priority: Priority): void {
   for (;;) {
     const token = peek(state);
 
     if (token == null) {
-      return ast;
+      break;
 
     } else {
-      info = lookup(token);
+      const info = lookup(token);
 
-      if (info.infix != null && priority < info.priority) {
+      if (priority >= info.priority) {
         next(state);
-        ast = info.infix(state, ast, token);
+        info.parse(state, output, token);
 
       } else {
-        return ast;
+        break;
       }
     }
   }
 }
 
 
-function parseAll(state: ParserState, priority: Priority): Array<$ast.AST> {
-  const args: Array<$ast.AST> = [];
+export function parse(tokens: Array<$ast.Token>): Array<$ast.AST> {
+  const state = {
+    index: 0,
+    input: tokens
+  };
+
+  const output: Array<$ast.AST> = [];
 
   for (;;) {
     const token = peek(state);
 
     if (token == null) {
-      return args;
+      return output;
 
     } else {
       next(state);
-      args.push(parse1(state, priority, token));
+      lookup(token).parse(state, output, token);
     }
   }
 }
 
 
-export function parse(tokens: Array<$ast.Token>): Array<$ast.AST> {
-  return parseAll({
-    index: 0,
-    input: tokens
-  }, 0);
-}
-
-
-function parseStartBracket(end: string, make: (args: Array<$ast.AST>, loc: Loc) => $ast.AST): TokenInfo {
+function parseStartBracket(priority: Priority, end: string, make: (args: Array<$ast.AST>, loc: Loc) => $ast.AST): TokenInfo {
   return {
-    priority: Infinity,
-    prefix: (state: ParserState, start: $ast.Token): $ast.AST => {
+    priority: priority,
+    parse: (state: ParserState, output: Array<$ast.AST>, start: $ast.Token): void => {
       const args: Array<$ast.AST> = [];
 
       for (;;) {
@@ -131,10 +109,11 @@ function parseStartBracket(end: string, make: (args: Array<$ast.AST>, loc: Loc) 
           next(state);
 
           if (token.type === "symbol" && token.value === end) {
-            return make(args, concat(start.loc, token.loc));
+            output.push(make(args, concat(start.loc, token.loc)));
+            break;
 
           } else {
-            args.push(parse1(state, 0, token));
+            lookup(token).parse(state, args, token);
           }
         }
       }
@@ -143,62 +122,82 @@ function parseStartBracket(end: string, make: (args: Array<$ast.AST>, loc: Loc) 
 }
 
 
-function parseEndBracket(start: string): TokenInfo {
+function parseEndBracket(priority: Priority, start: string): TokenInfo {
   return {
-    priority: 0,
-    prefix: (state: ParserState, token: $ast.Token): $ast.AST => {
+    priority: priority,
+    parse: (state: ParserState, output: Array<$ast.AST>, token: $ast.Token): void => {
       throw errorMissing(token.loc, "starting " + start);
     }
   };
 }
 
 
-function parseSingle(fn: (loc: Loc) => $ast.AST): TokenInfo {
+function parseSingle(priority: Priority, fn: (loc: Loc) => $ast.AST): TokenInfo {
   return {
-    priority: 0,
-    prefix: (state: ParserState, token: $ast.Token): $ast.AST => {
-      return fn(token.loc);
+    priority: priority,
+    parse: (state: ParserState, output: Array<$ast.AST>, token: $ast.Token): void => {
+      output.push(fn(token.loc));
     }
   };
-}
-
-
-function parseRight(state: ParserState, priority: Priority, assoc: Associativity, middle: $ast.Token): $ast.AST {
-  const token = peek(state);
-
-  if (token == null) {
-    throw new NulanError(middle.loc, "There must be an expression on the right of " + middle.value);
-
-  } else {
-    next(state);
-
-    return parse1(state, (assoc === "left" ? priority : priority - 1), token);
-  }
 }
 
 
 function parsePrefix(priority: Priority, make: (ast: $ast.AST, loc: Loc) => $ast.AST): TokenInfo {
   return {
     priority: priority,
-    prefix: (state: ParserState, middle: $ast.Token): $ast.AST => {
-      const right = parseRight(state, priority, "right", middle);
+    parse: (state: ParserState, output: Array<$ast.AST>, middle: $ast.Token): void => {
+      const a: Array<$ast.AST> = [];
 
-      return make(right, concat(middle.loc, right.loc));
+      parse1(state, a, priority);
+
+      const length = a.length;
+
+      if (length === 0) {
+        throw new NulanError(middle.loc, "There must be an expression on the right of " + middle.value);
+
+      } else {
+        const right: $ast.AST = a[0];
+
+        output.push(make(right, concat(middle.loc, right.loc)));
+
+        for (let i = 1; i < length; ++i) {
+          output.push(a[i]);
+        }
+      }
     }
   };
 }
 
 
-function parseInfix(priority: Priority, assoc: Associativity, make: (left: $ast.AST, right: $ast.AST, loc: Loc) => $ast.AST): TokenInfo {
+export function parseInfix(priority: Priority, assoc: Associativity, make: (left: $ast.AST, right: $ast.AST, loc: Loc) => $ast.AST): TokenInfo {
   return {
     priority: priority,
-    prefix: (state: ParserState, middle: $ast.Token): $ast.AST => {
-      throw new NulanError(middle.loc, "There must be an expression on the left of " + middle.value);
-    },
-    infix: (state: ParserState, left: $ast.AST, middle: $ast.Token): $ast.AST => {
-      const right = parseRight(state, priority, assoc, middle);
+    parse: (state: ParserState, output: Array<$ast.AST>, middle: $ast.Token): void => {
+      if (output.length === 0) {
+        throw new NulanError(middle.loc, "There must be an expression on the left of " + middle.value);
 
-      return make(left, right, concat(left.loc, right.loc));
+      } else {
+        const left: $ast.AST = <$ast.AST>output.pop();
+
+        const a: Array<$ast.AST> = [];
+
+        parse1(state, a, (assoc === "right" ? priority : priority - 1));
+
+        const length = a.length;
+
+        if (length === 0) {
+          throw new NulanError(middle.loc, "There must be an expression on the right of " + middle.value);
+
+        } else {
+          const right: $ast.AST = a[0];
+
+          output.push(make(left, right, concat(left.loc, right.loc)));
+
+          for (let i = 1; i < length; ++i) {
+            output.push(a[i]);
+          }
+        }
+      }
     }
   };
 }
@@ -207,23 +206,56 @@ function parseInfix(priority: Priority, assoc: Associativity, make: (left: $ast.
 function parseRest(priority: Priority, make: (args: Array<$ast.AST>, loc: Loc) => $ast.AST): TokenInfo {
   return {
     priority: priority,
-    prefix: (state: ParserState, start: $ast.Token): $ast.AST => {
-      const args = parseAll(state, priority);
+    parse: (state: ParserState, output: Array<$ast.AST>, start: $ast.Token): void => {
+      const args: Array<$ast.AST> = [];
+
+      parse1(state, args, priority);
 
       if (args.length === 0) {
-        return make(args, start.loc);
+        output.push(make(args, start.loc));
 
       } else {
-        return make(args, concat(start.loc, args[args.length - 1].loc));
+        output.push(make(args, concat(start.loc, args[args.length - 1].loc)));
       }
     }
   };
 }
 
 
-const specials: { [key: string]: TokenInfo } = Object.create(null);
+export const specials: { [key: string]: TokenInfo } = Object.create(null);
 
-specials["^"] = parsePrefix(Infinity, (ast: $ast.AST, loc: Loc) => {
+specials[")"] = parseEndBracket(6, "(");
+specials["]"] = parseEndBracket(6, "[");
+specials["}"] = parseEndBracket(6, "{");
+
+specials[":"] = parseInfix(5, "right", $ast.match);
+
+specials["|"] = parseRest(4, $ast.bar);
+
+specials["&"] = parsePrefix(3, $ast.quote);
+
+specials["<="] = parseInfix(2, "right", $ast.assign);
+specials["::"] = parseInfix(2, "right", $ast.type);
+
+specials["."] = parseInfix(2, "left", (left, right, loc) => {
+  if (left.type === "integer" && right.type === "integer") {
+    return $ast.float(left.value + "." + right.value, loc);
+
+  } else {
+    return $ast.dot(left, right, loc);
+  }
+});
+
+specials["~"] = parsePrefix(1, $ast.unquote);
+specials["@"] = parsePrefix(1, $ast.splice);
+
+specials["_"] = parseSingle(0, $ast.wildcard);
+
+specials["("] = parseStartBracket(0, ")", $ast.call);
+specials["["] = parseStartBracket(0, "]", $ast.array);
+specials["{"] = parseStartBracket(0, "}", $ast.record);
+
+specials["^"] = parsePrefix(0, (ast: $ast.AST, loc: Loc) => {
   if (ast.type === "call") {
     if (ast.args.length === 1) {
       const x = ast.args[0];
@@ -240,33 +272,9 @@ specials["^"] = parsePrefix(Infinity, (ast: $ast.AST, loc: Loc) => {
   }
 });
 
-specials["("] = parseStartBracket(")", $ast.call);
-specials["["] = parseStartBracket("]", $ast.array);
-specials["{"] = parseStartBracket("}", $ast.record);
-
-specials[")"] = parseEndBracket("(");
-specials["]"] = parseEndBracket("[");
-specials["}"] = parseEndBracket("{");
-
-specials["_"] = parseSingle($ast.wildcard);
-
-specials["|"] = parseRest(6, $ast.bar);
-
-specials[":"] = parseInfix(7, "right", $ast.match);
-
-specials["&"] = parsePrefix(3, $ast.quote);
-
-specials["<="] = parseInfix(4, "right", $ast.assign);
-specials["::"] = parseInfix(4, "right", $ast.type);
-
-specials["."] = parseInfix(4, "left", (left, right, loc) => {
-  if (left.type === "integer" && right.type === "integer") {
-    return $ast.float(left.value + "." + right.value, loc);
-
-  } else {
-    return $ast.dot(left, right, loc);
+const defaultParser: TokenInfo = {
+  priority: 0,
+  parse: (state: ParserState, output: Array<$ast.AST>, token: $ast.Token): void => {
+    output.push(token);
   }
-});
-
-specials["~"] = parsePrefix(5, $ast.unquote);
-specials["@"] = parsePrefix(5, $ast.splice);
+};
