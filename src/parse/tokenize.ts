@@ -692,6 +692,7 @@ function specialStringEscapeUnicode(state: TokenState, pos: Position, chars: Arr
 const specialStringEscapes: Escapes = Object.create(null);
 specialStringEscapes["\""] = specialStringEscapeChar("\"");
 specialStringEscapes["\\"] = specialStringEscapeChar("\\");
+specialStringEscapes["s"] = specialStringEscapeChar(" ");
 specialStringEscapes["t"] = specialStringEscapeChar("\t");
 specialStringEscapes["n"] = specialStringEscapeChar("\n");
 specialStringEscapes["r"] = specialStringEscapeChar("\r");

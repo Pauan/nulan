@@ -188,8 +188,8 @@ test("string", () => {
 		string("foo bar", l(f, p(0, 0, 0), p(9, 0, 9)))
 	]);
 
-	expect(tokenize("\"foo\\\"\\\\\\t\\n\\rbar\"", f)).toEqual([
-		string("foo\"\\\t\n\rbar", l(f, p(0, 0, 0), p(18, 0, 18)))
+	expect(tokenize("\"foo\\\"\\\\\\t\\n\\s\\rbar\"", f)).toEqual([
+		string("foo\"\\\t\n \rbar", l(f, p(0, 0, 0), p(20, 0, 20)))
 	]);
 
 	expect(tokenize("  \"foo\\\n   bar\"", f)).toEqual([
@@ -218,7 +218,7 @@ test("string", () => {
 
 	expectError(() => tokenize("\"foo\\1\"", f),
 		l(f, p(4, 0, 4), p(6, 0, 6)),
-		"Invalid \\1, it must be one of the following: \\<NEWLINE> \\\" \\\\ \\n \\r \\t \\u");
+		"Invalid \\1, it must be one of the following: \\<NEWLINE> \\\" \\\\ \\n \\r \\s \\t \\u");
 
 	expectError(() => tokenize(" \"foo", f),
 		l(f, p(1, 0, 1), p(5, 0, 5)),
